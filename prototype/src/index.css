@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: theme("fontFamily.sans");
+  }
+  h1, h2, h3, h4 {
+    font-family: theme("fontFamily.display");
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  a {
+    @apply text-mountain-700 underline-offset-2 hover:underline;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  .card {
+    @apply bg-white rounded-xl border border-ink-300/40 shadow-sm;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-mountain-700 text-white font-medium hover:bg-mountain-900 transition;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-mountain-900 hover:bg-mountain-100 transition;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+}
+
+/* Leaflet fix: marker icons */
+.leaflet-container {
+  font-family: inherit;
+}

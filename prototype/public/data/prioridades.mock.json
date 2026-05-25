@@ -1,0 +1,27 @@
+{
+  "_mock": true,
+  "metodologia": "Promedio ponderado normalizado de 6 variables (exposición, población expuesta, pobreza, infraestructura crítica, disponibilidad de agua, frecuencia de emergencias). Cada variable se normaliza al rango [0,1] y se combina con los pesos por defecto.",
+  "pesos_default": {
+    "exposicion": 0.25,
+    "poblacion_expuesta": 0.20,
+    "pobreza": 0.15,
+    "infraestructura": 0.15,
+    "agua": 0.15,
+    "frecuencia": 0.10
+  },
+  "scores": [
+    { "ubigeo": "080302", "distrito": "Pisac",       "provincia": "Calca",        "score": 0.78, "nivel": "alto",  "variables": { "exposicion": 0.80, "poblacion_expuesta": 0.65, "pobreza": 0.70, "infraestructura": 0.60, "agua": 0.55, "frecuencia": 0.85 } },
+    { "ubigeo": "080701", "distrito": "Paucartambo", "provincia": "Paucartambo",  "score": 0.82, "nivel": "alto",  "variables": { "exposicion": 0.85, "poblacion_expuesta": 0.55, "pobreza": 0.80, "infraestructura": 0.50, "agua": 0.45, "frecuencia": 0.80 } },
+    { "ubigeo": "080801", "distrito": "Urcos",       "provincia": "Quispicanchi", "score": 0.71, "nivel": "alto",  "variables": { "exposicion": 0.70, "poblacion_expuesta": 0.60, "pobreza": 0.65, "infraestructura": 0.55, "agua": 0.50, "frecuencia": 0.75 } },
+    { "ubigeo": "081001", "distrito": "Santo Tomás", "provincia": "Chumbivilcas", "score": 0.69, "nivel": "alto",  "variables": { "exposicion": 0.65, "poblacion_expuesta": 0.50, "pobreza": 0.80, "infraestructura": 0.45, "agua": 0.40, "frecuencia": 0.65 } },
+    { "ubigeo": "080301", "distrito": "Calca",       "provincia": "Calca",        "score": 0.58, "nivel": "medio", "variables": { "exposicion": 0.60, "poblacion_expuesta": 0.60, "pobreza": 0.55, "infraestructura": 0.65, "agua": 0.55, "frecuencia": 0.60 } },
+    { "ubigeo": "080501", "distrito": "Anta",        "provincia": "Anta",         "score": 0.51, "nivel": "medio", "variables": { "exposicion": 0.50, "poblacion_expuesta": 0.55, "pobreza": 0.50, "infraestructura": 0.60, "agua": 0.50, "frecuencia": 0.45 } },
+    { "ubigeo": "080901", "distrito": "Sicuani",     "provincia": "Canchis",      "score": 0.47, "nivel": "medio", "variables": { "exposicion": 0.45, "poblacion_expuesta": 0.65, "pobreza": 0.45, "infraestructura": 0.70, "agua": 0.55, "frecuencia": 0.40 } },
+    { "ubigeo": "081201", "distrito": "Yauri",       "provincia": "Canas",        "score": 0.42, "nivel": "medio", "variables": { "exposicion": 0.40, "poblacion_expuesta": 0.45, "pobreza": 0.55, "infraestructura": 0.40, "agua": 0.35, "frecuencia": 0.40 } },
+    { "ubigeo": "080101", "distrito": "Cusco",       "provincia": "Cusco",        "score": 0.38, "nivel": "medio", "variables": { "exposicion": 0.30, "poblacion_expuesta": 0.85, "pobreza": 0.30, "infraestructura": 0.85, "agua": 0.65, "frecuencia": 0.35 } },
+    { "ubigeo": "081301", "distrito": "Urubamba",    "provincia": "Urubamba",     "score": 0.36, "nivel": "medio", "variables": { "exposicion": 0.40, "poblacion_expuesta": 0.50, "pobreza": 0.35, "infraestructura": 0.70, "agua": 0.55, "frecuencia": 0.30 } },
+    { "ubigeo": "080601", "distrito": "Espinar",     "provincia": "Espinar",      "score": 0.28, "nivel": "bajo",  "variables": { "exposicion": 0.25, "poblacion_expuesta": 0.50, "pobreza": 0.35, "infraestructura": 0.60, "agua": 0.40, "frecuencia": 0.20 } },
+    { "ubigeo": "080201", "distrito": "Acomayo",     "provincia": "Acomayo",      "score": 0.32, "nivel": "bajo",  "variables": { "exposicion": 0.30, "poblacion_expuesta": 0.40, "pobreza": 0.45, "infraestructura": 0.50, "agua": 0.45, "frecuencia": 0.25 } },
+    { "ubigeo": "081101", "distrito": "Quillabamba", "provincia": "La Convención","score": 0.25, "nivel": "bajo",  "variables": { "exposicion": 0.20, "poblacion_expuesta": 0.55, "pobreza": 0.40, "infraestructura": 0.65, "agua": 0.70, "frecuencia": 0.20 } }
+  ]
+}
