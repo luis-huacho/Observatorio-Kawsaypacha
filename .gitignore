@@ -27,6 +27,10 @@ prototype/vite.config.d.ts
 # Vercel
 .vercel
 
+# Playwright MCP artifacts
+.playwright-mcp/
+home-fixed.png
+
 # Logs
 *.log
 

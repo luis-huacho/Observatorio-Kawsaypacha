@@ -153,17 +153,6 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="container-page mt-16 mb-8">
-        <div className="card p-8 bg-mountain-100/60 border-mountain-500/30 text-center">
-          <div className="font-display text-lg font-bold text-mountain-900">Este es un prototipo de validación</div>
-          <p className="text-ink-600 text-sm mt-2 max-w-2xl mx-auto">
-            Los datos de centros poblados y niveles de peligro provienen de SIGRID-CENEPRED.
-            Otros datasets (medidas, inversión, prioridades, normativa) están marcados como
-            <span className="mx-1 chip border border-mock/40 bg-mock/10 text-mock">Dato referencial</span>
-            y serán reemplazados por fuentes oficiales en la fase siguiente.
-          </p>
-        </div>
-      </section>
     </>
   );
 }
