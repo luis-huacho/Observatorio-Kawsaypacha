@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 
 const RECURSOS = [
   {
@@ -31,16 +32,12 @@ const RECURSOS = [
 
 export default function Recursos() {
   return (
-    <div className="container-page py-8">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl md:text-4xl font-bold text-mountain-900">
-          Recursos
-        </h1>
-        <p className="text-ink-600 mt-2 max-w-3xl">
-          Directorio de fuentes oficiales, normativa y herramientas relacionadas a la GRD y ACC.
-        </p>
-      </header>
-
+    <>
+      <PageHeader
+        titulo="Recursos"
+        descripcion="Directorio de fuentes oficiales, normativa y herramientas relacionadas a la GRD y ACC."
+      />
+      <div className="container-page py-8">
       <div className="space-y-8">
         {RECURSOS.map((cat) => (
           <section key={cat.categoria}>
@@ -67,6 +64,7 @@ export default function Recursos() {
           </section>
         ))}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

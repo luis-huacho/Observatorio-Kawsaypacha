@@ -1,4 +1,5 @@
 import { Users, MessageSquare, Brain } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 
 const COMPONENTES = [
   {
@@ -36,20 +37,26 @@ const COMPONENTES = [
 
 export default function Sobre() {
   return (
-    <div className="container-page py-8 max-w-4xl">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl md:text-4xl font-bold text-mountain-900">
-          Sobre el Observatorio Kawsaypacha
-        </h1>
-        <p className="text-lg text-ink-600 mt-3">
-          Herramienta web para monitorear y dar seguimiento a la gestión del riesgo de desastres
-          y la adaptación al cambio climático en la región Cusco, Perú. Operado por
-          {" "}
-          <a href="https://www.predes.org.pe/" target="_blank" rel="noopener noreferrer">PREDES</a>
-          {" "}— Centro de Estudios y Prevención de Desastres.
-        </p>
-      </header>
-
+    <>
+      <PageHeader
+        titulo="Sobre el Observatorio Kawsaypacha"
+        descripcion={
+          <>
+            Herramienta web para monitorear y dar seguimiento a la gestión del riesgo de desastres
+            y la adaptación al cambio climático en la región Cusco, Perú. Operado por{" "}
+            <a
+              href="https://www.predes.org.pe/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white underline"
+            >
+              PREDES
+            </a>{" "}
+            — Centro de Estudios y Prevención de Desastres.
+          </>
+        }
+      />
+      <div className="container-page py-8 max-w-4xl">
       <section className="grid md:grid-cols-3 gap-3 mb-10">
         <Obj titulo="Visibilizar escenarios de riesgo" texto="Identificar centros poblados y comunidades expuestos a peligros climáticos y geodinámicos." />
         <Obj titulo="Difundir prácticas exitosas" texto="Documentar medidas que funcionan, lecciones aprendidas y casos de mal-adaptación." />
@@ -63,7 +70,7 @@ export default function Sobre() {
         {COMPONENTES.map((c) => (
           <article key={c.titulo} className="card p-5">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-lg bg-mountain-100 text-mountain-700 grid place-items-center shrink-0">
+              <div className="w-12 h-12 rounded-full bg-mountain-100 text-mountain-700 grid place-items-center shrink-0">
                 <c.icon className="w-6 h-6" />
               </div>
               <div>
@@ -78,8 +85,8 @@ export default function Sobre() {
         ))}
       </div>
 
-      <section className="mt-10 card p-6 bg-mountain-100/60 border-mountain-500/30">
-        <h2 className="font-display text-xl font-bold text-mountain-900">Comunidades piloto</h2>
+      <section className="mt-10 callout">
+        <h2 className="font-display text-xl font-bold text-mountain-700">Comunidades piloto</h2>
         <p className="text-ink-600 mt-2">
           El observatorio responde inicialmente a las necesidades de las comunidades de
           <strong> Chahuaytiri, Sacaca y Pampallacta</strong>, en el distrito de <strong>Pisac</strong>,
@@ -94,7 +101,8 @@ export default function Sobre() {
           <a className="ml-1" href="https://www.predes.org.pe/" target="_blank" rel="noopener noreferrer">PREDES</a>.
         </p>
       </section>
-    </div>
+      </div>
+    </>
   );
 }
 

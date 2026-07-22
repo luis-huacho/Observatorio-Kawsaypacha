@@ -7,6 +7,7 @@ import type { Inversion } from "@/lib/types";
 import { formatPct, formatSoles } from "@/lib/semaforo";
 import MockBadge from "@/components/MockBadge";
 import EmptyState from "@/components/EmptyState";
+import PageHeader from "@/components/PageHeader";
 
 export default function InversionView() {
   const inv = useJsonData<Inversion>("/data/inversion.mock.json");
@@ -31,20 +32,14 @@ export default function InversionView() {
   ];
 
   return (
-    <div className="container-page py-8">
-      <header className="mb-6 flex flex-wrap items-start gap-3 justify-between">
-        <div>
-          <h1 className="font-display text-3xl md:text-4xl font-bold text-mountain-900">
-            Ventana 3 — Inversión PPR 0068
-          </h1>
-          <p className="text-ink-600 mt-2 max-w-3xl">
-            ¿Cuánto y cómo invierten los gobiernos locales en reducción de vulnerabilidad y atención
-            de emergencias? Programa Presupuestal 0068 — ejercicio {d.anio}.
-          </p>
-        </div>
-        <MockBadge label="Sección con datos referenciales" />
-      </header>
-
+    <>
+      <PageHeader
+        eyebrow="Ventana 3"
+        titulo="Inversión PPR 0068"
+        descripcion={`¿Cuánto y cómo invierten los gobiernos locales en reducción de vulnerabilidad y atención de emergencias? Programa Presupuestal 0068 — ejercicio ${d.anio}.`}
+        badge={<MockBadge label="Sección con datos referenciales" />}
+      />
+      <div className="container-page py-8">
       <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <KPI label="PIM total Cusco" value={formatSoles(d.agregados.pim_total)} />
         <KPI label="Ejecutado" value={formatSoles(d.agregados.ejecutado)} sub={formatPct(d.agregados.porcentaje_ejecucion)} />
@@ -104,7 +99,7 @@ export default function InversionView() {
             <select
               value={orden}
               onChange={(e) => setOrden(e.target.value as typeof orden)}
-              className="rounded-md border border-ink-300/60 bg-white px-3 py-1.5"
+              className="control py-1.5"
             >
               <option value="pim">Mayor PIM</option>
               <option value="ejecucion">Mayor ejecución %</option>
@@ -115,7 +110,7 @@ export default function InversionView() {
 
         <div className="card overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-mountain-100/60 text-xs uppercase tracking-wide text-ink-600">
+            <thead className="bg-mountain-700 text-xs uppercase tracking-wide text-white/90">
               <tr>
                 <th className="text-left px-4 py-3">Distrito</th>
                 <th className="text-left px-4 py-3 hidden md:table-cell">Provincia</th>
@@ -143,7 +138,8 @@ export default function InversionView() {
           </table>
         </div>
       </section>
-    </div>
+      </div>
+    </>
   );
 }
 

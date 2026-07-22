@@ -4,6 +4,7 @@ import { useJsonData } from "@/lib/useJsonData";
 import type { Norma } from "@/lib/types";
 import MockBadge from "@/components/MockBadge";
 import EmptyState from "@/components/EmptyState";
+import PageHeader from "@/components/PageHeader";
 
 export default function NormativaView() {
   const data = useJsonData<Norma[]>("/data/normativa.mock.json");
@@ -22,24 +23,18 @@ export default function NormativaView() {
   if (data.status !== "ok") return <div className="container-page py-12"><EmptyState /></div>;
 
   return (
-    <div className="container-page py-8">
-      <header className="mb-6 flex flex-wrap items-start gap-3 justify-between">
-        <div>
-          <h1 className="font-display text-3xl md:text-4xl font-bold text-mountain-900">
-            Normativa
-          </h1>
-          <p className="text-ink-600 mt-2 max-w-3xl">
-            Repositorio de normativa reciente de GRD y ACC, con análisis y recomendaciones de PREDES.
-          </p>
-        </div>
-        <MockBadge label="Sección con datos referenciales" />
-      </header>
-
+    <>
+      <PageHeader
+        titulo="Normativa"
+        descripcion="Repositorio de normativa reciente de GRD y ACC, con análisis y recomendaciones de PREDES."
+        badge={<MockBadge label="Sección con datos referenciales" />}
+      />
+      <div className="container-page py-8">
       <div className="grid sm:grid-cols-2 gap-3 mb-6 max-w-xl">
         <select
           value={tipo}
           onChange={(e) => setTipo(e.target.value)}
-          className="rounded-md border border-ink-300/60 bg-white px-3 py-2 text-sm"
+          className="control"
         >
           <option value="">Todos los tipos</option>
           {["Ley", "DS", "RM", "RJ", "Ordenanza"].map((t) => (
@@ -49,7 +44,7 @@ export default function NormativaView() {
         <select
           value={ambito}
           onChange={(e) => setAmbito(e.target.value)}
-          className="rounded-md border border-ink-300/60 bg-white px-3 py-2 text-sm"
+          className="control"
         >
           <option value="">Todos los ámbitos</option>
           <option value="nacional">Nacional</option>
@@ -76,7 +71,7 @@ export default function NormativaView() {
                 <h3 className="font-display font-bold text-mountain-900 leading-tight">{n.titulo}</h3>
                 <p className="text-sm text-ink-600 mt-1">{n.resumen}</p>
                 {n.analisis_predes && (
-                  <div className="mt-3 p-3 bg-mountain-100/60 rounded-md text-sm">
+                  <div className="mt-3 callout p-3 text-sm">
                     <span className="font-semibold text-mountain-900">Análisis PREDES: </span>
                     {n.analisis_predes}
                   </div>
@@ -96,6 +91,7 @@ export default function NormativaView() {
           </li>
         ))}
       </ul>
-    </div>
+      </div>
+    </>
   );
 }

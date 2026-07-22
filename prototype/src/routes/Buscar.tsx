@@ -3,6 +3,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import { useJsonData } from "@/lib/useJsonData";
 import type { CentroPoblado } from "@/lib/types";
 import EmptyState from "@/components/EmptyState";
+import PageHeader from "@/components/PageHeader";
 import { formatNumber } from "@/lib/semaforo";
 
 export default function Buscar() {
@@ -23,16 +24,17 @@ export default function Buscar() {
   }, [ccpp, q]);
 
   return (
-    <div className="container-page py-8">
-      <h1 className="font-display text-2xl md:text-3xl font-bold text-mountain-900">
-        Resultados para “{q}”
-      </h1>
-      <p className="text-ink-600 mt-1">
-        {ccpp.status === "ok"
-          ? `${formatNumber(matches.length)} centro(s) poblado(s) encontrado(s)`
-          : "Cargando…"}
-      </p>
-
+    <>
+      <PageHeader
+        eyebrow="Búsqueda"
+        titulo={`Resultados para “${q}”`}
+        descripcion={
+          ccpp.status === "ok"
+            ? `${formatNumber(matches.length)} centro(s) poblado(s) encontrado(s)`
+            : "Cargando…"
+        }
+      />
+      <div className="container-page py-8">
       {ccpp.status === "ok" && matches.length === 0 ? (
         <div className="mt-6">
           <EmptyState
@@ -59,6 +61,7 @@ export default function Buscar() {
           ))}
         </ul>
       )}
-    </div>
+      </div>
+    </>
   );
 }

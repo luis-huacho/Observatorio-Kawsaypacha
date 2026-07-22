@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
-import { ChevronLeft, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 import { useJsonData } from "@/lib/useJsonData";
 import type { Medida } from "@/lib/types";
 import MockBadge from "@/components/MockBadge";
@@ -25,15 +26,16 @@ export default function MedidaDetalle() {
   }
 
   return (
-    <article className="container-page py-8 max-w-3xl">
-      <Link to="/medidas" className="inline-flex items-center gap-1 text-sm text-ink-600 hover:text-mountain-700 no-underline mb-4">
-        <ChevronLeft className="w-4 h-4" /> Volver a medidas
-      </Link>
-      <MockBadge className="mb-3" />
-      <h1 className="font-display text-3xl md:text-4xl font-bold text-mountain-900 leading-tight">
-        {m.titulo}
-      </h1>
-      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-ink-600">
+    <>
+      <PageHeader
+        eyebrow="Medida"
+        titulo={m.titulo}
+        badge={<MockBadge />}
+        backTo="/medidas"
+        backLabel="Volver a medidas"
+      />
+      <article className="container-page py-8 max-w-3xl">
+      <div className="flex flex-wrap items-center gap-3 text-sm text-ink-600">
         <span className="chip border border-level-3/30 bg-level-3/10 text-level-3">{m.peligro}</span>
         <span><MapPin className="w-3 h-3 inline mr-1" />{m.comunidad}</span>
         <span className="capitalize">Ámbito {m.ambito}</span>
@@ -51,6 +53,7 @@ export default function MedidaDetalle() {
           </span>
         ))}
       </div>
-    </article>
+      </article>
+    </>
   );
 }

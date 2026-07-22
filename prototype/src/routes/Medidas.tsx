@@ -6,6 +6,7 @@ import type { Medida } from "@/lib/types";
 import { TIPOS_PELIGRO } from "@/lib/types";
 import MockBadge from "@/components/MockBadge";
 import EmptyState from "@/components/EmptyState";
+import PageHeader from "@/components/PageHeader";
 
 const RESULTADO_ESTILO: Record<Medida["resultado"], { label: string; color: string; Icon: typeof Lightbulb }> = {
   exito: { label: "Práctica exitosa", color: "bg-level-1/15 text-level-1 border-level-1/30", Icon: Sprout },
@@ -30,20 +31,14 @@ export default function Medidas() {
   }, [medidas, peligro, ambito, resultado]);
 
   return (
-    <div className="container-page py-8">
-      <header className="mb-6 flex flex-wrap items-start gap-3 justify-between">
-        <div>
-          <h1 className="font-display text-3xl md:text-4xl font-bold text-mountain-900">
-            Ventana 2 — Medidas
-          </h1>
-          <p className="text-ink-600 mt-2 max-w-3xl">
-            ¿Qué prácticas están funcionando para enfrentar peligros climáticos? Casos de éxito,
-            lecciones aprendidas y advertencias de mal-adaptación.
-          </p>
-        </div>
-        <MockBadge label="Sección con datos referenciales" />
-      </header>
-
+    <>
+      <PageHeader
+        eyebrow="Ventana 2"
+        titulo="Medidas"
+        descripcion="¿Qué prácticas están funcionando para enfrentar peligros climáticos? Casos de éxito, lecciones aprendidas y advertencias de mal-adaptación."
+        badge={<MockBadge label="Sección con datos referenciales" />}
+      />
+      <div className="container-page py-8">
       <div className="grid md:grid-cols-3 gap-3 mb-6">
         <Select label="Peligro" value={peligro} onChange={setPeligro} options={TIPOS_PELIGRO} />
         <Select
@@ -103,7 +98,8 @@ export default function Medidas() {
           })}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -121,7 +117,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-ink-300/60 bg-white px-3 py-2 text-sm"
+        className="control w-full"
       >
         <option value="">Todos</option>
         {options.map((o) => {

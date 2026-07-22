@@ -9,6 +9,7 @@ import GeoSelector from "@/components/GeoSelector";
 import SemaforoChip from "@/components/SemaforoChip";
 import EmptyState from "@/components/EmptyState";
 import MockBadge from "@/components/MockBadge";
+import PageHeader from "@/components/PageHeader";
 
 const MapaPeligros = lazy(() => import("@/components/MapaPeligros"));
 
@@ -50,18 +51,13 @@ export default function Peligros() {
   const cargando = ccpp.status === "loading" || peligros.status === "loading";
 
   return (
-    <div className="container-page py-8">
-      <header className="mb-6">
-        <h1 className="font-display text-3xl md:text-4xl font-bold text-mountain-900">
-          Ventana 1 — Peligros
-        </h1>
-        <p className="text-ink-600 mt-2 max-w-3xl">
-          Mapa de exposición a peligros climáticos y geodinámicos en los centros poblados de Cusco.
-          Datos provenientes de SIGRID-CENEPRED. Activa o desactiva las capas geográficas
-          (lagunas, ríos, nevados) desde el control superior derecho del mapa.
-        </p>
-      </header>
-
+    <>
+      <PageHeader
+        eyebrow="Ventana 1"
+        titulo="Peligros"
+        descripcion="Mapa de exposición a peligros climáticos y geodinámicos en los centros poblados de Cusco. Datos provenientes de SIGRID-CENEPRED. Activa o desactiva las capas geográficas (lagunas, ríos, nevados) desde el control superior derecho del mapa."
+      />
+      <div className="container-page py-8">
       <div className="grid lg:grid-cols-[280px_1fr] gap-6">
         {/* Filtros */}
         <aside className="card p-5 h-fit lg:sticky lg:top-20">
@@ -89,7 +85,7 @@ export default function Peligros() {
               <select
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value)}
-                className="w-full rounded-md border border-ink-300/60 bg-white px-3 py-2 text-sm"
+                className="control w-full"
               >
                 <option value="">Todos los peligros</option>
                 {TIPOS_PELIGRO.map((t) => (
@@ -102,15 +98,15 @@ export default function Peligros() {
               <label className="block text-xs font-medium text-ink-600 mb-1">
                 Nivel mínimo
               </label>
-              <div className="flex gap-1">
+              <div className="flex gap-1 bg-mountain-100/60 rounded-full p-1">
                 {[0, 1, 2, 3, 4].map((n) => (
                   <button
                     key={n}
                     onClick={() => setNivelMin(n)}
-                    className={`flex-1 py-2 text-sm rounded-md border transition ${
+                    className={`flex-1 py-1.5 text-sm rounded-full transition ${
                       nivelMin === n
-                        ? "bg-mountain-700 text-white border-mountain-700"
-                        : "bg-white text-ink-600 border-ink-300/60 hover:border-mountain-500"
+                        ? "bg-mountain-700 text-white shadow-sm"
+                        : "text-ink-600 hover:bg-white"
                     }`}
                   >
                     {n === 0 ? "Todos" : n}
@@ -218,6 +214,7 @@ export default function Peligros() {
           </div>
         </section>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

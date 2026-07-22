@@ -53,16 +53,22 @@
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
   .card {
-    @apply bg-white rounded-xl border border-ink-300/40 shadow-sm;
+    @apply bg-white rounded-2xl border border-mountain-900/10 shadow-[0_2px_12px_rgba(11,59,38,0.06)];
   }
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-mountain-700 text-white font-medium hover:bg-mountain-800 transition;
+    @apply inline-flex items-center gap-2 px-5 py-2 rounded-full bg-mountain-700 text-white font-medium hover:bg-mountain-800 transition;
   }
   .btn-ghost {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-mountain-900 hover:bg-mountain-100 transition;
+    @apply inline-flex items-center gap-2 px-5 py-2 rounded-full text-mountain-700 hover:bg-mountain-100 transition;
   }
   .chip {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .control {
+    @apply rounded-lg border border-ink-300/60 bg-white px-3 py-2 text-sm outline-none transition focus:border-mountain-500 focus:ring-2 focus:ring-mountain-500/25 disabled:bg-ink-300/10 disabled:text-ink-600;
+  }
+  .callout {
+    @apply rounded-xl border-l-4 border-mountain-500 bg-mountain-100/50 p-5;
   }
 }
 

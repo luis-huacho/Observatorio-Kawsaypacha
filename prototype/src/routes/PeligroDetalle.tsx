@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
-import { ChevronLeft, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 import { useJsonData } from "@/lib/useJsonData";
 import type { CentroPoblado, ClasificacionPeligro } from "@/lib/types";
 import SemaforoChip from "@/components/SemaforoChip";
@@ -34,26 +35,22 @@ export default function PeligroDetalle() {
   const clasifs = peligros.data.filter((p) => p.codigo_ccpp === codigo);
 
   return (
-    <div className="container-page py-8">
-      <Link to="/peligros" className="inline-flex items-center gap-1 text-sm text-ink-600 hover:text-mountain-700 no-underline mb-4">
-        <ChevronLeft className="w-4 h-4" /> Volver al mapa
-      </Link>
-
-      <header className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-wide text-ink-600">{cp.categoria}</div>
-          <h1 className="font-display text-3xl md:text-4xl font-bold text-mountain-900">
-            {cp.nombre}
-          </h1>
-          <div className="mt-2 text-ink-600 flex items-center gap-2">
+    <>
+      <PageHeader
+        eyebrow={cp.categoria}
+        titulo={cp.nombre}
+        descripcion={
+          <span className="inline-flex items-center gap-2">
             <MapPin className="w-4 h-4" />
             {cp.distrito} · {cp.provincia} · {cp.departamento}
-          </div>
-        </div>
-        <div className="font-mono text-xs text-ink-600">CCPP {cp.codigo}</div>
-      </header>
-
-      <section className="mt-6 grid sm:grid-cols-3 gap-4">
+          </span>
+        }
+        badge={<span className="font-mono text-xs text-white/70">CCPP {cp.codigo}</span>}
+        backTo="/peligros"
+        backLabel="Volver al mapa"
+      />
+      <div className="container-page py-8">
+      <section className="grid sm:grid-cols-3 gap-4">
         <Card label="Población" value={cp.poblacion != null ? formatNumber(cp.poblacion) : "s/d"} sub="habitantes" />
         <Card label="Altitud" value={cp.altitud != null ? formatNumber(cp.altitud) : "s/d"} sub="msnm" />
         <Card
@@ -76,7 +73,7 @@ export default function PeligroDetalle() {
         ) : (
           <div className="card overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-mountain-100/60 text-xs uppercase tracking-wide text-ink-600">
+              <thead className="bg-mountain-700 text-xs uppercase tracking-wide text-white/90">
                 <tr>
                   <th className="text-left px-4 py-3">Peligro</th>
                   <th className="text-left px-4 py-3 hidden sm:table-cell">Tipo / Detalle</th>
@@ -102,7 +99,8 @@ export default function PeligroDetalle() {
           </div>
         )}
       </section>
-    </div>
+      </div>
+    </>
   );
 }
 

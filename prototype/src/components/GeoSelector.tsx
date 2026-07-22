@@ -25,7 +25,7 @@ export default function GeoSelector({ ccpp, provincia, distrito, onChange }: Pro
       <select
         value={provincia}
         onChange={(e) => onChange(e.target.value, "")}
-        className="rounded-md border border-ink-300/60 bg-white px-3 py-2 text-sm"
+        className="control"
       >
         <option value="">Todas las provincias</option>
         {provincias.map((p) => (
@@ -36,7 +36,7 @@ export default function GeoSelector({ ccpp, provincia, distrito, onChange }: Pro
         value={distrito}
         onChange={(e) => onChange(provincia, e.target.value)}
         disabled={!provincia}
-        className="rounded-md border border-ink-300/60 bg-white px-3 py-2 text-sm disabled:bg-ink-300/10 disabled:text-ink-600"
+        className="control"
       >
         <option value="">Todos los distritos</option>
         {distritos.map((d) => (

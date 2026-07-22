@@ -4,6 +4,7 @@ import type { Prioridades, PrioridadDistrito } from "@/lib/types";
 import { colorFromNivelStr, formatPct } from "@/lib/semaforo";
 import MockBadge from "@/components/MockBadge";
 import EmptyState from "@/components/EmptyState";
+import PageHeader from "@/components/PageHeader";
 
 const VAR_LABEL: Record<keyof PrioridadDistrito["variables"], string> = {
   exposicion: "Exposición al peligro",
@@ -49,20 +50,14 @@ export default function PrioridadesView() {
   if (p.status !== "ok") return <div className="container-page py-12"><EmptyState /></div>;
 
   return (
-    <div className="container-page py-8">
-      <header className="mb-6 flex flex-wrap items-start gap-3 justify-between">
-        <div>
-          <h1 className="font-display text-3xl md:text-4xl font-bold text-mountain-900">
-            Ventana 4 — Prioridades
-          </h1>
-          <p className="text-ink-600 mt-2 max-w-3xl">
-            ¿Dónde debería invertirse primero? Scoring multicriterio por distrito.
-            Ajusta los pesos a tu criterio para explorar escenarios.
-          </p>
-        </div>
-        <MockBadge label="Sección con datos referenciales" />
-      </header>
-
+    <>
+      <PageHeader
+        eyebrow="Ventana 4"
+        titulo="Prioridades"
+        descripcion="¿Dónde debería invertirse primero? Scoring multicriterio por distrito. Ajusta los pesos a tu criterio para explorar escenarios."
+        badge={<MockBadge label="Sección con datos referenciales" />}
+      />
+      <div className="container-page py-8">
       <div className="grid lg:grid-cols-[320px_1fr] gap-6">
         <aside className="card p-5 h-fit lg:sticky lg:top-20">
           <h2 className="font-display font-semibold text-mountain-900 mb-3">Pesos de las variables</h2>
@@ -126,7 +121,7 @@ export default function PrioridadesView() {
                     <div className="text-xs text-ink-600">{d.provincia}</div>
                   </div>
                   <div className="w-40 hidden sm:block">
-                    <div className="h-2 bg-ink-300/20 rounded-full overflow-hidden">
+                    <div className="h-2 bg-mountain-100 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full"
                         style={{
@@ -148,6 +143,7 @@ export default function PrioridadesView() {
           </div>
         </section>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
