@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import {
-  MapPin, Lightbulb, Coins, Target, Search, ArrowRight,
-  Mountain, Sprout, Building2
+  MapPin, Lightbulb, Coins, Target, Search, ArrowRight, Mountain
 } from "lucide-react";
 import { useJsonData } from "@/lib/useJsonData";
 import type { CentroPoblado, ClasificacionPeligro } from "@/lib/types";
@@ -56,13 +55,17 @@ export default function Home() {
   return (
     <>
       {/* Hero */}
-      <section className="relative bg-gradient-to-br from-mountain-900 via-mountain-700 to-mountain-500 text-white overflow-hidden">
-        <div className="absolute inset-0 opacity-10 pointer-events-none" aria-hidden="true">
-          <svg className="w-full h-full" viewBox="0 0 800 400" preserveAspectRatio="none">
-            <path d="M0,400 L100,180 L220,260 L340,120 L460,220 L600,80 L720,200 L800,160 L800,400 Z" fill="white"/>
-          </svg>
-        </div>
-        <div className="container-page relative py-16 md:py-24">
+      <section className="relative text-white overflow-hidden">
+        <img
+          src="/img/hero-comunidad.jpg"
+          alt="Comunidad altoandina construyendo una qocha en Cusco"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-mountain-900/90 via-mountain-900/70 to-mountain-700/40"
+          aria-hidden="true"
+        />
+        <div className="container-page relative py-16 md:py-24 pb-24 md:pb-32">
           <div className="max-w-3xl">
             <span className="chip bg-white/15 text-white border border-white/20 mb-4">
               <Mountain className="w-3 h-3" /> Cusco, Perú
@@ -84,6 +87,15 @@ export default function Home() {
             </div>
           </div>
         </div>
+        {/* Curva inferior estilo predes.org.pe */}
+        <svg
+          className="absolute bottom-0 left-0 w-full h-10 md:h-16 pointer-events-none"
+          viewBox="0 0 1920 64"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path d="M0,64 L0,48 C480,-16 1440,-16 1920,48 L1920,64 Z" fill="#FAFAF7" />
+        </svg>
       </section>
 
       {/* Cifras */}
@@ -98,8 +110,8 @@ export default function Home() {
 
       {/* 4 Ventanas */}
       <section className="container-page mt-16">
-        <h2 className="font-display text-3xl font-bold text-mountain-900">Las 4 ventanas del observatorio</h2>
-        <p className="text-ink-600 mt-2 max-w-2xl">
+        <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Las 4 ventanas del observatorio</h2>
+        <p className="text-ink-600 mt-2 max-w-2xl mx-auto text-center">
           De lo general al detalle — partimos de un mapa regional y llegamos a la actividad presupuestal
           de una municipalidad.
         </p>
@@ -139,17 +151,15 @@ export default function Home() {
 
       {/* Casos */}
       <section className="container-page mt-16">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <h2 className="font-display text-3xl font-bold text-mountain-900">Casos recientes</h2>
-            <p className="text-ink-600 mt-1">Prácticas comunales y distritales con resultados.</p>
-          </div>
-          <Link to="/medidas" className="btn-ghost">Ver todas →</Link>
+        <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Casos recientes</h2>
+        <p className="text-ink-600 mt-1 text-center">Prácticas comunales y distritales con resultados.</p>
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
+          <CasoPreview img="/img/caso-qochas.jpg" titulo="Qochas comunales en Pampallacta" peligro="Sequía" />
+          <CasoPreview img="/img/caso-chahuaytiri.jpg" titulo="Acondicionamiento térmico en Chahuaytiri" peligro="Heladas" />
+          <CasoPreview img="/img/caso-calca.jpg" titulo="Brigadas contra incendios en Calca" peligro="Incendios" />
         </div>
-        <div className="grid gap-5 md:grid-cols-3">
-          <CasoPreview icon={Sprout} titulo="Qochas comunales en Pampallacta" peligro="Sequía" />
-          <CasoPreview icon={Building2} titulo="Acondicionamiento térmico en Chahuaytiri" peligro="Heladas" />
-          <CasoPreview icon={Lightbulb} titulo="Brigadas contra incendios en Calca" peligro="Incendios" />
+        <div className="mt-8 text-center">
+          <Link to="/medidas" className="btn-primary">Ver todas las medidas</Link>
         </div>
       </section>
 
@@ -169,18 +179,20 @@ function Stat({ label, value, accent = false }: { label: string; value: string; 
 }
 
 function CasoPreview({
-  icon: Icon, titulo, peligro,
-}: { icon: typeof Sprout; titulo: string; peligro: string }) {
+  img, titulo, peligro,
+}: { img: string; titulo: string; peligro: string }) {
   return (
-    <Link to="/medidas" className="card p-5 hover:shadow-md transition no-underline">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-mountain-100 text-mountain-700 grid place-items-center">
-          <Icon className="w-5 h-5" />
-        </div>
-        <span className="chip border border-level-3/30 bg-level-3/10 text-level-3">{peligro}</span>
+    <Link to="/medidas" className="card overflow-hidden hover:shadow-md transition no-underline">
+      <div className="relative aspect-[3/2]">
+        <img src={img} alt={titulo} className="absolute inset-0 w-full h-full object-cover" />
+        <span className="chip absolute top-3 left-3 bg-white/90 text-level-3 border border-level-3/30">
+          {peligro}
+        </span>
       </div>
-      <div className="mt-3 font-semibold text-mountain-900">{titulo}</div>
-      <div className="mt-2 text-xs text-mock">Dato referencial</div>
+      <div className="p-5">
+        <div className="font-semibold text-mountain-900">{titulo}</div>
+        <div className="mt-2 text-xs text-mock">Dato referencial</div>
+      </div>
     </Link>
   );
 }

@@ -2,7 +2,17 @@ import { Link } from "react-router-dom";
 
 export default function Footer() {
   return (
-    <footer className="mt-16 bg-mountain-900 text-mountain-100">
+    <footer className="mt-16">
+      {/* Curva superior estilo predes.org.pe */}
+      <svg
+        className="block w-full h-10 md:h-14 -mb-px"
+        viewBox="0 0 1920 64"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <path d="M0,64 L0,48 C480,-16 1440,-16 1920,48 L1920,64 Z" fill="#0B3B26" />
+      </svg>
+      <div className="bg-mountain-900 text-mountain-100">
       <div className="container-page py-10 grid gap-8 md:grid-cols-4">
         <div className="md:col-span-2">
           <img src="/logo-predes-white.svg" alt="PREDES — Centro de Estudios y Prevención de Desastres" className="h-12 w-auto mb-4" />
@@ -40,6 +50,7 @@ export default function Footer() {
             Prototipo de validación
           </span>
         </div>
+      </div>
       </div>
     </footer>
   );
