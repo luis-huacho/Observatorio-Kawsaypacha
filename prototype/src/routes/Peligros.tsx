@@ -8,6 +8,7 @@ import { NIVEL_BG, NIVEL_LABEL, formatNumber } from "@/lib/semaforo";
 import GeoSelector from "@/components/GeoSelector";
 import SemaforoChip from "@/components/SemaforoChip";
 import EmptyState from "@/components/EmptyState";
+import MockBadge from "@/components/MockBadge";
 
 const MapaPeligros = lazy(() => import("@/components/MapaPeligros"));
 
@@ -56,7 +57,8 @@ export default function Peligros() {
         </h1>
         <p className="text-ink-600 mt-2 max-w-3xl">
           Mapa de exposición a peligros climáticos y geodinámicos en los centros poblados de Cusco.
-          Datos provenientes de SIGRID-CENEPRED.
+          Datos provenientes de SIGRID-CENEPRED. Activa o desactiva las capas geográficas
+          (lagunas, ríos, nevados) desde el control superior derecho del mapa.
         </p>
       </header>
 
@@ -133,6 +135,12 @@ export default function Peligros() {
 
         {/* Mapa */}
         <section>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-ink-600">
+              Capas geográficas activables: lagunas, ríos y nevados.
+            </span>
+            <MockBadge label="Capas geográficas: datos de prueba" />
+          </div>
           <div className="card p-1 h-[600px] overflow-hidden">
             {cargando ? (
               <div className="h-full grid place-items-center text-ink-600">Cargando mapa…</div>

@@ -1,7 +1,12 @@
-import { useMemo } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip } from "react-leaflet";
+import { useEffect, useMemo } from "react";
+import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, LayersControl, GeoJSON, ScaleControl, useMap } from "react-leaflet";
+import L from "leaflet";
+import type { Layer, PathOptions } from "leaflet";
+import type { Feature } from "geojson";
 import type { CentroPoblado, ClasificacionPeligro, Nivel } from "@/lib/types";
 import { NIVEL_COLOR, NIVEL_LABEL, formatNumber } from "@/lib/semaforo";
+import { useJsonData } from "@/lib/useJsonData";
+import { BuscarLugarControl, MedirControl, DescargarPNGControl } from "@/components/MapaControles";
 import { Link } from "react-router-dom";
 
 type Props = {
@@ -10,8 +15,112 @@ type Props = {
   tipoPeligroFiltro: string | null;
 };
 
+type CapaGeo = {
+  type: "FeatureCollection";
+  features: Feature[];
+};
+
 // Centro aproximado de Cusco
 const CENTER: [number, number] = [-13.5, -72.0];
+const ZOOM_INICIAL = 8;
+
+// Estilos de las capas geográficas (paleta del proyecto)
+const ESTILO_LAGUNAS: PathOptions = { color: "#007480", weight: 1, fillColor: "#0095A4", fillOpacity: 0.55 };
+const ESTILO_RIOS: PathOptions = { color: "#007480", weight: 2, opacity: 0.85 };
+const ESTILO_NEVADOS: PathOptions = { color: "#7A93A6", weight: 1, fillColor: "#CFE4F2", fillOpacity: 0.7 };
+
+function bindNombre(feature: Feature | undefined, layer: Layer) {
+  const nombre = (feature?.properties as { nombre?: string } | undefined)?.nombre;
+  if (nombre) layer.bindTooltip(nombre, { sticky: true });
+}
+
+/** Crea un botón de control Leaflet con un ícono y una acción. */
+function useBotonControl(
+  posicion: L.ControlPosition,
+  titulo: string,
+  html: string,
+  onClick: (map: L.Map) => void,
+) {
+  const map = useMap();
+  useEffect(() => {
+    const ctrl = new L.Control({ position: posicion });
+    ctrl.onAdd = () => {
+      const div = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+      const a = L.DomUtil.create("a", "", div) as HTMLAnchorElement;
+      a.href = "#";
+      a.title = titulo;
+      a.setAttribute("aria-label", titulo);
+      a.innerHTML = html;
+      a.style.fontSize = "16px";
+      a.style.fontWeight = "bold";
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.on(a, "click", (e) => {
+        L.DomEvent.preventDefault(e);
+        onClick(map);
+      });
+      return div;
+    };
+    ctrl.addTo(map);
+    return () => {
+      ctrl.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]);
+  return null;
+}
+
+/** Botón: volver a la vista inicial de la región. */
+function VistaInicialControl() {
+  return useBotonControl("topleft", "Vista inicial (toda la región)", "⌂", (map) => {
+    map.setView(CENTER, ZOOM_INICIAL);
+  });
+}
+
+/** Botón: pantalla completa del mapa (API nativa del navegador). */
+function PantallaCompletaControl() {
+  return useBotonControl("topleft", "Pantalla completa", "⛶", (map) => {
+    const el = map.getContainer();
+    if (!document.fullscreenElement) {
+      el.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
+    window.setTimeout(() => map.invalidateSize(), 250);
+  });
+}
+
+/** Leyenda de niveles de exposición (esquina inferior derecha). */
+function LeyendaControl() {
+  const map = useMap();
+  useEffect(() => {
+    const ctrl = new L.Control({ position: "bottomright" });
+    ctrl.onAdd = () => {
+      const div = L.DomUtil.create("div", "leaflet-control");
+      div.style.background = "rgba(255,255,255,0.92)";
+      div.style.padding = "8px 10px";
+      div.style.borderRadius = "8px";
+      div.style.boxShadow = "0 1px 4px rgba(0,0,0,0.2)";
+      div.style.font = "11px/1.4 system-ui, sans-serif";
+      div.style.color = "#1A1A1A";
+      const filas = ([1, 2, 3, 4] as Nivel[])
+        .map(
+          (n) =>
+            `<div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+               <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${NIVEL_COLOR[n]}"></span>
+               <span>${NIVEL_LABEL[n]}</span>
+             </div>`,
+        )
+        .join("");
+      div.innerHTML = `<div style="font-weight:600;margin-bottom:2px">Nivel de exposición</div>${filas}`;
+      return div;
+    };
+    ctrl.addTo(map);
+    return () => {
+      ctrl.remove();
+    };
+  }, [map]);
+  return null;
+}
 
 export default function MapaPeligros({ ccpp, peligros, tipoPeligroFiltro }: Props) {
   // Para cada CCPP, buscar el máximo nivel del peligro filtrado (o de todos)
@@ -39,18 +148,75 @@ export default function MapaPeligros({ ccpp, peligros, tipoPeligroFiltro }: Prop
     return map;
   }, [peligros]);
 
+  // Capas geográficas de prueba (geoJSON). En Fase 1 se reemplazan por las oficiales.
+  const lagunas = useJsonData<CapaGeo>("/data/geo/lagunas.demo.geojson");
+  const rios = useJsonData<CapaGeo>("/data/geo/rios.demo.geojson");
+  const nevados = useJsonData<CapaGeo>("/data/geo/nevados.demo.geojson");
+
   return (
     <MapContainer
       center={CENTER}
-      zoom={8}
+      zoom={ZOOM_INICIAL}
       scrollWheelZoom={true}
       className="w-full h-full rounded-lg"
       preferCanvas={true}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-      />
+      {/* Herramientas del visor */}
+      <ScaleControl position="bottomleft" imperial={false} />
+      <VistaInicialControl />
+      <PantallaCompletaControl />
+      <MedirControl />
+      <DescargarPNGControl />
+      <BuscarLugarControl ccpp={ccpp} />
+      <LeyendaControl />
+
+      <LayersControl position="topright">
+        {/* Mapas base */}
+        <LayersControl.BaseLayer checked name="Mapa claro">
+          <TileLayer
+            crossOrigin="anonymous"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          />
+        </LayersControl.BaseLayer>
+        <LayersControl.BaseLayer name="Satélite">
+          <TileLayer
+            crossOrigin="anonymous"
+            attribution='Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          />
+        </LayersControl.BaseLayer>
+        <LayersControl.BaseLayer name="OpenStreetMap">
+          <TileLayer
+            crossOrigin="anonymous"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        </LayersControl.BaseLayer>
+
+        {/* Capas geográficas */}
+        <LayersControl.Overlay checked name="Lagunas">
+          {lagunas.status === "ok" ? (
+            <GeoJSON key="lagunas" data={lagunas.data} style={() => ESTILO_LAGUNAS} onEachFeature={bindNombre} />
+          ) : (
+            <span />
+          )}
+        </LayersControl.Overlay>
+        <LayersControl.Overlay checked name="Ríos">
+          {rios.status === "ok" ? (
+            <GeoJSON key="rios" data={rios.data} style={() => ESTILO_RIOS} onEachFeature={bindNombre} />
+          ) : (
+            <span />
+          )}
+        </LayersControl.Overlay>
+        <LayersControl.Overlay checked name="Nevados">
+          {nevados.status === "ok" ? (
+            <GeoJSON key="nevados" data={nevados.data} style={() => ESTILO_NEVADOS} onEachFeature={bindNombre} />
+          ) : (
+            <span />
+          )}
+        </LayersControl.Overlay>
+      </LayersControl>
       {ccpp.map((c) => {
         if (c.lat == null || c.lon == null) return null;
         const nivel = ccppNivel.get(c.codigo);
