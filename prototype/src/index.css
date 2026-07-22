@@ -2,6 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Metropolis — tipografía institucional de PREDES, self-hosted */
+@font-face {
+  font-family: "Metropolis";
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/metropolis-light.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Metropolis";
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/metropolis-regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Metropolis";
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/metropolis-medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Metropolis";
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/metropolis-semibold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Metropolis";
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/metropolis-bold.woff2") format("woff2");
+}
+
 @layer base {
   html {
     font-family: theme("fontFamily.sans");
@@ -24,7 +56,7 @@
     @apply bg-white rounded-xl border border-ink-300/40 shadow-sm;
   }
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-mountain-700 text-white font-medium hover:bg-mountain-900 transition;
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-mountain-700 text-white font-medium hover:bg-mountain-800 transition;
   }
   .btn-ghost {
     @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-mountain-900 hover:bg-mountain-100 transition;

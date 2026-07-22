@@ -8,10 +8,10 @@ export const NIVEL_LABEL: Record<Nivel, string> = {
 };
 
 export const NIVEL_COLOR: Record<Nivel, string> = {
-  1: "#4CAF50",
-  2: "#FFC107",
-  3: "#FF7043",
-  4: "#D32F2F",
+  1: "#5BBB5D",
+  2: "#EBB320",
+  3: "#F57C15",
+  4: "#970A00",
 };
 
 export const NIVEL_BG: Record<Nivel, string> = {
@@ -28,7 +28,7 @@ export function nivelFromScore(score: number): "bajo" | "medio" | "alto" {
 }
 
 export function colorFromNivelStr(n: "bajo" | "medio" | "alto"): string {
-  return n === "alto" ? "#D32F2F" : n === "medio" ? "#FFC107" : "#4CAF50";
+  return n === "alto" ? "#970A00" : n === "medio" ? "#EBB320" : "#5BBB5D";
 }
 
 export function formatNumber(n: number): string {

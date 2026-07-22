@@ -70,8 +70,8 @@ export default function InversionView() {
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(v: number) => `S/ ${v.toFixed(1)}M`} />
                 <Legend />
-                <Line type="monotone" dataKey="PIM" stroke="#1F5F8A" strokeWidth={2.5} />
-                <Line type="monotone" dataKey="Devengado" stroke="#6BA585" strokeWidth={2.5} />
+                <Line type="monotone" dataKey="PIM" stroke="#007480" strokeWidth={2.5} />
+                <Line type="monotone" dataKey="Devengado" stroke="#009257" strokeWidth={2.5} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -89,7 +89,7 @@ export default function InversionView() {
                 <XAxis dataKey="tipo" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `S/ ${(v / 1e6).toFixed(0)}M`} />
                 <Tooltip formatter={(v: number) => formatSoles(v)} />
-                <Bar dataKey="monto" fill="#6BA585" />
+                <Bar dataKey="monto" fill="#009257" />
               </BarChart>
             </ResponsiveContainer>
           </div>

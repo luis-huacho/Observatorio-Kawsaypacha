@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { Search, Menu, X, Mountain } from "lucide-react";
+import { Search, Menu, X } from "lucide-react";
 
 const NAV = [
   { to: "/peligros", label: "Peligros" },
@@ -25,9 +25,9 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-ink-300/40">
       <div className="container-page flex items-center gap-6 h-16">
-        <Link to="/" className="flex items-center gap-2 text-mountain-900 no-underline">
-          <Mountain className="w-7 h-7 text-mountain-700" />
-          <span className="font-display text-lg font-bold leading-none">
+        <Link to="/" className="flex items-center gap-3 text-mountain-900 no-underline">
+          <img src="/logo-predes-green.svg" alt="PREDES" className="h-8 w-auto" />
+          <span className="font-display text-lg font-bold leading-none border-l border-ink-300/60 pl-3">
             Kawsaypacha
             <span className="block text-xs text-ink-600 font-medium tracking-wide">
               Observatorio Cusco

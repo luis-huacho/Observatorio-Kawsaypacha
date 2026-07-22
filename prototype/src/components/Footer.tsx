@@ -5,6 +5,7 @@ export default function Footer() {
     <footer className="mt-16 bg-mountain-900 text-mountain-100">
       <div className="container-page py-10 grid gap-8 md:grid-cols-4">
         <div className="md:col-span-2">
+          <img src="/logo-predes-white.svg" alt="PREDES — Centro de Estudios y Prevención de Desastres" className="h-12 w-auto mb-4" />
           <div className="font-display text-lg font-bold text-white">Observatorio Kawsaypacha</div>
           <p className="text-sm mt-2 text-mountain-100/80 max-w-md">
             Monitoreo y seguimiento de la gestión del riesgo de desastres y la adaptación
