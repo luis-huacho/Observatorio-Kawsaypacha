@@ -6,6 +6,7 @@ import type { Medida } from "@/lib/types";
 import { TIPOS_PELIGRO } from "@/lib/types";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
+import Reveal from "@/components/Reveal";
 
 const RESULTADO_ESTILO: Record<Medida["resultado"], { label: string; color: string; Icon: typeof Lightbulb }> = {
   exito: { label: "Práctica exitosa", color: "bg-level-1/15 text-level-1 border-level-1/30", Icon: Sprout },
@@ -60,13 +61,13 @@ export default function Medidas() {
         <EmptyState title="Sin medidas con esos filtros" />
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtradas.map((m) => {
+          {filtradas.map((m, i) => {
             const r = RESULTADO_ESTILO[m.resultado];
             return (
+              <Reveal key={m.id} delay={(i % 3) * 70}>
               <Link
                 to={`/medidas/${m.slug}`}
-                key={m.id}
-                className="card p-5 hover:shadow-md transition no-underline relative"
+                className="card block h-full p-5 hover:shadow-md hover:-translate-y-0.5 transition duration-300 no-underline relative"
               >
                 <div className="flex items-center gap-2 mb-3 mt-1">
                   <span className={`chip border ${r.color}`}>
@@ -90,6 +91,7 @@ export default function Medidas() {
                   ))}
                 </div>
               </Link>
+              </Reveal>
             );
           })}
         </div>

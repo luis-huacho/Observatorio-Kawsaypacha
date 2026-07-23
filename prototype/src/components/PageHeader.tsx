@@ -15,7 +15,7 @@ interface Props {
 export default function PageHeader({ titulo, descripcion, eyebrow, badge, backTo, backLabel }: Props) {
   return (
     <section className="relative bg-gradient-to-r from-mountain-900 to-mountain-700 text-white">
-      <div className="container-page pt-10 md:pt-12 pb-14 md:pb-16">
+      <div className="container-page pt-10 md:pt-12 pb-14 md:pb-16 animate-fade-up">
         {backTo && (
           <Link
             to={backTo}

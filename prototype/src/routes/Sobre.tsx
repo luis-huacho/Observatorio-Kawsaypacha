@@ -5,6 +5,7 @@ import {
   Brain, Globe2, ArrowRight,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
+import Reveal from "@/components/Reveal";
 
 const PROPOSITOS = [
   {
@@ -99,14 +100,16 @@ export default function Sobre() {
             ¿Para qué sirve?
           </h2>
           <div className="grid md:grid-cols-3 gap-4">
-            {PROPOSITOS.map((p) => (
-              <div key={p.titulo} className="card p-5">
+            {PROPOSITOS.map((p, i) => (
+              <Reveal key={p.titulo} delay={i * 70}>
+              <div className="card h-full p-5">
                 <div className="w-11 h-11 rounded-full bg-mountain-100 text-mountain-700 grid place-items-center mb-3">
                   <p.icon className="w-5 h-5" />
                 </div>
                 <div className="font-display font-bold text-mountain-900">{p.titulo}</div>
                 <p className="text-sm text-ink-600 mt-1">{p.texto}</p>
               </div>
+              </Reveal>
             ))}
           </div>
         </section>
@@ -117,13 +120,15 @@ export default function Sobre() {
             ¿Para quién está dirigido?
           </h2>
           <div className="grid sm:grid-cols-2 gap-3">
-            {AUDIENCIAS.map((a) => (
-              <div key={a.label} className="flex items-center gap-3 card p-4">
-                <div className="w-9 h-9 rounded-full bg-mountain-100 text-mountain-700 grid place-items-center shrink-0">
-                  <a.icon className="w-4 h-4" />
+            {AUDIENCIAS.map((a, i) => (
+              <Reveal key={a.label} delay={(i % 2) * 70}>
+                <div className="flex items-center gap-3 card h-full p-4">
+                  <div className="w-9 h-9 rounded-full bg-mountain-100 text-mountain-700 grid place-items-center shrink-0">
+                    <a.icon className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm text-ink-900">{a.label}</span>
                 </div>
-                <span className="text-sm text-ink-900">{a.label}</span>
-              </div>
+              </Reveal>
             ))}
           </div>
           <p className="text-ink-600 text-sm mt-4">
@@ -168,14 +173,16 @@ export default function Sobre() {
             Principios que lo orientan
           </h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {PRINCIPIOS.map((p) => (
-              <div key={p.titulo} className="card p-5">
-                <div className="flex items-center gap-2 text-mountain-700">
-                  <p.icon className="w-5 h-5" />
-                  <span className="font-display font-bold text-mountain-900">{p.titulo}</span>
+            {PRINCIPIOS.map((p, i) => (
+              <Reveal key={p.titulo} delay={(i % 3) * 70}>
+                <div className="card h-full p-5">
+                  <div className="flex items-center gap-2 text-mountain-700">
+                    <p.icon className="w-5 h-5" />
+                    <span className="font-display font-bold text-mountain-900">{p.titulo}</span>
+                  </div>
+                  <p className="text-sm text-ink-600 mt-2">{p.texto}</p>
                 </div>
-                <p className="text-sm text-ink-600 mt-2">{p.texto}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </section>

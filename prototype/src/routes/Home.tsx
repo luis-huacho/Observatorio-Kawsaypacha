@@ -3,6 +3,7 @@ import {
   MapPin, Lightbulb, Coins, Search, ArrowRight, Mountain
 } from "lucide-react";
 import { useJsonData } from "@/lib/useJsonData";
+import Reveal from "@/components/Reveal";
 import type { CentroPoblado, ClasificacionPeligro } from "@/lib/types";
 import { formatNumber } from "@/lib/semaforo";
 
@@ -60,17 +61,23 @@ export default function Home() {
         />
         <div className="container-page relative py-16 md:py-24 pb-24 md:pb-32">
           <div className="max-w-3xl">
-            <span className="chip bg-white/15 text-white border border-white/20 mb-4">
+            <span className="chip bg-white/15 text-white border border-white/20 mb-4 animate-fade-up">
               <Mountain className="w-3 h-3" /> Cusco, Perú
             </span>
-            <h1 className="font-display text-4xl md:text-6xl font-extrabold leading-tight">
+            <h1
+              className="font-display text-4xl md:text-6xl font-extrabold leading-tight animate-fade-up"
+              style={{ animationDelay: "80ms" }}
+            >
               Observatorio del riesgo y la adaptación climática en Cusco.
             </h1>
-            <p className="mt-5 text-lg md:text-xl text-mountain-100/90 max-w-2xl">
+            <p
+              className="mt-5 text-lg md:text-xl text-mountain-100/90 max-w-2xl animate-fade-up"
+              style={{ animationDelay: "160ms" }}
+            >
               Monitoreamos peligros, prácticas que funcionan, inversión pública y prioridades
               de los gobiernos locales y regionales para reducir el riesgo de desastres.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-wrap gap-3 animate-fade-up" style={{ animationDelay: "240ms" }}>
               <Link to="/peligros" className="btn-primary bg-white text-mountain-900 hover:bg-paper">
                 Explorar mi distrito <ArrowRight className="w-4 h-4" />
               </Link>
@@ -93,12 +100,14 @@ export default function Home() {
 
       {/* Cifras */}
       <section className="container-page -mt-10 relative z-10">
-        <div className="card grid grid-cols-2 md:grid-cols-4 divide-x divide-ink-300/30 overflow-hidden">
-          <Stat label="Centros poblados monitoreados" value={totalCcpp != null ? formatNumber(totalCcpp) : "…"} />
-          <Stat label="Distritos cubiertos" value={distritos != null ? String(distritos) : "…"} />
-          <Stat label="Clasificaciones de peligro" value={totalClasif != null ? formatNumber(totalClasif) : "…"} />
-          <Stat label="CCPP con peligro alto/muy alto" value={ccppAltos != null ? formatNumber(ccppAltos) : "…"} accent />
-        </div>
+        <Reveal>
+          <div className="card grid grid-cols-2 md:grid-cols-4 divide-x divide-ink-300/30 overflow-hidden">
+            <Stat label="Centros poblados monitoreados" value={totalCcpp != null ? formatNumber(totalCcpp) : "…"} />
+            <Stat label="Distritos cubiertos" value={distritos != null ? String(distritos) : "…"} />
+            <Stat label="Clasificaciones de peligro" value={totalClasif != null ? formatNumber(totalClasif) : "…"} />
+            <Stat label="CCPP con peligro alto/muy alto" value={ccppAltos != null ? formatNumber(ccppAltos) : "…"} accent />
+          </div>
+        </Reveal>
       </section>
 
       {/* Secciones */}
@@ -109,23 +118,25 @@ export default function Home() {
           de una municipalidad.
         </p>
         <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {SECCIONES.map((v) => (
-            <Link
-              key={v.to}
-              to={v.to}
-              className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${v.color} text-white p-6 shadow-sm hover:shadow-lg transition no-underline`}
-            >
-              <v.icon className="w-9 h-9 mb-3" />
-              <div className="font-display font-bold text-lg">{v.titulo}</div>
-              <p className="text-sm text-white/90 mt-1">{v.pregunta}</p>
-              <ArrowRight className="absolute bottom-5 right-5 w-5 h-5 opacity-80" />
-            </Link>
+          {SECCIONES.map((v, i) => (
+            <Reveal key={v.to} delay={i * 80}>
+              <Link
+                to={v.to}
+                className={`relative block h-full overflow-hidden rounded-xl bg-gradient-to-br ${v.color} text-white p-6 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition duration-300 no-underline`}
+              >
+                <v.icon className="w-9 h-9 mb-3" />
+                <div className="font-display font-bold text-lg">{v.titulo}</div>
+                <p className="text-sm text-white/90 mt-1">{v.pregunta}</p>
+                <ArrowRight className="absolute bottom-5 right-5 w-5 h-5 opacity-80" />
+              </Link>
+            </Reveal>
           ))}
         </div>
       </section>
 
       {/* Búsqueda */}
       <section className="container-page mt-16">
+        <Reveal>
         <div className="card p-8 md:p-10 flex flex-col md:flex-row items-center gap-6">
           <Search className="w-12 h-12 text-mountain-700 shrink-0" />
           <div className="flex-1">
@@ -140,6 +151,7 @@ export default function Home() {
             Ir al buscador <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
+        </Reveal>
       </section>
 
       {/* Casos */}
@@ -147,9 +159,15 @@ export default function Home() {
         <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Casos recientes</h2>
         <p className="text-ink-600 mt-1 text-center">Prácticas comunales y distritales con resultados.</p>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
-          <CasoPreview img="/img/caso-qochas.jpg" titulo="Qochas comunales en Pampallacta" peligro="Sequía" />
-          <CasoPreview img="/img/caso-chahuaytiri.jpg" titulo="Acondicionamiento térmico en Chahuaytiri" peligro="Heladas" />
-          <CasoPreview img="/img/caso-calca.jpg" titulo="Brigadas contra incendios en Calca" peligro="Incendios" />
+          {[
+            { img: "/img/caso-qochas.jpg", titulo: "Qochas comunales en Pampallacta", peligro: "Sequía" },
+            { img: "/img/caso-chahuaytiri.jpg", titulo: "Acondicionamiento térmico en Chahuaytiri", peligro: "Heladas" },
+            { img: "/img/caso-calca.jpg", titulo: "Brigadas contra incendios en Calca", peligro: "Incendios" },
+          ].map((c, i) => (
+            <Reveal key={c.img} delay={i * 80}>
+              <CasoPreview img={c.img} titulo={c.titulo} peligro={c.peligro} />
+            </Reveal>
+          ))}
         </div>
         <div className="mt-8 text-center">
           <Link to="/medidas" className="btn-primary">Ver todas las medidas</Link>
@@ -175,7 +193,7 @@ function CasoPreview({
   img, titulo, peligro,
 }: { img: string; titulo: string; peligro: string }) {
   return (
-    <Link to="/medidas" className="card overflow-hidden hover:shadow-md transition no-underline">
+    <Link to="/medidas" className="card block h-full overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition duration-300 no-underline">
       <div className="relative aspect-[3/2]">
         <img src={img} alt={titulo} className="absolute inset-0 w-full h-full object-cover" />
         <span className="chip absolute top-3 left-3 bg-white/90 text-level-3 border border-level-3/30">
