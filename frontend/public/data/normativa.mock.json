@@ -1,0 +1,46 @@
+[
+  {
+    "_mock": true,
+    "id": "ley-29664",
+    "titulo": "Ley N° 29664 — Sistema Nacional de Gestión del Riesgo de Desastres (SINAGERD)",
+    "tipo": "Ley",
+    "ambito": "nacional",
+    "fecha": "2011-02-19",
+    "resumen": "Crea el SINAGERD como sistema interinstitucional, define los 7 procesos de la GRD y las responsabilidades de los tres niveles de gobierno.",
+    "url_oficial": "https://www.gob.pe/institucion/cenepred/normas-legales/103045-29664",
+    "analisis_predes": null
+  },
+  {
+    "_mock": true,
+    "id": "ds-048-2011",
+    "titulo": "DS N° 048-2011-PCM — Reglamento de la Ley 29664",
+    "tipo": "DS",
+    "ambito": "nacional",
+    "fecha": "2011-05-25",
+    "resumen": "Reglamento que detalla la operación del SINAGERD, los instrumentos de planificación (PLANAGERD, PPRD) y mecanismos de coordinación.",
+    "url_oficial": null,
+    "analisis_predes": "Establece el marco para los PPRD distritales; herramienta clave para la priorización de inversión en el PPR 0068."
+  },
+  {
+    "_mock": true,
+    "id": "ordenanza-cusco-2024-grd",
+    "titulo": "Ordenanza Regional Cusco — Política regional de GRD y ACC 2024-2030",
+    "tipo": "Ordenanza",
+    "ambito": "regional",
+    "fecha": "2024-03-14",
+    "resumen": "Aprueba la política regional con énfasis en cabeceras de cuenca, gestión del agua y resiliencia comunal.",
+    "url_oficial": null,
+    "analisis_predes": "Primer instrumento regional que articula GRD con ACC con enfoque territorial. Requiere reglamentación específica para distritos."
+  },
+  {
+    "_mock": true,
+    "id": "directiva-pp0068-2025",
+    "titulo": "Directiva MEF — Lineamientos PPR 0068 ejercicio fiscal 2025",
+    "tipo": "RM",
+    "ambito": "nacional",
+    "fecha": "2024-12-20",
+    "resumen": "Lineamientos para programación, formulación y ejecución del PPR 0068 — Reducción de la Vulnerabilidad y Atención de Emergencias por Desastres.",
+    "url_oficial": null,
+    "analisis_predes": "Cambia el peso relativo entre prevención y respuesta. Recomendado revisar antes de formular el PIM 2025."
+  }
+]

@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "name": "nevados_demo",
+  "_demo": true,
+  "_nota": "Datos de prueba. Geometrías aproximadas. Reemplazar por geoJSON oficial en Fase 1.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "nombre": "Nevado Ausangate", "tipo": "nevado" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-71.250, -13.770], [-71.205, -13.762], [-71.185, -13.792],
+          [-71.200, -13.822], [-71.245, -13.828], [-71.268, -13.800], [-71.250, -13.770]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "nombre": "Nevado Salkantay", "tipo": "nevado" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-72.560, -13.320], [-72.525, -13.312], [-72.508, -13.340],
+          [-72.522, -13.368], [-72.558, -13.372], [-72.578, -13.346], [-72.560, -13.320]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "nombre": "Nevado Verónica", "tipo": "nevado" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-72.470, -13.380], [-72.445, -13.374], [-72.432, -13.396],
+          [-72.444, -13.418], [-72.470, -13.422], [-72.484, -13.400], [-72.470, -13.380]
+        ]]
+      }
+    }
+  ]
+}

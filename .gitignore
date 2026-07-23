@@ -39,3 +39,19 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Backend (Django)
+backend/media/
+backend/staticfiles/
+**/.env
+uv.lock.tmp
+
+# Docker local
+backups/
+frontend/vite.config.js
+frontend/vite.config.d.ts
+
+# Documentación interna y data fuente (no se versionan)
+data/
+_specs/
+_docs/

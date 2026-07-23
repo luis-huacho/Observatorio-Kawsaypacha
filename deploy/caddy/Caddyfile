@@ -1,0 +1,44 @@
+# Edge único: HTTPS automático (Let's Encrypt), SPA, API, admin, búsqueda y estáticos.
+# SITE_DOMAIN viene de backend/.env (ej. observatorio.predes.org.pe).
+# En local (sin dominio) usa "localhost" y Caddy emite certificado interno.
+
+{$SITE_DOMAIN:localhost} {
+	encode zstd gzip
+
+	# API y admin de Django (estáticos del admin los sirve whitenoise).
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	handle /admin/* {
+		# Si cambias ADMIN_URL en backend/.env, replica el prefijo aquí.
+		reverse_proxy backend:8000
+	}
+	handle /static/* {
+		reverse_proxy backend:8000
+	}
+
+	# Búsqueda: proxy directo a Meilisearch (el frontend usa una llave search-only).
+	handle_path /search/* {
+		reverse_proxy meilisearch:7700
+	}
+
+	# Tiles PMTiles: estáticos con soporte de Range requests (nativo en file_server).
+	handle_path /tiles/* {
+		root * /srv/media/tiles
+		header Cache-Control "public, max-age=3600"
+		file_server
+	}
+
+	# Archivos subidos (imágenes, PDFs, documentos).
+	handle_path /media/* {
+		root * /srv/media
+		file_server
+	}
+
+	# SPA: todo lo demás cae en index.html (client-side routing).
+	handle {
+		root * /srv/www
+		try_files {path} /index.html
+		file_server
+	}
+}

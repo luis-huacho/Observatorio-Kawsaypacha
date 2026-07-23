@@ -1,0 +1,36 @@
+{
+  "_mock": true,
+  "anio": 2025,
+  "agregados": {
+    "pim_total": 145000000,
+    "ejecutado": 78000000,
+    "porcentaje_ejecucion": 0.538,
+    "municipios_con_ppr_0068": 87
+  },
+  "comparacion_prevencion_respuesta": {
+    "prevencion_total": 52000000,
+    "respuesta_total": 26000000
+  },
+  "por_distrito": [
+    { "ubigeo": "080101", "distrito": "Cusco",       "provincia": "Cusco",       "pia": 5800000, "pim": 6700000, "devengado": 4200000, "pct_prevencion": 0.55, "pct_respuesta": 0.45 },
+    { "ubigeo": "080302", "distrito": "Pisac",       "provincia": "Calca",       "pia": 1200000, "pim": 1450000, "devengado":  890000, "pct_prevencion": 0.62, "pct_respuesta": 0.38 },
+    { "ubigeo": "080301", "distrito": "Calca",       "provincia": "Calca",       "pia": 1500000, "pim": 1820000, "devengado": 1100000, "pct_prevencion": 0.70, "pct_respuesta": 0.30 },
+    { "ubigeo": "080501", "distrito": "Anta",        "provincia": "Anta",        "pia": 980000,  "pim": 1110000, "devengado":  720000, "pct_prevencion": 0.66, "pct_respuesta": 0.34 },
+    { "ubigeo": "080701", "distrito": "Paucartambo", "provincia": "Paucartambo", "pia": 870000,  "pim":  990000, "devengado":  480000, "pct_prevencion": 0.45, "pct_respuesta": 0.55 },
+    { "ubigeo": "080801", "distrito": "Urcos",       "provincia": "Quispicanchi","pia": 1300000, "pim": 1490000, "devengado":  910000, "pct_prevencion": 0.58, "pct_respuesta": 0.42 },
+    { "ubigeo": "080901", "distrito": "Sicuani",     "provincia": "Canchis",     "pia": 1800000, "pim": 2100000, "devengado": 1300000, "pct_prevencion": 0.60, "pct_respuesta": 0.40 },
+    { "ubigeo": "081001", "distrito": "Santo Tomás", "provincia": "Chumbivilcas","pia":  950000, "pim": 1080000, "devengado":  580000, "pct_prevencion": 0.50, "pct_respuesta": 0.50 },
+    { "ubigeo": "080201", "distrito": "Acomayo",     "provincia": "Acomayo",     "pia":  720000, "pim":  820000, "devengado":  410000, "pct_prevencion": 0.48, "pct_respuesta": 0.52 },
+    { "ubigeo": "080601", "distrito": "Espinar",     "provincia": "Espinar",     "pia": 2200000, "pim": 2530000, "devengado": 1480000, "pct_prevencion": 0.64, "pct_respuesta": 0.36 },
+    { "ubigeo": "081101", "distrito": "Quillabamba", "provincia": "La Convención","pia":3100000, "pim": 3460000, "devengado": 1980000, "pct_prevencion": 0.68, "pct_respuesta": 0.32 },
+    { "ubigeo": "081201", "distrito": "Yauri",       "provincia": "Canas",       "pia":  610000, "pim":  690000, "devengado":  330000, "pct_prevencion": 0.42, "pct_respuesta": 0.58 },
+    { "ubigeo": "081301", "distrito": "Urubamba",    "provincia": "Urubamba",    "pia": 1700000, "pim": 1970000, "devengado": 1190000, "pct_prevencion": 0.71, "pct_respuesta": 0.29 }
+  ],
+  "tendencia": [
+    { "anio": 2021, "pim":  98000000, "devengado":  62000000 },
+    { "anio": 2022, "pim": 112000000, "devengado":  74000000 },
+    { "anio": 2023, "pim": 128000000, "devengado":  81000000 },
+    { "anio": 2024, "pim": 138000000, "devengado": 102000000 },
+    { "anio": 2025, "pim": 145000000, "devengado":  78000000 }
+  ]
+}

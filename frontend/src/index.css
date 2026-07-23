@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Metropolis — tipografía institucional de PREDES, self-hosted */
+@font-face {
+  font-family: "Metropolis";
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/metropolis-light.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Metropolis";
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/metropolis-regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Metropolis";
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/metropolis-medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Metropolis";
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/metropolis-semibold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Metropolis";
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/metropolis-bold.woff2") format("woff2");
+}
+
+@layer base {
+  html {
+    font-family: theme("fontFamily.sans");
+  }
+  h1, h2, h3, h4 {
+    font-family: theme("fontFamily.display");
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  a {
+    @apply text-mountain-700 underline-offset-2 hover:underline;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  .card {
+    @apply bg-white rounded-2xl border border-mountain-900/10 shadow-[0_2px_12px_rgba(11,59,38,0.06)];
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-5 py-2 rounded-full bg-mountain-700 text-white font-medium hover:bg-mountain-800 transition;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-5 py-2 rounded-full text-mountain-700 hover:bg-mountain-100 transition;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .control {
+    @apply rounded-lg border border-ink-300/60 bg-white px-3 py-2 text-sm outline-none transition focus:border-mountain-500 focus:ring-2 focus:ring-mountain-500/25 disabled:bg-ink-300/10 disabled:text-ink-600;
+  }
+  .callout {
+    @apply rounded-xl border-l-4 border-mountain-500 bg-mountain-100/50 p-5;
+  }
+  .animate-fade-up {
+    animation: fade-up 0.5s ease-out both;
+  }
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up {
+    animation: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Leaflet fix: marker icons */
+.leaflet-container {
+  font-family: inherit;
+}

@@ -1,0 +1,38 @@
+# Override de desarrollo.
+# Uso: docker compose -f compose.yml -f compose.dev.yml up --build
+#
+# - Expone db (5432), meilisearch (7700) y backend (8000) al host.
+# - Backend con runserver + código montado (hot reload).
+# - caddy/backup/frontend quedan fuera (perfil "prod" no activado);
+#   el frontend en dev se corre en el host con `npm run dev` (Vite proxy → :8000).
+
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  meilisearch:
+    ports:
+      - "7700:7700"
+
+  backend:
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - media:/app/media
+
+  worker:
+    volumes:
+      - ./backend:/app
+      - media:/app/media
+
+  frontend:
+    profiles: ["prod"]
+
+  caddy:
+    profiles: ["prod"]
+
+  backup:
+    profiles: ["prod"]
