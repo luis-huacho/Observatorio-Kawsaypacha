@@ -191,7 +191,6 @@ function CasoPreview({
       </div>
       <div className="p-5">
         <div className="font-semibold text-mountain-900">{titulo}</div>
-        <div className="mt-2 text-xs text-mock">Dato referencial</div>
       </div>
     </Link>
   );

@@ -3,7 +3,6 @@ import { MapPin } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { useJsonData } from "@/lib/useJsonData";
 import type { Medida } from "@/lib/types";
-import MockBadge from "@/components/MockBadge";
 import EmptyState from "@/components/EmptyState";
 
 export default function MedidaDetalle() {
@@ -30,7 +29,6 @@ export default function MedidaDetalle() {
       <PageHeader
         eyebrow="Medida"
         titulo={m.titulo}
-        badge={<MockBadge />}
         backTo="/medidas"
         backLabel="Volver a medidas"
       />

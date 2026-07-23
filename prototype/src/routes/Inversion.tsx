@@ -5,7 +5,6 @@ import {
 import { useJsonData } from "@/lib/useJsonData";
 import type { Inversion } from "@/lib/types";
 import { formatPct, formatSoles } from "@/lib/semaforo";
-import MockBadge from "@/components/MockBadge";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 
@@ -37,7 +36,6 @@ export default function InversionView() {
         eyebrow="Ventana 3"
         titulo="Inversión PPR 0068"
         descripcion={`¿Cuánto y cómo invierten los gobiernos locales en reducción de vulnerabilidad y atención de emergencias? Programa Presupuestal 0068 — ejercicio ${d.anio}.`}
-        badge={<MockBadge label="Sección con datos referenciales" />}
       />
       <div className="container-page py-8">
       <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

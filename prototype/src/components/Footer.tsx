@@ -44,11 +44,8 @@ export default function Footer() {
         </div>
       </div>
       <div className="border-t border-mountain-700/50">
-        <div className="container-page py-4 text-xs text-mountain-100/60 flex flex-wrap gap-3 items-center justify-between">
+        <div className="container-page py-4 text-xs text-mountain-100/60">
           <span>© {new Date().getFullYear()} PREDES — Centro de Estudios y Prevención de Desastres</span>
-          <span className="px-2 py-0.5 rounded-full bg-mock/20 text-mock font-semibold">
-            Prototipo de validación
-          </span>
         </div>
       </div>
       </div>

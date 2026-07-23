@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { ExternalLink, FileText } from "lucide-react";
 import { useJsonData } from "@/lib/useJsonData";
 import type { Norma } from "@/lib/types";
-import MockBadge from "@/components/MockBadge";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 
@@ -27,7 +26,6 @@ export default function NormativaView() {
       <PageHeader
         titulo="Normativa"
         descripcion="Repositorio de normativa reciente de GRD y ACC, con análisis y recomendaciones de PREDES."
-        badge={<MockBadge label="Sección con datos referenciales" />}
       />
       <div className="container-page py-8">
       <div className="grid sm:grid-cols-2 gap-3 mb-6 max-w-xl">

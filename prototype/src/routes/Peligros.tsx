@@ -8,7 +8,6 @@ import { NIVEL_BG, NIVEL_LABEL, formatNumber } from "@/lib/semaforo";
 import GeoSelector from "@/components/GeoSelector";
 import SemaforoChip from "@/components/SemaforoChip";
 import EmptyState from "@/components/EmptyState";
-import MockBadge from "@/components/MockBadge";
 import PageHeader from "@/components/PageHeader";
 
 const MapaPeligros = lazy(() => import("@/components/MapaPeligros"));
@@ -131,11 +130,10 @@ export default function Peligros() {
 
         {/* Mapa */}
         <section>
-          <div className="flex items-center justify-between mb-2">
+          <div className="mb-2">
             <span className="text-xs text-ink-600">
               Capas geográficas activables: lagunas, ríos y nevados.
             </span>
-            <MockBadge label="Capas geográficas: datos de prueba" />
           </div>
           <div className="card p-1 h-[600px] overflow-hidden">
             {cargando ? (

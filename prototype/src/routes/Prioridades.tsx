@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useJsonData } from "@/lib/useJsonData";
 import type { Prioridades, PrioridadDistrito } from "@/lib/types";
 import { colorFromNivelStr, formatPct } from "@/lib/semaforo";
-import MockBadge from "@/components/MockBadge";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 
@@ -55,7 +54,6 @@ export default function PrioridadesView() {
         eyebrow="Ventana 4"
         titulo="Prioridades"
         descripcion="¿Dónde debería invertirse primero? Scoring multicriterio por distrito. Ajusta los pesos a tu criterio para explorar escenarios."
-        badge={<MockBadge label="Sección con datos referenciales" />}
       />
       <div className="container-page py-8">
       <div className="grid lg:grid-cols-[320px_1fr] gap-6">

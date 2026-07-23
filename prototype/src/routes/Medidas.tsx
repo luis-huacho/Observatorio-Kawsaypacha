@@ -4,7 +4,6 @@ import { Lightbulb, Sprout, AlertTriangle, MapPin } from "lucide-react";
 import { useJsonData } from "@/lib/useJsonData";
 import type { Medida } from "@/lib/types";
 import { TIPOS_PELIGRO } from "@/lib/types";
-import MockBadge from "@/components/MockBadge";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 
@@ -36,7 +35,6 @@ export default function Medidas() {
         eyebrow="Ventana 2"
         titulo="Medidas"
         descripcion="¿Qué prácticas están funcionando para enfrentar peligros climáticos? Casos de éxito, lecciones aprendidas y advertencias de mal-adaptación."
-        badge={<MockBadge label="Sección con datos referenciales" />}
       />
       <div className="container-page py-8">
       <div className="grid md:grid-cols-3 gap-3 mb-6">
@@ -71,7 +69,6 @@ export default function Medidas() {
                 key={m.id}
                 className="card p-5 hover:shadow-md transition no-underline relative"
               >
-                <MockBadge className="absolute top-3 right-3" />
                 <div className="flex items-center gap-2 mb-3 mt-1">
                   <span className={`chip border ${r.color}`}>
                     <r.Icon className="w-3 h-3" />
