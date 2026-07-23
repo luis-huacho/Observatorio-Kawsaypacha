@@ -6,32 +6,32 @@ import { useJsonData } from "@/lib/useJsonData";
 import type { CentroPoblado, ClasificacionPeligro } from "@/lib/types";
 import { formatNumber } from "@/lib/semaforo";
 
-const VENTANAS = [
+const SECCIONES = [
   {
     to: "/peligros",
     icon: MapPin,
-    titulo: "Ventana 1 — Peligros",
+    titulo: "Exposición a peligros naturales",
     pregunta: "¿Qué peligros afectan más a mi distrito?",
     color: "from-level-4/80 to-level-3/70",
   },
   {
     to: "/medidas",
     icon: Lightbulb,
-    titulo: "Ventana 2 — Medidas",
+    titulo: "Medidas",
     pregunta: "¿Qué medidas están funcionando?",
     color: "from-mountain-700 to-mountain-500",
   },
   {
     to: "/inversion",
     icon: Coins,
-    titulo: "Ventana 3 — Inversión",
+    titulo: "Inversión",
     pregunta: "¿Cuánto y cómo se invierte (PPR 0068)?",
     color: "from-sky-700 to-sky-500",
   },
   {
     to: "/prioridades",
     icon: Target,
-    titulo: "Ventana 4 — Prioridades",
+    titulo: "Prioridades",
     pregunta: "¿Dónde debería invertirse primero?",
     color: "from-earth-700 to-earth-500",
   },
@@ -108,15 +108,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4 Ventanas */}
+      {/* Secciones */}
       <section className="container-page mt-16">
-        <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Las 4 ventanas del observatorio</h2>
+        <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Explora el observatorio</h2>
         <p className="text-ink-600 mt-2 max-w-2xl mx-auto text-center">
           De lo general al detalle — partimos de un mapa regional y llegamos a la actividad presupuestal
           de una municipalidad.
         </p>
         <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-          {VENTANAS.map((v) => (
+          {SECCIONES.map((v) => (
             <Link
               key={v.to}
               to={v.to}

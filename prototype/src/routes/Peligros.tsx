@@ -52,8 +52,7 @@ export default function Peligros() {
   return (
     <>
       <PageHeader
-        eyebrow="Ventana 1"
-        titulo="Peligros"
+        titulo="Exposición a peligros naturales"
         descripcion="Mapa de exposición a peligros climáticos y geodinámicos en los centros poblados de Cusco. Datos provenientes de SIGRID-CENEPRED. Activa o desactiva las capas geográficas (lagunas, ríos, nevados) desde el control superior derecho del mapa."
       />
       <div className="container-page py-8">

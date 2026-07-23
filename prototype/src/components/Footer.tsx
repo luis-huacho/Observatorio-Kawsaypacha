@@ -26,9 +26,9 @@ export default function Footer() {
           </p>
         </div>
         <div>
-          <div className="text-xs uppercase tracking-wider text-mountain-100/60 mb-3">Ventanas</div>
+          <div className="text-xs uppercase tracking-wider text-mountain-100/60 mb-3">Secciones</div>
           <ul className="space-y-2 text-sm">
-            <li><Link className="text-mountain-100 hover:text-white no-underline" to="/peligros">Peligros</Link></li>
+            <li><Link className="text-mountain-100 hover:text-white no-underline" to="/peligros">Exposición a peligros</Link></li>
             <li><Link className="text-mountain-100 hover:text-white no-underline" to="/medidas">Medidas</Link></li>
             <li><Link className="text-mountain-100 hover:text-white no-underline" to="/inversion">Inversión</Link></li>
             <li><Link className="text-mountain-100 hover:text-white no-underline" to="/prioridades">Prioridades</Link></li>

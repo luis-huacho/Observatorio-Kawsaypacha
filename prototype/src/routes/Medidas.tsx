@@ -32,7 +32,6 @@ export default function Medidas() {
   return (
     <>
       <PageHeader
-        eyebrow="Ventana 2"
         titulo="Medidas"
         descripcion="¿Qué prácticas están funcionando para enfrentar peligros climáticos? Casos de éxito, lecciones aprendidas y advertencias de mal-adaptación."
       />

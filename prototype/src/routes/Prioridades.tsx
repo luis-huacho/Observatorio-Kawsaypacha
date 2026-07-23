@@ -51,7 +51,6 @@ export default function PrioridadesView() {
   return (
     <>
       <PageHeader
-        eyebrow="Ventana 4"
         titulo="Prioridades"
         descripcion="¿Dónde debería invertirse primero? Scoring multicriterio por distrito. Ajusta los pesos a tu criterio para explorar escenarios."
       />

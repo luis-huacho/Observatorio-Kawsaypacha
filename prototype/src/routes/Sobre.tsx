@@ -141,7 +141,7 @@ export default function Sobre() {
           <p className="text-ink-600 leading-relaxed">
             El observatorio integra información de fuentes oficiales nacionales y regionales, y la
             complementa con los conocimientos y experiencias generados en los territorios donde
-            interviene PREDES. La información se organiza en ventanas temáticas que responden
+            interviene PREDES. La información se organiza en componentes temáticos que responden
             preguntas clave:
           </p>
           <div className="mt-4 grid sm:grid-cols-2 gap-3">

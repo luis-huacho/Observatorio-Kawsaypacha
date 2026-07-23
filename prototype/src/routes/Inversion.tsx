@@ -33,8 +33,7 @@ export default function InversionView() {
   return (
     <>
       <PageHeader
-        eyebrow="Ventana 3"
-        titulo="Inversión PPR 0068"
+        titulo="Inversión"
         descripcion={`¿Cuánto y cómo invierten los gobiernos locales en reducción de vulnerabilidad y atención de emergencias? Programa Presupuestal 0068 — ejercicio ${d.anio}.`}
       />
       <div className="container-page py-8">
