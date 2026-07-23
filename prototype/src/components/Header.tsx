@@ -45,7 +45,7 @@ export default function Header() {
           <Link to="/" className="flex items-center gap-3 text-white no-underline">
             <img src="/logo-predes-white.svg" alt="PREDES" className="h-8 w-auto" />
             <span className="font-display text-lg font-bold leading-none border-l border-white/30 pl-3">
-              Kawsaypacha
+              Kallpachakuy
               <span className="block text-xs text-white/80 font-medium tracking-wide">
                 Observatorio Cusco
               </span>

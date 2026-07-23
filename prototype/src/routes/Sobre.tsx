@@ -1,116 +1,185 @@
-import { Users, MessageSquare, Brain } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  Activity, Sprout, FileText, Landmark, Building2, Users, GraduationCap,
+  Handshake, Newspaper, BookOpen, UserRound, Eye, ShieldCheck, Unlock,
+  Brain, Globe2, ArrowRight,
+} from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 
-const COMPONENTES = [
+const PROPOSITOS = [
   {
-    icon: Users,
-    titulo: "Componente de Gobernanza",
-    desc: "Articula a los actores implicados en la implementación del observatorio y define funciones, acciones y resultados por componente.",
-    actividades: [
-      "Revisar y dar opinión técnica del contenido del observatorio",
-      "Generar recomendaciones a partir de la información publicada",
-      "Realizar análisis de la nueva normativa de GRD",
-    ],
+    icon: Activity,
+    titulo: "Monitorear los riesgos",
+    texto:
+      "Seguir la evolución de los riesgos asociados a los principales peligros que afectan a la región Cusco.",
   },
   {
-    icon: MessageSquare,
-    titulo: "Comunicación y Divulgación",
-    desc: "Diseña, coordina y ejecuta actividades de divulgación y comunicación del conocimiento sistematizado.",
-    actividades: [
-      "Diseño y mantenimiento de la página del observatorio",
-      "Elaboración de productos comunicacionales",
-      "Organización de espacios de co-aprendizaje",
-    ],
+    icon: Sprout,
+    titulo: "Visibilizar lo que funciona",
+    texto:
+      "Difundir medidas, experiencias y buenas prácticas que han demostrado reducir el riesgo y aportar a la adaptación al cambio climático.",
   },
   {
-    icon: Brain,
-    titulo: "Gestión del Conocimiento",
-    desc: "Recolecta, procesa y sistematiza la información del observatorio. Genera productos estadísticos y visualizaciones.",
-    actividades: [
-      "Generación de productos sobre las variables monitoreadas",
-      "Actualización periódica de los datasets",
-      "Redacción de ayudas memoria explicativas",
-      "Apoyo en la generación de visualizaciones",
-    ],
+    icon: FileText,
+    titulo: "Facilitar información oficial",
+    texto:
+      "Acercar la información pública sobre inversión, normativa e instrumentos de gestión vinculados a la GRD y la ACC.",
   },
+];
+
+const AUDIENCIAS = [
+  { icon: Landmark, label: "Gobiernos regional, provinciales y distritales" },
+  { icon: Building2, label: "Entidades públicas de GRD y cambio climático" },
+  { icon: Users, label: "Comunidades campesinas y organizaciones sociales" },
+  { icon: GraduationCap, label: "Academia y centros de investigación" },
+  { icon: Handshake, label: "Cooperación y organizaciones de desarrollo" },
+  { icon: Newspaper, label: "Periodistas y comunicadores" },
+  { icon: BookOpen, label: "Estudiantes" },
+  { icon: UserRound, label: "Ciudadanía interesada en su territorio" },
+];
+
+const PREGUNTAS = [
+  { to: "/peligros", texto: "¿A qué peligros está expuesto mi territorio?" },
+  { to: "/medidas", texto: "¿Qué medidas están funcionando para reducir esos riesgos?" },
+  { to: "/inversion", texto: "¿Cuánto y cómo se invierte en gestión del riesgo?" },
+  { to: "/normativa", texto: "¿Qué normas orientan la GRD y la adaptación al cambio climático?" },
+];
+
+const PRINCIPIOS = [
+  { icon: Eye, titulo: "Transparencia", texto: "Información pública y fuentes oficiales." },
+  { icon: ShieldCheck, titulo: "Rigor técnico", texto: "Calidad y actualización permanente de los datos." },
+  { icon: Unlock, titulo: "Acceso abierto", texto: "Cualquier persona puede consultar y usar los contenidos." },
+  { icon: Brain, titulo: "Gestión del conocimiento", texto: "Intercambio de aprendizajes entre instituciones y comunidades." },
+  { icon: Globe2, titulo: "Interculturalidad", texto: "Valora el conocimiento ancestral y las prácticas de las comunidades andinas." },
+  { icon: Handshake, titulo: "Colaboración", texto: "Articula Estado, academia, sociedad civil y cooperación." },
 ];
 
 export default function Sobre() {
   return (
     <>
       <PageHeader
-        titulo="Sobre el Observatorio Kawsaypacha"
-        descripcion={
-          <>
-            Herramienta web para monitorear y dar seguimiento a la gestión del riesgo de desastres
-            y la adaptación al cambio climático en la región Cusco, Perú. Operado por{" "}
-            <a
-              href="https://www.predes.org.pe/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-white underline"
-            >
-              PREDES
-            </a>{" "}
-            — Centro de Estudios y Prevención de Desastres.
-          </>
-        }
+        eyebrow="GRD y ACC en la región Cusco"
+        titulo="Sobre el Observatorio Kallpachakuy"
+        descripcion="Plataforma pública de información, monitoreo y gestión del conocimiento sobre la Gestión del Riesgo de Desastres (GRD) y la Adaptación al Cambio Climático (ACC) en la región Cusco, impulsada por PREDES."
       />
       <div className="container-page py-8 max-w-4xl">
-      <section className="grid md:grid-cols-3 gap-3 mb-10">
-        <Obj titulo="Visibilizar escenarios de riesgo" texto="Identificar centros poblados y comunidades expuestos a peligros climáticos y geodinámicos." />
-        <Obj titulo="Difundir prácticas exitosas" texto="Documentar medidas que funcionan, lecciones aprendidas y casos de mal-adaptación." />
-        <Obj titulo="Detectar cuellos de botella" texto="Visibilizar dificultades de los gobiernos locales y regionales en GRD y ACC." />
-      </section>
+        {/* ¿Qué es? */}
+        <section>
+          <h2 className="font-display text-2xl font-bold text-mountain-900 mb-3">
+            ¿Qué es el observatorio?
+          </h2>
+          <p className="text-ink-600 leading-relaxed">
+            Es un espacio que integra, organiza y difunde información relevante sobre la GRD y la
+            ACC en Cusco. Su propósito es convertir información dispersa en conocimiento útil para
+            la toma de decisiones: datos confiables, mapas, indicadores, normativa, experiencias
+            exitosas y herramientas al alcance de autoridades, comunidades, instituciones,
+            investigadores y ciudadanía, para comprender mejor los riesgos del territorio y
+            fortalecer la resiliencia de la población.
+          </p>
+        </section>
 
-      <h2 className="font-display text-2xl font-bold text-mountain-900 mb-4">
-        Componentes operativos
-      </h2>
-      <div className="space-y-5">
-        {COMPONENTES.map((c) => (
-          <article key={c.titulo} className="card p-5">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full bg-mountain-100 text-mountain-700 grid place-items-center shrink-0">
-                <c.icon className="w-6 h-6" />
+        {/* ¿Por qué nace? */}
+        <section className="mt-8 callout">
+          <h2 className="font-display text-xl font-bold text-mountain-700">¿Por qué nace?</h2>
+          <p className="text-ink-600 mt-2">
+            Es una iniciativa de <strong>PREDES</strong> en el marco de los proyectos financiados
+            por <strong>Pan para el Mundo</strong> (Brot für die Welt) en comunidades altoandinas
+            de Cusco, orientados a fortalecer la resiliencia frente al cambio climático con
+            soluciones basadas en la naturaleza, recuperación de saberes ancestrales y
+            fortalecimiento de capacidades locales. En ese trabajo se hizo evidente la necesidad
+            de un espacio que sistematice, actualice y comparta información confiable sobre los
+            peligros, la inversión pública, la normativa vigente y las experiencias que reducen la
+            vulnerabilidad del territorio. El observatorio responde a esa necesidad.
+          </p>
+        </section>
+
+        {/* ¿Para qué sirve? */}
+        <section className="mt-10">
+          <h2 className="font-display text-2xl font-bold text-mountain-900 mb-4">
+            ¿Para qué sirve?
+          </h2>
+          <div className="grid md:grid-cols-3 gap-4">
+            {PROPOSITOS.map((p) => (
+              <div key={p.titulo} className="card p-5">
+                <div className="w-11 h-11 rounded-full bg-mountain-100 text-mountain-700 grid place-items-center mb-3">
+                  <p.icon className="w-5 h-5" />
+                </div>
+                <div className="font-display font-bold text-mountain-900">{p.titulo}</div>
+                <p className="text-sm text-ink-600 mt-1">{p.texto}</p>
               </div>
-              <div>
-                <h3 className="font-display font-bold text-mountain-900 text-lg">{c.titulo}</h3>
-                <p className="text-ink-600 mt-1">{c.desc}</p>
-                <ul className="mt-3 text-sm text-ink-900 list-disc list-inside space-y-1">
-                  {c.actividades.map((a) => <li key={a}>{a}</li>)}
-                </ul>
+            ))}
+          </div>
+        </section>
+
+        {/* ¿Para quién? */}
+        <section className="mt-10">
+          <h2 className="font-display text-2xl font-bold text-mountain-900 mb-4">
+            ¿Para quién está dirigido?
+          </h2>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {AUDIENCIAS.map((a) => (
+              <div key={a.label} className="flex items-center gap-3 card p-4">
+                <div className="w-9 h-9 rounded-full bg-mountain-100 text-mountain-700 grid place-items-center shrink-0">
+                  <a.icon className="w-4 h-4" />
+                </div>
+                <span className="text-sm text-ink-900">{a.label}</span>
               </div>
-            </div>
-          </article>
-        ))}
-      </div>
+            ))}
+          </div>
+          <p className="text-ink-600 text-sm mt-4">
+            Al ser una plataforma pública, cualquier persona puede acceder libremente a la
+            información y usarla en procesos de planificación, investigación, educación e
+            incidencia.
+          </p>
+        </section>
 
-      <section className="mt-10 callout">
-        <h2 className="font-display text-xl font-bold text-mountain-700">Comunidades piloto</h2>
-        <p className="text-ink-600 mt-2">
-          El observatorio responde inicialmente a las necesidades de las comunidades de
-          <strong> Chahuaytiri, Sacaca y Pampallacta</strong>, en el distrito de <strong>Pisac</strong>,
-          provincia de <strong>Calca</strong>, región Cusco — con datos a escala regional para todo Cusco.
-        </p>
-      </section>
+        {/* ¿Cómo funciona? */}
+        <section className="mt-10">
+          <h2 className="font-display text-2xl font-bold text-mountain-900 mb-3">
+            ¿Cómo funciona?
+          </h2>
+          <p className="text-ink-600 leading-relaxed">
+            El observatorio integra información de fuentes oficiales nacionales y regionales, y la
+            complementa con los conocimientos y experiencias generados en los territorios donde
+            interviene PREDES. La información se organiza en ventanas temáticas que responden
+            preguntas clave:
+          </p>
+          <div className="mt-4 grid sm:grid-cols-2 gap-3">
+            {PREGUNTAS.map((q) => (
+              <Link
+                key={q.to}
+                to={q.to}
+                className="card p-4 flex items-center justify-between gap-3 hover:shadow-md transition no-underline"
+              >
+                <span className="text-sm font-medium text-mountain-900">{q.texto}</span>
+                <ArrowRight className="w-4 h-4 text-mountain-700 shrink-0" />
+              </Link>
+            ))}
+          </div>
+          <p className="text-ink-600 text-sm mt-4">
+            Además incorpora productos de comunicación, análisis, mapas interactivos y materiales
+            de divulgación pensados para distintos públicos.
+          </p>
+        </section>
 
-      <section className="mt-10">
-        <h2 className="font-display text-xl font-bold text-mountain-900 mb-3">Contacto</h2>
-        <p className="text-ink-600">
-          ¿Quieres aportar al observatorio? Escríbenos a través del sitio institucional de
-          <a className="ml-1" href="https://www.predes.org.pe/" target="_blank" rel="noopener noreferrer">PREDES</a>.
-        </p>
-      </section>
+        {/* Principios */}
+        <section className="mt-10">
+          <h2 className="font-display text-2xl font-bold text-mountain-900 mb-4">
+            Principios que lo orientan
+          </h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {PRINCIPIOS.map((p) => (
+              <div key={p.titulo} className="card p-5">
+                <div className="flex items-center gap-2 text-mountain-700">
+                  <p.icon className="w-5 h-5" />
+                  <span className="font-display font-bold text-mountain-900">{p.titulo}</span>
+                </div>
+                <p className="text-sm text-ink-600 mt-2">{p.texto}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </>
-  );
-}
-
-function Obj({ titulo, texto }: { titulo: string; texto: string }) {
-  return (
-    <div className="card p-5">
-      <div className="font-display font-bold text-mountain-900">{titulo}</div>
-      <p className="text-sm text-ink-600 mt-1">{texto}</p>
-    </div>
   );
 }
