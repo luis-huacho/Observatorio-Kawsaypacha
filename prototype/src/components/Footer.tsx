@@ -31,7 +31,6 @@ export default function Footer() {
             <li><Link className="text-mountain-100 hover:text-white no-underline" to="/peligros">Exposición a peligros</Link></li>
             <li><Link className="text-mountain-100 hover:text-white no-underline" to="/medidas">Medidas</Link></li>
             <li><Link className="text-mountain-100 hover:text-white no-underline" to="/inversion">Inversión</Link></li>
-            <li><Link className="text-mountain-100 hover:text-white no-underline" to="/prioridades">Prioridades</Link></li>
           </ul>
         </div>
         <div>

@@ -3,10 +3,9 @@ import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { Search, Menu, X } from "lucide-react";
 
 const NAV = [
-  { to: "/peligros", label: "Peligros" },
+  { to: "/peligros", label: "Exposición a peligros" },
   { to: "/medidas", label: "Medidas" },
   { to: "/inversion", label: "Inversión" },
-  { to: "/prioridades", label: "Prioridades" },
   { to: "/normativa", label: "Normativa" },
   { to: "/sobre", label: "Sobre" },
 ];

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import {
-  MapPin, Lightbulb, Coins, Target, Search, ArrowRight, Mountain
+  MapPin, Lightbulb, Coins, Search, ArrowRight, Mountain
 } from "lucide-react";
 import { useJsonData } from "@/lib/useJsonData";
 import type { CentroPoblado, ClasificacionPeligro } from "@/lib/types";
@@ -27,13 +27,6 @@ const SECCIONES = [
     titulo: "Inversión",
     pregunta: "¿Cuánto y cómo se invierte (PPR 0068)?",
     color: "from-sky-700 to-sky-500",
-  },
-  {
-    to: "/prioridades",
-    icon: Target,
-    titulo: "Prioridades",
-    pregunta: "¿Dónde debería invertirse primero?",
-    color: "from-earth-700 to-earth-500",
   },
 ];
 
@@ -115,7 +108,7 @@ export default function Home() {
           De lo general al detalle — partimos de un mapa regional y llegamos a la actividad presupuestal
           de una municipalidad.
         </p>
-        <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {SECCIONES.map((v) => (
             <Link
               key={v.to}
