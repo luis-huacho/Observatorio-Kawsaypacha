@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "apps.sitio",
     "apps.mapas",
     "apps.metricas",
+    "apps.informes",
     "apps.api",
 ]
 
@@ -118,6 +119,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Estáticos del proyecto (no de una app): el logo que incrusta WeasyPrint y las copias de
+# MapLibre y pmtiles que usa el visor del PDF. Django solo autodescubre `<app>/static/`, así
+# que sin esto el navegador headless recibía 404 y el mapa nunca llegaba a dibujarse.
+STATICFILES_DIRS = [BASE_DIR / "static"]
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},

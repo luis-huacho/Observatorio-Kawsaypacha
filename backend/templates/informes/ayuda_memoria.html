@@ -1,0 +1,237 @@
+{% load informes %}<!--
+  Ayuda memoria — puerto de prototype/src/components/ReporteImpresion.tsx a WeasyPrint.
+
+  El CSS va embebido y sin depender de Tailwind: WeasyPrint no ejecuta JS ni resuelve un build
+  de utilidades, así que la maqueta se expresa en CSS plano equivalente al que el prototipo
+  producía. Los tamaños en pt (no rem) porque el medio es papel.
+-->
+<meta charset="utf-8">
+<title>Ayuda memoria — {{ distrito.nombre }}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 14mm 13mm 16mm 13mm;
+    @bottom-right {
+      content: "Página " counter(page) " de " counter(pages);
+      font-family: sans-serif; font-size: 7pt; color: #6B7280;
+    }
+    @bottom-left {
+      content: "Observatorio Kallpachakuy — PREDES";
+      font-family: sans-serif; font-size: 7pt; color: #6B7280;
+    }
+  }
+  body { font-family: sans-serif; font-size: 9pt; color: #1F2937; line-height: 1.45; }
+  h1 { font-size: 15pt; color: #0B3B26; margin: 10pt 0 0; }
+  h2 { font-size: 10.5pt; color: #0B3B26; margin: 12pt 0 3pt; }
+  p { margin: 0 0 5pt; }
+  strong { font-weight: 700; }
+  .membrete { border-bottom: 2px solid #14654A; padding-bottom: 6pt; }
+  .membrete td { vertical-align: top; }
+  .marca { font-weight: 700; color: #0B3B26; font-size: 10pt; }
+  .fino { font-size: 7.5pt; color: #6B7280; }
+  .ambito th { text-align: left; color: #6B7280; font-weight: 500; width: 30mm;
+               padding: 1pt 8pt 1pt 0; vertical-align: top; white-space: nowrap; }
+  .ambito td { padding: 1pt 0; }
+  table.datos { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  table.datos th, table.datos td { border: 0.5pt solid #D1D5DB; padding: 2.5pt 4pt;
+                                   text-align: left; }
+  table.datos thead th { background: #E7F0EA; font-weight: 600; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .punto { display: inline-block; width: 5pt; height: 5pt; border-radius: 50%;
+           vertical-align: middle; margin-right: 2pt; }
+  /* WeasyPrint respeta break-inside; sin él, el bloque de cifras se corta a mitad de frase. */
+  .evitar-corte { break-inside: avoid; }
+  .tabla-larga { break-inside: auto; }
+  .tabla-larga thead { display: table-header-group; }   /* cabecera repetida en cada página */
+  .mapa { width: 100%; border: 0.5pt solid #D1D5DB; }
+  .aviso { font-size: 7.5pt; color: #8A5A00; margin: 0 0 3pt; }
+  .cierre { margin-top: 14pt; padding-top: 5pt; border-top: 0.5pt solid #D1D5DB;
+            font-size: 7.5pt; color: #6B7280; }
+</style>
+
+<table class="membrete" width="100%">
+  <tr>
+    <td>
+      {# El SVG ya incluye "Centro de Estudios y Prevención de Desastres": no se repite. #}
+      <img src="{% logo_predes %}" alt="PREDES — Centro de Estudios y Prevención de Desastres"
+           style="height: 34pt">
+    </td>
+    <td style="text-align: right">
+      <div class="marca">Observatorio Kallpachakuy</div>
+      <div class="fino">
+        Gestión del Riesgo de Desastres<br>
+        y Adaptación al Cambio Climático · Región Cusco
+      </div>
+    </td>
+  </tr>
+</table>
+
+<h1>Ayuda memoria — Exposición a peligros naturales</h1>
+
+<table class="ambito" width="100%" style="font-size: 8pt; margin-top: 6pt">
+  <tr><th>Ámbito</th>
+      <td>Distrito de {{ distrito.nombre }}, provincia de {{ provincia }}, región Cusco</td></tr>
+  <tr><th>Ubigeo</th><td>{{ distrito.ubigeo }}</td></tr>
+  <tr><th>Filtros aplicados</th><td>{{ filtros }}</td></tr>
+  <tr><th>Generado</th>
+      <td>{{ generado_en|date:"j \d\e F \d\e Y" }}, {{ generado_en|date:"H:i" }} h</td></tr>
+</table>
+
+{# --- Presentación redactada con las cifras del propio filtro --- #}
+<section class="evitar-corte" style="margin-top: 8pt">
+  <p>
+    El distrito de <strong>{{ distrito.nombre }}</strong> (provincia de {{ provincia }}, región
+    Cusco) registra <strong>{{ total_ambito|miles }}</strong>
+    {{ total_ambito|plural_es:"centro poblado,centros poblados" }} en el padrón del Observatorio.
+    De ellos, <strong>{{ total_clasificados|miles }}</strong>
+    {{ total_clasificados|plural_es:"cuenta,cuentan" }} con clasificación de nivel de peligro{% if nombre_peligro %} frente a <strong>{{ nombre_peligro|lower }}</strong>{% endif %}{% if nivel_min %} en nivel {{ nivel_min_label|lower }} o superior{% endif %}, según la
+    información de {{ fuentes|join:", " }}.
+  </p>
+  {% if total_clasificados %}
+    <p>
+      {% if criticos %}<strong>{{ criticos|miles }}</strong> de esos centros poblados
+      {{ criticos|plural_es:"presenta,presentan" }} al menos un peligro clasificado en nivel
+      <strong>alto o muy alto</strong>. {% endif %}
+      La población registrada en los centros poblados clasificados asciende a
+      <strong>{{ poblacion_expuesta|miles }}</strong> habitantes según el padrón vigente.
+    </p>
+  {% endif %}
+  {% if frecuencia and frecuencia.total %}
+    <p>
+      El distrito acumula <strong>{{ frecuencia.total|miles }}</strong> emergencias
+      registradas{% if frecuencia.rango_fecha %} en el periodo
+      {{ frecuencia.rango_fecha }}{% endif %}{% if frecuencia.desglose_disponible %}, siendo
+      <strong>{{ evento_mas_frecuente }}</strong> el evento más recurrente{% else %} (la fuente
+      reporta el total sin desagregar por tipo de evento){% endif %}.
+    </p>
+  {% endif %}
+  {% if sin_dato %}
+    <p>
+      Cabe señalar que <strong>{{ sin_dato|miles }}</strong>
+      {{ sin_dato|plural_es:"centro poblado,centros poblados" }} del distrito
+      {{ sin_dato|plural_es:"no cuenta,no cuentan" }} con clasificación de peligro en la base
+      consultada. Esta ausencia no equivale a ausencia de riesgo: constituye un vacío de
+      información que se recomienda cubrir mediante evaluación técnica.
+    </p>
+  {% endif %}
+</section>
+
+{# --- Mapa --- #}
+{% if mapa_png %}
+  <section class="evitar-corte">
+    <h2>Mapa de exposición</h2>
+    <img class="mapa" src="{{ mapa_png }}"
+         alt="Mapa de exposición a peligros del distrito de {{ distrito.nombre }}">
+    <div class="fino" style="margin-top: 2pt">
+      Vista generada por el Observatorio. Los círculos representan centros poblados coloreados
+      por nivel de peligro; los grises no tienen clasificación en la base consultada.
+    </div>
+  </section>
+{% elif mapa_error %}
+  <p class="aviso">No fue posible generar el mapa para este documento ({{ mapa_error }}). El
+  resto del contenido no se ve afectado; el visor en línea sigue disponible.</p>
+{% endif %}
+
+{# --- Distribución por nivel --- #}
+<section class="evitar-corte">
+  <h2>Distribución de centros poblados por nivel máximo</h2>
+  <table class="datos">
+    <thead>
+      <tr>
+        {% for n in niveles %}
+          <th><span class="punto" style="background: {{ n.color }}"></span>{{ n.label }}</th>
+        {% endfor %}
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        {% for n in niveles %}<td class="num">{{ n.conteo|miles }}</td>{% endfor %}
+        <td class="num"><strong>{{ total_niveles|miles }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="fino" style="margin-top: 2pt">
+    Cada centro poblado se cuenta una sola vez, en el más alto de sus peligros evaluados. El
+    total resume {{ clasificaciones_contadas|miles }}
+    {{ clasificaciones_contadas|plural_es:"clasificación,clasificaciones" }} (una por cada
+    peligro evaluado en cada centro poblado).
+  </div>
+</section>
+
+{# --- Emergencias --- #}
+{% if frecuencia and frecuencia.total %}
+  <section class="evitar-corte">
+    <h2>Emergencias registradas{% if frecuencia.rango_fecha %}
+      ({{ frecuencia.rango_fecha }}){% endif %}</h2>
+    {% if not frecuencia.desglose_disponible %}
+      <p class="aviso">La fuente declara estos totales pero no los desagrega por tipo de
+      evento.</p>
+    {% endif %}
+    <table class="datos">
+      <thead>
+        <tr><th style="width: 32mm">Categoría</th><th>Eventos</th>
+            <th style="width: 14mm" class="num">Total</th></tr>
+      </thead>
+      <tbody>
+        {% for c in frecuencia.categorias %}{% if c.total %}
+          <tr>
+            <td>{{ c.categoria }}</td>
+            <td>{% for e in c.eventos %}{% if not forloop.first %}, {% endif %}{{ e.evento }}
+                ({{ e.conteo }}){% empty %}—{% endfor %}</td>
+            <td class="num">{{ c.total|miles }}</td>
+          </tr>
+        {% endif %}{% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endif %}
+
+{# --- Tabla de centros poblados clasificados --- #}
+<section>
+  <h2>Centros poblados con clasificación de peligro ({{ total_clasificados|miles }})</h2>
+  {% if not filas %}
+    <p class="fino">Ningún centro poblado del ámbito cuenta con clasificación para los filtros
+    aplicados.</p>
+  {% else %}
+    <table class="datos tabla-larga">
+      <thead>
+        <tr>
+          <th style="width: 38mm">Centro poblado</th>
+          <th style="width: 22mm">Categoría</th>
+          <th style="width: 16mm" class="num">Población</th>
+          <th style="width: 16mm" class="num">Altitud</th>
+          <th>Peligros clasificados</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in filas %}
+          <tr>
+            <td>{{ f.nombre }}</td>
+            <td>{{ f.categoria }}</td>
+            <td class="num">{% if f.poblacion != None %}{{ f.poblacion|miles }}{% else %}—{% endif %}</td>
+            <td class="num">{% if f.altitud != None %}{{ f.altitud|miles }} m{% else %}—{% endif %}</td>
+            <td>{% for p in f.peligros %}{% if not forloop.first %}; {% endif %}<span
+                class="punto" style="background: {{ p.color }}"></span>{{ p.peligro }}:
+                {{ p.label }}{% endfor %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+
+{# --- Fuentes y firma --- #}
+<div class="cierre evitar-corte">
+  <p>
+    <strong>Fuentes.</strong> Niveles de peligro y registro de emergencias:
+    {{ fuentes|join:", " }}. Padrón de centros poblados: INEI. Los enlaces a los estudios de
+    respaldo por centro poblado están disponibles en el visor en línea del Observatorio.
+  </p>
+  {{ firma|safe }}
+  <p>
+    Documento generado automáticamente desde el Observatorio Kallpachakuy el
+    {{ generado_en|date:"j \d\e F \d\e Y" }} a las {{ generado_en|date:"H:i" }} h. Refleja el
+    estado de la base de datos en esa fecha.
+  </p>
+</div>
