@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, Suspense, lazy } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Filter } from "lucide-react";
 import { useJsonData } from "@/lib/useJsonData";
 import type {
   CentroPoblado,
@@ -15,10 +15,15 @@ import SemaforoChip from "@/components/SemaforoChip";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 import FrecuenciaEmergencias from "@/components/FrecuenciaEmergencias";
+import ReporteImpresion from "@/components/ReporteImpresion";
+import type { MapaPeligrosHandle } from "@/components/MapaPeligros";
 
 const MapaPeligros = lazy(() => import("@/components/MapaPeligros"));
 
 const POR_PAGINA = 50;
+
+/** Datos congelados en el momento de pulsar "ayuda memoria". */
+type Reporte = { mapaPng: string | null; mapaBase: string; generadoEn: Date };
 
 export default function Peligros() {
   const ccpp = useJsonData<CentroPoblado[]>("/data/ccpp.json");
@@ -102,13 +107,119 @@ export default function Peligros() {
 
   const cargando = ccpp.status === "loading" || peligros.status === "loading";
 
+  // --- Ayuda memoria imprimible --------------------------------------------------------------
+  const mapaRef = useRef<MapaPeligrosHandle>(null);
+  const [reporte, setReporte] = useState<Reporte | null>(null);
+  const [generando, setGenerando] = useState(false);
+
+  const frecuenciaDistrito = useMemo(
+    () =>
+      frecuencia.status === "ok" && distrito
+        ? frecuencia.data.find((d) => d.distrito === distrito)
+        : undefined,
+    [frecuencia, distrito]
+  );
+
+  const generarAyudaMemoria = useCallback(async () => {
+    setGenerando(true);
+    let mapaPng: string | null = null;
+    let mapaBase = "";
+    try {
+      mapaPng = (await mapaRef.current?.capturarPNG()) ?? null;
+      mapaBase = mapaRef.current?.mapaBaseActivo() ?? "";
+    } catch (err) {
+      // Un mapa base sin CORS contamina el canvas. El documento sigue teniendo valor sin la
+      // imagen, así que se ofrece continuar en vez de abortar la descarga entera.
+      console.error("No se pudo capturar el mapa:", err);
+      const seguir = window.confirm(
+        "No se pudo incluir la imagen del mapa: el mapa base actual no permite exportarla. " +
+          "¿Generar la ayuda memoria sin el mapa?"
+      );
+      if (!seguir) {
+        setGenerando(false);
+        return;
+      }
+    }
+    setReporte({ mapaPng, mapaBase, generadoEn: new Date() });
+  }, []);
+
+  // El diálogo de impresión debe abrirse cuando el documento ya está en el DOM y la imagen del
+  // mapa decodificada; si no, el PDF sale con el hueco en blanco.
+  useEffect(() => {
+    if (!reporte) return;
+    let cancelado = false;
+
+    const limpiar = () => {
+      setGenerando(false);
+      setReporte(null);
+    };
+
+    const imprimir = async () => {
+      const img = document.querySelector<HTMLImageElement>(".solo-impresion img[alt^='Mapa']");
+      if (img) {
+        try {
+          await img.decode();
+        } catch {
+          /* Si la imagen no decodifica, se imprime igual: el resto del documento es válido. */
+        }
+      }
+      if (cancelado) return;
+      // El listener va antes del print(): en algunos navegadores la llamada es bloqueante y
+      // afterprint se dispara sin que print() haya retornado. Desmontar el documento a mano
+      // después de print() puede vaciarlo antes de que el diálogo lo haya leído.
+      window.addEventListener("afterprint", limpiar, { once: true });
+      window.print();
+    };
+
+    imprimir();
+    return () => {
+      cancelado = true;
+      window.removeEventListener("afterprint", limpiar);
+    };
+  }, [reporte]);
+
   return (
     <>
       <PageHeader
         titulo="Exposición a peligros naturales"
         descripcion="Mapa de exposición a peligros climáticos y geodinámicos en los centros poblados de Cusco. Datos provenientes de SIGRID-CENEPRED. Activa o desactiva las capas geográficas (lagunas, ríos, glaciares) desde el control superior derecho del mapa."
+        badge={
+          <button
+            type="button"
+            onClick={generarAyudaMemoria}
+            disabled={!distrito || generando}
+            title={
+              distrito
+                ? `Genera un documento imprimible del distrito de ${distrito} con los filtros actuales`
+                : "Selecciona un distrito para generar la ayuda memoria"
+            }
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-mountain-900 text-sm font-medium transition hover:bg-mountain-100 disabled:bg-white/25 disabled:text-white/70 disabled:cursor-not-allowed"
+          >
+            <FileText className="w-4 h-4" />
+            {generando ? "Generando…" : "Ayuda memoria (PDF)"}
+          </button>
+        }
       />
-      <div className="container-page py-8">
+
+      {/* El documento imprimible: oculto en pantalla, es lo único que se ve al imprimir. */}
+      {reporte && (
+        <ReporteImpresion
+          ccpp={ccppFiltrados}
+          clasificaciones={peligrosFiltrados}
+          stats={stats}
+          frecuencia={frecuenciaDistrito}
+          provincia={provincia}
+          distrito={distrito}
+          ubigeoDistrito={ubigeoDistrito}
+          nombrePeligro={nombrePeligro}
+          nivelMin={nivelMin}
+          mapaPng={reporte.mapaPng}
+          mapaBase={reporte.mapaBase}
+          generadoEn={reporte.generadoEn}
+        />
+      )}
+
+      <div className="container-page py-8 no-imprimir">
       <div className="grid lg:grid-cols-[280px_1fr] gap-6">
         {/* Filtros */}
         <aside className="card p-5 h-fit lg:sticky lg:top-20">
@@ -193,6 +304,7 @@ export default function Peligros() {
             ) : ccpp.status === "ok" && peligros.status === "ok" ? (
               <Suspense fallback={<div className="h-full grid place-items-center text-ink-600">Cargando mapa…</div>}>
                 <MapaPeligros
+                  ref={mapaRef}
                   ccpp={ccpp.data}
                   peligroSlug={slug || null}
                   nivelMin={nivelMin}

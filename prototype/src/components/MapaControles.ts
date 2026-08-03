@@ -318,10 +318,30 @@ export class MedirControl implements IControl {
 }
 
 /**
- * Descarga la vista actual como PNG. MapLibre pinta todo (mapa base incluido) en un único
- * canvas WebGL, así que basta leerlo — no hace falta `html-to-image`. Requiere que el mapa se
- * haya creado con `preserveDrawingBuffer: true`.
+ * Devuelve la vista actual del mapa como data URL PNG. MapLibre pinta todo (mapa base incluido)
+ * en un único canvas WebGL, así que basta leerlo — no hace falta `html-to-image`. Requiere que
+ * el mapa se haya creado con `preserveDrawingBuffer: true`.
+ *
+ * Lo usan el botón de descarga del propio mapa y la ayuda memoria imprimible.
  */
+export function capturarPNG(map: MapLibreMap): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // Forzar un repintado antes de leer el buffer, si no puede salir en blanco.
+    map.triggerRepaint();
+    map.once("render", () => {
+      // El fallo ocurre en este callback, no en la llamada: si el mapa base no envía cabeceras
+      // CORS, sus teselas contaminan el canvas y toDataURL lanza SecurityError. Los cuatro
+      // bases actuales lo permiten, pero las capas son administrables.
+      try {
+        resolve(map.getCanvas().toDataURL("image/png"));
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
+/** Descarga la vista actual como PNG. */
 export class DescargarPNGControl implements IControl {
   private contenedor?: HTMLDivElement;
 
@@ -329,31 +349,23 @@ export class DescargarPNGControl implements IControl {
     this.contenedor = grupo();
     const b = boton("Descargar vista (PNG)", "⤓");
     b.style.fontWeight = "bold";
-    b.addEventListener("click", () => {
+    b.addEventListener("click", async () => {
       const previo = b.innerHTML;
       b.innerHTML = "…";
-      // Forzar un repintado antes de leer el buffer, si no puede salir en blanco.
-      map.triggerRepaint();
-      map.once("render", () => {
-        // El try va aquí dentro: el fallo ocurre en este callback, no en el clic. Si el mapa
-        // base no envía cabeceras CORS, sus teselas contaminan el canvas y toDataURL lanza
-        // SecurityError. Los cuatro bases actuales lo permiten, pero las capas son
-        // administrables, así que el aviso tiene que llegar al usuario y no a la consola.
-        try {
-          const enlace = document.createElement("a");
-          enlace.download = "observatorio-mapa-cusco.png";
-          enlace.href = map.getCanvas().toDataURL("image/png");
-          enlace.click();
-        } catch (err) {
-          console.error("No se pudo exportar el PNG:", err);
-          window.alert(
-            "No se pudo exportar la imagen: el mapa base actual no permite descargar la vista. " +
-              "Prueba con otro mapa base."
-          );
-        } finally {
-          b.innerHTML = previo;
-        }
-      });
+      try {
+        const enlace = document.createElement("a");
+        enlace.download = "observatorio-mapa-cusco.png";
+        enlace.href = await capturarPNG(map);
+        enlace.click();
+      } catch (err) {
+        console.error("No se pudo exportar el PNG:", err);
+        window.alert(
+          "No se pudo exportar la imagen: el mapa base actual no permite descargar la vista. " +
+            "Prueba con otro mapa base."
+        );
+      } finally {
+        b.innerHTML = previo;
+      }
     });
     this.contenedor.appendChild(b);
     return this.contenedor;

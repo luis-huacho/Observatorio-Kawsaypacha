@@ -110,3 +110,57 @@
 .maplibregl-map {
   font-family: inherit;
 }
+
+/* --- Impresión: ayuda memoria -------------------------------------------------------------
+   El documento vive oculto en el DOM y solo aparece al imprimir. En la plataforma real lo
+   generará WeasyPrint desde una plantilla equivalente, así que estas reglas se mantienen en
+   CSS estándar (nada específico de un navegador).                                          */
+
+.solo-impresion {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  /* Fuera el cromo del sitio: la cabecera y el pie del Layout, y todo lo que la página marque
+     como no imprimible (filtros, mapa interactivo, paginación). El reporte no usa <header> ni
+     <footer> precisamente para no tener que rescatarlos de esta regla. */
+  header,
+  footer,
+  .no-imprimir {
+    display: none !important;
+  }
+
+  .solo-impresion {
+    display: block !important;
+  }
+
+  /* Sin esto los navegadores descartan los fondos: los puntos de nivel y el membrete
+     saldrían en blanco y negro, que es justo lo que el semáforo no puede permitirse. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* La tabla de centros poblados puede ocupar varias páginas; lo que no debe partirse es
+     una fila, y la cabecera tiene que repetirse arriba de cada página. */
+  table {
+    break-inside: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr,
+  .evitar-corte {
+    break-inside: avoid;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+}

@@ -9,7 +9,7 @@
  * Los tiles se generan con `prototype/scripts/build_tiles.sh` y se sirven desde
  * `public/tiles/`.
  */
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import maplibregl from "maplibre-gl";
 import { Protocol } from "pmtiles";
@@ -23,6 +23,7 @@ import {
   DescargarPNGControl,
   MedirControl,
   VistaInicialControl,
+  capturarPNG,
 } from "@/components/MapaControles";
 
 const CENTRO: [number, number] = [-72.0, -13.5];
@@ -125,7 +126,18 @@ type Props = {
   ubigeoDistrito: string;
 };
 
-export default function MapaPeligros({ ccpp, peligroSlug, nivelMin, ubigeoDistrito }: Props) {
+/** Lo que la página puede pedirle al mapa de forma imperativa. */
+export type MapaPeligrosHandle = {
+  /** PNG de la vista actual, para incrustarlo en la ayuda memoria imprimible. */
+  capturarPNG: () => Promise<string>;
+  /** Nombre legible del mapa base activo, para citarlo al pie de la imagen. */
+  mapaBaseActivo: () => string;
+};
+
+const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros(
+  { ccpp, peligroSlug, nivelMin, ubigeoDistrito },
+  ref
+) {
   const contenedor = useRef<HTMLDivElement>(null);
   const mapa = useRef<maplibregl.Map | null>(null);
   // El popup se construye una sola vez dentro del efecto de montaje, así que necesita una
@@ -141,6 +153,19 @@ export default function MapaPeligros({ ccpp, peligroSlug, nivelMin, ubigeoDistri
     glaciares: true,
   });
   const [abierto, setAbierto] = useState(false);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      capturarPNG: () => {
+        const map = mapa.current;
+        if (!map) return Promise.reject(new Error("El mapa todavía no está listo"));
+        return capturarPNG(map);
+      },
+      mapaBaseActivo: () => MAPAS_BASE.find((m) => m.id === base)?.nombre ?? "",
+    }),
+    [base]
+  );
 
   // --- Construcción del mapa (una sola vez) --------------------------------------------------
   useEffect(() => {
@@ -469,7 +494,9 @@ export default function MapaPeligros({ ccpp, peligroSlug, nivelMin, ubigeoDistri
       </div>
     </div>
   );
-}
+});
+
+export default MapaPeligros;
 
 /** Los tiles guardan el slug; para el popup hace falta el nombre legible del catálogo. */
 const NOMBRE_POR_SLUG = new Map<string, string>(PELIGROS.map((p) => [p.slug, p.nombre]));
