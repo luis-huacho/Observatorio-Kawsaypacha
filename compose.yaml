@@ -65,8 +65,17 @@ services:
     restart: unless-stopped
 
   # Compila la SPA y deja dist/ en el volumen que sirve nginx; termina al copiar.
+  # Las VITE_* van como build args porque Vite las hornea en el bundle: si no llegan al build,
+  # la imagen sale apuntando a localhost. Salen del .env de la RAÍZ (ver .env.example), que es
+  # el que interpola compose — distinto de backend/.env, que son los secretos de Django.
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:?falta VITE_API_URL en el .env de la raíz}
+        VITE_SEARCH_URL: ${VITE_SEARCH_URL:-}
+        VITE_TILES_URL: ${VITE_TILES_URL:-}
+        VITE_MEILI_SEARCH_KEY: ${VITE_MEILI_SEARCH_KEY:-}
     volumes:
       - web_dist:/out
     restart: "no"

@@ -1,0 +1,166 @@
+# Desarrollo
+
+Cómo levantar el Observatorio en una máquina local, sembrarlo con los datos reales y correr las
+pruebas.
+
+## Requisitos
+
+- Docker y Docker Compose.
+- Node 22 y npm, para el frontend en modo desarrollo.
+- Los **archivos de datos**, que no se versionan (145 MB): `data/layers/data/*.xlsx` y
+  `data/layers/*.geojson`. Los entrega PREDES; sin ellos el seed no tiene qué importar.
+- Opcional: `uv` y Python 3.12+, si quieres correr `manage.py` desde el host.
+
+## Primera vez
+
+```bash
+# 1. Configuración
+cp backend/.env.example backend/.env     # secretos de Django (rellenar SECRET_KEY y contraseñas)
+cp .env.example .env                     # variables de compose (dominios y VITE_*)
+cp frontend/.env.example frontend/.env   # URLs que usa el frontend en dev
+
+# 2. Levantar la base, la búsqueda, el backend y el worker
+docker compose -f compose.yaml -f compose.dev.yml up -d --build
+
+# 3. Sembrar: catálogos, datos reales de los Excel, contenido de demostración y tiles
+docker compose -f compose.yaml -f compose.dev.yml exec backend \
+  python manage.py seed --demo --capas --tiles
+
+# 4. Copiar la llave de búsqueda que imprime el paso anterior a frontend/.env
+#    (también la imprime `manage.py meili_setup`)
+
+# 5. El frontend, en el host
+cd frontend && npm install && npm run dev
+```
+
+Con eso: **http://localhost:5173** el sitio, **http://localhost:8000/admin/** el admin,
+**http://localhost:8000/api/docs/** el API.
+
+El primer build de la imagen del backend tarda unos minutos porque **compila tippecanoe**. Es una
+sola vez; las siguientes reutilizan la capa.
+
+## El día a día
+
+```bash
+# Arriba / abajo
+docker compose -f compose.yaml -f compose.dev.yml up -d
+docker compose -f compose.yaml -f compose.dev.yml down
+
+# Logs (los correos del flujo editorial salen aquí, en la consola)
+docker compose -f compose.yaml -f compose.dev.yml logs -f backend worker
+
+# Cualquier comando de Django
+docker compose -f compose.yaml -f compose.dev.yml exec backend python manage.py <comando>
+```
+
+Un alias ahorra teclear:
+
+```bash
+alias dc='docker compose -f compose.yaml -f compose.dev.yml'
+alias dm='docker compose -f compose.yaml -f compose.dev.yml exec backend python manage.py'
+```
+
+### Correr `manage.py` desde el host
+
+Se puede, pero hay que redirigir dos nombres de servicio a `localhost`:
+
+```bash
+cd backend && uv sync --all-groups
+POSTGRES_HOST=localhost MEILI_URL=http://localhost:7700 .venv/bin/python manage.py shell
+```
+
+Sin esos dos, Django busca los hosts `db` y `meilisearch`, que solo existen dentro de la red de
+compose. Va más rápido para iterar, pero **el pipeline de tiles y el PDF no funcionan** desde el
+host: necesitan tippecanoe, GDAL y Chromium, que viven en la imagen.
+
+## El seed
+
+```bash
+dm seed                    # catálogos, territorio, peligros y frecuencia
+dm seed --demo             # además, el contenido de demostración del prototipo
+dm seed --capas            # adjunta los GeoJSON a las capas cartográficas
+dm seed --tiles            # genera los PMTiles (necesita tippecanoe: usar el contenedor)
+dm seed --solo-catalogos   # solo catálogos, grupos y textos; sin importar Excel
+```
+
+Es **idempotente** y **no pisa lo que hayas editado**: crea lo que falta y deja en paz lo que ya
+existe. Se puede correr en cada despliegue sin miedo a devolverle a PREDES sus textos al valor de
+fábrica.
+
+Al terminar imprime los conteos. Si no coinciden con estos, algo se perdió por el camino:
+
+```
+  Provincias                        13
+  Distritos                        112
+  Centros poblados               8,968
+    con alguna clasificación     3,238
+    sin dato clasificado         5,730
+  Clasificaciones de peligro    10,978
+  Frecuencias de emergencia        644
+    distritos con desglose          64
+  Totales declarados (ADR-D1)      104
+```
+
+El seed también imprime **advertencias**, y son esperadas: 229 filas del Excel sin `NIVEL_PELI`,
+2 sin `CODIGO`, 47 distritos que declaran subtotales sin desglosar y Acomayo sin fila. No son
+errores del importador: son la calidad de los datos de origen, y están anotadas en
+`_specs/00-alcance-decisiones.md` para devolvérselas al cliente.
+
+## Probar el modo producción en local
+
+El modo desarrollo no cubre cuatro cosas: que el bundle compilado se sirva bien, que las rutas
+del router resuelvan por `try_files`, que los estáticos del admin estén donde nginx los busca, y
+que los tiles salgan por rangos. Para eso hay un tercer override, sobre HTTP y un solo host:
+
+```bash
+# El .env de la raíz debe apuntar a http://localhost (ver .env.example)
+docker compose -f compose.yaml -f compose.local.yml up -d --build
+docker compose -f compose.yaml -f compose.local.yml run --rm frontend   # publica dist/
+docker compose -f compose.yaml -f compose.local.yml exec backend python manage.py collectstatic --noinput
+```
+
+→ **http://localhost/** el sitio compilado, **/admin/** el admin, **/api/docs/** el API.
+
+Ojo con `VITE_*`: **Vite las hornea en el bundle durante el build**, no las lee en runtime. Si
+cambias una, hay que reconstruir la imagen del frontend (`--build`), no basta con reiniciar.
+
+## Pruebas
+
+```bash
+dc exec backend pytest                 # suite backend (sin las lentas)
+dc exec backend pytest -m lento        # incluye las que usan los Excel completos
+cd frontend && npm run lint            # tsc --noEmit
+cd frontend && npm run build           # el build es parte de la verificación
+npx playwright test                    # E2E contra el stack levantado
+```
+
+El plan completo, con los casos obligatorios y de dónde sale cada uno, está en
+`_specs/08-plan-pruebas.md`.
+
+## Trampas que ya nos costaron tiempo
+
+- **`useJsonData` ya no existe.** Todo pasa por `lib/api.ts`, que es el único punto de
+  integración. Si una página necesita datos nuevos, se le añade un endpoint, no un `fetch` suelto.
+- **El slug del peligro lleva guion bajo** (`lluvias_intensas`). Es la clave de las propiedades
+  `nivel_<slug>` de los tiles: con guion medio el visor deja de pintar y nada más falla.
+- **`nginx` resuelve los nombres del `upstream` una sola vez.** Por eso la configuración usa un
+  `resolver` y una variable en `proxy_pass`: sin eso, cada despliegue del backend le cambia la IP
+  y nginx devuelve 502 hasta que alguien lo reinicia.
+- **Las dos unidades de la distribución difieren en 3.4×.** «Centros poblados por su nivel
+  máximo» (3,238) y «clasificaciones» (10,978) no son intercambiables. El API las devuelve
+  rotuladas las dos; usar la que no toca fue un error real del prototipo.
+- **Los tiles necesitan HTTP Range.** En desarrollo los sirve una vista propia porque ni
+  `static.serve` ni `FileResponse` lo implementan en Django 5.2: sin rangos el visor «funciona»
+  pero descarga 3 MB por tesela y va lentísimo solo en local.
+
+## Estructura
+
+```
+backend/          Django. `apps/` una carpeta por dominio; `config/` settings y urls
+frontend/         Vite + React + TS. `src/lib/` capa de datos; `src/routes/` una por página
+prototype/        Prototipo aprobado. CONGELADO: es la referencia visual, no se toca
+_specs/           Especificaciones y ADR. Se leen antes de cambiar algo de fondo
+_docs/            Esta documentación
+deploy/nginx/     `conf.d/` producción, `local/` prueba local sobre HTTP
+data/             Excel y GeoJSON canónicos. NO se versionan
+```

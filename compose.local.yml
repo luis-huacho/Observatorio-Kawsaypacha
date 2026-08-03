@@ -1,0 +1,49 @@
+# Override para probar el MODO PRODUCCIÓN EN LOCAL, sobre HTTP y en un solo host.
+#
+#   docker compose -f compose.yaml -f compose.local.yml up -d --build
+#   docker compose -f compose.yaml -f compose.local.yml down
+#
+# Qué verifica que el modo de desarrollo NO cubre: que el bundle de Vite se sirve bien, que las
+# rutas del router resuelven por try_files, que los estáticos del admin están donde nginx los
+# busca, y que los tiles salen por rangos con sus cabeceras CORS.
+#
+# Antes de levantarlo hace falta un .env en la raíz con las VITE_* apuntando a http://localhost
+# (ver .env.example).
+
+services:
+  # `BACKEND_URL` es la URL con la que **el navegador** alcanza al backend: el API la usa para
+  # construir las URL absolutas de `/tiles/` y `/media/` que devuelve a la SPA. En este modo el
+  # backend no publica el 8000, así que apuntarlo ahí deja al visor pidiendo tiles a un puerto
+  # cerrado (ERR_CONNECTION_REFUSED) mientras todo lo demás funciona.
+  backend:
+    environment:
+      BACKEND_URL: http://localhost
+      SITE_URL: http://localhost
+      CORS_ALLOWED_ORIGINS: http://localhost
+      RENDER_MAPA_BASE_URL: http://backend:8000
+
+  worker:
+    environment:
+      BACKEND_URL: http://localhost
+      RENDER_MAPA_BASE_URL: http://backend:8000
+
+  nginx:
+    # Solo la config local: la de producción exige certificados que aquí no existen.
+    volumes:
+      # `conf.d` se REEMPLAZA por el directorio local (mismo target que en compose.yaml, así
+      # que compose sustituye en vez de acumular). Los includes compartidos van a otra ruta:
+      # anidar un montaje dentro de conf.d falla, porque el de producción va en solo lectura.
+      - ./deploy/nginx/local:/etc/nginx/conf.d:ro
+      - ./deploy/nginx/conf.d:/etc/nginx/comun:ro
+      - web_dist:/srv/www:ro
+      - media:/srv/media:ro
+      - static:/srv/static:ro
+    ports:
+      - "80:80"
+
+  # certbot no tiene sentido sin dominio público.
+  certbot:
+    profiles: ["nunca"]
+
+  backup:
+    profiles: ["nunca"]

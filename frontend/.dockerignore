@@ -1,0 +1,7 @@
+node_modules
+dist
+# `.env` fuera: los valores de build llegan como build args. Copiarlo haría que la imagen
+# heredara la configuración de la máquina de quien construye (ver Dockerfile).
+.env
+.env.*
+*.tsbuildinfo
