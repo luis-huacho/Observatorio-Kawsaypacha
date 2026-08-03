@@ -40,7 +40,25 @@ CCPP_OBLIGATORIOS = {
     "0803020001",  # PISAC: distrito de la medida demo
 }
 DISTRITOS_FRECUENCIA = ["OLLANTAYTAMBO", "CUSCO", "SANGARARA", "MOLLEPATA", "ACOPIA"]
-FILAS_POR_HOJA = 60
+FILAS_POR_HOJA = 70
+
+
+def _clave(valor) -> str:
+    """Nombre de distrito comparable: sin acentos, sin espacios de sobra, en mayúsculas.
+
+    El mismo distrito se escribe SANGARARA y SANGARARÁ según el archivo.
+    """
+    texto = str(valor or "").strip().upper()
+    for con, sin in (("Á", "A"), ("É", "E"), ("Í", "I"), ("Ó", "O"), ("Ú", "U"), ("Ñ", "N")):
+        texto = texto.replace(con, sin)
+    return texto
+
+
+#: Las dos muestras tienen que ser **consistentes entre sí**: el importador de frecuencia
+#: resuelve el distrito por nombre contra el padrón que dejó el de niveles, así que si la muestra
+#: de niveles no trae ningún centro poblado de OLLANTAYTAMBO, su fila de emergencias se omite con
+#: aviso y las pruebas de ADR-D1 pasan sin comprobar nada. Costó un rato descubrirlo.
+DISTRITOS_NECESARIOS = {_clave(d) for d in DISTRITOS_FRECUENCIA}
 
 
 def muestra_niveles(origen: pathlib.Path, destino: pathlib.Path) -> None:
@@ -58,14 +76,21 @@ def muestra_niveles(origen: pathlib.Path, destino: pathlib.Path) -> None:
         # Al menos una fila de cada grafía de Fuente: en Inundación las 49 de
         # SINAGERD_CENEPRED están al final, y un recorte por posición se las dejaría fuera.
         por_fuente: dict[str, list] = {}
+        pendientes = set(DISTRITOS_NECESARIOS)
         for fila in it:
             if not fila or all(c is None for c in fila):
                 continue
             codigo = str(fila[3]).strip() if fila[3] is not None else ""
+            distrito = _clave(fila[2])
             if not codigo:
                 huerfanas.append(fila)
             elif codigo in CCPP_OBLIGATORIOS:
                 obligatorias.append(fila)
+                pendientes.discard(distrito)
+            elif distrito in pendientes:
+                # Un centro poblado de cada distrito que aparece en la muestra de frecuencia.
+                obligatorias.append(fila)
+                pendientes.discard(distrito)
             elif fila[10] and fila[12] is None:
                 sin_nivel.append(fila)
             elif fila[12] is not None:
@@ -92,6 +117,8 @@ def muestra_niveles(origen: pathlib.Path, destino: pathlib.Path) -> None:
         print(f"  {hoja}: {len(elegidas)} filas "
               f"({len(obligatorias)} clave, {len(sin_nivel[:5])} sin nivel, "
               f"{len(huerfanas[:2])} sin código)")
+        if pendientes:
+            print(f"    ¡ojo! sin centros poblados de: {', '.join(sorted(pendientes))}")
     wb.close()
     salida.save(destino)
 

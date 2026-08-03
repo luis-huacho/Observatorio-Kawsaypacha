@@ -72,3 +72,10 @@ frontend/vite.config.d.ts
 
 # _specs/ SÍ se versiona: acumula los ADR, el modelo de datos y los contratos de API con los que
 # se construye el backend. Tenerlo en un solo disco, sin historial, era un riesgo innecesario.
+
+# Playwright: artefactos de cada corrida (capturas, vídeos, trazas) y el informe HTML. Se
+# regeneran en cada `npx playwright test` y pesan MB por prueba fallida.
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/

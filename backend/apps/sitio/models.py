@@ -1,7 +1,12 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from apps.core.models import TimeStampedMixin, WorkflowMixin, permiso_publicar
+from apps.core.models import (
+    HtmlRicoMixin,
+    TimeStampedMixin,
+    WorkflowMixin,
+    permiso_publicar,
+)
 
 
 class ConfiguracionSitio(TimeStampedMixin):
@@ -37,12 +42,14 @@ class ConfiguracionSitio(TimeStampedMixin):
         return obj
 
 
-class BloqueTexto(TimeStampedMixin):
+class BloqueTexto(TimeStampedMixin, HtmlRicoMixin):
     """Texto estático administrable, identificado por clave (`home.hero.titulo`, `sobre.mision`).
 
     Un modelo por página multiplicaría tablas y admins para lo mismo; la clave con prefijo
     permite agrupar en el admin y que el frontend pida un solo payload.
     """
+
+    campos_html = ("cuerpo",)
 
     class Pagina(models.TextChoices):
         HOME = "home", "Portada"

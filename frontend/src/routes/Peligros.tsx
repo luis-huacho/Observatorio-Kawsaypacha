@@ -226,6 +226,7 @@ export default function Peligros() {
             <div>
               <label className="block text-xs font-medium text-ink-600 mb-1">Tipo de peligro</label>
               <select
+                aria-label="Tipo de peligro"
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 className="control w-full"
@@ -241,11 +242,17 @@ export default function Peligros() {
               <label className="block text-xs font-medium text-ink-600 mb-1">
                 Nivel mínimo
               </label>
-              <div className="flex gap-1 bg-mountain-100/60 rounded-full p-1">
+              <div
+                role="group"
+                aria-label="Nivel mínimo"
+                className="flex gap-1 bg-mountain-100/60 rounded-full p-1"
+              >
                 {[0, 1, 2, 3, 4].map((n) => (
                   <button
                     key={n}
                     onClick={() => setNivelMin(n)}
+                    aria-pressed={nivelMin === n}
+                    aria-label={n === 0 ? "Todos los niveles" : `Nivel mínimo ${n}`}
                     className={`flex-1 py-1.5 text-sm rounded-full transition ${
                       nivelMin === n
                         ? "bg-mountain-700 text-white shadow-sm"

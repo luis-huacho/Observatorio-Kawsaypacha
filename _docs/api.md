@@ -137,7 +137,7 @@ Además, `desglose_disponible` distingue un tercer estado. Cusco, por ejemplo:
     {"categoria": "Geodinámica externa", "slug": "geodinamica_externa",
      "total": 43, "solo_total": true, "eventos": []}
   ],
-  "total": 122
+  "total": 134
 }
 ```
 

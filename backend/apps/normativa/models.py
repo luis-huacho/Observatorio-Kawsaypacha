@@ -1,11 +1,18 @@
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
-from apps.core.models import TimeStampedMixin, WorkflowMixin, permiso_publicar
+from apps.core.models import (
+    HtmlRicoMixin,
+    TimeStampedMixin,
+    WorkflowMixin,
+    permiso_publicar,
+)
 
 
-class Norma(TimeStampedMixin, WorkflowMixin):
+class Norma(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
     """Norma del marco GRD/ACC, con ficha propia en /normativa/{slug}."""
+
+    campos_html = ("contenido",)
 
     class Tipo(models.TextChoices):
         LEY = "Ley", "Ley"

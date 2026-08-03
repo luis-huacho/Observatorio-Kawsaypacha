@@ -151,7 +151,12 @@ REST_FRAMEWORK = {
         # Los exports y el PDF cuestan mucho más que una lectura: un bucle de descargas
         # tumbaría el worker antes que el API.
         "descarga": "30/hour",
-        "beacon": "60/min",
+        # 60/min era demasiado poco: **toda una oficina detrás de un NAT comparte IP**, y un
+        # taller con treinta personas navegando pasa de 60 vistas por minuto sin esfuerzo. Lo
+        # descubrieron las pruebas E2E, que desde una sola IP empezaron a recibir 429 en la
+        # consola del navegador. Cada beacon es un INSERT, así que el techo puede ser alto y
+        # seguir sirviendo para lo que es: cortar a un cliente roto o a quien infle las cifras.
+        "beacon": "600/min",
     },
 }
 

@@ -13,10 +13,12 @@ class DescargaThrottle(AnonRateThrottle):
 
 
 class BeaconThrottle(AnonRateThrottle):
-    """Métricas por `sendBeacon`: 60/minuto por IP.
+    """Métricas por `sendBeacon`: 600/minuto por IP.
 
-    Es el único endpoint de escritura público. El límite acota el ruido de un cliente roto o
-    de alguien inflando las cifras a mano, sin llegar a estorbar a un usuario real.
+    Es el único endpoint de escritura público. El límite acota el ruido de un cliente roto o de
+    alguien inflando las cifras a mano, y por eso el techo es alto: **una institución entera
+    comparte IP detrás del NAT**, así que un límite pensado para «una persona navegando» castiga
+    a una oficina. Cada beacon es un INSERT; el coste no justifica un techo bajo.
     """
 
     scope = "beacon"

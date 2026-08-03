@@ -127,15 +127,34 @@ cambias una, hay que reconstruir la imagen del frontend (`--build`), no basta co
 ## Pruebas
 
 ```bash
-dc exec backend pytest                 # suite backend (sin las lentas)
-dc exec backend pytest -m lento        # incluye las que usan los Excel completos
+dc exec backend pytest                 # 112 pruebas, ~35 s (sin las lentas)
+dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
-npx playwright test                    # E2E contra el stack levantado
+npm install && npx playwright install chromium   # una sola vez, en la raíz
+npx playwright test                    # 45 E2E contra el dev server
 ```
 
-El plan completo, con los casos obligatorios y de dónde sale cada uno, está en
-`_specs/08-plan-pruebas.md`.
+`pytest` vive **dentro del contenedor**, para correr con las mismas versiones de GDAL, tippecanoe
+y WeasyPrint que producción. Se instala porque `compose.dev.yml` construye la imagen con
+`GRUPOS_UV=--group dev`; si cambias esa opción hace falta
+`dc up -d --renew-anon-volumes backend`, porque `/app/.venv` es un volumen anónimo que sobrevive
+a la reconstrucción y se queda con el venv viejo.
+
+### La corrida que de verdad importa
+
+```bash
+docker compose -f compose.yaml -f compose.local.yml up -d --build
+docker compose -f compose.yaml -f compose.local.yml run --rm frontend
+E2E_URL=http://localhost npx playwright test
+```
+
+Contra el bundle compilado servido por nginx. **Es la que encuentra los fallos de integración**:
+en desarrollo el navegador ataca a Meilisearch directamente, así que un proxy `/search/` mal
+configurado —lo que pasaba— es invisible hasta que el sitio se sirve como en producción.
+
+El plan completo, con los casos obligatorios, de dónde sale cada uno y lo que la suite ya
+encontró, está en `_specs/08-plan-pruebas.md`.
 
 ## Trampas que ya nos costaron tiempo
 
@@ -152,6 +171,12 @@ El plan completo, con los casos obligatorios y de dónde sale cada uno, está en
 - **Los tiles necesitan HTTP Range.** En desarrollo los sirve una vista propia porque ni
   `static.serve` ni `FileResponse` lo implementan en Django 5.2: sin rangos el visor «funciona»
   pero descarga 3 MB por tesela y va lentísimo solo en local.
+- **Una variable en `proxy_pass` desactiva la sustitución del prefijo de la `location`.** Es la
+  contrapartida del truco del resolver: `proxy_pass http://$destino/` no reescribe `/search/x → /x`,
+  manda todo a `/`. Por eso ese bloque quita el prefijo con `rewrite`. Y ojo con la comprobación
+  fácil: `GET /search/health` devolvía 200 **porque la raíz de Meilisearch también devuelve 200**.
+- **El HTML rico se sanea en `save()` del modelo** (`HtmlRicoMixin.campos_html`), no en el admin.
+  Si añades un campo de CKEditor, declárarlo ahí: `campos_rich` del admin solo elige el widget.
 
 ## Estructura
 

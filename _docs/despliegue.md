@@ -109,10 +109,25 @@ curl -s  https://obs.predes.org.pe/api/sitio/ | head -c 80      # JSON de config
 curl -sI https://obs.predes.org.pe/gestion/login/ | head -1     # 200, el admin
 curl -sr 0-99 -D - -o /dev/null https://obs.predes.org.pe/tiles/ccpp.pmtiles | grep -i 206
 curl -s https://obs.predes.org.pe/api/peligros/resumen/ | grep -o '"total_ccpp":[0-9]*'
+
+# Buscador: 401 es la respuesta CORRECTA sin llave. Lo que importa es que Meilisearch reciba
+# la ruta, no la raíz.
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  -H 'Content-Type: application/json' -d '{"queries":[]}' \
+  https://obs.predes.org.pe/search/multi-search
 ```
 
-El último debe decir `8968`. Y en el navegador, `/peligros` tiene que pintar los puntos: es lo
-que confirma de una vez que el API, los tiles, CORS y el bundle están todos bien.
+El del resumen debe decir `8968`.
+
+> **`GET /search/health` respondiendo 200 no prueba nada.** La raíz de Meilisearch también
+> responde 200, así que si el proxy manda todo a la raíz —lo que pasaba hasta que las pruebas E2E
+> lo destaparon— esa comprobación pasa igual y el buscador cae al fallback de DRF en cada
+> búsqueda, sin un error a la vista. Por eso se comprueba `multi-search` con POST: **405 significa
+> proxy mal configurado**, y 401 (sin llave) o 200 (con ella) significa que llega bien.
+
+Y en el navegador, `/peligros` tiene que pintar los puntos: es lo que confirma de una vez que el
+API, los tiles, CORS y el bundle están todos bien. La verificación completa es
+`E2E_URL=https://observatorio.predes.org.pe npx playwright test`.
 
 ## Runbook
 
@@ -200,6 +215,12 @@ manda la página. Si devuelve `features: []`, el filtro está de más.
 
 **El buscador no encuentra algo que sí está publicado.** `meili_rebuild`. Si se arregla, hubo una
 escritura fuera del ORM (un import, un `update()` de queryset) que las señales no vieron.
+
+**El buscador funciona pero sin facetas ni tolerancia a errores de tecleo.** Está cayendo al
+fallback de DRF. Comprobar `POST /search/multi-search` (ver arriba): un 405 es el proxy mandando
+todo a la raíz de Meilisearch, y se arregla en el `location /search/` de
+`deploy/nginx/conf.d/observatorio.conf`, que quita el prefijo con `rewrite` y **no** con la barra
+final de `proxy_pass`.
 
 **Un Excel no entra.** Admin → Cargas de datos → el `log` de la carga. Está escrito en español y
 cita hoja y fila; es el documento que dice qué corregir en el archivo.

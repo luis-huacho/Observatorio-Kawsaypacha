@@ -42,7 +42,12 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 COPY pyproject.toml uv.lock* ./
-RUN uv sync --no-dev
+# Por defecto sin dependencias de desarrollo. `compose.dev.yml` construye con
+# `GRUPOS_UV=--group dev` para que pytest exista **dentro de la imagen**: correr la suite en el
+# contenedor es lo que garantiza que se prueba con las mismas versiones de GDAL, tippecanoe y
+# WeasyPrint que producción, y no con las que haya en la máquina de quien programa.
+ARG GRUPOS_UV=--no-dev
+RUN uv sync ${GRUPOS_UV}
 
 ENV PATH="/app/.venv/bin:$PATH"
 

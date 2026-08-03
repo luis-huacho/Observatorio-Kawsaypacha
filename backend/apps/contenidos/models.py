@@ -1,10 +1,17 @@
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
-from apps.core.models import TimeStampedMixin, WorkflowMixin, permiso_publicar
+from apps.core.models import (
+    HtmlRicoMixin,
+    TimeStampedMixin,
+    WorkflowMixin,
+    permiso_publicar,
+)
 
 
-class Noticia(TimeStampedMixin, WorkflowMixin):
+class Noticia(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
+    campos_html = ("cuerpo",)
+
     class Tipo(models.TextChoices):
         NOTICIA = "noticia", "Noticia"
         ARTICULO = "articulo", "Artículo"

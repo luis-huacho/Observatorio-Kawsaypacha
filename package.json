@@ -1,0 +1,13 @@
+{
+  "name": "observatorio-e2e",
+  "private": true,
+  "description": "Pruebas de extremo a extremo del Observatorio Kallpachakuy (ver _specs/08-plan-pruebas.md)",
+  "scripts": {
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:informe": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

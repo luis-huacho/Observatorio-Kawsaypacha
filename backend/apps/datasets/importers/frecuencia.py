@@ -105,6 +105,8 @@ def importar(upload) -> dict:
     desgloses: list[dict] = []
     declarados: list[dict] = []
     distritos_vistos: set[str] = set()
+    #: Distritos con fila en el Excel pero sin un solo número (ni eventos ni subtotales).
+    sin_dato: list[str] = []
 
     for n_fila, r in enumerate(filas, start=2):
         if not r or not r[idx_dist]:
@@ -172,16 +174,25 @@ def importar(upload) -> dict:
                         f"{declarado} pero el desglose suma {sumado}. Prevalece el desglose."
                     )
         else:
-            for cat_slug, i in idx_total_categoria.items():
-                declarado = _entero(r[i])
-                if declarado is None:
-                    continue
-                declarados.append({**comun, "categoria": cat_slug, "total": declarado})
-            advertencias.append(
-                f"{distrito.nombre}: la fuente declara subtotales pero no desagrega por tipo de "
-                f"evento. Se muestran los totales declarados con la advertencia correspondiente "
-                f"(ADR-D1); sin esto el distrito aparecería con 0 emergencias."
-            )
+            declarados_fila = [
+                {**comun, "categoria": cat_slug, "total": declarado}
+                for cat_slug, i in idx_total_categoria.items()
+                if (declarado := _entero(r[i])) is not None
+            ]
+            if declarados_fila:
+                declarados.extend(declarados_fila)
+                advertencias.append(
+                    f"{distrito.nombre}: la fuente declara subtotales pero no desagrega por tipo "
+                    f"de evento. Se muestran los totales declarados con la advertencia "
+                    f"correspondiente (ADR-D1); sin esto el distrito aparecería con 0 emergencias."
+                )
+            else:
+                # Fila presente y **enteramente vacía**: 21 distritos del archivo real. No es lo
+                # mismo que declarar subtotales sin desglose (arriba) ni que declarar cero: no
+                # hay ningún dato. Se cuentan aparte porque el API responderá 404 igual que para
+                # ACOMAYO, y sin este aviso 21 distritos sin información quedarían indistinguibles
+                # del único que ni siquiera está en el archivo.
+                sin_dato.append(f"{distrito.nombre} ({distrito.ubigeo})")
 
     wb.close()
 
@@ -196,6 +207,12 @@ def importar(upload) -> dict:
         advertencias.append(
             f"{len(sin_fila)} distrito(s) del padrón no tienen fila en el Excel y quedarán sin "
             f"historial de emergencias: {', '.join(sin_fila)}. Conviene pedirlas a la fuente."
+        )
+    if sin_dato:
+        advertencias.append(
+            f"{len(sin_dato)} distrito(s) tienen fila en el Excel pero ni un solo dato, ni por "
+            f"evento ni como subtotal: {', '.join(sin_dato)}. Quedan sin historial igual que los "
+            f"que no tienen fila, y conviene pedirlos a la fuente."
         )
 
     # --- Escritura atómica --------------------------------------------------
@@ -248,8 +265,11 @@ def importar(upload) -> dict:
     return {
         "filas_leidas": filas_leidas,
         "filas_importadas": len(desgloses) + len(declarados),
-        "distritos_con_datos": len(distritos_vistos),
+        "distritos_en_archivo": len(distritos_vistos),
+        # Los que quedan con algo que mostrar: la fila vacía no cuenta como dato.
+        "distritos_con_datos": len(distritos_vistos) - len(sin_dato),
         "distritos_sin_fila": sin_fila,
+        "distritos_sin_dato": sin_dato,
         "registros_desglosados": len(desgloses),
         "totales_declarados": len(declarados),
         "advertencias": advertencias[:300],

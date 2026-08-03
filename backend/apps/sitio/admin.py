@@ -4,7 +4,6 @@ from django_ckeditor_5.widgets import CKEditor5Widget
 from unfold.admin import ModelAdmin
 
 from apps.core.admin_workflow import WorkflowAdmin
-from apps.core.sanitizar import sanear
 
 from .models import BloqueTexto, ConfiguracionSitio, EnlaceMenu, HeroSlide
 
@@ -45,11 +44,6 @@ class BloqueTextoAdmin(ModelAdmin):
         if db_field.name == "cuerpo":
             kwargs["widget"] = CKEditor5Widget(config_name="default")
         return super().formfield_for_dbfield(db_field, request, **kwargs)
-
-    def save_model(self, request, obj, form, change):
-        # Vale también aquí: el saneado es del contenido, no del modelo que lo guarda.
-        obj.cuerpo = sanear(obj.cuerpo)
-        super().save_model(request, obj, form, change)
 
     def get_readonly_fields(self, request, obj=None):
         # La clave la consume el frontend por su nombre; renombrarla rompe la página en

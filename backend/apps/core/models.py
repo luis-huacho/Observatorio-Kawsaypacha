@@ -20,6 +20,32 @@ class TimeStampedMixin(models.Model):
         abstract = True
 
 
+class HtmlRicoMixin(models.Model):
+    """Sanea los campos de `campos_html` **en `save()`** (ADR-D2).
+
+    Vivía solo en `WorkflowAdmin.save_model`, y eso dejaba la garantía a medias: cualquier
+    escritura que no pasara por el formulario del admin —un `loaddata`, un script, un futuro
+    importador— metía el HTML tal cual en la base. El `help_text` de esos campos ya prometía que
+    se saneaba al guardar, así que la promesa estaba escrita en el sitio equivocado.
+
+    Aquí abajo la garantía es del modelo, y el resto del sistema la hereda: el frontend inyecta
+    con `dangerouslySetInnerHTML`, el PDF y el índice de Meilisearch leen de la base.
+    """
+
+    #: Campos con HTML de CKEditor que hay que sanear.
+    campos_html: tuple[str, ...] = ()
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        from apps.core.sanitizar import sanear
+
+        for campo in self.campos_html:
+            setattr(self, campo, sanear(getattr(self, campo, "")))
+        super().save(*args, **kwargs)
+
+
 class PublicadosManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(estado=WorkflowMixin.Estado.PUBLICADO)

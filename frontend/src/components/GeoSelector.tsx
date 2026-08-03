@@ -37,7 +37,10 @@ export default function GeoSelector({
 
   return (
     <div className="flex flex-col sm:flex-row gap-2">
+      {/* `aria-label` en los dos: el rótulo «Ubicación» que hay encima describe el par, no cada
+          select, así que un lector de pantalla anunciaría dos combos sin nombre. */}
       <select
+        aria-label="Provincia"
         value={provincia}
         onChange={(e) => onChange(e.target.value, "")}
         className="control"
@@ -48,6 +51,7 @@ export default function GeoSelector({
         ))}
       </select>
       <select
+        aria-label="Distrito"
         value={distrito}
         onChange={(e) => onChange(provincia, e.target.value)}
         disabled={!provincia}

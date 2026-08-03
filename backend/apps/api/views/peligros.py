@@ -235,13 +235,11 @@ class FrecuenciaListaView(APIView):
         responses={200: list},
     )
     def get(self, request):
-        queryset = FrecuenciaEmergencia.objects.select_related("distrito__provincia")
-        filtro = FrecuenciaFilter(request.query_params, queryset=queryset, request=request)
-        ubigeos = (
-            filtro.qs.values_list("distrito__ubigeo", flat=True).distinct()
-        )
-        distritos = Distrito.objects.filter(ubigeo__in=list(ubigeos)).select_related("provincia")
-        return Response([consultas.frecuencia(d) for d in distritos.order_by("nombre")])
+        # Los distritos salen de `consultas`, que mira **las dos** tablas: filtrar solo por
+        # FrecuenciaEmergencia dejaba fuera a los 26 distritos que declaran subtotales sin
+        # desglose (ADR-D1), Cusco incluido, mientras el detalle sí los servía.
+        distritos = consultas.distritos_con_emergencias(request.query_params)
+        return Response([consultas.frecuencia(d) for d in distritos])
 
 
 class FrecuenciaDetalleView(APIView):
@@ -291,15 +289,21 @@ class FrecuenciaExportView(APIView):
                 ]
             # Los totales declarados van en las mismas filas, marcados: si no aparecieran, el
             # Excel dejaría a Cusco en cero y contradiría al sitio (ADR-D1).
+            #
+            # Se acotan a los distritos que **pasan los mismos filtros**. La primera versión
+            # los excluía por los ubigeos que devolvía el desglose, y con un filtro que no
+            # casaba con ningún desglose esa lista salía vacía: el `exclude` no recortaba nada y
+            # el Excel de un solo distrito acababa trayendo los declarados de toda la región.
             from apps.peligros.models import TotalDeclaradoEmergencias
 
-            declarados = TotalDeclaradoEmergencias.objects.select_related(
-                "distrito__provincia", "categoria"
+            ubigeos = set(
+                consultas.distritos_con_emergencias(request.query_params).values_list(
+                    "ubigeo", flat=True
+                )
             )
-            if ubigeos := list(
-                filtro.qs.values_list("distrito__ubigeo", flat=True).distinct()
-            ):
-                declarados = declarados.exclude(distrito__ubigeo__in=ubigeos)
+            declarados = TotalDeclaradoEmergencias.objects.filter(
+                distrito__ubigeo__in=ubigeos
+            ).select_related("distrito__provincia", "categoria")
             for t in declarados.order_by("distrito__nombre", "categoria__orden"):
                 yield [
                     t.distrito.provincia.nombre,

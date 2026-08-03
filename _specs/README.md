@@ -45,7 +45,7 @@ El pipeline del spec 05 se validó de punta a punta en el prototipo (`prototype/
 ### Actualización 03/08/2026 — decisiones de despliegue y arranque de la construcción
 
 - **ADR-A6bis**: nginx + certbot en contenedor sustituyen a Caddy.
-- **ADR-A13**: dos dominios — `observatorio.predes.org.pe` (SPA) y `obs.predes.org.pe` (API, admin, media, tiles, search), con CORS entre ambos. 07 reescrito en consecuencia.
+- **ADR-A14**: dos dominios — `observatorio.predes.org.pe` (SPA) y `obs.predes.org.pe` (API, admin, media, tiles, search), con CORS entre ambos. 07 reescrito en consecuencia. (A13 ya estaba tomado por la capa CCPP agrupada.)
 - **ADR-D3**: la ventana Inversión se difiere; solo se entrega la ruta con su estado vacío.
 - Se cierran los dos pendientes que los specs arrastraban: **`GET /api/ccpp/geojson/`** queda definido en 02 (FeatureCollection completo con los mismos filtros que la tabla), y el **mapa de la ayuda memoria se renderiza en servidor** con navegador headless.
 - Nuevo **08-plan-pruebas.md**. Se evaluó añadir `data-model.md`, `infra.md`, `prod.md`, `tech.md` y `ui.md`: los cinco ya están cubiertos por 01, 07, 00 y 06, y duplicarlos solo garantiza que se desincronicen.

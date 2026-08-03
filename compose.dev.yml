@@ -24,6 +24,17 @@ services:
       - "7700:7700"
 
   backend:
+    # Con las dependencias de desarrollo, para que `pytest` corra dentro del contenedor y la
+    # suite use las mismas versiones de GDAL, tippecanoe y WeasyPrint que producción.
+    #
+    # `image` con nombre propio para que las dos imágenes convivan: sin él, un
+    # `up --build` del modo producción local reconstruye SIN el grupo dev sobre el mismo tag y
+    # `pytest` desaparece del contenedor de desarrollo con un «executable file not found».
+    image: predes-observatorio-backend-dev
+    build:
+      context: ./backend
+      args:
+        GRUPOS_UV: "--group dev"
     command: python manage.py runserver 0.0.0.0:8000
     environment:
       DEBUG: "True"
@@ -40,6 +51,13 @@ services:
       - ./data/layers:/datos:ro
 
   worker:
+    # La misma imagen que el backend: es el mismo código, y tenerlas distintas haría que una
+    # tarea se comporte de otra forma que la vista que la encoló.
+    image: predes-observatorio-backend-dev
+    build:
+      context: ./backend
+      args:
+        GRUPOS_UV: "--group dev"
     environment:
       DEBUG: "True"
       EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend

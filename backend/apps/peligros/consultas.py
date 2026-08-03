@@ -14,6 +14,43 @@ from apps.peligros.models import (
 )
 
 
+def distritos_con_emergencias(params=None):
+    """Distritos que tienen **algo que mostrar** de emergencias, según los filtros pedidos.
+
+    Mira las dos tablas, y ahí está la razón de existir de esta función: consultar solo
+    `FrecuenciaEmergencia` deja fuera a los 26 distritos que declaran subtotales sin desglose
+    (ADR-D1) —entre ellos Cusco, que es el caso que motivó el ADR—, así que la tabla y el export
+    perdían justo los distritos que el ADR existe para no perder. El detalle sí los servía, de
+    modo que el sitio se contradecía consigo mismo sin que nada fallara.
+
+    `params` acepta los mismos filtros que el resto de la familia: `distrito` y `provincia` por
+    ubigeo o nombre, y `categoria` por slug.
+    """
+    from apps.territorio.models import Distrito
+
+    params = params or {}
+    tiene_desglose = Q(frecuencias__isnull=False)
+    tiene_declarado = Q(totales_declarados__isnull=False)
+    if categoria := (params.get("categoria") or "").strip():
+        tiene_desglose &= Q(frecuencias__tipo_evento__categoria__slug=categoria)
+        tiene_declarado &= Q(totales_declarados__categoria__slug=categoria)
+
+    queryset = Distrito.objects.filter(tiene_desglose | tiene_declarado).distinct()
+
+    if valor := (params.get("distrito") or "").strip():
+        queryset = _por_ubigeo_o_nombre(queryset, "ubigeo", "nombre", valor)
+    if valor := (params.get("provincia") or "").strip():
+        queryset = _por_ubigeo_o_nombre(queryset, "provincia__ubigeo", "provincia__nombre", valor)
+    return queryset.select_related("provincia").order_by("nombre")
+
+
+def _por_ubigeo_o_nombre(queryset, campo_ubigeo: str, campo_nombre: str, valor: str):
+    """Igual que en `api.filters`: el cliente manda ubigeo cuando lo tiene y nombre cuando no."""
+    if valor.isdigit():
+        return queryset.filter(**{campo_ubigeo: valor})
+    return queryset.filter(**{f"{campo_nombre}__iexact": valor})
+
+
 def resumen(queryset_ccpp, peligro: str = "", nivel_min="") -> dict:
     """Cifras del panel de distribución y de la portada.
 

@@ -13,7 +13,6 @@ from django.contrib import admin, messages
 from django.utils.html import format_html
 
 from apps.core.models import WorkflowMixin
-from apps.core.sanitizar import sanear
 
 COLORES_ESTADO = {
     "borrador": ("#6B7280", "#F3F4F6"),
@@ -34,7 +33,7 @@ def badge(texto: str, color: str, fondo: str) -> str:
 class WorkflowAdmin(admin.ModelAdmin):
     """Base de los admin de contenido editorial."""
 
-    #: Campos con HTML de CKEditor que hay que sanear al guardar.
+    #: Campos con HTML de CKEditor: eligen el widget. El saneado lo hace el modelo.
     campos_rich: list[str] = []
 
     readonly_fields = ("estado_badge", "publicado_en", "creado_por", "revisado_por",
@@ -62,10 +61,11 @@ class WorkflowAdmin(admin.ModelAdmin):
         return excluidos
 
     def save_model(self, request, obj, form, change):
+        # El saneado del HTML **no** está aquí: lo hace `HtmlRicoMixin.save()`, para que la
+        # garantía valga también fuera del admin (un `loaddata`, un script, un importador).
+        # `campos_rich` sigue existiendo, pero solo para elegir el widget de CKEditor.
         if not change and not obj.creado_por_id:
             obj.creado_por = request.user
-        for campo in self.campos_rich:
-            setattr(obj, campo, sanear(getattr(obj, campo, "")))
         super().save_model(request, obj, form, change)
 
     # -- Acciones de transición -------------------------------------------

@@ -1,11 +1,18 @@
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
-from apps.core.models import TimeStampedMixin, WorkflowMixin, permiso_publicar
+from apps.core.models import (
+    HtmlRicoMixin,
+    TimeStampedMixin,
+    WorkflowMixin,
+    permiso_publicar,
+)
 
 
-class Medida(TimeStampedMixin, WorkflowMixin):
+class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
     """Buena práctica o experiencia de campo documentada por PREDES."""
+
+    campos_html = ("contenido",)
 
     class Ambito(models.TextChoices):
         COMUNAL = "comunal", "Comunal"
