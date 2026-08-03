@@ -86,19 +86,23 @@ export default function Peligros() {
     return max;
   }, [peligrosFiltrados]);
 
-  // Los peor clasificados primero; los 5,730 CCPP sin dato al final, que encabezar la tabla
-  // con ellos no dice nada.
-  const ccppOrdenados = useMemo(() => {
-    return [...ccppFiltrados].sort((a, b) => {
-      const na = nivelMaxPorCcpp.get(a.codigo) ?? 0;
-      const nb = nivelMaxPorCcpp.get(b.codigo) ?? 0;
-      return nb - na || a.nombre.localeCompare(b.nombre, "es");
-    });
+  // La tabla lista solo los clasificados, ordenados por gravedad: incluir el padrón completo la
+  // convertía en una lista de "sin dato" (5,730 de 8,968 en toda la región). Emparejar aquí el
+  // centro poblado con su nivel deja el tipo como Nivel y no Nivel | undefined.
+  const filasTabla = useMemo(() => {
+    return ccppFiltrados
+      .flatMap((c) => {
+        const nivel = nivelMaxPorCcpp.get(c.codigo);
+        return nivel ? [{ ccpp: c, nivel }] : [];
+      })
+      .sort((a, b) => b.nivel - a.nivel || a.ccpp.nombre.localeCompare(b.ccpp.nombre, "es"));
   }, [ccppFiltrados, nivelMaxPorCcpp]);
 
-  const totalPaginas = Math.max(1, Math.ceil(ccppOrdenados.length / POR_PAGINA));
+  const sinClasificar = ccppFiltrados.length - filasTabla.length;
+
+  const totalPaginas = Math.max(1, Math.ceil(filasTabla.length / POR_PAGINA));
   const desde = (pagina - 1) * POR_PAGINA;
-  const visibles = ccppOrdenados.slice(desde, desde + POR_PAGINA);
+  const visibles = filasTabla.slice(desde, desde + POR_PAGINA);
 
   // Cualquier cambio de filtro deja la paginación sin sentido.
   useEffect(() => {
@@ -324,18 +328,34 @@ export default function Peligros() {
 
           {/* Lista compacta */}
           <div className="card mt-4 p-5">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h2 className="font-display font-semibold text-mountain-900">
-                Centros poblados en el filtro actual
+                Centros poblados con clasificación de peligro
               </h2>
               <span className="text-sm text-ink-600">
-                {formatNumber(ccppOrdenados.length)} CCPP
+                {formatNumber(filasTabla.length)} CCPP
+                {/* Decirlo evita que la tabla se lea como el padrón completo: no tener
+                    clasificación no es lo mismo que no tener riesgo. */}
+                {sinClasificar > 0 && (
+                  <span className="text-ink-300">
+                    {" · "}
+                    {formatNumber(sinClasificar)} sin clasificación
+                  </span>
+                )}
               </span>
             </div>
-            {ccppOrdenados.length === 0 ? (
+            {filasTabla.length === 0 ? (
               <EmptyState
-                title="Sin centros poblados"
-                message="Ningún centro poblado coincide con los filtros actuales."
+                title={
+                  sinClasificar > 0 ? "Sin clasificaciones registradas" : "Sin centros poblados"
+                }
+                message={
+                  sinClasificar > 0
+                    ? `Los ${formatNumber(sinClasificar)} centros poblados del ámbito no tienen ` +
+                      "clasificación de peligro para los filtros aplicados. La ausencia de dato no " +
+                      "equivale a ausencia de riesgo."
+                    : "Ningún centro poblado coincide con los filtros actuales."
+                }
               />
             ) : (
               <>
@@ -350,32 +370,25 @@ export default function Peligros() {
                       </tr>
                     </thead>
                     <tbody>
-                      {visibles.map((c) => {
-                        const max = nivelMaxPorCcpp.get(c.codigo) ?? null;
-                        return (
-                          <tr key={c.codigo} className="border-t border-ink-300/20 hover:bg-mountain-100/40">
-                            <td className="px-2 py-2">
-                              <Link className="text-mountain-900 hover:text-mountain-700 no-underline" to={`/peligros/${c.codigo}`}>
-                                {c.nombre}
-                              </Link>
-                              <div className="text-xs text-ink-600">{c.categoria}</div>
-                            </td>
-                            <td className="px-2 py-2 hidden sm:table-cell text-ink-600">{c.distrito}</td>
-                            <td className="px-2 py-2 text-right font-mono">
-                              {c.poblacion != null ? formatNumber(c.poblacion) : "—"}
-                            </td>
-                            <td className="px-2 py-2 text-center">
-                              {max ? (
-                                <span className={`chip border ${NIVEL_BG[max]}`}>
-                                  {NIVEL_LABEL[max]}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-ink-300">sin dato</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {visibles.map(({ ccpp: c, nivel }) => (
+                        <tr key={c.codigo} className="border-t border-ink-300/20 hover:bg-mountain-100/40">
+                          <td className="px-2 py-2">
+                            <Link className="text-mountain-900 hover:text-mountain-700 no-underline" to={`/peligros/${c.codigo}`}>
+                              {c.nombre}
+                            </Link>
+                            <div className="text-xs text-ink-600">{c.categoria}</div>
+                          </td>
+                          <td className="px-2 py-2 hidden sm:table-cell text-ink-600">{c.distrito}</td>
+                          <td className="px-2 py-2 text-right font-mono">
+                            {c.poblacion != null ? formatNumber(c.poblacion) : "—"}
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <span className={`chip border ${NIVEL_BG[nivel]}`}>
+                              {NIVEL_LABEL[nivel]}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -383,8 +396,8 @@ export default function Peligros() {
                 <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-ink-300/30">
                   <span className="text-xs text-ink-600">
                     Mostrando {formatNumber(desde + 1)}–
-                    {formatNumber(Math.min(desde + POR_PAGINA, ccppOrdenados.length))} de{" "}
-                    {formatNumber(ccppOrdenados.length)} centros poblados
+                    {formatNumber(Math.min(desde + POR_PAGINA, filasTabla.length))} de{" "}
+                    {formatNumber(filasTabla.length)} centros poblados clasificados
                   </span>
                   <div className="flex items-center gap-2">
                     <button
