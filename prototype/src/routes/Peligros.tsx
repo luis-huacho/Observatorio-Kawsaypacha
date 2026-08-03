@@ -32,8 +32,8 @@ export default function Peligros() {
 
   const [provincia, setProvincia] = useState("");
   const [distrito, setDistrito] = useState("");
-  // Un único identificador de peligro: el mapa filtra el tile por `nivel_<slug>` y la tabla
-  // filtra el JSON por nombre. Ambos salen del catálogo PELIGROS.
+  // El selector guarda el slug del catálogo PELIGROS; el filtro sobre las clasificaciones
+  // compara por nombre, así que hace falta traducirlo.
   const [slug, setSlug] = useState("");
   const [nivelMin, setNivelMin] = useState(0);
   const [pagina, setPagina] = useState(1);
@@ -43,11 +43,17 @@ export default function Peligros() {
     [slug]
   );
 
-  // El tile filtra por ubigeo; el GeoSelector trabaja con nombres.
+  // Solo para citarlo en la ayuda memoria imprimible; el GeoSelector trabaja con nombres.
+  // Se acota por provincia además de por distrito: buscar solo por nombre daba el ubigeo
+  // equivocado ante distritos homónimos de provincias distintas.
   const ubigeoDistrito = useMemo(() => {
     if (ccpp.status !== "ok" || !distrito) return "";
-    return ccpp.data.find((c) => c.distrito === distrito)?.ubigeo_distrito ?? "";
-  }, [ccpp, distrito]);
+    return (
+      ccpp.data.find(
+        (c) => c.distrito === distrito && (!provincia || c.provincia === provincia)
+      )?.ubigeo_distrito ?? ""
+    );
+  }, [ccpp, distrito, provincia]);
 
   const ccppFiltrados = useMemo(() => {
     if (ccpp.status !== "ok") return [];
@@ -69,12 +75,6 @@ export default function Peligros() {
     });
   }, [peligros, ccppFiltrados, nombrePeligro, nivelMin]);
 
-  const stats = useMemo(() => {
-    const counts: Record<Nivel, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
-    for (const p of peligrosFiltrados) counts[p.nivel as Nivel]++;
-    return counts;
-  }, [peligrosFiltrados]);
-
   // Nivel máximo por centro poblado, precalculado una vez: la tabla lo leía con un filter()
   // por fila, lo que con 10,978 clasificaciones se notaba al teclear en los filtros.
   const nivelMaxPorCcpp = useMemo(() => {
@@ -85,6 +85,15 @@ export default function Peligros() {
     }
     return max;
   }, [peligrosFiltrados]);
+
+  // Se cuenta cada centro poblado una sola vez, en su nivel más alto: es la misma unidad que la
+  // tabla de abajo y que el mapa. Contar clasificaciones daba 225 donde la tabla mostraba 75 CCPP,
+  // porque los 75 centros poblados de ACOMAYO tienen 3 peligros evaluados cada uno.
+  const stats = useMemo(() => {
+    const counts: Record<Nivel, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    for (const nivel of nivelMaxPorCcpp.values()) counts[nivel]++;
+    return counts;
+  }, [nivelMaxPorCcpp]);
 
   // La tabla lista solo los clasificados, ordenados por gravedad: incluir el padrón completo la
   // convertía en una lista de "sin dato" (5,730 de 8,968 en toda la región). Emparejar aquí el
@@ -99,6 +108,48 @@ export default function Peligros() {
   }, [ccppFiltrados, nivelMaxPorCcpp]);
 
   const sinClasificar = ccppFiltrados.length - filasTabla.length;
+
+  // Los puntos del mapa se arman aquí y no desde el tile vectorial: el clustering de MapLibre solo
+  // opera sobre fuentes GeoJSON. Partir de `ccppFiltrados` y `nivelMaxPorCcpp` hace además que el
+  // visor herede exactamente los mismos filtros que la tabla — antes el mapa solo sabía del
+  // distrito, así que al elegir únicamente una provincia seguía dibujando toda la región.
+  const puntosMapa = useMemo<GeoJSON.FeatureCollection<GeoJSON.Point>>(() => {
+    // El popup necesita el desglose por peligro; agruparlo una vez evita recorrer las
+    // clasificaciones por cada centro poblado.
+    const porCcpp = new Map<string, { peligro: string; nivel: Nivel }[]>();
+    for (const p of peligrosFiltrados) {
+      const lista = porCcpp.get(p.codigo_ccpp);
+      const item = { peligro: p.peligro, nivel: p.nivel as Nivel };
+      if (lista) lista.push(item);
+      else porCcpp.set(p.codigo_ccpp, [item]);
+    }
+
+    const features = ccppFiltrados.flatMap<GeoJSON.Feature<GeoJSON.Point>>((c) => {
+      if (c.lat == null || c.lon == null) return [];
+      const clasif = (porCcpp.get(c.codigo) ?? []).sort((a, b) => b.nivel - a.nivel);
+      return [
+        {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [c.lon, c.lat] },
+          properties: {
+            codigo: c.codigo,
+            nombre: c.nombre,
+            categoria: c.categoria,
+            distrito: c.distrito,
+            provincia: c.provincia,
+            poblacion: c.poblacion ?? 0,
+            altitud: c.altitud ?? null,
+            // 0 = sin clasificación; el mapa lo pinta gris en vez de tratarlo como nivel bajo.
+            nivel: nivelMaxPorCcpp.get(c.codigo) ?? 0,
+            // Serializado: las propiedades que sobreviven al worker de clustering son escalares.
+            clasif: JSON.stringify(clasif),
+          },
+        },
+      ];
+    });
+
+    return { type: "FeatureCollection", features };
+  }, [ccppFiltrados, nivelMaxPorCcpp, peligrosFiltrados]);
 
   const totalPaginas = Math.max(1, Math.ceil(filasTabla.length / POR_PAGINA));
   const desde = (pagina - 1) * POR_PAGINA;
@@ -282,7 +333,12 @@ export default function Peligros() {
             </div>
 
             <div className="pt-3 border-t border-ink-300/30">
-              <div className="text-xs text-ink-600 mb-2">Distribución</div>
+              {/* Decir la unidad evita leer estos conteos como número de clasificaciones: cada
+                  centro poblado aparece una sola vez, en el más alto de sus peligros evaluados. */}
+              <div className="text-xs text-ink-600">Distribución</div>
+              <div className="text-[10px] text-ink-300 mb-2">
+                por centro poblado (nivel máximo)
+              </div>
               <div className="space-y-1">
                 {([4, 3, 2, 1] as Nivel[]).map((n) => (
                   <div key={n} className="flex items-center justify-between text-xs">
@@ -290,6 +346,12 @@ export default function Peligros() {
                     <span className="font-mono font-semibold">{formatNumber(stats[n])}</span>
                   </div>
                 ))}
+              </div>
+              <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-ink-300/30">
+                <span className="text-ink-600">Total</span>
+                <span className="font-mono font-semibold">
+                  {formatNumber(filasTabla.length)} CCPP
+                </span>
               </div>
             </div>
           </div>
@@ -310,9 +372,9 @@ export default function Peligros() {
                 <MapaPeligros
                   ref={mapaRef}
                   ccpp={ccpp.data}
+                  puntos={puntosMapa}
                   peligroSlug={slug || null}
-                  nivelMin={nivelMin}
-                  ubigeoDistrito={ubigeoDistrito}
+                  ambitoAcotado={Boolean(provincia || distrito)}
                 />
               </Suspense>
             ) : (

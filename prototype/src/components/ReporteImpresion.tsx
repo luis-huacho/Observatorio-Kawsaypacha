@@ -197,7 +197,7 @@ export default function ReporteImpresion({
       {/* --- Distribución por nivel ----------------------------------------------------- */}
       <section className="mt-4 evitar-corte">
         <h2 className="font-display font-semibold text-mountain-900 text-sm mb-1">
-          Distribución de clasificaciones por nivel
+          Distribución de centros poblados por nivel máximo
         </h2>
         <table className="w-full text-[11px] border-collapse">
           <thead>
@@ -228,7 +228,10 @@ export default function ReporteImpresion({
           </tbody>
         </table>
         <div className="text-[10px] text-ink-600 mt-1">
-          Un centro poblado puede tener más de una clasificación, una por cada peligro evaluado.
+          Cada centro poblado se cuenta una sola vez, en el más alto de sus peligros evaluados. El
+          total de arriba resume {formatNumber(clasificaciones.length)}{" "}
+          {clasificaciones.length === 1 ? "clasificación" : "clasificaciones"} (una por cada peligro
+          evaluado en cada centro poblado).
         </div>
       </section>
 

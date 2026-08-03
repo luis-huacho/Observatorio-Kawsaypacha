@@ -1,13 +1,17 @@
 /**
- * Visor de exposición sobre MapLibre GL + PMTiles.
+ * Visor de exposición sobre MapLibre GL.
  *
  * Sustituye a la versión Leaflet, donde cada cambio de peligro o de nivel rehacía 8,968
- * CircleMarker desde React. Aquí los puntos llegan en un tile vectorial con una propiedad
- * `nivel_<slug>` por peligro, y filtrar es reescribir una expresión sobre el tile ya
- * descargado — sin red y sin re-render.
+ * CircleMarker desde React. Aquí los centros poblados son una fuente GeoJSON agrupada
+ * (clustering) que la página arma ya filtrada, y el dibujo lo resuelve la GPU con expresiones
+ * de estilo — sin marcadores en el DOM y sin re-render de React.
  *
- * Los tiles se generan con `prototype/scripts/build_tiles.sh` y se sirven desde
- * `public/tiles/`.
+ * La fuente no puede ser un tile vectorial: MapLibre solo agrupa fuentes `geojson`. Por lo mismo
+ * el filtrado no se hace con `setFilter` (los clusters se calculan sobre la fuente entera, antes
+ * del filtro de capa) sino reemplazando los datos con `setData`.
+ *
+ * Las capas de contexto —lagunas, ríos y glaciares— sí siguen en PMTiles, generadas con
+ * `prototype/scripts/build_tiles.sh` y servidas desde `public/tiles/`.
  */
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -16,7 +20,6 @@ import { Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Layers } from "lucide-react";
 import type { CentroPoblado, Nivel } from "@/lib/types";
-import { PELIGROS } from "@/lib/types";
 import { NIVEL_COLOR, NIVEL_LABEL, formatNumber } from "@/lib/semaforo";
 import {
   BuscarLugarControl,
@@ -30,18 +33,82 @@ const CENTRO: [number, number] = [-72.0, -13.5];
 const ZOOM_INICIAL = 7;
 const TILES = "/tiles";
 const SIN_DATO = "#BDBDBD";
+const VACIO: GeoJSON.FeatureCollection<GeoJSON.Point> = {
+  type: "FeatureCollection",
+  features: [],
+};
+
+/**
+ * Símbolos proporcionales a la población.
+ *
+ * La población de los centros poblados es muy asimétrica —mediana 23 habitantes, máximo 111,930 en
+ * la ciudad del Cusco— así que una escala lineal deja el 90% de los puntos indistinguibles y una
+ * raíz continua no se puede leyendar. Clases graduadas: cada peldaño abarca un orden de magnitud y
+ * el radio crece con la raíz del área para que la comparación visual sea honesta.
+ */
+const CLASES_POBLACION: { desde: number; radio: number; etiqueta: string }[] = [
+  { desde: 0, radio: 2.5, etiqueta: "sin dato" },
+  { desde: 1, radio: 4, etiqueta: "1 – 49" },
+  { desde: 50, radio: 6, etiqueta: "50 – 199" },
+  { desde: 200, radio: 8.5, etiqueta: "200 – 999" },
+  { desde: 1000, radio: 12, etiqueta: "1 mil – 10 mil" },
+  { desde: 10000, radio: 17, etiqueta: "más de 10 mil" },
+];
+
+/** `step` de MapLibre: valor por defecto y luego pares (umbral, salida). */
+function escalaPorPoblacion(campo: maplibregl.ExpressionSpecification) {
+  const [primera, ...resto] = CLASES_POBLACION;
+  return [
+    "step",
+    campo,
+    primera.radio,
+    ...resto.flatMap((c) => [c.desde, c.radio]),
+  ] as maplibregl.ExpressionSpecification;
+}
+
+/**
+ * Los clusters usan la misma lógica sobre la población agregada del grupo, desplazada hacia
+ * arriba: un cluster siempre pesa más que cualquiera de sus puntos y debe leerse como tal.
+ */
+const RADIO_CLUSTER: maplibregl.ExpressionSpecification = [
+  "step",
+  ["get", "pob"],
+  8,
+  200, 11,
+  1000, 14,
+  10000, 18,
+  100000, 24,
+];
 
 // El protocolo pmtiles:// se registra una sola vez por sesión, no por instancia de mapa.
 let protocoloRegistrado = false;
 
 /**
- * Toda mutación del estilo (paint, filtros, visibilidad) exige que el estilo esté cargado.
+ * Toda mutación del estilo (paint, datos, visibilidad) exige que el estilo esté cargado.
  * El estado `listo` basta en el flujo normal, pero tras un hot reload React conserva el estado
  * mientras el mapa se reconstruye, así que se comprueba también contra el propio mapa.
+ *
+ * No sirve esperar el evento `load`: cuando el efecto corre justo después de que React reaccionara
+ * a ese mismo evento, `isStyleLoaded()` todavía puede devolver false —hay cambios de estilo en
+ * vuelo— y un `once("load")` sobre un mapa que ya cargó no se ejecuta jamás, así que el efecto se
+ * pierde en silencio. `styledata` tampoco basta por sí solo: sus últimas emisiones pueden llegar
+ * con el estilo aún sin asentar y después no vuelve a haber ninguna. `idle` cierra el hueco —se
+ * emite cuando ya no queda nada pendiente por cargar ni dibujar— y ambos se limpian solos con
+ * `map.remove()`.
  */
 function cuandoListo(map: maplibregl.Map, fn: () => void) {
-  if (map.isStyleLoaded()) fn();
-  else map.once("load", fn);
+  if (map.isStyleLoaded()) {
+    fn();
+    return;
+  }
+  const reintentar = () => {
+    if (!map.isStyleLoaded()) return;
+    map.off("styledata", reintentar);
+    map.off("idle", reintentar);
+    fn();
+  };
+  map.on("styledata", reintentar);
+  map.on("idle", reintentar);
 }
 
 type MapaBase = {
@@ -117,13 +184,14 @@ const CAPAS_CONTEXTO: CapaContexto[] = [
 ];
 
 type Props = {
-  /** Solo para el buscador de lugares; los puntos del mapa vienen del tile. */
+  /** Padrón completo: alimenta el buscador de lugares, que no depende de los filtros. */
   ccpp: CentroPoblado[];
-  /** Slug del peligro activo, o null para "todos" (usa nivel_max). */
+  /** Centros poblados a dibujar, ya filtrados por la página. `nivel` 0 = sin clasificación. */
+  puntos: GeoJSON.FeatureCollection<GeoJSON.Point>;
+  /** Slug del peligro activo, o null para "todos". Solo rotula la leyenda. */
   peligroSlug: string | null;
-  nivelMin: number;
-  /** Ubigeo del distrito seleccionado, o "" para toda la región. */
-  ubigeoDistrito: string;
+  /** Si hay algún filtro geográfico activo, la cámara se ciñe a los puntos recibidos. */
+  ambitoAcotado: boolean;
 };
 
 /** Lo que la página puede pedirle al mapa de forma imperativa. */
@@ -135,7 +203,7 @@ export type MapaPeligrosHandle = {
 };
 
 const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros(
-  { ccpp, peligroSlug, nivelMin, ubigeoDistrito },
+  { ccpp, puntos, peligroSlug, ambitoAcotado },
   ref
 ) {
   const contenedor = useRef<HTMLDivElement>(null);
@@ -185,7 +253,11 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
       attributionControl: { compact: true },
       style: {
         version: 8,
-        glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
+        // Auto-hospedados: fonts.openmaptiles.org dejó de servir glifos y responde un HTML con
+        // status 200, que MapLibre intenta parsear como protobuf ("Unimplemented type: 4"). Los
+        // rótulos de los grupos solo usan dígitos y la abreviatura k/M, así que basta el rango
+        // 0-255 — 168 KB en total y sin depender de terceros.
+        glyphs: "/fonts/glyphs/{fontstack}/{range}.pbf",
         sources: {
           // Una fuente por mapa base. Las que no tienen ninguna capa visible no descargan
           // teselas, y el control de atribución solo publica las que están en uso: al conmutar,
@@ -205,7 +277,22 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
           lagunas: { type: "vector", url: `pmtiles://${TILES}/lagunas.pmtiles` },
           rios: { type: "vector", url: `pmtiles://${TILES}/rios.pmtiles` },
           glaciares: { type: "vector", url: `pmtiles://${TILES}/glaciares.pmtiles` },
-          ccpp: { type: "vector", url: `pmtiles://${TILES}/ccpp.pmtiles` },
+          // Arranca vacía: los datos llegan por prop y se inyectan con setData.
+          ccpp: {
+            type: "geojson",
+            data: VACIO,
+            cluster: true,
+            clusterRadius: 50,
+            // Pasado este zoom los grupos se abren y se ve el centro poblado individual.
+            clusterMaxZoom: 12,
+            clusterProperties: {
+              // El tamaño del grupo lo da la población que concentra, no cuántos puntos son.
+              pob: ["+", ["coalesce", ["get", "poblacion"], 0]],
+              // Y el color, el peor nivel del grupo: un cluster no puede verse más benigno que
+              // el centro poblado más expuesto que contiene.
+              nivelMax: ["max", ["coalesce", ["get", "nivel"], 0]],
+            },
+          },
         },
         layers: [
           // Al fondo de la pila y todas ocultas menos la de por defecto.
@@ -244,14 +331,44 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
             paint: { "line-color": "#007480", "line-width": 0.5 },
           },
 
+          // Puntos sueltos debajo de los grupos: a zoom intermedio conviven ambos y el grupo,
+          // que resume más información, debe quedar por encima.
           {
-            id: "ccpp-puntos", type: "circle", source: "ccpp", "source-layer": "ccpp",
+            id: "ccpp-puntos", type: "circle", source: "ccpp",
+            filter: ["!", ["has", "point_count"]],
             paint: {
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 2.5, 9, 4, 14, 7],
+              "circle-radius": escalaPorPoblacion(["coalesce", ["get", "poblacion"], 0]),
               "circle-color": SIN_DATO,
               "circle-opacity": 0.75,
               "circle-stroke-width": 0.5,
               "circle-stroke-color": "#ffffff",
+            },
+          },
+          {
+            id: "ccpp-clusters", type: "circle", source: "ccpp",
+            filter: ["has", "point_count"],
+            paint: {
+              "circle-radius": RADIO_CLUSTER,
+              "circle-color": SIN_DATO,
+              "circle-opacity": 0.85,
+              "circle-stroke-width": 1.5,
+              "circle-stroke-color": "#ffffff",
+            },
+          },
+          {
+            id: "ccpp-clusters-num", type: "symbol", source: "ccpp",
+            filter: ["has", "point_count"],
+            layout: {
+              "text-field": ["get", "point_count_abbreviated"],
+              "text-font": ["Noto Sans Bold"],
+              // Acompaña al radio para que el número no desborde los grupos pequeños.
+              "text-size": ["step", ["get", "point_count"], 10, 100, 11, 1000, 12],
+              "text-allow-overlap": true,
+            },
+            paint: {
+              "text-color": "#ffffff",
+              "text-halo-color": "rgba(0,0,0,0.35)",
+              "text-halo-width": 1,
             },
           },
         ],
@@ -275,9 +392,7 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
       if (!f) return;
       const p = f.properties as Record<string, unknown>;
 
-      const clasificados = Object.entries(p)
-        .filter(([k, v]) => k.startsWith("nivel_") && k !== "nivel_max" && typeof v === "number")
-        .map(([k, v]) => ({ slug: k.slice("nivel_".length), nivel: v as Nivel }));
+      const clasificados = leerClasificaciones(p.clasif);
 
       const nodo = document.createElement("div");
       nodo.className = "text-sm";
@@ -295,7 +410,7 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
               .map(
                 (c) =>
                   `<li><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;margin-right:6px;vertical-align:middle;background:${NIVEL_COLOR[c.nivel]}"></span>` +
-                  `${nombreDePeligro(c.slug)}: <strong>${NIVEL_LABEL[c.nivel]}</strong></li>`
+                  `${c.peligro}: <strong>${NIVEL_LABEL[c.nivel]}</strong></li>`
               )
               .join("") +
             `</ul></div>`
@@ -312,8 +427,24 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
         .addTo(map);
     });
 
-    map.on("mouseenter", "ccpp-puntos", () => (map.getCanvas().style.cursor = "pointer"));
-    map.on("mouseleave", "ccpp-puntos", () => (map.getCanvas().style.cursor = ""));
+    // Un grupo no tiene ficha propia: al pulsarlo se acerca la cámara hasta el zoom en que
+    // supercluster lo descompone, que es lo que el usuario está pidiendo al hacer clic.
+    map.on("click", "ccpp-clusters", async (e) => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const fuente = map.getSource("ccpp") as maplibregl.GeoJSONSource;
+      const zoom = await fuente.getClusterExpansionZoom(f.properties.cluster_id as number);
+      map.easeTo({
+        center: (f.geometry as GeoJSON.Point).coordinates as [number, number],
+        zoom,
+        duration: 500,
+      });
+    });
+
+    for (const capa of ["ccpp-puntos", "ccpp-clusters"]) {
+      map.on("mouseenter", capa, () => (map.getCanvas().style.cursor = "pointer"));
+      map.on("mouseleave", capa, () => (map.getCanvas().style.cursor = ""));
+    }
 
     mapa.current = map;
     return () => {
@@ -324,25 +455,43 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- Filtro y color: la parte que antes obligaba a rehacer los marcadores ------------------
+  // --- Datos: con clustering el filtro vive en la fuente, no en la capa ----------------------
+  // `setFilter` no serviría aquí: supercluster agrupa la fuente entera antes de que la capa filtre,
+  // así que un cluster seguiría contando puntos ya descartados. La página entrega los centros
+  // poblados ya filtrados y aquí solo se reemplazan.
+  useEffect(() => {
+    const map = mapa.current;
+    if (!map || !listo) return;
+    cuandoListo(map, () => {
+      (map.getSource("ccpp") as maplibregl.GeoJSONSource | undefined)?.setData(puntos);
+    });
+  }, [listo, puntos]);
+
+  // --- Color del semáforo ---------------------------------------------------------------------
   useEffect(() => {
     const map = mapa.current;
     if (!map || !listo) return;
 
     cuandoListo(map, () => {
-      const campo = peligroSlug ? `nivel_${peligroSlug}` : "nivel_max";
-      // coalesce(…, 0) hace que "sin dato" sea un valor propio y no un nivel bajo.
-      const nivel: maplibregl.ExpressionSpecification = ["coalesce", ["get", campo], 0];
+      const semaforo = (nivel: maplibregl.ExpressionSpecification) =>
+        [
+          "match",
+          nivel,
+          1, NIVEL_COLOR[1],
+          2, NIVEL_COLOR[2],
+          3, NIVEL_COLOR[3],
+          4, NIVEL_COLOR[4],
+          SIN_DATO,
+        ] as maplibregl.ExpressionSpecification;
 
-      map.setPaintProperty("ccpp-puntos", "circle-color", [
-        "match",
-        nivel,
-        1, NIVEL_COLOR[1],
-        2, NIVEL_COLOR[2],
-        3, NIVEL_COLOR[3],
-        4, NIVEL_COLOR[4],
-        SIN_DATO,
-      ] as maplibregl.ExpressionSpecification);
+      // coalesce(…, 0) hace que "sin dato" sea un valor propio y no un nivel bajo.
+      const nivel: maplibregl.ExpressionSpecification = ["coalesce", ["get", "nivel"], 0];
+      map.setPaintProperty("ccpp-puntos", "circle-color", semaforo(nivel));
+      map.setPaintProperty(
+        "ccpp-clusters",
+        "circle-color",
+        semaforo(["coalesce", ["get", "nivelMax"], 0])
+      );
 
       // Los sin dato se atenúan para que el semáforo destaque. Hay que bajar también el borde:
       // `circle-stroke-opacity` es independiente de `circle-opacity` y vale 1 por defecto, así
@@ -353,41 +502,27 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
       ];
       map.setPaintProperty("ccpp-puntos", "circle-opacity", atenuar);
       map.setPaintProperty("ccpp-puntos", "circle-stroke-opacity", atenuar);
-
-      const condiciones: maplibregl.ExpressionSpecification[] = [];
-      if (nivelMin > 0) condiciones.push([">=", nivel, nivelMin]);
-      if (ubigeoDistrito) condiciones.push(["==", ["get", "ubigeo_distrito"], ubigeoDistrito]);
-
-      map.setFilter(
-        "ccpp-puntos",
-        condiciones.length ? (["all", ...condiciones] as maplibregl.FilterSpecification) : null
-      );
     });
-  }, [listo, peligroSlug, nivelMin, ubigeoDistrito]);
+  }, [listo]);
 
-  // --- Encuadre al elegir un distrito --------------------------------------------------------
-  // El filtro de arriba oculta los puntos de fuera, pero sin mover la cámara el usuario se queda
-  // mirando toda la región. Los límites salen del padrón, que ya está en memoria.
+  // --- Encuadre al acotar el ámbito -----------------------------------------------------------
+  // Sin mover la cámara, filtrar deja al usuario mirando toda la región. Los límites salen de los
+  // puntos ya filtrados, así que el encuadre funciona igual para provincia sola que para distrito.
   useEffect(() => {
     const map = mapa.current;
     if (!map || !listo) return;
-    if (!ubigeoDistrito) {
+    if (!ambitoAcotado) {
       map.flyTo({ center: CENTRO, zoom: ZOOM_INICIAL });
       return;
     }
-    const puntos = ccpp.filter(
-      (c) => c.ubigeo_distrito === ubigeoDistrito && c.lat != null && c.lon != null
-    );
-    if (!puntos.length) return;
-    const limites = puntos.reduce(
-      (b, c) => b.extend([c.lon as number, c.lat as number]),
-      new maplibregl.LngLatBounds(
-        [puntos[0].lon as number, puntos[0].lat as number],
-        [puntos[0].lon as number, puntos[0].lat as number]
-      )
+    const coords = puntos.features.map((f) => f.geometry.coordinates as [number, number]);
+    if (!coords.length) return;
+    const limites = coords.reduce(
+      (b, c) => b.extend(c),
+      new maplibregl.LngLatBounds(coords[0], coords[0])
     );
     map.fitBounds(limites, { padding: 60, maxZoom: 12, duration: 800 });
-  }, [listo, ubigeoDistrito, ccpp]);
+  }, [listo, ambitoAcotado, puntos]);
 
   // --- Mapa base -----------------------------------------------------------------------------
   useEffect(() => {
@@ -491,6 +626,28 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
             Sin dato
           </div>
         </div>
+
+        {/* El tamaño codifica una segunda variable, así que necesita su propia clave: sin ella
+            un círculo grande se lee como "más peligroso" en vez de "más gente expuesta". */}
+        <div className="text-[11px] font-semibold text-ink-900 mt-2 pt-2 border-t border-ink-300/40">
+          Población
+        </div>
+        <div className="space-y-0.5 mt-1">
+          {CLASES_POBLACION.filter((c) => c.desde > 0).map((c) => (
+            <div key={c.desde} className="flex items-center gap-1.5 text-[11px] text-ink-600">
+              <span className="w-[34px] flex justify-center shrink-0">
+                <span
+                  className="rounded-full border border-white bg-ink-300"
+                  style={{ width: c.radio * 2, height: c.radio * 2 }}
+                />
+              </span>
+              {c.etiqueta}
+            </div>
+          ))}
+        </div>
+        <div className="text-[10px] text-ink-300 mt-1 max-w-[9rem] leading-tight">
+          Los grupos suman la población de los centros poblados que contienen.
+        </div>
       </div>
     </div>
   );
@@ -498,9 +655,16 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
 
 export default MapaPeligros;
 
-/** Los tiles guardan el slug; para el popup hace falta el nombre legible del catálogo. */
-const NOMBRE_POR_SLUG = new Map<string, string>(PELIGROS.map((p) => [p.slug, p.nombre]));
-
-function nombreDePeligro(slug: string): string {
-  return NOMBRE_POR_SLUG.get(slug) ?? slug.replace(/_/g, " ");
+/**
+ * Las propiedades de una fuente GeoJSON agrupada tienen que ser escalares para sobrevivir al
+ * worker de clustering, así que el desglose por peligro viaja serializado.
+ */
+function leerClasificaciones(valor: unknown): { peligro: string; nivel: Nivel }[] {
+  if (typeof valor !== "string") return [];
+  try {
+    const lista = JSON.parse(valor);
+    return Array.isArray(lista) ? lista : [];
+  } catch {
+    return [];
+  }
 }
