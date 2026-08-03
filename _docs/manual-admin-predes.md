@@ -105,9 +105,9 @@ Tres cosas importantes:
 2. **La carga anterior queda marcada como reemplazada, no se borra.** Siempre se puede ver qué
    archivo produjo qué datos y cuándo.
 3. **Los avisos son normales.** El Excel actual produce unos cuantos: 229 filas sin nivel de
-   peligro, 2 sin código, 47 distritos que declaran un total sin desglosar y Acomayo que no tiene
-   fila. No son fallos del sistema: es la calidad de los datos de origen, y están anotados para
-   pedírselos a quien los produce.
+   peligro, 2 sin código, 26 distritos que declaran un total sin desglosar, 21 que tienen fila pero
+   ningún dato, y Acomayo que no tiene fila. No son fallos del sistema: es la calidad de los datos de
+   origen, y están anotados para pedírselos a quien los produce.
 
 Al terminar una carga de peligros, **los puntos del mapa y el buscador se actualizan solos**. No
 hay que hacer nada más.

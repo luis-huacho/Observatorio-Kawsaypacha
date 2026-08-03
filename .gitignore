@@ -67,6 +67,7 @@ frontend/vite.config.d.ts
 !/_docs/arquitectura.md
 !/_docs/desarrollo.md
 !/_docs/despliegue.md
+!/_docs/despliegue-sin-docker.md
 !/_docs/manual-admin-predes.md
 !/_docs/api.md
 

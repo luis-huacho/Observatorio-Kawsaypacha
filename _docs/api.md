@@ -141,7 +141,7 @@ Además, `desglose_disponible` distingue un tercer estado. Cusco, por ejemplo:
 }
 ```
 
-47 distritos declaran subtotales por categoría sin desglosarlos por tipo de evento (ADR-D1). Los
+26 distritos declaran subtotales por categoría sin desglosarlos por tipo de evento (ADR-D1). Los
 totales son reales y se pueden citar; lo que falta es el reparto interno. Un cliente que interprete
 `eventos: []` como «cero emergencias» dirá justo lo contrario de lo que dice el dato: por eso está
 `solo_total`, para que la interfaz lo enuncie en vez de dibujar un gráfico vacío.

@@ -29,7 +29,7 @@ Plataforma web pública de PREDES para monitorear la **Gestión del Riesgo de De
 - **Búsqueda** — Meilisearch, con llave *search-only* en el bundle del navegador.
 - **Mapas** — capas de contexto (ríos, lagunas, glaciares) como PMTiles estáticos servidos con HTTP
   Range; los centros poblados llegan como GeoJSON desde el API.
-- **Edge** — nginx + certbot en contenedor, sobre dos dominios.
+- **Edge** — nginx, sobre dos dominios.
 
 ## Mapa del repo
 
@@ -43,66 +43,265 @@ Plataforma web pública de PREDES para monitorear la **Gestión del Riesgo de De
 ├── _docs/             Documentación técnica y entregables (arquitectura, desarrollo, despliegue)
 ├── prototype/         Prototipo aprobado. CONGELADO: referencia visual, no se toca
 ├── data/              Excel y GeoJSON canónicos — NO se versionan (145 MB, los entrega PREDES)
-├── compose.yaml       Base (= producción)
+├── compose.yaml       Base (= producción con Docker)
 ├── compose.dev.yml    Override de desarrollo
 ├── compose.local.yml  Override para probar el modo producción en local, sobre HTTP
 ├── Claude.md          Guía del proyecto para el agente
 └── README.md          Este archivo
 ```
 
+---
+
+# Entorno local
+
 ## Requisitos
 
-- Docker y Docker Compose.
-- Node 22 y npm, para el frontend en modo desarrollo.
-- Los archivos de datos, que **no se versionan**: `data/layers/data/*.xlsx` y
-  `data/layers/*.geojson`. Sin ellos el seed no tiene qué importar.
-- Opcional: `uv` y Python 3.12+, si quieres correr `manage.py` desde el host.
+- **Docker** y Docker Compose.
+- **Node 22** y npm, para el frontend en modo desarrollo y para las pruebas E2E.
+- Los **archivos de datos**, que no se versionan (145 MB): `data/layers/data/*.xlsx` y
+  `data/layers/*.geojson`. Los entrega PREDES; sin ellos el seed no tiene qué importar, pero la
+  plataforma arranca igual (con `seed --solo-catalogos`).
+- Opcional: `uv` y Python 3.12+, solo si quieres correr `manage.py` desde el host.
 
-## Primera vez
+## 1. Primera vez
 
 ```bash
-# 1. Configuración
-cp backend/.env.example backend/.env     # secretos de Django (rellenar SECRET_KEY y contraseñas)
-cp .env.example .env                     # variables de compose (dominios y VITE_*)
-cp frontend/.env.example frontend/.env   # URLs que usa el frontend en dev
+# a. Configuración: tres archivos, cada uno para una cosa distinta (ver §3)
+cp backend/.env.example backend/.env     # secretos de Django
+cp .env.example .env                     # variables que interpola Docker Compose
+cp frontend/.env.example frontend/.env   # URLs que usa Vite en dev
 
-# 2. Levantar base, búsqueda, backend y worker
+# b. En backend/.env, como mínimo:
+#      SECRET_KEY            → python -c "import secrets; print(secrets.token_urlsafe(50))"
+#      POSTGRES_PASSWORD     → cualquier contraseña
+#      MEILI_MASTER_KEY      → otra cadena larga y aleatoria
+#      DJANGO_SUPERUSER_USERNAME / _EMAIL / _PASSWORD  → tu acceso al admin
+
+# c. Levantar base de datos, búsqueda, backend y worker
 docker compose -f compose.yaml -f compose.dev.yml up -d --build
 
-# 3. Sembrar: catálogos, datos reales de los Excel, contenido de demostración y tiles
+# d. Sembrar: catálogos, los Excel reales, contenido de demostración y tiles
 docker compose -f compose.yaml -f compose.dev.yml exec backend \
   python manage.py seed --demo --capas --tiles
 
-# 4. Copiar a frontend/.env la llave de búsqueda que imprime el paso anterior
+# e. Copiar a frontend/.env la llave de búsqueda que imprime el paso anterior
+#    (también la reimprime `manage.py meili_setup`)
+#      VITE_MEILI_SEARCH_KEY=...
 
-# 5. El frontend, en el host
+# f. El frontend, en el host
 cd frontend && npm install && npm run dev
 ```
 
-Con eso: **http://localhost:5173** el sitio, **http://localhost:8000/admin/** el admin,
-**http://localhost:8000/api/docs/** el API.
+El primer build tarda unos minutos porque **compila tippecanoe**; es una sola vez. El seed con
+`--tiles` tarda otro par de minutos y al final imprime los conteos: compáralos con la tabla de
+[Los datos](#los-datos).
 
-El primer build de la imagen del backend tarda unos minutos porque **compila tippecanoe**. Es una
-sola vez.
+## 2. Qué se sirve y dónde
 
-## El día a día
+| Servicio | URL | Acceso | De dónde sale |
+| --- | --- | --- | --- |
+| **El sitio** (Vite, en el host) | http://localhost:5173 | público | `npm run dev` |
+| **API** | http://localhost:8000/api/ | público, sin autenticación | contenedor `backend` |
+| Documentación del API | http://localhost:8000/api/docs/ | público | Swagger UI |
+| Esquema OpenAPI | http://localhost:8000/api/schema/ | público | YAML, para generar clientes |
+| **Admin** | http://localhost:8000/**`$ADMIN_URL`** | usuario y contraseña | `DJANGO_SUPERUSER_*` de `backend/.env`, creado por `seed` |
+| Tiles | http://localhost:8000/tiles/ccpp.pmtiles | público | vista propia, **solo con `DEBUG=True`** |
+| Media subida | http://localhost:8000/media/… | público | Django, **solo con `DEBUG=True`** |
+| **Meilisearch** | http://localhost:7700 | `Authorization: Bearer <master key>` | `MEILI_MASTER_KEY` de `backend/.env` |
+| **PostgreSQL** | localhost:5432 | usuario / contraseña / base | `POSTGRES_*` de `backend/.env` |
+| Worker de tareas | sin puerto | — | `logs -f worker` |
+
+**El prefijo del admin lo fija `ADMIN_URL`** en `backend/.env`, y el `.env.example` trae
+`gestion/`: si lo copiaste sin cambiarlo, el admin está en
+**http://localhost:8000/gestion/**, no en `/admin/`. Se cambia a propósito, porque `/admin/` es lo
+primero que prueba cualquier escaneo automático. En local puedes dejar `ADMIN_URL=admin/` si te
+resulta más cómodo.
+
+Comprobación rápida de que todo responde:
 
 ```bash
-docker compose -f compose.yaml -f compose.dev.yml up -d      # arriba
-docker compose -f compose.yaml -f compose.dev.yml down       # abajo
-docker compose -f compose.yaml -f compose.dev.yml logs -f backend worker
-docker compose -f compose.yaml -f compose.dev.yml exec backend python manage.py <comando>
+curl -s localhost:8000/api/peligros/resumen/ | grep -o '"total_ccpp":[0-9]*'   # 8968
+curl -sr 0-99 -D - -o /dev/null localhost:8000/tiles/ccpp.pmtiles | head -1    # 206
+curl -s localhost:7700/health                                                  # available
 ```
 
-Un alias ahorra teclear:
+En dev, **el navegador ataca a Meilisearch directamente** en el 7700 con la llave de solo búsqueda
+(en producción pasa por nginx bajo `/search/`). Si el 7700 no responde, el buscador sigue
+funcionando contra `/api/buscar/`, pero sin facetas ni tolerancia a errores de tecleo.
+
+## 3. Los tres `.env`
+
+Es la confusión más habitual: son tres archivos, con tres consumidores distintos.
+
+| Archivo | Lo lee | Contiene |
+| --- | --- | --- |
+| `backend/.env` | Django (`environ.Env.read_env`) y los contenedores (`env_file`) | Secretos: `SECRET_KEY`, `POSTGRES_*`, `MEILI_MASTER_KEY`, SMTP, Gemini, superusuario, `ADMIN_URL` |
+| `.env` (raíz) | **Docker Compose**, al interpolar `compose.yaml` | Las `VITE_*` que se hornean en el bundle del frontend al construir la imagen |
+| `frontend/.env` | Vite en `npm run dev` | URL del API, de la búsqueda y de los tiles para el modo desarrollo |
+
+Ninguno se versiona; los tres `.env.example` sí. Dos cosas que conviene saber:
+
+- **Las `VITE_*` se hornean en el bundle durante el build**, no se leen en runtime. Cambiarlas exige
+  reconstruir la imagen del frontend, no reiniciarla.
+- **`backend/.env` lo lee Django directamente**, así que también sirve para correr `manage.py` desde
+  el host (ver §9).
+
+## 4. El día a día
 
 ```bash
 alias dc='docker compose -f compose.yaml -f compose.dev.yml'
 alias dm='docker compose -f compose.yaml -f compose.dev.yml exec backend python manage.py'
+
+dc up -d                      # arriba
+dc down                       # abajo (los datos se conservan)
+dc ps                         # qué está corriendo
+dc logs -f backend worker     # los correos del flujo editorial salen aquí, por consola
+dm <comando>                  # cualquier comando de Django
 ```
 
-Comandos propios: `seed` (con `--demo`, `--capas`, `--tiles`, `--solo-catalogos`), `meili_setup`,
-`meili_rebuild`, `generar_tiles_ccpp`, `generar_tiles`.
+Comandos propios del proyecto:
+
+| Comando | Para qué |
+| --- | --- |
+| `seed [--demo] [--capas] [--tiles] [--solo-catalogos]` | Sembrar. Idempotente y **no pisa lo editado** |
+| `meili_setup` | Crear índices e imprimir la llave de solo búsqueda |
+| `meili_rebuild [indice]` | Reconstruir la búsqueda desde la base |
+| `generar_tiles_ccpp` | Regenerar los PMTiles de centros poblados |
+| `generar_tiles [--rehacer]` | Regenerar los PMTiles de las capas de contexto |
+
+## 5. Revisar que el sistema está bien
+
+Ocho comprobaciones, elegidas porque cada una cubre algo que **falla en silencio**: la página carga,
+el API responde 200 y la cifra que se publica es otra.
+
+| Qué | Cómo | Qué confirma |
+| --- | --- | --- |
+| Los datos entraron completos | `curl -s localhost:8000/api/peligros/resumen/` | `total_ccpp: 8968`; los importadores no perdieron filas |
+| El visor pinta | abrir http://localhost:5173/peligros | API, GeoJSON y MapLibre funcionando a la vez |
+| Los tiles salen por rangos | `curl -sr 0-99 -D - -o /dev/null localhost:8000/tiles/ccpp.pmtiles` | **206**, no 200: sin Range el visor descarga 3 MB por tesela |
+| Las capas se anuncian | `curl -s localhost:8000/api/mapas/capas/` | tres capas con su URL: los PMTiles se generaron |
+| Los filtros llegan al API | filtrar por peligro y nivel en `/peligros` | la tabla se recorta y el total lo da el servidor, no las filas cargadas |
+| La búsqueda usa Meilisearch | `curl -s localhost:8000/api/buscar/estado/` | `meili_disponible: true`; si es `false`, está en modo degradado |
+| El admin y el flujo editorial | entrar, crear una noticia, enviarla a revisión y publicarla | credenciales, permisos y avisos por correo (van a `logs -f worker`) |
+| La ayuda memoria | `curl -so /tmp/am.pdf localhost:8000/api/distritos/080101/ayuda-memoria.pdf` | WeasyPrint y la captura del mapa con Chromium |
+
+Las cinco comprobaciones **manuales previas a la entrega** —más exigentes que estas— están en
+[`_specs/08-plan-pruebas.md`](./_specs/08-plan-pruebas.md).
+
+## 6. Probar
+
+```bash
+dc exec backend pytest                 # 112 pruebas, ~35 s
+dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
+
+cd frontend && npm run lint            # tsc --noEmit
+cd frontend && npm run build           # el build es parte de la verificación
+
+npm install && npx playwright install chromium   # una sola vez, en la raíz
+npx playwright test                    # 47 E2E en escritorio y móvil
+```
+
+`pytest` corre **dentro del contenedor**, con las mismas versiones de GDAL, tippecanoe y WeasyPrint
+que producción. Si responde `executable file not found`, ver §9.
+
+Con el dev server recién arrancado conviene visitar las rutas una vez antes de lanzar Playwright:
+Vite compila cada módulo la primera vez que se lo piden, y con varios navegadores en paralelo esa
+compilación se lleva por delante el *timeout* de las peticiones.
+
+```bash
+for r in / /peligros /medidas /buscar /inversion; do curl -so /dev/null localhost:5173$r; done
+```
+
+## 7. Modo producción en local
+
+El modo desarrollo no cubre cuatro cosas: que el bundle compilado se sirva bien, que las rutas del
+router resuelvan por `try_files`, que los estáticos del admin estén donde nginx los busca, y que los
+tiles salgan por rangos con sus cabeceras CORS. Para eso hay un tercer override, sobre HTTP y un
+solo host:
+
+```bash
+# El .env de la raíz debe apuntar a http://localhost (ver .env.example)
+docker compose -f compose.yaml -f compose.local.yml up -d --build
+docker compose -f compose.yaml -f compose.local.yml run --rm frontend        # publica dist/
+docker compose -f compose.yaml -f compose.local.yml exec backend \
+  python manage.py collectstatic --noinput
+```
+
+Aquí **todo sale por el puerto 80**, como en producción: http://localhost el sitio,
+`/api/`, `/api/docs/`, el admin, `/static/`, `/media/`, `/tiles/` y `/search/`. Ningún otro puerto
+queda publicado.
+
+Tres cosas que conviene saber de este modo:
+
+- **Es fiel solo con `DEBUG=False`** en `backend/.env` (lo que trae el `.env.example`). En
+  desarrollo, `compose.dev.yml` fuerza `DEBUG=True`; aquí no se fuerza nada, así que si tu
+  `backend/.env` dice `True`, estás probando algo a medio camino.
+- Con `DEBUG=False`, **`ALLOWED_HOSTS` tiene que contener el host que uses**. Trae `localhost`; si
+  abres el sitio desde otra máquina de la red por IP, Django responde **400 Bad Request** hasta que
+  añadas esa IP (y a `CSRF_TRUSTED_ORIGINS` para poder usar el admin).
+- El login del admin **sí funciona** en `http://localhost` aunque las cookies sean `Secure`, porque
+  el navegador considera `localhost` un origen de confianza. Sobre una IP de red sin HTTPS no
+  funcionaría: la cookie de sesión se descarta y el login parece fallar sin decir por qué.
+
+Es también la corrida de pruebas que más vale:
+
+```bash
+E2E_URL=http://localhost npx playwright test
+```
+
+**Encuentra fallos de integración que el modo desarrollo no puede ver**: en dev el navegador ataca a
+Meilisearch directamente, así que un proxy `/search/` mal configurado es invisible. Ya pasó una vez.
+
+## 8. Empezar de cero
+
+```bash
+dc down -v      # ⚠️ -v BORRA los volúmenes: base de datos, índices, media y tiles
+dc up -d
+dm seed --demo --capas --tiles
+dm meili_setup  # ← imprime una llave de búsqueda NUEVA: cópiala a frontend/.env
+```
+
+`down` sin `-v` conserva los datos; `down -v` los borra. Es la forma de comprobar que las
+instrucciones de §1 funcionan en una máquina limpia — en un reset real tarda unos 50 s: 20 s en
+levantar y 29 s en sembrar con tiles.
+
+> **La llave de búsqueda cambia con el reset**, porque vive en los datos de Meilisearch. Si dejas la
+> vieja en `frontend/.env`, el navegador recibe **403** al buscar y el sitio cae al fallback de DRF:
+> sigue funcionando, sin facetas y sin tolerancia a errores de tecleo, y lo único que lo delata son
+> los 403 en la consola del navegador. Es el mismo tipo de degradación silenciosa que el fallo del
+> proxy `/search/`.
+
+## 9. Cuando algo no arranca
+
+| Síntoma | Causa y arreglo |
+| --- | --- |
+| `pytest: executable file not found` | La imagen de dev se reconstruyó sin el grupo `dev`, o el venv del volumen anónimo es el viejo: `dc up -d --build --renew-anon-volumes backend worker` |
+| El visor sale sin capas | Los tiles no se generaron: `dm seed --capas --tiles`, y comprobar `/api/mapas/capas/` |
+| El visor sale sin puntos | `/api/ccpp/geojson/` con los mismos filtros que manda la página; si devuelve `features: []`, el filtro está de más |
+| El buscador no encuentra algo publicado | `dm meili_rebuild` |
+| El sitio carga pero sin datos | `frontend/.env`: `VITE_API_URL` no apunta a `http://localhost:8000/api` |
+| **403** al buscar, en la consola del navegador | La `VITE_MEILI_SEARCH_KEY` de `frontend/.env` ya no existe (pasa tras un `down -v`): `dm meili_setup` y copiar la nueva |
+| El admin da 404 | El prefijo es `ADMIN_URL`, no `/admin/`: mira `backend/.env` |
+| «port is already allocated» | Otro proyecto ocupa 5432, 7700, 8000 o 80. `dc down` en el otro, o cambia el puerto publicado en `compose.dev.yml` |
+| Un Excel no entra | Admin → Cargas de datos → el `log` de la carga, que cita hoja y fila |
+| El PDF sale sin mapa | Degradación prevista: si la captura con Chromium falla, el documento se genera igual. El motivo está en `logs -f worker` |
+
+## 10. Sin Docker en local (opcional)
+
+Para iterar más rápido en el backend se puede correr `manage.py` desde el host, con la base y la
+búsqueda todavía en contenedores:
+
+```bash
+cd backend && uv sync --all-groups
+POSTGRES_HOST=localhost MEILI_URL=http://localhost:7700 .venv/bin/python manage.py shell
+```
+
+Sin esos dos, Django busca los hosts `db` y `meilisearch`, que solo existen dentro de la red de
+Compose. **El pipeline de tiles y el PDF no funcionan así**: necesitan tippecanoe, GDAL y Chromium,
+que viven en la imagen. Para un servidor entero sin contenedores, ver
+[`_docs/despliegue-sin-docker.md`](./_docs/despliegue-sin-docker.md).
+
+---
 
 ## Los datos
 
@@ -117,8 +316,8 @@ si no coinciden con estos, algo se perdió por el camino:
 | — con alguna clasificación | 3.238 | |
 | — sin dato clasificado | 5.730 | |
 | Clasificaciones de peligro | 10.978 | Excel SIGRID-CENEPRED |
-| Frecuencias de emergencia | 644 | Excel SIGRID-CENEPRED |
-| Totales declarados (ADR-D1) | 104 | |
+| Frecuencias de emergencia | 644 (en 64 distritos) | Excel SIGRID-CENEPRED |
+| Totales declarados (ADR-D1) | 104 (en 26 distritos) | |
 
 **Dos unidades que no son intercambiables.** «Centros poblados por su nivel máximo» (3.238) y
 «clasificaciones» (10.978) difieren en 3.4×, porque un centro poblado aporta una fila por cada
@@ -126,44 +325,104 @@ peligro evaluado. El API devuelve las dos rotuladas; usar la que no toca fue un 
 prototipo, visible como un panel que decía 225 donde la tabla de al lado decía 75.
 
 El seed también imprime **advertencias esperadas**: 229 filas del Excel sin `NIVEL_PELI`, 2 sin
-`CODIGO`, 47 distritos que declaran subtotales sin desglosar y Acomayo sin fila. No son fallos del
-importador sino calidad de los datos de origen, y están anotadas en
-[`_specs/00-alcance-decisiones.md`](./_specs/00-alcance-decisiones.md) para devolvérselas al cliente.
+`CODIGO`, **26 distritos que declaran subtotales sin desglosar**, **21 con fila pero sin ningún
+dato** y Acomayo sin fila. No son fallos del importador sino calidad de los datos de origen, y están
+anotadas en [`_specs/00-alcance-decisiones.md`](./_specs/00-alcance-decisiones.md) para
+devolvérselas al cliente.
 
-## Pruebas
+---
+
+# Producción
+
+Dos dominios en ambas vías, con CORS entre ellos:
+
+| Dominio | Sirve |
+| --- | --- |
+| `observatorio.predes.org.pe` | La SPA compilada. Es lo que se difunde |
+| `obs.predes.org.pe` | `/api/`, el admin, `/static/`, `/media/`, `/tiles/`, `/search/` |
+
+## Qué vía elegir
+
+| | **Docker Compose** (recomendada) | **Sin Docker** |
+| --- | --- | --- |
+| Base de datos | Contenedor PostgreSQL 16 + respaldo con rotación | **Servicio gestionado** (la contrata PREDES) |
+| Backend | Contenedor con gunicorn | gunicorn bajo systemd |
+| Búsqueda | Contenedor Meilisearch | Meilisearch bajo systemd |
+| tippecanoe, GDAL, WeasyPrint, Chromium | Fijados en la imagen | Instalados en el servidor |
+| Reproducibilidad | Alta: la imagen fija cada versión | A cargo de quien administra |
+| Cuándo usarla | Por defecto: es la probada de punta a punta | Cuando no se pueda usar Docker, o la base ya sea un servicio contratado |
+| Procedimiento | [`_docs/despliegue.md`](./_docs/despliegue.md) | [`_docs/despliegue-sin-docker.md`](./_docs/despliegue-sin-docker.md) |
+
+## Con Docker Compose
 
 ```bash
-dc exec backend pytest                 # 112 pruebas, ~35 s
-dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
-cd frontend && npm run lint            # tsc --noEmit
-cd frontend && npm run build           # el build es parte de la verificación
-npm install && npx playwright install chromium   # una sola vez, en la raíz
-npx playwright test                    # 45 E2E contra el dev server
+git clone <repo> observatorio && cd observatorio
+cp backend/.env.example backend/.env     # dominios reales, secretos, ADMIN_URL
+cp .env.example .env                     # VITE_* con https://obs.predes.org.pe
+
+# 1. Certificados, ANTES de levantar nginx (ver la nota de abajo)
+docker compose run --rm --entrypoint certbot --publish 80:80 certbot certonly \
+  --standalone -d observatorio.predes.org.pe -d obs.predes.org.pe \
+  --email <correo> --agree-tos --no-eff-email
+
+# 2. Todo arriba
+docker compose up -d --build
+
+# 3. Índices, llave de búsqueda y datos
+docker compose exec backend python manage.py meili_setup      # imprime VITE_MEILI_SEARCH_KEY
+docker compose exec backend python manage.py seed --capas --tiles
+
+# 4. Reconstruir el frontend con la llave ya en el .env de la raíz, y publicarlo
+docker compose build frontend && docker compose run --rm frontend
 ```
 
-`pytest` corre **dentro del contenedor**, con las mismas versiones de GDAL, tippecanoe y WeasyPrint
-que producción.
+> **El primer certificado se emite con `--standalone` y con nginx parado**, no por webroot. La
+> configuración de nginx declara `ssl_certificate`, así que **nginx no arranca hasta que los
+> certificados existen** —falla con `cannot load certificate`—, y sin nginx no hay quién sirva el
+> reto de `/.well-known/acme-challenge/`. Certbot abre él mismo el puerto 80 para resolverlo. Las
+> renovaciones posteriores sí van por webroot, con nginx ya en marcha: las hace solo el contenedor
+> `certbot`.
+>
+> Y **`--entrypoint certbot` no es opcional**: el servicio trae un `entrypoint` con el bucle de
+> renovación, de modo que sin sobreescribirlo los argumentos se ignoran y el comando se queda
+> girando en el bucle sin emitir nada.
 
-### La corrida que de verdad importa
-
-```bash
-docker compose -f compose.yaml -f compose.local.yml up -d --build
-docker compose -f compose.yaml -f compose.local.yml run --rm frontend
-E2E_URL=http://localhost npx playwright test
-```
-
-Contra el bundle compilado servido por nginx. **Es la que encuentra los fallos de integración**: en
-desarrollo el navegador ataca a Meilisearch directamente, así que un proxy `/search/` mal
-configurado es invisible hasta que el sitio se sirve como en producción. Ya pasó una vez.
-
-## Despliegue
-
-Servidor propio con Docker Compose, nginx + certbot para HTTPS y backups automáticos de PostgreSQL
-(requisito 8 del TDR). Dos dominios: `observatorio.predes.org.pe` sirve la SPA y
-`obs.predes.org.pe` el API, el admin, media, tiles y búsqueda, con CORS entre ambos.
-
-Puesta en marcha, comprobaciones posteriores, runbook, backups y diagnóstico:
+Incluye `nginx` con HTTPS, `certbot` renovando solo, y `pg_dump` diario con rotación 7/4/6 —
+restauración probada y cronometrada en 3 s. El detalle, el runbook y el diagnóstico están en
 [`_docs/despliegue.md`](./_docs/despliegue.md).
+
+## Sin Docker, con base de datos gestionada
+
+Mismo código y mismos dos dominios, sin contenedores: la base es un servicio gestionado, gunicorn y
+Meilisearch corren bajo systemd, y nginx sirve la SPA compilada. Resumen:
+
+```bash
+# 1. Paquetes del sistema (WeasyPrint, GDAL, runtime de tippecanoe, nginx, certbot,
+#    postgresql-client) y tippecanoe >= 2.17 compilado: no hay paquete en Debian ni en RHEL
+# 2. Python 3.12+ y dependencias:  uv python install 3.12 && uv sync --no-dev
+#    (Debian 12 trae Python 3.11, que NO sirve: el proyecto exige >= 3.12)
+# 3. Meilisearch como servicio systemd, escuchando solo en 127.0.0.1:7700
+# 4. La base gestionada: POSTGRES_HOST/PORT/... y PGSSLMODE=require en backend/.env
+# 5. migrate + meili_setup + seed + collectstatic
+# 6. Dos unidades systemd: gunicorn (:8000) y el worker de tareas
+# 7. nginx con los dos server_name, y certbot para los certificados
+# 8. Cron: agregación nocturna de métricas y pg_dump con rotación
+```
+
+El procedimiento completo —con los paquetes para Debian/Ubuntu **y** RHEL/Fedora, las unidades
+systemd y la configuración de nginx listas para copiar, las comprobaciones posteriores y el
+diagnóstico— está en
+[`_docs/despliegue-sin-docker.md`](./_docs/despliegue-sin-docker.md).
+
+## Lo que depende de PREDES
+
+Se implementó todo con valores por defecto seguros, y estas piezas quedan pendientes del cliente:
+DNS de los dos dominios, credenciales SMTP (mientras tanto los correos van al log),
+`GEMINI_API_KEY` (sin ella el resumen con IA se deshabilita con aviso), los datos de Inversión, la
+fila de Acomayo, y sustituir OpenTopoMap por una fuente de mapa base con licencia apta para
+producción.
+
+---
 
 ## Documentación
 
@@ -171,7 +430,8 @@ Puesta en marcha, comprobaciones posteriores, runbook, backups y diagnóstico:
 | --- | --- |
 | Entender cómo encaja todo | [`_docs/arquitectura.md`](./_docs/arquitectura.md) |
 | Levantarlo y trabajar en él | [`_docs/desarrollo.md`](./_docs/desarrollo.md) |
-| Desplegarlo y operarlo | [`_docs/despliegue.md`](./_docs/despliegue.md) |
+| Desplegarlo con Docker y operarlo | [`_docs/despliegue.md`](./_docs/despliegue.md) |
+| Desplegarlo sin Docker | [`_docs/despliegue-sin-docker.md`](./_docs/despliegue-sin-docker.md) |
 | Usar el API | [`_docs/api.md`](./_docs/api.md) |
 | Administrar contenido (para PREDES) | [`_docs/manual-admin-predes.md`](./_docs/manual-admin-predes.md) |
 | **Implementar algo** | [`_specs/`](./_specs/) — modelo de datos, contrato de API, ADR |

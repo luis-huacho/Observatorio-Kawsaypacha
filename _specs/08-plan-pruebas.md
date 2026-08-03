@@ -114,7 +114,7 @@ Un módulo por familia. El criterio es el **contrato del spec 02**, no la implem
 
 ## Casos obligatorios — E2E (Playwright)
 
-Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. 45 pruebas, ~1 min.
+Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. 47 pruebas, ~1 min.
 
 | Spec | Comprueba |
 |---|---|

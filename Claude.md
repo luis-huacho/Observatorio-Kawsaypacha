@@ -12,9 +12,10 @@ Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PRED
   - Capas de contexto (ríos, lagunas, glaciares): GeoJSON → recorte a Cusco → Tippecanoe → `.pmtiles` estáticos en `media/tiles/`, servidos con HTTP Range.
   - Capa de centros poblados del visor: **fuente `geojson` agrupada** servida por `GET /api/ccpp/geojson/` (ADR-A13). MapLibre solo agrupa fuentes `geojson`, así que el clustering obliga a salirse del tile. `generar_tiles_ccpp` sigue existiendo, pero **el visor no lo consume**.
 - Gemini 2.5 Flash: autocompleta resúmenes de PDF en el admin (humano siempre revisa antes de publicar).
-- Orquestación: `compose.yaml` es la base (= producción), con dos overrides — `compose.dev.yml` (desarrollo) y `compose.local.yml` (modo producción en local, sobre HTTP).
+- Orquestación: `compose.yaml` es la base (= producción **con contenedor de base de datos**), con dos overrides — `compose.dev.yml` (desarrollo) y `compose.local.yml` (modo producción en local, sobre HTTP).
+- **Hay dos vías de producción, y las dos están documentadas**: con Docker Compose (recomendada, `_docs/despliegue.md`) y **sin Docker con base de datos gestionada** (`_docs/despliegue-sin-docker.md`, gunicorn y Meilisearch bajo systemd). Los archivos de compose y de nginx sirven a la primera; la segunda no necesita cambios de código, solo variables de entorno.
 - Edge: **nginx + certbot** en contenedor (ADR-A6bis, sustituyó a Caddy), sobre **dos dominios** (ADR-A14): la SPA en `observatorio.predes.org.pe`, y API/admin/media/tiles/search en `obs.predes.org.pe`, con CORS entre ambos.
-- Secretos SIEMPRE en `.env` en la raíz de `frontend/` y `backend/` — nunca commitear (los `.env.example` sí se versionan).
+- Secretos en **tres** `.env`, nunca commiteados (los `.env.example` sí se versionan): `backend/.env` (secretos de Django, lo lee `read_env()` y también los contenedores por `env_file`), `frontend/.env` (URLs para `npm run dev`) y **`.env` en la raíz**, que es el que interpola Docker Compose con las `VITE_*` del build.
 
 ## Specs — leer antes de implementar cada área
 
@@ -28,9 +29,9 @@ Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PRED
 - `05-mapas-tiles.md` — pipeline de tiles, capa CCPP agrupada, gotchas de MapLibre
 - `06-frontend.md` — rutas, api.ts, estados vacíos
 - `07-despliegue-ops.md` — compose, nginx, los dos dominios, HTTPS, backups, runbook
-- `08-plan-pruebas.md` — qué se prueba y con qué; criterio de entrega
+- `08-plan-pruebas.md` — qué se prueba y con qué; criterio de entrega, y los seis fallos silenciosos que la suite encontró
 
-`_docs/` contiene la documentación técnica versionada (`arquitectura`, `desarrollo`, `despliegue`, `api`, `manual-admin-predes`) más documentos para la dirección que no se versionan. Sirve para operar; **para implementar manda `_specs/`**.
+`_docs/` contiene la documentación técnica versionada (`arquitectura`, `desarrollo`, `despliegue`, `despliegue-sin-docker`, `api`, `manual-admin-predes`) más documentos para la dirección que no se versionan. Sirve para operar; **para implementar manda `_specs/`**. Ojo al añadir un documento: `.gitignore` ignora `/_docs/*` y hay que negar el archivo nuevo explícitamente.
 
 ## Comandos
 
@@ -48,6 +49,8 @@ Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PRED
 - **Las dos unidades de la distribución no son intercambiables**: "centros poblados por su nivel máximo" (3,238) y "clasificaciones" (10,978) difieren en 3.4×, porque un CCPP aporta una fila por peligro evaluado. Cualquier cifra que se muestre tiene que declarar cuál es.
 - **El slug del peligro lleva guion bajo** (`lluvias_intensas`). Es la clave de las propiedades `nivel_<slug>` de los tiles: con guion medio el visor deja de pintar y nada más falla.
 - **El HTML rico se sanea en `save()` del modelo** (`HtmlRicoMixin.campos_html`), no en el admin. Al añadir un campo de CKEditor hay que declararlo ahí; `campos_rich` del admin solo elige el widget.
+- **`pytest` vive en la imagen `predes-observatorio-backend-dev`** (`compose.dev.yml` la construye con `GRUPOS_UV=--group dev`). Si responde `executable file not found`, hace falta `up -d --build --renew-anon-volumes backend worker`: `/app/.venv` es un volumen anónimo que sobrevive a la reconstrucción y se queda con el venv viejo.
+- **Con una variable en `proxy_pass`, nginx deja de sustituir el prefijo de la `location`**: el prefijo se quita con `rewrite`. Es lo que dejó el buscador cayendo al fallback de DRF, y la comprobación fácil no lo veía porque `GET /search/health` devuelve 200 igual (la raíz de Meilisearch también responde 200). Se comprueba con `POST /search/multi-search`.
 - Contenido editorial siempre pasa por `WorkflowMixin` (borrador → revisión → publicado); nunca publicar directo ni saltarse las notificaciones.
 - Importación de datos SOLO vía `DatasetUpload` (validación + reemplazo atómico); no escribir imports ad-hoc.
 - Mantener la paleta/design tokens del prototipo (`tailwind.config.ts`: mountain/earth/sky/level-1..4).

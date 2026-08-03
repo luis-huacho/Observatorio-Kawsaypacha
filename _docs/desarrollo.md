@@ -33,8 +33,10 @@ docker compose -f compose.yaml -f compose.dev.yml exec backend \
 cd frontend && npm install && npm run dev
 ```
 
-Con eso: **http://localhost:5173** el sitio, **http://localhost:8000/admin/** el admin,
-**http://localhost:8000/api/docs/** el API.
+Con eso: **http://localhost:5173** el sitio, **http://localhost:8000/api/docs/** el API, y el admin
+en **http://localhost:8000/`$ADMIN_URL`** — el prefijo lo fija `ADMIN_URL` en `backend/.env`, y el
+`.env.example` trae `gestion/`, así que copiándolo tal cual el admin está en `/gestion/` y no en
+`/admin/`. La tabla completa de accesos, con puertos y credenciales, está en el README.
 
 El primer build de la imagen del backend tarda unos minutos porque **compila tippecanoe**. Es una
 sola vez; las siguientes reutilizan la capa.
@@ -102,9 +104,9 @@ Al terminar imprime los conteos. Si no coinciden con estos, algo se perdió por 
 ```
 
 El seed también imprime **advertencias**, y son esperadas: 229 filas del Excel sin `NIVEL_PELI`,
-2 sin `CODIGO`, 47 distritos que declaran subtotales sin desglosar y Acomayo sin fila. No son
-errores del importador: son la calidad de los datos de origen, y están anotadas en
-`_specs/00-alcance-decisiones.md` para devolvérselas al cliente.
+2 sin `CODIGO`, **26 distritos que declaran subtotales sin desglosar**, **21 con fila pero sin
+ningún dato** y Acomayo sin fila. No son errores del importador: son la calidad de los datos de
+origen, y están anotadas en `_specs/00-alcance-decisiones.md` para devolvérselas al cliente.
 
 ## Probar el modo producción en local
 
@@ -119,10 +121,16 @@ docker compose -f compose.yaml -f compose.local.yml run --rm frontend   # public
 docker compose -f compose.yaml -f compose.local.yml exec backend python manage.py collectstatic --noinput
 ```
 
-→ **http://localhost/** el sitio compilado, **/admin/** el admin, **/api/docs/** el API.
+→ **http://localhost/** el sitio compilado, el admin bajo su `ADMIN_URL`, **/api/docs/** el API.
+Todo por el puerto 80: en este modo no queda ningún otro puerto publicado.
 
 Ojo con `VITE_*`: **Vite las hornea en el bundle durante el build**, no las lee en runtime. Si
 cambias una, hay que reconstruir la imagen del frontend (`--build`), no basta con reiniciar.
+
+Y con dos cosas más de este modo: es fiel solo con `DEBUG=False` en `backend/.env` (en desarrollo,
+`compose.dev.yml` fuerza `True`; aquí no se fuerza nada), y con `DEBUG=False` **`ALLOWED_HOSTS` tiene
+que contener el host que uses** — si abres el sitio desde otra máquina por IP, Django responde 400
+hasta que la añadas.
 
 ## Pruebas
 
@@ -132,7 +140,7 @@ dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF co
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
 npm install && npx playwright install chromium   # una sola vez, en la raíz
-npx playwright test                    # 45 E2E contra el dev server
+npx playwright test                    # 47 E2E en escritorio y móvil
 ```
 
 `pytest` vive **dentro del contenedor**, para correr con las mismas versiones de GDAL, tippecanoe

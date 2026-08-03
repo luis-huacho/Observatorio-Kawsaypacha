@@ -78,10 +78,9 @@ VITE_MEILI_SEARCH_KEY=<la imprime meili_setup; se rellena en el paso 4>
 > cambien hay que reconstruir la imagen del frontend, no basta con reiniciar.
 
 ```bash
-# 2. Certificados. Primero nginx en modo HTTP para que certbot pueda validar por webroot.
-docker compose up -d db meilisearch backend worker
-docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
-  -d observatorio.predes.org.pe -d obs.predes.org.pe \
+# 2. Certificados, con nginx todavía parado y certbot abriendo él mismo el puerto 80.
+docker compose run --rm --entrypoint certbot --publish 80:80 certbot certonly \
+  --standalone -d observatorio.predes.org.pe -d obs.predes.org.pe \
   --email <correo> --agree-tos --no-eff-email
 
 # 3. Todo arriba
@@ -100,6 +99,22 @@ docker compose build frontend && docker compose run --rm frontend
 
 `migrate` y `meili_setup` corren solos en cada arranque del contenedor (son idempotentes), así
 que el paso 4 solo hace falta para **ver** la llave.
+
+### Por qué el primer certificado va por `--standalone` y no por webroot
+
+Dos razones, las dos comprobadas:
+
+1. **nginx no arranca sin los certificados.** Los bloques `443` declaran `ssl_certificate`, y con el
+   archivo ausente nginx aborta con `cannot load certificate … No such file or directory`. Así que
+   no puede servir el reto de `/.well-known/acme-challenge/` antes de que exista el primer
+   certificado: es un círculo. Con `--standalone`, certbot abre el puerto 80 por su cuenta.
+2. **`--entrypoint certbot` no es opcional.** El servicio `certbot` define un `entrypoint` con el
+   bucle de renovación, de modo que `docker compose run --rm certbot certonly …` **ignora los
+   argumentos** y se queda girando en el bucle sin emitir nada. El síntoma es un comando que no
+   termina y no dice por qué.
+
+Las **renovaciones** sí van por webroot y no requieren nada: las hace el propio contenedor `certbot`
+cada 12 h, y el `--webroot` de su bucle prevalece sobre el método guardado en la primera emisión.
 
 ## Comprobaciones tras desplegar
 
