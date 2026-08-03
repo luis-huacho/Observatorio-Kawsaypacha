@@ -4,12 +4,16 @@ Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PRED
 
 ## Arquitectura
 
-- `frontend/` — Vite + React 18 + TS + Tailwind 3 + react-router 6; mapa en migración Leaflet → MapLibre GL + PMTiles. Consume el API vía `src/lib/api.ts` (`VITE_API_URL`).
+- `frontend/` — Vite + React 18 + TS + Tailwind 3 + react-router 6 + MapLibre GL. Consume el API vía `src/lib/api.ts` (`VITE_API_URL`).
 - `backend/` — Django 5.2 LTS + DRF + PostgreSQL 16 (sin PostGIS) + django-tasks (worker por BD, sin Redis) + admin con django-unfold. Apps en `backend/apps/`.
+- `e2e/` — pruebas de extremo a extremo con Playwright; `deploy/nginx/` — configuración de nginx (`conf.d/` producción, `local/` prueba local sobre HTTP).
 - Meilisearch: búsqueda y facetas (llave search-only para el frontend; master key solo en backend).
-- Tiles: GeoJSON → recorte a Cusco → Tippecanoe → `.pmtiles` estáticos en `media/tiles/` (servidos con HTTP Range por Caddy). La capa de CCPP se regenera desde la BD (`generar_tiles_ccpp`).
+- Mapas, **son dos cosas distintas**:
+  - Capas de contexto (ríos, lagunas, glaciares): GeoJSON → recorte a Cusco → Tippecanoe → `.pmtiles` estáticos en `media/tiles/`, servidos con HTTP Range.
+  - Capa de centros poblados del visor: **fuente `geojson` agrupada** servida por `GET /api/ccpp/geojson/` (ADR-A13). MapLibre solo agrupa fuentes `geojson`, así que el clustering obliga a salirse del tile. `generar_tiles_ccpp` sigue existiendo, pero **el visor no lo consume**.
 - Gemini 2.5 Flash: autocompleta resúmenes de PDF en el admin (humano siempre revisa antes de publicar).
-- Orquestación: `compose.yml` (+ `compose.dev.yml` para desarrollo). Caddy es el único punto de entrada (SPA, /api, /admin, /search, /media, /tiles).
+- Orquestación: `compose.yaml` es la base (= producción), con dos overrides — `compose.dev.yml` (desarrollo) y `compose.local.yml` (modo producción en local, sobre HTTP).
+- Edge: **nginx + certbot** en contenedor (ADR-A6bis, sustituyó a Caddy), sobre **dos dominios** (ADR-A14): la SPA en `observatorio.predes.org.pe`, y API/admin/media/tiles/search en `obs.predes.org.pe`, con CORS entre ambos.
 - Secretos SIEMPRE en `.env` en la raíz de `frontend/` y `backend/` — nunca commitear (los `.env.example` sí se versionan).
 
 ## Specs — leer antes de implementar cada área
@@ -21,22 +25,29 @@ Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PRED
 - `02-api.md` — contrato de endpoints y payloads
 - `03-admin-editorial.md` — Unfold, roles, flujo editorial, importadores, Gemini
 - `04-busqueda.md` — índices Meilisearch y sincronización
-- `05-mapas-tiles.md` — pipeline de tiles y migración a MapLibre
+- `05-mapas-tiles.md` — pipeline de tiles, capa CCPP agrupada, gotchas de MapLibre
 - `06-frontend.md` — rutas, api.ts, estados vacíos
-- `07-despliegue-ops.md` — compose, HTTPS, backups, runbook
+- `07-despliegue-ops.md` — compose, nginx, los dos dominios, HTTPS, backups, runbook
+- `08-plan-pruebas.md` — qué se prueba y con qué; criterio de entrega
 
-`_docs/` contiene documentos para la dirección y entregables contractuales (no técnicos): no usarlos como spec.
+`_docs/` contiene la documentación técnica versionada (`arquitectura`, `desarrollo`, `despliegue`, `api`, `manual-admin-predes`) más documentos para la dirección que no se versionan. Sirve para operar; **para implementar manda `_specs/`**.
 
 ## Comandos
 
-- Dev completo: `docker compose -f compose.yml -f compose.dev.yml up`
-- Backend: `uv run manage.py migrate | createsuperuser | check`; Meilisearch: `meili_setup` (crea índices/llaves), `meili_rebuild`; tiles: `generar_tiles_ccpp`
+- Dev completo: `docker compose -f compose.yaml -f compose.dev.yml up -d --build`, y luego `cd frontend && npm run dev` en el host (Node 22)
+- Siembra: `seed` (+ `--demo`, `--capas`, `--tiles`, `--solo-catalogos`). Es idempotente y no pisa lo editado
+- Backend: `manage.py migrate | createsuperuser | check`; Meilisearch: `meili_setup` (crea índices/llaves), `meili_rebuild`; tiles: `generar_tiles_ccpp`, `generar_tiles`
 - Frontend: `npm run dev | build | lint` (lint = `tsc --noEmit`)
+- Pruebas: `pytest` **dentro del contenedor** (`-m lento` para las 4 caras) y `npx playwright test` desde la raíz. La corrida que encuentra los fallos de integración es la de `compose.local.yml` con `E2E_URL=http://localhost` — ver `_docs/desarrollo.md`
 
 ## Convenciones
 
 - Español en modelos, admin y UI (dominio GRD peruano: ubigeo, CCPP, PIM/PIA/devengado…).
 - Los tipos TS de `frontend/src/lib/types.ts` son espejo de los serializers de `backend/apps/api/` — cambiar ambos juntos.
+- **Todo dato pasa por `frontend/src/lib/api.ts`**, que es el único punto de integración. `useJsonData` ya no existe: si una página necesita datos nuevos se le añade un endpoint, no un `fetch` suelto.
+- **Las dos unidades de la distribución no son intercambiables**: "centros poblados por su nivel máximo" (3,238) y "clasificaciones" (10,978) difieren en 3.4×, porque un CCPP aporta una fila por peligro evaluado. Cualquier cifra que se muestre tiene que declarar cuál es.
+- **El slug del peligro lleva guion bajo** (`lluvias_intensas`). Es la clave de las propiedades `nivel_<slug>` de los tiles: con guion medio el visor deja de pintar y nada más falla.
+- **El HTML rico se sanea en `save()` del modelo** (`HtmlRicoMixin.campos_html`), no en el admin. Al añadir un campo de CKEditor hay que declararlo ahí; `campos_rich` del admin solo elige el widget.
 - Contenido editorial siempre pasa por `WorkflowMixin` (borrador → revisión → publicado); nunca publicar directo ni saltarse las notificaciones.
 - Importación de datos SOLO vía `DatasetUpload` (validación + reemplazo atómico); no escribir imports ad-hoc.
 - Mantener la paleta/design tokens del prototipo (`tailwind.config.ts`: mountain/earth/sky/level-1..4).
