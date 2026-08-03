@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { CalendarDays, ExternalLink, Globe2 } from "lucide-react";
+import { CalendarDays, Landmark } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { useJsonData } from "@/lib/useJsonData";
 import type { Norma } from "@/lib/types";
@@ -7,6 +7,7 @@ import { formatFecha } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
 import Portada from "@/components/Portada";
 import PalabrasClave from "@/components/PalabrasClave";
+import EnlaceNorma, { PUBLICA } from "@/components/EnlaceNorma";
 
 export default function NormaDetalle() {
   const { slug } = useParams();
@@ -51,35 +52,31 @@ export default function NormaDetalle() {
             <CalendarDays className="w-4 h-4" />
             {formatFecha(n.fecha)}
           </span>
-          <span className="inline-flex items-center gap-1 capitalize">
-            <Globe2 className="w-4 h-4" />
-            Ámbito {n.ambito}
+          <span className="inline-flex items-center gap-1">
+            <Landmark className="w-4 h-4" />
+            Publicada por el {PUBLICA[n.ambito]}
           </span>
         </div>
 
         <Portada tipo="norma" imagen={n.imagen_portada} pie={n.imagen_titulo} alt={n.titulo} />
 
         <p className="mt-6 text-lg text-ink-900 leading-relaxed">{n.resumen}</p>
-        <div className="mt-4 text-ink-600 leading-relaxed whitespace-pre-line">{n.contenido}</div>
+
+        {/* Acción principal de la página: quien llega aquí suele venir a por el documento. */}
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <EnlaceNorma url={n.url_oficial} />
+          <span className="text-xs text-ink-600">
+            Enlace de ejemplo en el prototipo; la plataforma apuntará a la publicación oficial.
+          </span>
+        </div>
+
+        <div className="mt-6 text-ink-600 leading-relaxed whitespace-pre-line">{n.contenido}</div>
 
         {n.analisis_predes && (
           <div className="mt-6 callout p-4 text-sm">
             <span className="font-semibold text-mountain-900">Análisis PREDES: </span>
             {n.analisis_predes}
           </div>
-        )}
-
-        {/* El enlace a la norma oficial vive aquí y ya no en el listado: allí la tarjeta entera
-            es un enlace y anidar anclas es HTML inválido. */}
-        {n.url_oficial && (
-          <a
-            href={n.url_oficial}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-6 inline-flex items-center gap-1 text-sm"
-          >
-            Ver norma oficial <ExternalLink className="w-3 h-3" />
-          </a>
         )}
 
         <PalabrasClave palabras={n.palabras_clave} base="/normativa" />

@@ -10,7 +10,7 @@
     "resumen": "Crea el SINAGERD como sistema interinstitucional, define los 7 procesos de la GRD y las responsabilidades de los tres niveles de gobierno.",
     "contenido": "La Ley 29664 crea el Sistema Nacional de Gestión del Riesgo de Desastres y ordena en siete procesos lo que hasta entonces era un conjunto disperso de responsabilidades: estimación, prevención, reducción, preparación, respuesta, rehabilitación y reconstrucción.\n\nPara un gobierno local, el punto decisivo es que la gestión del riesgo deja de ser una función de emergencia y pasa a ser una competencia permanente, que debe expresarse en los instrumentos de planificación y en el presupuesto. La norma asigna al nivel distrital la ejecución de los procesos en su jurisdicción y la incorporación del enfoque de riesgo en sus planes de desarrollo.\n\nEn la práctica, esto es lo que sustenta que una municipalidad pueda —y deba— destinar recursos a prevención antes de que ocurra el desastre, y no solo a la atención posterior.",
     "analisis_predes": null,
-    "url_oficial": "https://www.gob.pe/institucion/cenepred/normas-legales/103045-29664",
+    "url_oficial": "https://www.gob.pe/cenepred",
     "imagen_portada": null,
     "imagen_titulo": null,
     "palabras_clave": [
@@ -31,7 +31,7 @@
     "resumen": "Reglamento que detalla la operación del SINAGERD, los instrumentos de planificación (PLANAGERD, PPRD) y mecanismos de coordinación.",
     "contenido": "El reglamento traduce la Ley 29664 en procedimientos concretos: define quién hace qué en cada uno de los siete procesos, establece los instrumentos de planificación y fija los mecanismos de coordinación entre niveles de gobierno.\n\nPara los distritos de Cusco, el instrumento más relevante que habilita es el Plan de Prevención y Reducción del Riesgo de Desastres (PPRD). Es el documento que articula el diagnóstico de exposición con las acciones priorizadas, y el que da soporte técnico a la formulación presupuestal.\n\nBuena parte de los estudios que alimentan la base de niveles de peligro del observatorio proviene precisamente de PPRD distritales elaborados bajo este marco, lo que explica que la cobertura de información sea desigual entre distritos: donde hay plan, hay dato.",
     "analisis_predes": "Establece el marco para los PPRD distritales; herramienta clave para la priorización de inversión en el PPR 0068.",
-    "url_oficial": null,
+    "url_oficial": "https://www.gob.pe/institucion/pcm/normas-legales",
     "imagen_portada": null,
     "imagen_titulo": null,
     "palabras_clave": [
@@ -52,7 +52,7 @@
     "resumen": "Aprueba la política regional con énfasis en cabeceras de cuenca, gestión del agua y resiliencia comunal.",
     "contenido": "La ordenanza aprueba la política regional de gestión del riesgo y adaptación al cambio climático con un horizonte al 2030, y es el primer instrumento regional que articula ambas agendas con enfoque territorial.\n\nSus énfasis —cabeceras de cuenca, gestión del agua y resiliencia comunal— coinciden con los peligros que la base de exposición muestra como más extendidos en la región: movimientos en masa, heladas y sequía. Esa coincidencia es la que permite usar la política como respaldo al priorizar intervenciones en el ámbito distrital.\n\nLa política requiere reglamentación específica para bajar a los distritos. Mientras tanto, funciona como marco de referencia en las mesas técnicas y como argumento en la formulación de proyectos.",
     "analisis_predes": "Primer instrumento regional que articula GRD con ACC con enfoque territorial. Requiere reglamentación específica para distritos.",
-    "url_oficial": null,
+    "url_oficial": "https://www.regioncusco.gob.pe/",
     "imagen_portada": null,
     "imagen_titulo": null,
     "palabras_clave": [
@@ -73,7 +73,7 @@
     "resumen": "Lineamientos para programación, formulación y ejecución del PPR 0068 — Reducción de la Vulnerabilidad y Atención de Emergencias por Desastres.",
     "contenido": "Los lineamientos regulan cómo se programa, formula y ejecuta el Programa Presupuestal 0068, que es la principal vía de financiamiento de la gestión del riesgo en el nivel local.\n\nEl cambio de fondo respecto de ejercicios anteriores está en el peso relativo entre las actividades de prevención y las de respuesta: se abre espacio para intervenciones estructurales, pero se exige sustentar la priorización con información de exposición y vulnerabilidad.\n\nEsa exigencia es la que vuelve utilizable un observatorio como este. Un distrito que puede mostrar cuántos de sus centros poblados están en nivel alto o muy alto, con qué estudio de respaldo y con qué historial de emergencias, está en condiciones de defender su formulación. El que no dispone de esa información parte en desventaja, aunque su riesgo real sea mayor.",
     "analisis_predes": "Cambia el peso relativo entre prevención y respuesta. Recomendado revisar antes de formular el PIM 2025.",
-    "url_oficial": null,
+    "url_oficial": "https://www.gob.pe/institucion/mef/normas-legales",
     "imagen_portada": null,
     "imagen_titulo": null,
     "palabras_clave": [
@@ -81,6 +81,27 @@
       "MEF",
       "prevención",
       "formulación presupuestal"
+    ]
+  },
+  {
+    "_mock": true,
+    "id": "pprd-echarati-2030",
+    "slug": "pprd-echarati-2030",
+    "titulo": "Plan de Prevención y Reducción del Riesgo de Desastres — Municipalidad Distrital de Echarati al 2030",
+    "tipo": "Ordenanza",
+    "ambito": "local",
+    "fecha": "2023-11-30",
+    "resumen": "Instrumento distrital que identifica los peligros del territorio, prioriza los centros poblados expuestos y programa las acciones de prevención y reducción del riesgo.",
+    "contenido": "Los Planes de Prevención y Reducción del Riesgo de Desastres son el instrumento con el que un distrito traduce el diagnóstico de exposición en acciones concretas y presupuestables. Se aprueban por ordenanza municipal y se formulan bajo el marco de la Ley 29664 y su reglamento.\n\nPara el observatorio son además una fuente primaria: buena parte de las clasificaciones de nivel de peligro por centro poblado que alimentan el visor proviene de los estudios contenidos en PPRD distritales como este, registrados en SIGRID-CENEPRED.\n\nEsa dependencia explica por qué la cobertura de información es tan desigual entre distritos de la región: donde hay plan formulado, hay centros poblados clasificados; donde no lo hay, el mapa queda en gris.",
+    "analisis_predes": "Ejemplo del instrumento local que sostiene la base de exposición. Los distritos sin PPRD son los que concentran los vacíos de información del visor.",
+    "url_oficial": "https://sigrid.cenepred.gob.pe/sigridv3/storage/biblioteca//17383_plan-de-prevencion-y-reduccion-del-riesgo-de-desastres-de-la-municipalidad-distrital-de-echarati-al-2030.pdf",
+    "imagen_portada": null,
+    "imagen_titulo": null,
+    "palabras_clave": [
+      "PPRD",
+      "Echarati",
+      "gobierno local",
+      "instrumentos"
     ]
   }
 ]
