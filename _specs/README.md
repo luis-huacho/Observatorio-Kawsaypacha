@@ -7,6 +7,28 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 - Fase 0 (prototipo estático) **completada y aprobada** por PREDES.
 - Fase actual: construcción de `frontend/` (Vite + React + TS + MapLibre) y `backend/` (Django 5.2 LTS + PostgreSQL + Meilisearch + PMTiles), desplegados con Docker Compose.
 
+### Actualización 03/08/2026 — auditoría de cifras del visor y clustering
+
+Auditar por qué `/peligros` mostraba 225 en "Distribución" y 75 en la tabla para ACOMAYO destapó
+una ambigüedad de unidades y arrastró un cambio de arquitectura en la capa CCPP. Se corrigieron
+00, 01, 02, 05 y 06:
+
+- **Las dos cifras eran correctas y contaban cosas distintas**: 225 clasificaciones = 75 CCPP × 3
+  peligros evaluados. La UI pasa a contar centros poblados por su nivel máximo (misma unidad que la
+  tabla y el mapa). Toda cifra de distribución en los specs lleva ahora su unidad declarada (01).
+- **Nuevo ADR-A13**: la capa CCPP del visor deja PMTiles y pasa a fuente `geojson` agrupada, porque
+  **MapLibre solo agrupa fuentes `geojson`** y el clustering con símbolos proporcionales a
+  población es requisito. Ríos, lagunas y glaciares siguen en PMTiles.
+- Con clustering, **filtrar con `setFilter` es incorrecto**: los clusters se calculan antes del
+  filtro de capa y su conteo mentiría. Se filtra con `setData` (05).
+- Hueco en el contrato de API: `/api/peligros/resumen/` no permitía derivar el nivel máximo por
+  CCPP, y falta un `/api/ccpp/geojson/` para los puntos del visor. Ambos anotados en 02, el segundo
+  **sin definir todavía**.
+- Dos bugs reales encontrados por el camino, ambos documentados en 05: el guard de estilo
+  `once("load")` que recomendaba el propio spec **no funciona** y perdía efectos en silencio, y
+  `fonts.openmaptiles.org` dejó de servir glifos (devuelve HTML con status 200). Los glifos pasan a
+  auto-hospedarse.
+
 ### Actualización 02/08/2026 — auditoría de los Excel y prueba del pipeline de tiles
 
 Los specs se escribieron contra una versión anterior de los datos. Al auditar los archivos reales de `data/layers/` se corrigieron 00, 01, 02, 03, 05 y 06. Lo que cambió de fondo:

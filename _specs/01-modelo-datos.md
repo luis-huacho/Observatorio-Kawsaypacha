@@ -102,7 +102,20 @@ Se aplica a: Medida, Norma, Documento, Noticia, Video, Evento, HeroSlide. Tambi�
 
 > **`subtipo` sale de `ClasificacionPeligro`.** En los datos reales `TIP_PELIG` toma un único valor por peligro (3 valores para los 9 peligros), o sea que es un atributo del catálogo y no de la fila. Guardarlo por clasificación duplicaba el dato en 10,978 filas y metía un campo redundante en la llave única. Pasa a `TipoPeligro.categoria_geo` y la unique queda `(centro_poblado, tipo_peligro)`.
 
-Niveles: 1 Bajo / 2 Medio / 3 Alto / 4 Muy alto (paleta `level-1..4` del prototipo). Distribución real: 1 → 1,244 · 2 → 2,814 · 3 → 3,869 · 4 → 3,051.
+Niveles: 1 Bajo / 2 Medio / 3 Alto / 4 Muy alto (paleta `level-1..4` del prototipo).
+
+**Al citar una distribución hay que decir la unidad**, porque las dos lecturas difieren en 3.4×:
+
+| Unidad | 1 Bajo | 2 Medio | 3 Alto | 4 Muy alto | Total |
+|---|---:|---:|---:|---:|---:|
+| Clasificaciones (filas de `ClasificacionPeligro`) | 1,244 | 2,814 | 3,869 | 3,051 | **10,978** |
+| Centros poblados, por su nivel **máximo** | 31 | 253 | 922 | 2,032 | **3,238** |
+
+La diferencia es que un CCPP aporta una fila por cada peligro evaluado: los 75 centros poblados del
+distrito de ACOMAYO tienen 3 peligros cada uno y suman 225 clasificaciones. La UI cuenta centros
+poblados (ver 06); un endpoint de resumen que devuelva lo otro debe nombrarlo explícitamente. Los
+5,730 CCPP restantes del padrón no tienen ninguna clasificación — y **ausencia de dato no es
+ausencia de riesgo**.
 
 ### datasets — mecanismo genérico de importación (ADR-A12)
 ```python

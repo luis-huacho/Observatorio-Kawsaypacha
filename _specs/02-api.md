@@ -13,8 +13,9 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 | `GET /api/ccpp/` | `provincia`, `distrito` (ubigeo6), `peligro` (slug), `nivel_min` 1-4, `buscar`, `page` | tabla del visor |
 | `GET /api/ccpp/{codigo}/` | — | ficha con clasificaciones anidadas |
 | `GET /api/ccpp/export.xlsx` | mismos filtros que la lista | openpyxl, streaming |
+| `GET /api/ccpp/geojson/` | mismos filtros que la lista, **sin paginar** | **PENDIENTE DE DEFINIR** (ver 05 / ADR-A13). Puntos del visor: MapLibre solo agrupa fuentes `geojson`, así que la capa CCPP no sale del tile. Un `FeatureCollection` de `Point` con `codigo, nombre, categoria, distrito, provincia, poblacion, altitud, nivel` (nivel = máximo tras aplicar los filtros; `0` = sin dato). Incluye **también los no clasificados**, que el visor pinta en gris. Orden de magnitud: 8,968 features region-wide |
 | `GET /api/peligros/tipos/` | — | catálogo (9) con orden y color |
-| `GET /api/peligros/resumen/` | `provincia`, `distrito` | agregados para cifras del home/visor |
+| `GET /api/peligros/resumen/` | `provincia`, `distrito`, `peligro`, `nivel_min` | agregados para cifras del home/visor. Devuelve **las dos unidades** (por CCPP y por clasificación) rotuladas; ver el ejemplo |
 | `GET /api/peligros/frecuencia/` | `distrito`, `provincia`, `categoria` | NUEVO: emergencias históricas por distrito |
 | `GET /api/peligros/frecuencia/export.xlsx` | ídem | |
 
@@ -36,6 +37,12 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 // GET /api/peligros/resumen/?distrito=080101
 {
   "total_ccpp": 123, "poblacion_total": 130000,
+  // [+] Distribución por nivel MÁXIMO de cada centro poblado: es lo que pinta el panel
+  // "Distribución" de /peligros y lo que debe cuadrar con el conteo de la tabla.
+  // NO se puede derivar de `por_peligro` — sumar por peligro cuenta cada CCPP tantas veces
+  // como peligros tenga evaluados (ACOMAYO: 75 CCPP → 225 clasificaciones). Tiene que venir
+  // agregado del servidor, y debe respetar los mismos filtros de peligro y nivel mínimo.
+  "por_ccpp": { "niveles": { "1": 0, "2": 0, "3": 26, "4": 49 }, "sin_clasificar": 0 },
   "por_peligro": [
     { "peligro": "Sismo", "slug": "sismo",
       "niveles": { "1": 0, "2": 3, "3": 40, "4": 80 }, "sin_dato": 0 }

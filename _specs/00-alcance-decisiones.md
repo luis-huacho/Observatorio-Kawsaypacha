@@ -51,7 +51,8 @@ Complementan a las ventanas: portada (hero administrable), buscador global, noti
 | A2 | **DRF** + django-filter + drf-spectacular | Django Ninja | API 95% lectura con filtros/paginación; ecosistema probado (throttling, exports) |
 | A3 | **django-tasks** (backend BD) + contenedor `worker` + cron | Celery + Redis | Sin broker extra; suficiente para Gemini, tiles, correos e importaciones con 1 desarrollador y 4 semanas |
 | A4 | Búsqueda: llave **search-only** de Meilisearch expuesta al navegador, proxy vía Caddy `/search/` | Proxy DRF | Las llaves search-only son seguras por diseño; facetas y typo-tolerance sin boilerplate. Las búsquedas se registran en métricas vía beacon |
-| A5 | Tiles: **PMTiles estáticos** servidos por Caddy con HTTP Range | tileserver dedicado / tiles dinámicos | MapLibre + protocolo `pmtiles://` lee por rangos; cero servicios adicionales |
+| A5 | Tiles: **PMTiles estáticos** servidos por Caddy con HTTP Range | tileserver dedicado / tiles dinámicos | MapLibre + protocolo `pmtiles://` lee por rangos; cero servicios adicionales. **Excepción: la capa CCPP** — ver A13 |
+| A13 | Capa CCPP del visor: **fuente `geojson` agrupada** (clustering + símbolos proporcionales a población) | PMTiles como el resto de capas | El clustering se pidió como requisito y **MapLibre solo agrupa fuentes `geojson`**; no hay clustering sobre fuentes vectoriales. Solo afecta a CCPP: ríos, lagunas y glaciares siguen en PMTiles. Detalle y pendientes en 05 |
 | A6 | Edge: **Caddy** (auto-Let's Encrypt) | nginx + certbot | Un contenedor: SPA + media/tiles + proxy api/admin/search + HTTPS automático |
 | A7 | Mapa: **MapLibre GL JS** (reescritura de `MapaPeligros`) | Leaflet + protomaps-leaflet | Soporte nativo MVT/PMTiles; mejor rendimiento con 8,968 puntos. Decisión del dueño del proyecto |
 | A8 | Admin: **django-unfold** | jazzmin / admin plano | UX moderna para editores no técnicos; dashboard personalizable. Decisión del dueño del proyecto |

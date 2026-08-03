@@ -35,7 +35,76 @@ Disparo: guardar `CapaCartografica` con archivo nuevo, o acción "(Re)generar ti
 6. **Swap atómico**: `mv` a `media/tiles/{slug}.pmtiles` (rename en el mismo volumen) — el mapa público nunca ve un tile corrupto.
 7. `estado_tiles=ok` + log de tippecanoe; en fallo `estado_tiles=error` + `log_error`.
 
-## Capa CCPP desde la BD (la capa central del visor)
+## Capa CCPP: GeoJSON agrupado, no tile vectorial
+
+> **Cambio respecto de la versión anterior de este spec.** Los centros poblados del visor **ya no
+> se leen de `ccpp.pmtiles`**. El dueño del proyecto pidió *marker clustering* con símbolos
+> proporcionales a la población, y **MapLibre solo agrupa fuentes `geojson`**: no existe clustering
+> sobre fuentes vectoriales, ni parámetro que lo habilite. Las capas de contexto (ríos, lagunas,
+> glaciares) siguen en PMTiles sin cambios; la excepción es únicamente la capa CCPP.
+>
+> Consecuencias que arrastra la decisión, verificadas en el prototipo:
+>
+> - **El filtrado no puede ir por `setFilter`.** Supercluster agrupa la fuente entera *antes* de
+>   que la capa aplique su filtro, así que un cluster seguiría contando puntos ya descartados y su
+>   conteo mentiría. Se filtra reemplazando los datos con `setData`.
+> - **Las propiedades de un feature agrupado deben ser escalares.** Lo que no lo sea (el desglose
+>   de peligros del popup) viaja serializado con `JSON.stringify`.
+> - **El formato ancho `nivel_<slug>` deja de hacer falta en el cliente**, porque la fuente se
+>   construye ya filtrada: cada punto lleva un solo campo `nivel` con el máximo de los peligros que
+>   sobrevivieron a los filtros, y `0` para "sin dato".
+> - En el prototipo la fuente se arma en `Peligros.tsx` desde los JSON ya cargados, de modo que el
+>   mapa hereda **exactamente** los mismos filtros que la tabla. Esto corrigió una desalineación
+>   real: el visor solo conocía el ubigeo del distrito, así que al elegir únicamente una provincia
+>   seguía dibujando toda la región mientras la tabla sí se recortaba.
+>
+> **Pendiente para `frontend/`**: de dónde sale ese GeoJSON en la plataforma. Con 8,968 puntos
+> region-wide el payload es del orden de los 2 MB que el prototipo ya descarga, así que sirve un
+> endpoint `/api/ccpp/geojson/` que acepte los mismos filtros que `/api/ccpp/` y devuelva
+> `codigo, nombre, categoria, distrito, provincia, poblacion, altitud, nivel` — pero **no está
+> decidido ni especificado en 02**. Alternativa a evaluar si el payload molesta: agrupar en
+> servidor por zoom/bbox, que es bastante más trabajo.
+
+### Símbolos proporcionales y clusters
+
+La población de los CCPP es muy asimétrica —mediana 23 habitantes, máximo 111,930 en la ciudad del
+Cusco—, así que una escala lineal deja el 90% de los puntos indistinguibles y una escala continua
+(raíz) no se puede leyendar. Clases graduadas, con el reparto real del padrón:
+
+| Población | CCPP | radio |
+|---|---:|---:|
+| 0 (sin dato) | 948 | 2.5 |
+| 1 – 49 | 5,471 | 4 |
+| 50 – 199 | 1,938 | 6 |
+| 200 – 999 | 521 | 8.5 |
+| 1,000 – 9,999 | 77 | 12 |
+| ≥ 10,000 | 13 | 17 |
+
+Los clusters usan la misma escala sobre la población **agregada** del grupo, desplazada un peldaño
+arriba, y se colorean con el **peor** nivel que contienen — un grupo no puede verse más benigno que
+el centro poblado más expuesto que agrupa. Ambas se declaran con `clusterProperties`:
+
+```js
+cluster: true, clusterRadius: 50, clusterMaxZoom: 12,
+clusterProperties: {
+  pob:      ["+",   ["coalesce", ["get", "poblacion"], 0]],
+  nivelMax: ["max", ["coalesce", ["get", "nivel"],     0]],
+}
+```
+
+Tres capas sobre la misma fuente: `ccpp-puntos` (`["!", ["has","point_count"]]`), `ccpp-clusters`
+(`["has","point_count"]`) y `ccpp-clusters-num` (symbol con `point_count_abbreviated`). El punto
+suelto va **debajo** del cluster: a zoom intermedio conviven y el grupo resume más información.
+Clic en cluster → `getClusterExpansionZoom` + `easeTo`.
+
+**El tamaño necesita su propia clave en la leyenda.** Codifica una segunda variable, y sin
+rotularla un círculo grande se lee como "más peligroso" en vez de "más gente expuesta".
+
+### Pipeline de tiles CCPP (se mantiene, pero ya no alimenta el visor)
+
+El comando sigue existiendo y el tile se sigue generando: es la referencia del formato ancho y deja
+la puerta abierta a una capa vectorial de CCPP para otros usos. Simplemente **el visor no lo
+consume**. Si se confirma que ningún consumidor lo necesita, es candidato a retirarse.
 
 No es una CapaCartografica: comando `manage.py generar_tiles_ccpp` (encadenado tras cada import de `peligros_ccpp`; también botón en admin).
 
@@ -52,11 +121,14 @@ Los nueve slugs, que deben coincidir con `TipoPeligro.slug` y con `PELIGROS` en 
 
 3. `tippecanoe -o ccpp.tmp.pmtiles -l ccpp -Z3 -z12 -r1 --drop-densest-as-needed --force` → swap a `media/tiles/ccpp.pmtiles`. `-r1` conserva todos los puntos en los zooms bajos. **El maxzoom va explícito**: con `-zg` tippecanoe deduce z6 a partir del espaciado medio de los CCPP, y a esa escala las coordenadas se cuantizan a ~150 m — se ve bien pero el clic cae en el punto equivocado. Referencia: con `-z12` el tile pesa 2.7 MB.
 
-El formato ancho permite al frontend **filtrar y colorear con expresiones MapLibre sin round-trips** al cambiar peligro/nivel. El `coalesce(…, 0)` es lo que mantiene "sin dato" como categoría propia y no como nivel bajo:
+El formato ancho se diseñó para que el frontend **filtrara y coloreara con expresiones MapLibre sin
+round-trips** al cambiar peligro/nivel. Con la capa CCPP servida como GeoJSON agrupado eso ya no
+aplica al visor: el filtro por peligro y por nivel se resuelve al construir la fuente, y cada punto
+llega con un único `nivel`. Lo que **sí** sobrevive es el `coalesce(…, 0)`, que es lo que mantiene
+"sin dato" como categoría propia y no como nivel bajo:
 ```js
-paint: { "circle-color": ["match", ["coalesce", ["get", `nivel_${slug}`], 0],
+paint: { "circle-color": ["match", ["coalesce", ["get", "nivel"], 0],
          1, C.level1, 2, C.level2, 3, C.level3, 4, C.level4, /*sin dato*/ C.sinDato ] }
-filter: [">=", ["coalesce", ["get", `nivel_${slug}`], 0], nivelMin]
 ```
 
 Implementación de referencia ya validada en local: `prototype/scripts/ccpp_to_geojsonseq.py` (emisor del formato ancho) y `prototype/scripts/build_tiles.sh` (pipeline completo con ogr2ogr y tippecanoe en contenedores).
@@ -78,9 +150,10 @@ Caddy sirve `/tiles/*` desde el volumen `media/tiles/` como estático: `Accept-R
   | `topografico` | Topográfico (OpenTopoMap) | 17 | relieve; útil para huaycos y movimientos en masa |
 
   `maxzoom` por fuente hace que MapLibre sobre-escale el último nivel disponible en vez de pedir teselas inexistentes. **OpenTopoMap es un servicio voluntario con política de uso restrictiva**: vale para el prototipo, pero en producción hay que sustituirlo por una fuente propia o con contrato. Los cuatro envían cabeceras CORS, así que la exportación PNG funciona con todos (comprobado); aun así el control captura `SecurityError` y avisa al usuario, porque las capas son administrables y el catálogo puede crecer.
-- Al montar, `GET /api/mapas/capas/` → por cada capa: `addSource(slug, { type: "vector", url: "pmtiles://" + VITE_TILES_URL + "/" + slug + ".pmtiles" })` + layer con paint derivado de `estilo` (JSON del admin → reemplazo de capas sin tocar código, requisito TDR). Fuente `ccpp` siempre presente.
+- Al montar, `GET /api/mapas/capas/` → por cada capa: `addSource(slug, { type: "vector", url: "pmtiles://" + VITE_TILES_URL + "/" + slug + ".pmtiles" })` + layer con paint derivado de `estilo` (JSON del admin → reemplazo de capas sin tocar código, requisito TDR). Esto vale para las capas de contexto; la fuente `ccpp`, siempre presente, es aparte y de tipo `geojson` agrupado (ver arriba).
+- `glyphs` apunta a los glifos auto-hospedados, no a `fonts.openmaptiles.org` (ver gotchas).
 - `MapaPeligros.tsx` y `MapaControles.ts` se portan del prototipo. Controles ya implementados: buscador de lugar (en `frontend/` pasa a alimentarse del índice Meili `ccpp` en vez del padrón en memoria) + `flyTo`, medición de distancia/área, exportar PNG, selector de mapa base + conmutador de capas en un solo panel, leyenda semáforo, vista inicial y pantalla completa.
-- Popups: `queryRenderedFeatures` con las props del tile; ficha completa desde `/api/ccpp/{codigo}/`.
+- Popups: `queryRenderedFeatures` con las props del feature; ficha completa desde `/api/ccpp/{codigo}/`. El desglose de peligros llega serializado (ver capa CCPP), así que el popup lo parsea.
 - Colores nivel 1-4: tokens `level-1..4` de `tailwind.config.ts` del prototipo.
 
 ### Implementación de referencia (`prototype/src/components/MapaPeligros.tsx`)
@@ -90,9 +163,22 @@ Caddy sirve `/tiles/*` desde el volumen `media/tiles/` como estático: `Accept-R
 Lo que costó y conviene no volver a descubrir:
 
 - **El mapa se crea con `preserveDrawingBuffer: true`.** Sin eso, `map.getCanvas().toDataURL()` devuelve un PNG en blanco. Además hay que forzar un `triggerRepaint()` y leer el canvas dentro de un `once("render")`.
-- **Los controles se añaden antes de que el estilo cargue.** Cualquier `addSource`/`addLayer`/`setPaintProperty` en `IControl.onAdd` o en un efecto lanza *"Style is not done loading"*. Todo cambio de estilo pasa por un guard `map.isStyleLoaded() ? fn() : map.once("load", fn)`.
+- **Los controles se añaden antes de que el estilo cargue.** Cualquier `addSource`/`addLayer`/`setPaintProperty` en `IControl.onAdd` o en un efecto lanza *"Style is not done loading"*, así que todo cambio de estilo necesita un guard.
+- **⚠ El guard `map.isStyleLoaded() ? fn() : map.once("load", fn)` está MAL** y estuvo escrito así en el prototipo. Cuando el efecto corre justo después de que React reaccionara al propio evento `load`, `isStyleLoaded()` todavía puede devolver `false` —hay cambios de estilo en vuelo— y entonces registra un `once("load")` sobre un mapa **que ya cargó**, que no se ejecuta jamás. El efecto se pierde en silencio: el síntoma fue un visor que arrancaba sin datos y sin colores, con cinco listeners colgados y cero errores en consola. `styledata` por sí solo tampoco basta, porque sus últimas emisiones llegan con el estilo aún sin asentar y después no vuelve a haber ninguna. El guard correcto reintenta en **`styledata` y `idle`**, y `idle` es el que cierra el hueco: se emite cuando no queda nada pendiente por cargar ni dibujar. Ambos se limpian solos con `map.remove()`.
+  ```js
+  function cuandoListo(map, fn) {
+    if (map.isStyleLoaded()) { fn(); return; }
+    const reintentar = () => {
+      if (!map.isStyleLoaded()) return;
+      map.off("styledata", reintentar); map.off("idle", reintentar); fn();
+    };
+    map.on("styledata", reintentar); map.on("idle", reintentar);
+  }
+  ```
+- **`fonts.openmaptiles.org` ya no sirve glifos.** Devuelve una página HTML con **status 200** para cualquier fontstack, que MapLibre intenta parsear como protobuf: `Unimplemented type: 4`, repetido por tesela. No falla mientras el estilo no tenga ninguna capa `symbol`, así que la URL muerta puede llevar tiempo ahí sin que nadie lo note. Los glifos se **auto-hospedan** en `public/fonts/glyphs/{fontstack}/{range}.pbf`: los rótulos de los clusters solo usan dígitos y la abreviatura k/M, así que basta el rango `0-255` de Noto Sans Regular y Bold — 168 KB, sin dependencia de terceros.
 - **`addProtocol("pmtiles", …)` se registra una vez por sesión**, no por instancia de mapa.
-- **Filtrar por distrito no basta**: hay que mover la cámara (`fitBounds` sobre los CCPP del distrito), o el usuario se queda mirando toda la región con casi todo oculto.
+- **Filtrar no basta**: hay que mover la cámara (`fitBounds` sobre los puntos que quedan), o el usuario se queda mirando toda la región con casi todo oculto. Encuadrar sobre la fuente ya filtrada —en vez de sobre "los CCPP del distrito"— hace que funcione igual para provincia sola que para distrito.
+- **Resolver un ubigeo por nombre de distrito es frágil.** `find(c => c.distrito === nombre)` sobre el padrón completo devuelve el primer homónimo de cualquier provincia. En Cusco hoy no hay colisiones, pero la suposición era implícita; hay que acotar también por provincia.
 - Los enlaces dentro de un popup no pueden ser `<a href>` — recargarían la SPA. Se usa un `<button>` con un handler que llama a `navigate()` del router.
 - El buscador de lugares necesita `stopPropagation` de `keydown` en su contenedor; si no, teclear dispara los atajos de teclado de MapLibre.
 - **`circle-stroke-opacity` es independiente de `circle-opacity`** y vale 1 por defecto. Con el relleno atenuado y el anillo opaco, los 5,730 puntos sin clasificar se funden en una mancha blanca, muy visible sobre ortofoto. Hay que atenuar ambas con la misma expresión.
