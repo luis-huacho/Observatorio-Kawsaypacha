@@ -10,14 +10,22 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 |---|---|---|
 | `GET /api/territorio/provincias/` | — | sin paginar (13) |
 | `GET /api/territorio/distritos/` | `provincia=<ubigeo4>` | sin paginar (112) |
-| `GET /api/ccpp/` | `provincia`, `distrito` (ubigeo6), `peligro` (slug), `nivel_min` 1-4, `buscar`, `page` | tabla del visor |
+| `GET /api/ccpp/` | `provincia`, `distrito` (ubigeo6), `peligro` (slug), `nivel_min` 1-4, `buscar`, `clasificados`, `page` | Padrón con `nivel` anotado (máximo tras los filtros; `null` = sin dato). **`clasificados=1`** deja solo los que tienen clasificación: es lo que usa la tabla del visor, porque el padrón completo la convertiría en una lista de «sin dato» (5,730 de 8,968 en la región). Ordena por nivel descendente con los «sin dato» al final |
 | `GET /api/ccpp/{codigo}/` | — | ficha con clasificaciones anidadas |
 | `GET /api/ccpp/export.xlsx` | mismos filtros que la lista | openpyxl, streaming |
 | `GET /api/ccpp/geojson/` | mismos filtros que la lista, **sin paginar** | Puntos del visor (ver 05 / ADR-A13). `FeatureCollection` de `Point`; ver el ejemplo y la nota de tamaño más abajo |
 | `GET /api/peligros/tipos/` | — | catálogo (9) con orden y color |
 | `GET /api/peligros/resumen/` | `provincia`, `distrito`, `peligro`, `nivel_min` | agregados para cifras del home/visor. Devuelve **las dos unidades** (por CCPP y por clasificación) rotuladas; ver el ejemplo |
-| `GET /api/peligros/frecuencia/` | `distrito`, `provincia`, `categoria` | NUEVO: emergencias históricas por distrito |
-| `GET /api/peligros/frecuencia/export.xlsx` | ídem | |
+| `GET /api/peligros/frecuencia/` | `distrito`, `provincia`, `categoria` | Lista, sin paginar (≤111): una entrada por distrito con datos |
+| `GET /api/peligros/frecuencia/{ubigeo}/` | — | El panel de un distrito. **404** si no tiene fila (ver abajo) |
+| `GET /api/peligros/frecuencia/export.xlsx` | ídem | Incluye los totales declarados marcados, o el Excel dejaría a Cusco en cero |
+
+> **Desviación deliberada respecto de la primera versión de este contrato.** El ejemplo original
+> mostraba `?distrito=…` devolviendo **un objeto** y 404 para Acomayo, pero el mismo endpoint sin
+> `distrito` tiene que devolver una lista (es lo que consume `FrecuenciaEmergencias.tsx`). Un
+> endpoint que cambia de forma según los parámetros es peor que dos endpoints, así que la lista y
+> el detalle se separan: `?distrito=080201` en la lista devuelve `[]`, y `/frecuencia/080201/` da
+> 404. Los dos estados vacíos siguen siendo distinguibles, que es lo que el contrato exigía.
 
 ### `/api/ccpp/geojson/` — la fuente del visor
 
@@ -61,6 +69,8 @@ Decisión de tamaño: se sirve el `FeatureCollection` completo en vez de agrupar
 // El frontend debe distinguir "sin dato" de "nivel bajo", no colapsarlos.
 
 // GET /api/peligros/resumen/?distrito=080101
+// El payload declara la unidad de cada bloque en un campo `unidades`: las dos lecturas
+// difieren en 3.4× y cualquier cliente que dibuje una de las dos tiene que poder rotularla.
 {
   "total_ccpp": 123, "poblacion_total": 130000,
   // [+] Distribución por nivel MÁXIMO de cada centro poblado: es lo que pinta el panel
@@ -106,7 +116,7 @@ Notas del contrato:
 
 - `desglose_disponible: false` significa que los totales salen de `TotalDeclaradoEmergencias`, no de la suma por evento. El frontend debe decirlo explícitamente en vez de dibujar un gráfico vacío o un cero.
 - **`rango_fecha` es por distrito** (23 variantes distintas, rango global 2000–2025). No existe un periodo regional, así que ningún agregado provincial o regional puede anunciar uno: los totales entre distritos no son directamente comparables.
-- Los distritos sin fila en el Excel (hoy solo **ACOMAYO, 080201**) responden **404**; los que tienen fila pero sin emergencias devuelven `total: 0`. Son dos estados vacíos distintos y la UI los distingue.
+- Los distritos sin fila en el Excel (hoy solo **ACOMAYO, 080201**) responden **404** en el detalle; los que tienen fila pero sin emergencias devuelven `total: 0`. Son dos estados vacíos distintos y la UI los distingue: el primero es un vacío de la fuente que hay que pedirle al cliente, el segundo es un dato real.
 
 ## Contenido editorial
 
