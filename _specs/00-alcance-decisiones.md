@@ -86,10 +86,11 @@ Complementan a las ventanas: portada (hero administrable), buscador global, noti
 
 Detectadas al auditar los Excel (02/08/2026); ninguna bloquea el desarrollo, todas conviene que PREDES las corrija en origen:
 
-1. El distrito de **Cusco** declara 134 emergencias sin desglose por tipo de evento.
+1. El distrito de **Cusco** declara 134 emergencias sin desglose por tipo de evento. Con él, **26 distritos** declaran subtotales sin desagregar (104 filas de total declarado).
 2. Falta la fila del distrito de **Acomayo** en `Base_Frecuencia_Peligro_Cusco.xlsx`.
 3. **229 filas** del Excel de niveles traen peligro y respaldo documental pero sin `NIVEL_PELI`.
 4. Descuadres entre subtotal y desglose en **Sangarará** y **Mollepata**.
 5. Dos grafías de la misma fuente (`SIGRID_CENEPRED` / `CENEPRED_SIGRID`) y 23 formatos de `RANGO FECHA`.
 6. `Incendio forestal` está clasificado como "inducido por acción humana" en un Excel y como "meteorológico" en el otro.
 7. En `lagos-y-lagunas.geojson`, 4 lagunas traen `DPTO` compuesto (`Arequipa/Cusco`, `Madre deDios/Cusco`, `Cusco/Junin`): cruzan el límite regional y ningún filtro por departamento las incluye. Conviene decidir con PREDES si deben mostrarse.
+8. **21 distritos tienen fila en el Excel de frecuencia y ni un solo dato** (ACOPIA, ACOS, MOSOC LLACTA, POMACANCHI, RONDOCAN, ANTA, CHINCHAYPUJIO, HUAROCONDO, LIMATAMBO, PUCYURA, ZURITE, ALTO PICHIGUA, CONDOROMA, COPORAQUE, ESPINAR, OCORURO, PALLPATA, PICHIGUA, INKAWASI, OCOBAMBA, SANTA ANA): ni por evento ni como subtotal. Sumados a Acomayo, son **22 de los 112 distritos sin historial de emergencias**, y el API responde 404 para todos ellos. Es distinto de declarar cero, y distinto de declarar un subtotal sin desagregar: no hay dato. Detectado el 03/08/2026 al escribir las pruebas del importador.

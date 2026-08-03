@@ -66,7 +66,18 @@ server {
     location /api/     { proxy_pass http://backend:8000; }
     location /gestion/ { proxy_pass http://backend:8000; }   # ADMIN_URL del .env
     location /static/  { alias /srv/static/; }
-    location /search/  { proxy_pass http://meilisearch:7700/; }
+
+    # El prefijo se quita con `rewrite`, NO con la barra final de proxy_pass: la configuración
+    # real usa una variable en el destino (ver el resolver, más abajo), y en cuanto proxy_pass
+    # lleva una variable nginx deja de sustituir el prefijo de la location. Con
+    # `proxy_pass http://$destino/` todas las peticiones llegaban a la RAÍZ de Meilisearch:
+    # `/search/health` daba 200 —la raíz también responde 200— y `POST /search/multi-search`
+    # daba 405, así que el buscador caía al fallback de DRF en cada búsqueda sin un error a la
+    # vista. La comprobación de despliegue es `POST /search/multi-search`, no `/search/health`.
+    location /search/ {
+        rewrite ^/search/(.*)$ /$1 break;
+        proxy_pass http://meilisearch:7700;
+    }
 
     location /media/ {
         alias /srv/media/;

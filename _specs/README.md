@@ -51,6 +51,34 @@ El pipeline del spec 05 se validó de punta a punta en el prototipo (`prototype/
 - Nuevo **08-plan-pruebas.md**. Se evaluó añadir `data-model.md`, `infra.md`, `prod.md`, `tech.md` y `ui.md`: los cinco ya están cubiertos por 01, 07, 00 y 06, y duplicarlos solo garantiza que se desincronicen.
 - `frontend/` se recreó desde `prototype/`: la copia anterior era previa a la migración a MapLibre.
 
+### Actualización 03/08/2026 — la suite de pruebas y los seis fallos silenciosos
+
+Escribir las pruebas del plan 08 encontró seis defectos, **ninguno visible**: en los seis casos el
+sistema respondía 200 y la pantalla se veía bien. Se corrigieron con las pruebas que los detectan, y
+08 los lista con su síntoma para que quede el argumento de por qué la fase existe:
+
+- **El proxy `/search/` mandaba todo a la raíz de Meilisearch.** Una variable en `proxy_pass`
+  desactiva la sustitución del prefijo de la `location`, así que la barra final no reescribía nada.
+  El buscador caía al fallback de DRF en cada búsqueda. Y `GET /search/health` devolvía 200 —la raíz
+  de Meilisearch también responde 200—, de modo que la comprobación obvia lo tapaba. Corregido en 07
+  con `rewrite`; la verificación de despliegue pasa a ser `POST /search/multi-search`.
+- **El listado de frecuencia omitía los 26 distritos que solo declaran subtotales** (ADR-D1), Cusco
+  incluido, mientras su detalle sí los servía. Se añade `consultas.distritos_con_emergencias`, que
+  mira las dos tablas: 64 → 90 entradas sobre los datos reales. Documentado en 02.
+- **El export de frecuencia ignoraba los filtros** al añadir los declarados.
+- **El saneado de HTML vivía en el admin**, no en `save()`, mientras el `help_text` del campo
+  prometía lo contrario (01 y 03 actualizados con `HtmlRicoMixin`).
+- **21 distritos con fila vacía** recibían el aviso de ADR-D1, que dice otra cosa. Nuevo hallazgo de
+  calidad de datos en 00: son un vacío de información, no un «declara sin desagregar».
+- **El beacon de métricas estaba limitado a 60/min por IP**, y una institución entera comparte IP
+  detrás del NAT (07).
+
+Dos lecciones de método, ya en 08: la corrida E2E **contra nginx** no es opcional —en desarrollo el
+navegador ataca a Meilisearch directamente y el fallo del proxy no existe—, y las dos muestras de
+Excel tienen que ser consistentes entre sí, porque el importador de frecuencia resuelve el distrito
+por nombre contra el padrón y sin un CCPP de Ollantaytambo las pruebas de ADR-D1 pasaban sin
+comprobar nada.
+
 ## Orden de lectura
 
 | Doc | Contenido |

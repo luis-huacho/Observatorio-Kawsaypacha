@@ -16,7 +16,7 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 | `GET /api/ccpp/geojson/` | mismos filtros que la lista, **sin paginar** | Puntos del visor (ver 05 / ADR-A13). `FeatureCollection` de `Point`; ver el ejemplo y la nota de tamaño más abajo |
 | `GET /api/peligros/tipos/` | — | catálogo (9) con orden y color |
 | `GET /api/peligros/resumen/` | `provincia`, `distrito`, `peligro`, `nivel_min` | agregados para cifras del home/visor. Devuelve **las dos unidades** (por CCPP y por clasificación) rotuladas; ver el ejemplo |
-| `GET /api/peligros/frecuencia/` | `distrito`, `provincia`, `categoria` | Lista, sin paginar (≤111): una entrada por distrito con datos |
+| `GET /api/peligros/frecuencia/` | `distrito`, `provincia`, `categoria` | Lista, sin paginar (90 de 112): una entrada por distrito **con datos de cualquiera de las dos tablas** |
 | `GET /api/peligros/frecuencia/{ubigeo}/` | — | El panel de un distrito. **404** si no tiene fila (ver abajo) |
 | `GET /api/peligros/frecuencia/export.xlsx` | ídem | Incluye los totales declarados marcados, o el Excel dejaría a Cusco en cero |
 
@@ -26,6 +26,14 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 > endpoint que cambia de forma según los parámetros es peor que dos endpoints, así que la lista y
 > el detalle se separan: `?distrito=080201` en la lista devuelve `[]`, y `/frecuencia/080201/` da
 > 404. Los dos estados vacíos siguen siendo distinguibles, que es lo que el contrato exigía.
+
+> **La lista mira las dos tablas.** Los distritos salen de `consultas.distritos_con_emergencias`,
+> que une `FrecuenciaEmergencia` y `TotalDeclaradoEmergencias`. Consultar solo la primera —lo que
+> hacía la implementación inicial— dejaba fuera a los **26 distritos que declaran subtotales sin
+> desagregar** (ADR-D1), Cusco incluido: 64 entradas en vez de 90. El detalle sí los servía, así que
+> la tabla y la ficha del mismo distrito se contradecían sin que ninguna consulta fallara. El export
+> tiene que acotar los declarados **con los mismos filtros**, o un Excel de un distrito acaba
+> trayendo los declarados de toda la región.
 
 ### `/api/ccpp/geojson/` — la fuente del visor
 
@@ -216,7 +224,12 @@ Notas de contrato heredadas de la maqueta:
 |---|---|---|
 | `GET /api/sitio/` | — | payload único cacheable (`Cache-Control: max-age=300`): ConfiguracionSitio + BloqueTexto + EnlaceMenu visibles + HeroSlides publicados. El frontend lo pide una vez al montar `Layout` |
 | `GET /api/mapas/capas/` | — | capas con `estado_tiles=ok` y `visible_por_defecto`/orden: `[{ slug, nombre, url: "/tiles/rios.pmtiles", tipo_geometria, estilo, min_zoom, max_zoom, atribucion }]` |
-| `POST /api/metricas/evento/` | body `{ "tipo": "busqueda", "ruta": "/buscar", "detalle": "heladas" }` | beacon (`navigator.sendBeacon`); throttle 60/min por IP; respuesta 204 |
+| `POST /api/metricas/evento/` | body `form-encoded` `tipo=busqueda&ruta=/buscar&detalle=heladas` | beacon (`navigator.sendBeacon`); throttle **600/min por IP**; respuesta 204 |
+
+> **`form-encoded` y no JSON**: con JSON el navegador exige preflight y `sendBeacon` no siempre
+> puede completarlo, así que las métricas se perdían en silencio. Y **600/min y no 60**: una
+> institución entera comparte IP detrás del NAT, de modo que un límite pensado para «una persona
+> navegando» castiga a una oficina. Cada beacon es un `INSERT`; el coste no justifica un techo bajo.
 
 ```jsonc
 // GET /api/sitio/

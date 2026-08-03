@@ -106,11 +106,15 @@ Los cuatro campos rich —`Medida.contenido`, `Norma.contenido`, `Noticia.cuerpo
   tamaño y conversión a un ancho máximo razonable. Una foto de 6 MB subida sin recortar es lo
   normal cuando el editor viene del trabajo de campo.
 - **Saneamiento al guardar**, no al mostrar: lista blanca de etiquetas y atributos antes de
-  persistir (ver ADR-D2). Vale también para el contenido que llegue por importación.
-- **`MedidaImagen` como inline ordenable** en el admin de Medida (Unfold sortable, igual que
-  `HeroSlide`), con `pie` obligatorio.
+  persistir (ver ADR-D2). Vale también para el contenido que llegue por importación, y por eso vive
+  en **`HtmlRicoMixin.save()`** del modelo (con `campos_html`) y no en el admin: mientras estuvo en
+  `WorkflowAdmin.save_model`, cualquier escritura que no pasara por el formulario —un `loaddata`, un
+  script— metía el HTML sin filtrar, aunque el `help_text` del campo prometiera lo contrario. El
+  `campos_rich` del admin queda solo para elegir el widget de CKEditor.
+- **`MedidaImagen` como inline** en el admin de Medida, con `pie` obligatorio y campo `orden`.
 - El editor debe ver que **dejar `imagen_portada` vacía usa la ilustración institucional** del
   peligro de la medida, para que no lo lea como un dato faltante.
-- `HeroSlide` con vista previa de imagen y orden drag (Unfold sortable).
+- `HeroSlide` con vista previa de imagen y `orden` editable en la lista. Pasa por el mismo flujo
+  editorial que el contenido, así que un slide se retira **archivándolo**.
 - `EnlaceMenu` por zona; **Prioridades existe con `visible=False`** (decisión de reunión — no borrar).
 - `ConfiguracionSitio` como singleton (un solo registro editable).
