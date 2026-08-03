@@ -2,23 +2,25 @@ import { useState } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { Search, Menu, X } from "lucide-react";
 
-const NAV = [
-  { to: "/peligros", label: "Exposición a peligros" },
-  { to: "/medidas", label: "Medidas" },
-  { to: "/inversion", label: "Inversión" },
-  { to: "/normativa", label: "Normativa" },
-  { to: "/sobre", label: "Sobre" },
-];
+import { registrarBusqueda } from "@/lib/metricas";
+import { useSitio } from "@/lib/sitio";
 
 export default function Header() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
+  // El menú lo controla `EnlaceMenu` desde el admin: PREDES reordena y oculta sin tocar código,
+  // y Prioridades vive ahí con visible=false (ADR-P1).
+  const { sitio } = useSitio();
+  const nav = sitio.menu.header;
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (q.trim()) navigate(`/buscar?q=${encodeURIComponent(q.trim())}`);
+    const termino = q.trim();
+    if (!termino) return;
+    registrarBusqueda(termino);
+    navigate(`/buscar?q=${encodeURIComponent(termino)}`);
   }
 
   return (
@@ -33,9 +35,18 @@ export default function Header() {
           >
             predes.org.pe
           </a>
-          <Link to="/sobre" className="text-white/90 hover:text-white no-underline">
-            Contacto
-          </Link>
+          {sitio.config.email_contacto ? (
+            <a
+              href={`mailto:${sitio.config.email_contacto}`}
+              className="text-white/90 hover:text-white no-underline"
+            >
+              Contacto
+            </a>
+          ) : (
+            <Link to="/sobre" className="text-white/90 hover:text-white no-underline">
+              Contacto
+            </Link>
+          )}
         </div>
       </div>
 
@@ -52,10 +63,10 @@ export default function Header() {
           </Link>
 
           <nav className="hidden lg:flex items-center gap-1 ml-2">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <NavLink
-                key={item.to}
-                to={item.to}
+                key={item.url}
+                to={item.url}
                 className={({ isActive }) =>
                   `px-3 py-2 rounded-md text-sm font-medium no-underline transition ${
                     isActive
@@ -64,7 +75,7 @@ export default function Header() {
                   }`
                 }
               >
-                {item.label}
+                {item.texto}
               </NavLink>
             ))}
           </nav>
@@ -96,10 +107,10 @@ export default function Header() {
       {open && (
         <div className="lg:hidden border-t border-white/20 bg-mountain-700 text-white">
           <div className="container-page py-3 flex flex-col gap-1">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <NavLink
-                key={item.to}
-                to={item.to}
+                key={item.url}
+                to={item.url}
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
                   `px-3 py-2 rounded-md text-sm font-medium no-underline ${
@@ -107,7 +118,7 @@ export default function Header() {
                   }`
                 }
               >
-                {item.label}
+                {item.texto}
               </NavLink>
             ))}
             <form onSubmit={onSubmit} className="flex items-center gap-2 mt-2 pt-2 border-t border-white/20">

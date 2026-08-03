@@ -1,24 +1,39 @@
 import { useMemo } from "react";
-import type { CentroPoblado } from "@/lib/types";
+import type { Distrito, Provincia } from "@/lib/types";
 
+/**
+ * Selects dependientes de provincia y distrito.
+ *
+ * Se alimenta de `/api/territorio/*` (13 + 112 filas) y no del padrón de centros poblados: antes
+ * derivaba las listas de los 8,968 CCPP, que es descargar 2 MB para llenar dos `<select>`.
+ * El autocompletado con Meilisearch es lo del buscador del mapa, no lo de aquí (spec 06).
+ */
 type Props = {
-  ccpp: CentroPoblado[];
+  provincias: Provincia[];
+  distritos: Distrito[];
   provincia: string;
   distrito: string;
   onChange: (provincia: string, distrito: string) => void;
 };
 
-export default function GeoSelector({ ccpp, provincia, distrito, onChange }: Props) {
+export default function GeoSelector({
+  provincias: provinciasApi,
+  distritos: distritosApi,
+  provincia,
+  distrito,
+  onChange,
+}: Props) {
   const provincias = useMemo(
-    () => Array.from(new Set(ccpp.map((c) => c.provincia))).sort(),
-    [ccpp]
+    () => provinciasApi.map((p) => p.nombre).sort((a, b) => a.localeCompare(b, "es")),
+    [provinciasApi]
   );
   const distritos = useMemo(() => {
     if (!provincia) return [];
-    return Array.from(
-      new Set(ccpp.filter((c) => c.provincia === provincia).map((c) => c.distrito))
-    ).sort();
-  }, [ccpp, provincia]);
+    return distritosApi
+      .filter((d) => d.provincia === provincia)
+      .map((d) => d.nombre)
+      .sort((a, b) => a.localeCompare(b, "es"));
+  }, [distritosApi, provincia]);
 
   return (
     <div className="flex flex-col sm:flex-row gap-2">

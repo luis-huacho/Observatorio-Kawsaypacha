@@ -2,9 +2,3 @@ node_modules/
 dist/
 .env
 *.tsbuildinfo
-
-# Artefactos transitorios heredados del prototipo mientras se migra la capa de datos
-# (spec 06). Los JSON los reemplaza el API y los .pmtiles los sirve obs.predes.org.pe/tiles;
-# se conservan en local para poder correr `npm run dev` antes de que el backend esté arriba.
-public/data/
-public/tiles/

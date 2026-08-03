@@ -1,9 +1,8 @@
 import { Link, useParams } from "react-router-dom";
 import { ExternalLink, Link2, MapPin, PlayCircle } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import { useJsonData } from "@/lib/useJsonData";
-import type { Medida } from "@/lib/types";
-import { claveMedida } from "@/lib/imagenes";
+import { useApi } from "@/lib/api";
+import type { MedidaDetalle as TMedida } from "@/lib/types";
 import EmptyState from "@/components/EmptyState";
 import Portada from "@/components/Portada";
 import ContenidoRico from "@/components/ContenidoRico";
@@ -14,17 +13,12 @@ import { RESULTADO_ESTILO } from "@/routes/Medidas";
 
 export default function MedidaDetalle() {
   const { slug } = useParams();
-  const medidas = useJsonData<Medida[]>("/data/medidas.mock.json");
+  const medida = useApi<TMedida>(slug ? `/medidas/${slug}/` : null);
 
-  if (medidas.status === "loading") return <div className="container-page py-12">Cargando…</div>;
-  if (medidas.status !== "ok")
-    return (
-      <div className="container-page py-12">
-        <EmptyState title="Error al cargar las medidas" />
-      </div>
-    );
+  if (medida.status === "loading") return <div className="container-page py-12">Cargando…</div>;
 
-  const m = medidas.data.find((x) => x.slug === slug);
+  // Un 404 es "no existe o fue retirada", no un error del sitio.
+  const m = medida.status === "ok" ? medida.data : null;
   if (!m) {
     return (
       <div className="container-page py-12">
@@ -66,7 +60,6 @@ export default function MedidaDetalle() {
         </div>
 
         <Portada
-          tipo={claveMedida(m.peligro)}
           imagen={m.imagen_portada}
           pie={m.imagen_titulo}
           alt={m.titulo}

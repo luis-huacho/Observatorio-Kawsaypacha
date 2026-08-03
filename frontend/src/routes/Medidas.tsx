@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Lightbulb, Sprout, AlertTriangle, MapPin } from "lucide-react";
-import { useJsonData } from "@/lib/useJsonData";
+import { useApiPaginado } from "@/lib/api";
+import { facetasDe, type Facetas } from "@/lib/search";
 import type { Medida } from "@/lib/types";
-import { TIPOS_PELIGRO } from "@/lib/types";
-import { portada, claveMedida } from "@/lib/imagenes";
+import { PELIGROS } from "@/lib/types";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 import Reveal from "@/components/Reveal";
@@ -21,31 +21,39 @@ export const RESULTADO_ESTILO: Record<
 };
 
 export default function Medidas() {
-  const medidas = useJsonData<Medida[]>("/data/medidas.mock.json");
+  // El selector guarda el SLUG del peligro, que es lo que filtra el API. Antes guardaba el
+  // nombre y la constante listaba nombres que no existían en los datos, así que el filtro
+  // devolvía cero resultados (spec 06).
   const [peligro, setPeligro] = useState("");
   const [ambito, setAmbito] = useState("");
   const [resultado, setResultado] = useState("");
   const [params, setParams] = useSearchParams();
   const tema = params.get("tema") ?? "";
 
-  const filtradas = useMemo(() => {
-    if (medidas.status !== "ok") return [];
-    return medidas.data.filter((m) => {
-      if (peligro && m.peligro !== peligro) return false;
-      if (ambito && m.ambito !== ambito) return false;
-      if (resultado && m.resultado !== resultado) return false;
-      if (tema && !m.palabras_clave.includes(tema)) return false;
-      return true;
+  const medidas = useApiPaginado<Medida>("/medidas/", { peligro, ambito, resultado, tema });
+  const filtradas = medidas.resultados;
+
+  // Conteos por faceta desde Meilisearch. Si no está disponible, `facetasDe` devuelve {} y los
+  // selectores se muestran sin números: el filtro sigue funcionando contra el API.
+  const [facetas, setFacetas] = useState<Facetas>({});
+  useEffect(() => {
+    let vigente = true;
+    void facetasDe("medidas", ["peligro", "ambito", "resultado", "provincia"]).then((f) => {
+      if (vigente) setFacetas(f);
     });
-  }, [medidas, peligro, ambito, resultado, tema]);
+    return () => {
+      vigente = false;
+    };
+  }, []);
 
   // Sin estas guardas, durante el fetch `filtradas` es [] y se pinta "Sin medidas con esos
   // filtros": un falso negativo que las demás rutas ya evitaban.
-  if (medidas.status === "loading") return <div className="container-page py-12">Cargando…</div>;
-  if (medidas.status !== "ok")
+  if (medidas.status === "loading" && !filtradas.length)
+    return <div className="container-page py-12">Cargando…</div>;
+  if (medidas.status === "error")
     return (
       <div className="container-page py-12">
-        <EmptyState title="Error al cargar las medidas" />
+        <EmptyState title="No se pudieron cargar las medidas" message={medidas.error?.message} />
       </div>
     );
 
@@ -57,22 +65,36 @@ export default function Medidas() {
       />
       <div className="container-page py-8">
       <div className="grid md:grid-cols-3 gap-3 mb-6">
-        <Select label="Peligro" value={peligro} onChange={setPeligro} options={TIPOS_PELIGRO} />
+        <Select
+          label="Peligro"
+          value={peligro}
+          onChange={setPeligro}
+          // Valor = slug (lo que filtra el API), etiqueta = nombre del catálogo.
+          options={PELIGROS.map((p) => ({ value: p.slug, label: p.nombre }))}
+          conteos={facetas.peligro}
+        />
         <Select
           label="Ámbito"
           value={ambito}
           onChange={setAmbito}
-          options={["comunal", "distrital", "provincial", "regional"]}
+          options={[
+            { value: "comunal", label: "Comunal" },
+            { value: "distrital", label: "Distrital" },
+            { value: "provincial", label: "Provincial" },
+            { value: "regional", label: "Regional" },
+          ]}
+          conteos={facetas.ambito}
         />
         <Select
           label="Resultado"
           value={resultado}
           onChange={setResultado}
           options={[
-            { value: "exito", label: "Práctica exitosa" },
+            { value: "exito", label: "Éxito" },
             { value: "leccion", label: "Lección aprendida" },
-            { value: "mal_adaptacion", label: "Mal-adaptación" },
+            { value: "mal_adaptacion", label: "Mala adaptación" },
           ]}
+          conteos={facetas.resultado}
         />
       </div>
 
@@ -88,13 +110,13 @@ export default function Medidas() {
           {filtradas.map((m, i) => {
             const r = RESULTADO_ESTILO[m.resultado];
             return (
-              <Reveal key={m.id} delay={(i % 3) * 70}>
+              <Reveal key={m.slug} delay={(i % 3) * 70}>
                 <Link
                   to={`/medidas/${m.slug}`}
                   className="card block h-full overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition duration-300 no-underline"
                 >
                   <img
-                    src={portada(claveMedida(m.peligro), m.imagen_portada)}
+                    src={m.imagen_portada}
                     alt={m.titulo}
                     loading="lazy"
                     className="w-full aspect-[3/2] object-cover"
@@ -134,12 +156,18 @@ export default function Medidas() {
 }
 
 function Select({
-  label, value, onChange, options,
+  label, value, onChange, options, conteos,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: readonly (string | { value: string; label: string })[];
+  /**
+   * Conteos por faceta de Meilisearch, indexados por la ETIQUETA que devuelve el índice (que es
+   * la legible: "Comunal", "Sequía"), no por el valor del filtro. Si Meilisearch no está,
+   * llega vacío y el selector se muestra sin números.
+   */
+  conteos?: Record<string, number>;
 }) {
   return (
     <div>
@@ -153,7 +181,13 @@ function Select({
         {options.map((o) => {
           const v = typeof o === "string" ? o : o.value;
           const l = typeof o === "string" ? o : o.label;
-          return <option key={v} value={v}>{l}</option>;
+          const n = conteos?.[l];
+          return (
+            <option key={v} value={v}>
+              {l}
+              {n === undefined ? "" : ` (${n})`}
+            </option>
+          );
         })}
       </select>
     </div>

@@ -1,27 +1,24 @@
 import { Link, useParams } from "react-router-dom";
 import { CalendarDays, Landmark } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import { useJsonData } from "@/lib/useJsonData";
-import type { Norma } from "@/lib/types";
+import { useApi } from "@/lib/api";
+import type { NormaDetalle as TNorma } from "@/lib/types";
 import { formatFecha } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
 import Portada from "@/components/Portada";
+import ContenidoRico from "@/components/ContenidoRico";
 import PalabrasClave from "@/components/PalabrasClave";
 import EnlaceNorma, { PUBLICA } from "@/components/EnlaceNorma";
 
 export default function NormaDetalle() {
   const { slug } = useParams();
-  const normas = useJsonData<Norma[]>("/data/normativa.mock.json");
+  const norma = useApi<TNorma>(slug ? `/normativa/${slug}/` : null);
 
-  if (normas.status === "loading") return <div className="container-page py-12">Cargando…</div>;
-  if (normas.status !== "ok")
-    return (
-      <div className="container-page py-12">
-        <EmptyState title="Error al cargar la normativa" />
-      </div>
-    );
+  if (norma.status === "loading") return <div className="container-page py-12">Cargando…</div>;
 
-  const n = normas.data.find((x) => x.slug === slug);
+  // Un 404 se trata como "no existe o fue retirada", no como error del sitio: el flujo
+  // editorial permite despublicar y los enlaces compartidos siguen circulando.
+  const n = norma.status === "ok" ? norma.data : null;
   if (!n) {
     return (
       <div className="container-page py-12">
@@ -58,7 +55,7 @@ export default function NormaDetalle() {
           </span>
         </div>
 
-        <Portada tipo="norma" imagen={n.imagen_portada} pie={n.imagen_titulo} alt={n.titulo} />
+        <Portada imagen={n.imagen_portada} pie={n.imagen_titulo} alt={n.titulo} />
 
         <p className="mt-6 text-lg text-ink-900 leading-relaxed">{n.resumen}</p>
 
@@ -70,7 +67,9 @@ export default function NormaDetalle() {
           </span>
         </div>
 
-        <div className="mt-6 text-ink-600 leading-relaxed whitespace-pre-line">{n.contenido}</div>
+        {/* `contenido` es rich text de CKEditor (spec 01), no texto plano: se pinta con
+            ContenidoRico, que además estila lo que el Preflight de Tailwind resetea. */}
+        <ContenidoRico html={n.contenido} className="mt-6" />
 
         {n.analisis_predes && (
           <div className="mt-6 callout p-4 text-sm">

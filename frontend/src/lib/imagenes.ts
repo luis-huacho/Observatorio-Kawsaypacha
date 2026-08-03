@@ -1,41 +1,30 @@
-import type { Noticia } from "@/lib/types";
-import { PELIGROS } from "@/lib/types";
-
 /**
- * Claves de imagen por defecto. Coinciden con los nombres de archivo en `public/img/default/`.
- * Las medidas usan `peligro-{slug}`, que resuelve `portadaMedida()`.
- */
-export type TipoConPortada = Noticia["tipo"] | "norma" | "medida" | `peligro-${string}`;
-
-const PIE_POR_DEFECTO = "Ilustración del Observatorio Kallpachakuy";
-
-/**
- * Resuelve la portada de una publicación.
+ * Portadas del contenido editorial.
  *
- * Mientras PREDES no suba una imagen, el contenido se muestra con la ilustración institucional de
- * su tipo. Es el camino que se ve por defecto —de ahí el nombre— y por eso los mocks lo dejan a
- * `null` en vez de fijar una imagen por pieza.
+ * **La resolución ya no vive aquí.** En el prototipo este módulo elegía la ilustración por
+ * defecto en el navegador; en la plataforma lo hace el serializer del API (spec 01/02), así que
+ * `imagen_portada` llega siempre con una URL usable —la propia o la institucional del tipo de
+ * contenido— y ningún cliente reimplementa la regla.
+ *
+ * Lo que queda son las dos piezas que el frontend sigue necesitando: el pie por defecto para
+ * cuando el API no manda ninguno, y la ilustración de reserva por si un despliegue viejo
+ * devolviera `null`.
  */
-export function portada(tipo: TipoConPortada, propia: string | null): string {
-  return propia ?? `/img/default/${tipo}.svg`;
+
+/** Ilustración de reserva. Solo se usa si el API devolviera una portada vacía. */
+const RESERVA = "/img/default/foto-pendiente.svg";
+
+/**
+ * El pie genérico dice que es una ilustración a propósito: no debe hacer pasar el gráfico
+ * institucional por una fotografía de un hecho real. Cuando el editor sube una foto suya, pone
+ * su propio pie.
+ */
+export const PIE_POR_DEFECTO = "Ilustración del Observatorio Kallpachakuy";
+
+export function portada(url: string | null | undefined): string {
+  return url || RESERVA;
 }
 
-/**
- * Pie de imagen. El genérico deja claro que es una ilustración y no una fotografía de un hecho:
- * cuando el editor suba una foto real pondrá el suyo.
- */
-export function pieDeImagen(propio: string | null): string {
-  return propio ?? PIE_POR_DEFECTO;
-}
-
-/**
- * Clave de portada de una medida a partir del nombre de su peligro.
- *
- * La ilustración va por peligro y no por resultado porque es el eje con el que se explora la
- * sección. Si el nombre no casa con el catálogo —dato viejo o un peligro nuevo— cae en la
- * reserva `medida`, que es preferible a un 404 de imagen.
- */
-export function claveMedida(nombrePeligro: string): TipoConPortada {
-  const p = PELIGROS.find((x) => x.nombre === nombrePeligro);
-  return p ? `peligro-${p.slug}` : "medida";
+export function pieDeImagen(propio: string | null | undefined): string {
+  return propio || PIE_POR_DEFECTO;
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useJsonData } from "@/lib/useJsonData";
+import { useApi } from "@/lib/api";
 import type { Prioridades, PrioridadDistrito } from "@/lib/types";
 import { colorFromNivelStr, formatPct } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
@@ -15,7 +15,11 @@ const VAR_LABEL: Record<keyof PrioridadDistrito["variables"], string> = {
 };
 
 export default function PrioridadesView() {
-  const p = useJsonData<Prioridades>("/data/prioridades.mock.json");
+  // La ventana está DESACTIVADA (ADR-P1) y no tiene ruta registrada en App.tsx: este componente
+  // se conserva para poder reactivarla sin rehacerla. El endpoint no existe todavía, así que
+  // pedirlo devuelve 404 y la página muestra su estado vacío — que es lo correcto mientras la
+  // decisión siga en pie.
+  const p = useApi<Prioridades>("/prioridades/");
   const [pesos, setPesos] = useState<PrioridadDistrito["variables"] | null>(null);
 
   const activos = useMemo(() => {

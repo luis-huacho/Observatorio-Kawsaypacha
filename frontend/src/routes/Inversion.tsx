@@ -2,29 +2,67 @@ import { useMemo, useState } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend,
 } from "recharts";
-import { useJsonData } from "@/lib/useJsonData";
-import type { Inversion } from "@/lib/types";
+import { useApi } from "@/lib/api";
+import { useBloque } from "@/lib/sitio";
+import type { InversionResponse } from "@/lib/types";
 import { formatPct, formatSoles } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 
+/**
+ * Ventana de Inversión (PPR 0068).
+ *
+ * **Diferida** (ADR-D3): el cliente aún no tiene claridad sobre la data —ni el formato del Excel
+ * ni el alcance del programa están definidos—, así que el API responde `{disponible: false}` y
+ * aquí se muestra un estado vacío honesto. Toda la maqueta de gráficos y tablas se conserva y se
+ * activa sola en cuanto el endpoint empiece a devolver datos: no hay nada que reescribir.
+ */
 export default function InversionView() {
-  const inv = useJsonData<Inversion>("/data/inversion.mock.json");
+  const inv = useApi<InversionResponse>("/inversion/");
   const [orden, setOrden] = useState<"pim" | "ejecucion" | "prevencion">("pim");
+  const textoEnPreparacion = useBloque(
+    "inversion.en_preparacion",
+    "<p>PREDES está consolidando los datos de inversión del PPR 0068. La sección se publicará " +
+      "en cuanto la información esté disponible.</p>"
+  );
+
+  const datos = inv.status === "ok" && inv.data.disponible ? inv.data : null;
 
   const distritos = useMemo(() => {
-    if (inv.status !== "ok") return [];
-    const arr = [...inv.data.por_distrito];
+    if (!datos) return [];
+    const arr = [...datos.por_distrito];
     if (orden === "pim") arr.sort((a, b) => b.pim - a.pim);
     if (orden === "ejecucion") arr.sort((a, b) => b.devengado / b.pim - a.devengado / a.pim);
     if (orden === "prevencion") arr.sort((a, b) => b.pct_prevencion - a.pct_prevencion);
     return arr;
-  }, [inv, orden]);
+  }, [datos, orden]);
 
   if (inv.status === "loading") return <div className="container-page py-12">Cargando…</div>;
-  if (inv.status !== "ok") return <div className="container-page py-12"><EmptyState /></div>;
 
-  const d = inv.data;
+  if (!datos) {
+    const motivo =
+      inv.status === "ok" && !inv.data.disponible ? inv.data.motivo : "";
+    return (
+      <>
+        <PageHeader
+          titulo="Inversión"
+          descripcion="¿Cuánto y cómo invierten los gobiernos locales en reducción de vulnerabilidad y atención de emergencias? Programa Presupuestal 0068."
+        />
+        <div className="container-page py-12">
+          <EmptyState
+            title="Información en preparación"
+            message={motivo || "Los datos de inversión aún no están disponibles."}
+          />
+          <div
+            className="mt-6 max-w-2xl mx-auto text-center text-sm text-ink-600 [&_p]:m-0"
+            dangerouslySetInnerHTML={{ __html: textoEnPreparacion }}
+          />
+        </div>
+      </>
+    );
+  }
+
+  const d = datos;
   const compData = [
     { tipo: "Prevención", monto: d.comparacion_prevencion_respuesta.prevencion_total },
     { tipo: "Respuesta",  monto: d.comparacion_prevencion_respuesta.respuesta_total },

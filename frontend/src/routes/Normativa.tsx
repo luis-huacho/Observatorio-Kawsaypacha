@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowRight, FileText } from "lucide-react";
-import { useJsonData } from "@/lib/useJsonData";
+import { ArrowRight, Download, FileText } from "lucide-react";
+import { urlApi, useApiPaginado } from "@/lib/api";
+import { registrarExport } from "@/lib/metricas";
 import type { Norma } from "@/lib/types";
 import { formatFecha } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
@@ -10,23 +11,26 @@ import FiltroTema from "@/components/FiltroTema";
 import EnlaceNorma, { PUBLICA } from "@/components/EnlaceNorma";
 
 export default function NormativaView() {
-  const data = useJsonData<Norma[]>("/data/normativa.mock.json");
   const [tipo, setTipo] = useState("");
   const [ambito, setAmbito] = useState("");
   const [params, setParams] = useSearchParams();
   const tema = params.get("tema") ?? "";
 
-  const filtradas = useMemo(() => {
-    if (data.status !== "ok") return [];
-    return data.data
-      .filter((n) => (tipo ? n.tipo === tipo : true))
-      .filter((n) => (ambito ? n.ambito === ambito : true))
-      .filter((n) => (tema ? n.palabras_clave.includes(tema) : true))
-      .sort((a, b) => b.fecha.localeCompare(a.fecha));
-  }, [data, tipo, ambito, tema]);
+  const filtros = { tipo, ambito, tema };
+  const normas = useApiPaginado<Norma>("/normativa/", filtros);
+  const filtradas = normas.resultados;
+  // El export respeta los filtros que el usuario tiene puestos: un Excel que no cuadra con lo
+  // que había en pantalla es peor que no tener export.
+  const urlExport = urlApi("/normativa/export.xlsx", filtros);
 
-  if (data.status === "loading") return <div className="container-page py-12">Cargando…</div>;
-  if (data.status !== "ok") return <div className="container-page py-12"><EmptyState /></div>;
+  if (normas.status === "loading" && !filtradas.length)
+    return <div className="container-page py-12">Cargando…</div>;
+  if (normas.status === "error")
+    return (
+      <div className="container-page py-12">
+        <EmptyState title="No se pudo cargar la normativa" message={normas.error?.message} />
+      </div>
+    );
 
   return (
     <>
@@ -35,11 +39,6 @@ export default function NormativaView() {
         descripcion="Repositorio de normativa reciente de GRD y ACC, con análisis y recomendaciones de PREDES. Cada norma enlaza a su publicación oficial en el portal del organismo que la emite."
       />
       <div className="container-page py-8">
-      <p className="text-xs text-ink-600 mb-5">
-        En este prototipo los enlaces a las publicaciones oficiales son de ejemplo y apuntan al
-        portal del organismo emisor. En la plataforma final cada norma llevará el enlace o el PDF
-        que cargue el equipo de PREDES.
-      </p>
       <div className="grid sm:grid-cols-2 gap-3 mb-6 max-w-xl">
         <select
           value={tipo}
@@ -75,7 +74,7 @@ export default function NormativaView() {
           {filtradas.map((n) => (
             /* La tarjeta tiene dos destinos —la ficha y la publicación oficial—, así que no puede
                ser un <Link> envolvente: anidar anclas es HTML inválido. Enlaza el título. */
-            <li key={n.id} className="card p-5">
+            <li key={n.slug} className="card p-5">
               <div className="flex items-start gap-4">
                 <FileText className="w-5 h-5 text-mountain-700 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">

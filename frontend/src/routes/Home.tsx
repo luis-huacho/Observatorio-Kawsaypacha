@@ -2,9 +2,10 @@ import { Link } from "react-router-dom";
 import {
   MapPin, Lightbulb, Coins, Search, ArrowRight, Mountain
 } from "lucide-react";
-import { useJsonData } from "@/lib/useJsonData";
+import { useApi, type Pagina } from "@/lib/api";
+import { useBloque } from "@/lib/sitio";
 import Reveal from "@/components/Reveal";
-import type { CentroPoblado, ClasificacionPeligro, Noticia, Norma } from "@/lib/types";
+import type { Distrito, Noticia, Norma, ResumenPeligros } from "@/lib/types";
 import { formatNumber, formatFecha } from "@/lib/semaforo";
 import { TarjetaNoticiaCompacta } from "@/routes/Noticias";
 
@@ -33,29 +34,45 @@ const SECCIONES = [
 ];
 
 export default function Home() {
-  const ccpp = useJsonData<CentroPoblado[]>("/data/ccpp.json");
-  const peligros = useJsonData<ClasificacionPeligro[]>("/data/peligros.json");
+  // Las cifras vienen agregadas del servidor: calcularlas en el cliente exigiría descargar las
+  // 10,978 clasificaciones solo para contar (spec 06).
+  const resumen = useApi<ResumenPeligros>("/peligros/resumen/");
+  const distritosApi = useApi<Distrito[]>("/territorio/distritos/");
 
-  const totalCcpp = ccpp.status === "ok" ? ccpp.data.length : null;
-  const totalClasif = peligros.status === "ok" ? peligros.data.length : null;
-  const ccppAltos =
-    peligros.status === "ok"
-      ? new Set(peligros.data.filter((p) => p.nivel >= 3).map((p) => p.codigo_ccpp)).size
-      : null;
-  const distritos =
-    ccpp.status === "ok"
-      ? new Set(ccpp.data.map((c) => c.ubigeo_distrito)).size
-      : null;
+  const cifras = resumen.status === "ok" ? resumen.data : null;
+  const totalCcpp = cifras?.total_ccpp ?? null;
+  const distritos = distritosApi.status === "ok" ? distritosApi.data.length : null;
+  const totalClasif = cifras
+    ? cifras.por_peligro.reduce(
+        (suma, p) => suma + Object.values(p.niveles).reduce((a, b) => a + b, 0),
+        0
+      )
+    : null;
+  // Centros poblados, no clasificaciones: es la unidad de `por_ccpp` y la que cuadra con la
+  // tabla del visor. Sumar por peligro contaría cada CCPP tantas veces como peligros tenga.
+  const ccppAltos = cifras
+    ? Number(cifras.por_ccpp.niveles["3"]) + Number(cifras.por_ccpp.niveles["4"])
+    : null;
 
-  // Bloque de actualidad: lo más reciente de cada sección editorial.
-  const noticias = useJsonData<Noticia[]>("/data/noticias.mock.json");
-  const normas = useJsonData<Norma[]>("/data/normativa.mock.json");
+  // Bloque de actualidad: lo más reciente de cada sección editorial. El API ya ordena por fecha
+  // descendente, así que basta pedir la primera página con tres elementos.
+  const noticias = useApi<Pagina<Noticia>>("/noticias/", { page_size: 3 });
+  const normas = useApi<Pagina<Norma>>("/normativa/", { page_size: 3 });
 
-  const porFechaDesc = <T extends { fecha: string }>(items: T[]) =>
-    [...items].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 3);
+  const ultimasNoticias = noticias.status === "ok" ? noticias.data.results : [];
+  const ultimasNormas = normas.status === "ok" ? normas.data.results : [];
 
-  const ultimasNoticias = noticias.status === "ok" ? porFechaDesc(noticias.data) : [];
-  const ultimasNormas = normas.status === "ok" ? porFechaDesc(normas.data) : [];
+  // Hero administrable: el título y el subtítulo salen de `BloqueTexto`, con los del prototipo
+  // como respaldo mientras carga.
+  const heroTitulo = useBloque(
+    "home.hero.titulo",
+    "<p>Observatorio del riesgo y la adaptación climática en Cusco.</p>"
+  );
+  const heroSubtitulo = useBloque(
+    "home.hero.subtitulo",
+    "<p>Monitoreamos peligros, prácticas que funcionan, inversión pública y prioridades de los " +
+      "gobiernos locales y regionales para reducir el riesgo de desastres.</p>"
+  );
 
   return (
     <>
@@ -75,19 +92,18 @@ export default function Home() {
             <span className="chip bg-white/15 text-white border border-white/20 mb-4 animate-fade-up">
               <Mountain className="w-3 h-3" /> Cusco, Perú
             </span>
+            {/* Título y subtítulo administrables. `[&>p]:m-0` porque el bloque llega envuelto
+                en <p> desde CKEditor y aquí el margen lo pone el contenedor. */}
             <h1
-              className="font-display text-4xl md:text-6xl font-extrabold leading-tight animate-fade-up"
+              className="font-display text-4xl md:text-6xl font-extrabold leading-tight animate-fade-up [&>p]:m-0"
               style={{ animationDelay: "80ms" }}
-            >
-              Observatorio del riesgo y la adaptación climática en Cusco.
-            </h1>
-            <p
-              className="mt-5 text-lg md:text-xl text-mountain-100/90 max-w-2xl animate-fade-up"
+              dangerouslySetInnerHTML={{ __html: heroTitulo }}
+            />
+            <div
+              className="mt-5 text-lg md:text-xl text-mountain-100/90 max-w-2xl animate-fade-up [&>p]:m-0"
               style={{ animationDelay: "160ms" }}
-            >
-              Monitoreamos peligros, prácticas que funcionan, inversión pública y prioridades
-              de los gobiernos locales y regionales para reducir el riesgo de desastres.
-            </p>
+              dangerouslySetInnerHTML={{ __html: heroSubtitulo }}
+            />
             <div className="mt-8 flex flex-wrap gap-3 animate-fade-up" style={{ animationDelay: "240ms" }}>
               <Link to="/peligros" className="btn-primary bg-white text-mountain-900 hover:bg-paper">
                 Explorar mi distrito <ArrowRight className="w-4 h-4" />
@@ -232,7 +248,7 @@ export default function Home() {
             </p>
             <div className="mt-5 space-y-4">
               {ultimasNormas.map((n, i) => (
-                <Reveal key={n.id} delay={i * 70}>
+                <Reveal key={n.slug} delay={i * 70}>
                   <NormaPreview norma={n} />
                 </Reveal>
               ))}

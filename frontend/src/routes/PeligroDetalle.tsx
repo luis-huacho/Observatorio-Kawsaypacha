@@ -1,8 +1,8 @@
 import { useParams, Link } from "react-router-dom";
 import { MapPin } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import { useJsonData } from "@/lib/useJsonData";
-import type { CentroPoblado, ClasificacionPeligro } from "@/lib/types";
+import { useApi } from "@/lib/api";
+import type { CentroPobladoDetalle } from "@/lib/types";
 import SemaforoChip from "@/components/SemaforoChip";
 import SourceLink from "@/components/SourceLink";
 import EmptyState from "@/components/EmptyState";
@@ -10,17 +10,14 @@ import { formatNumber } from "@/lib/semaforo";
 
 export default function PeligroDetalle() {
   const { codigo } = useParams();
-  const ccpp = useJsonData<CentroPoblado[]>("/data/ccpp.json");
-  const peligros = useJsonData<ClasificacionPeligro[]>("/data/peligros.json");
+  // La ficha trae sus clasificaciones anidadas: una petición en vez de cruzar dos datasets.
+  const detalle = useApi<CentroPobladoDetalle>(codigo ? `/ccpp/${codigo}/` : null);
 
-  if (ccpp.status === "loading" || peligros.status === "loading") {
+  if (detalle.status === "loading") {
     return <div className="container-page py-12 text-ink-600">Cargando…</div>;
   }
-  if (ccpp.status !== "ok" || peligros.status !== "ok") {
-    return <div className="container-page py-12"><EmptyState title="Error al cargar datos." /></div>;
-  }
 
-  const cp = ccpp.data.find((c) => c.codigo === codigo);
+  const cp = detalle.status === "ok" ? detalle.data : null;
   if (!cp) {
     return (
       <div className="container-page py-12">
@@ -32,7 +29,7 @@ export default function PeligroDetalle() {
     );
   }
 
-  const clasifs = peligros.data.filter((p) => p.codigo_ccpp === codigo);
+  const clasifs = cp.clasificaciones;
 
   return (
     <>

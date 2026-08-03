@@ -8,7 +8,13 @@ import MedidaDetalle from "./routes/MedidaDetalle";
 import Noticias from "./routes/Noticias";
 import NoticiaDetalle from "./routes/NoticiaDetalle";
 import Inversion from "./routes/Inversion";
-import Prioridades from "./routes/Prioridades";
+// Prioridades NO se registra (ADR-P1): la ventana quedó desactivada por decisión de reunión y
+// el componente se conserva sin ruta. Reactivarla es descomentar aquí y poner visible=true en
+// su EnlaceMenu.
+// import Prioridades from "./routes/Prioridades";
+import Videos from "./routes/Videos";
+import Eventos from "./routes/Eventos";
+import Comparar from "./routes/Comparar";
 import Normativa from "./routes/Normativa";
 import NormaDetalle from "./routes/NormaDetalle";
 import Recursos from "./routes/Recursos";
@@ -29,7 +35,9 @@ export default function App() {
         <Route path="/noticias" element={<Noticias />} />
         <Route path="/noticias/:slug" element={<NoticiaDetalle />} />
         <Route path="/inversion" element={<Inversion />} />
-        <Route path="/prioridades" element={<Prioridades />} />
+        <Route path="/videos" element={<Videos />} />
+        <Route path="/eventos" element={<Eventos />} />
+        <Route path="/comparar" element={<Comparar />} />
         <Route path="/normativa" element={<Normativa />} />
         <Route path="/normativa/:slug" element={<NormaDetalle />} />
         <Route path="/recursos" element={<Recursos />} />

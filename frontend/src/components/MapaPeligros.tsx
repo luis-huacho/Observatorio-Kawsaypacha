@@ -13,14 +13,15 @@
  * Las capas de contexto —lagunas, ríos y glaciares— sí siguen en PMTiles, generadas con
  * `prototype/scripts/build_tiles.sh` y servidas desde `public/tiles/`.
  */
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import maplibregl from "maplibre-gl";
+import maplibregl, { type LayerSpecification } from "maplibre-gl";
 import { Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Layers } from "lucide-react";
-import type { CentroPoblado, Nivel } from "@/lib/types";
+import type { CapaMapa, Nivel } from "@/lib/types";
 import { NIVEL_COLOR, NIVEL_LABEL, formatNumber } from "@/lib/semaforo";
+import { buscarLugares } from "@/lib/search";
 import {
   BuscarLugarControl,
   DescargarPNGControl,
@@ -31,7 +32,6 @@ import {
 
 const CENTRO: [number, number] = [-72.0, -13.5];
 const ZOOM_INICIAL = 7;
-const TILES = "/tiles";
 const SIN_DATO = "#BDBDBD";
 const VACIO: GeoJSON.FeatureCollection<GeoJSON.Point> = {
   type: "FeatureCollection",
@@ -177,15 +177,68 @@ type CapaContexto = {
   ids: string[];
 };
 
-const CAPAS_CONTEXTO: CapaContexto[] = [
-  { id: "lagunas", nombre: "Lagunas", ids: ["lagunas-fill", "lagunas-line"] },
-  { id: "rios", nombre: "Ríos", ids: ["rios-line"] },
-  { id: "glaciares", nombre: "Glaciares", ids: ["glaciares-fill", "glaciares-line"] },
-];
+/**
+ * Traduce una capa del catálogo a las capas de MapLibre que la dibujan.
+ *
+ * Un polígono necesita dos —relleno y contorno—, una línea solo una. El `source-layer` es el
+ * slug porque así se nombra la capa dentro del tile (lo fija tippecanoe con `-l`).
+ */
+function capasDeContexto(c: CapaMapa): LayerSpecification[] {
+  const e = (c.estilo ?? {}) as Record<string, unknown>;
+  const comun = { source: c.slug, "source-layer": c.slug, minzoom: c.min_zoom || 0 };
+
+  if (c.tipo_geometria === "linea") {
+    return [
+      {
+        ...comun,
+        id: `${c.slug}-line`,
+        type: "line",
+        paint: {
+          "line-color": (e["line-color"] as string) ?? "#0095A4",
+          "line-width": (e["line-width"] ?? 0.8) as never,
+          "line-opacity": (e["line-opacity"] ?? 0.75) as never,
+        },
+      },
+    ];
+  }
+  return [
+    {
+      ...comun,
+      id: `${c.slug}-fill`,
+      type: "fill",
+      paint: {
+        "fill-color": (e["fill-color"] as string) ?? "#0095A4",
+        "fill-opacity": (e["fill-opacity"] ?? 0.35) as never,
+      },
+    },
+    {
+      ...comun,
+      id: `${c.slug}-line`,
+      type: "line",
+      paint: {
+        "line-color": (e["line-color"] as string) ?? "#007480",
+        "line-width": (e["line-width"] ?? 0.6) as never,
+      },
+    },
+  ];
+}
+
+/** Ids de las capas de MapLibre que corresponden a una capa del catálogo. */
+function idsDeCapa(c: CapaMapa): string[] {
+  return capasDeContexto(c).map((l) => l.id);
+}
 
 type Props = {
-  /** Padrón completo: alimenta el buscador de lugares, que no depende de los filtros. */
-  ccpp: CentroPoblado[];
+  /**
+   * Capas de contexto, del catálogo del admin (`/api/mapas/capas/`).
+   *
+   * Antes estaban cableadas aquí, con una ruta relativa `/tiles/…` que en desarrollo resolvía
+   * contra el servidor de Vite y devolvía el `index.html` — de ahí el «Wrong magic number for
+   * PMTiles archive». Ahora la URL, el estilo y el orden los pone el admin, que es el requisito
+   * de reemplazo de capas del TDR: PREDES sube un GeoJSON nuevo y el visor lo dibuja sin que
+   * nadie toque código.
+   */
+  capas: CapaMapa[];
   /** Centros poblados a dibujar, ya filtrados por la página. `nivel` 0 = sin clasificación. */
   puntos: GeoJSON.FeatureCollection<GeoJSON.Point>;
   /** Slug del peligro activo, o null para "todos". Solo rotula la leyenda. */
@@ -203,7 +256,7 @@ export type MapaPeligrosHandle = {
 };
 
 const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros(
-  { ccpp, puntos, peligroSlug, ambitoAcotado },
+  { capas, puntos, peligroSlug, ambitoAcotado },
   ref
 ) {
   const contenedor = useRef<HTMLDivElement>(null);
@@ -215,11 +268,24 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
   navegar.current = navigate;
   const [listo, setListo] = useState(false);
   const [base, setBase] = useState(BASE_POR_DEFECTO);
-  const [visibles, setVisibles] = useState<Record<string, boolean>>({
-    lagunas: true,
-    rios: true,
-    glaciares: true,
-  });
+  // El conmutador y su estado inicial se derivan del catálogo: `visible_por_defecto` lo decide
+  // el admin, no el código.
+  const listaConmutador = useMemo(
+    () => capas.map((c) => ({ id: c.slug, nombre: c.nombre, ids: idsDeCapa(c) })),
+    [capas]
+  );
+  const [visibles, setVisibles] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setVisibles((previo) => {
+      const siguiente = { ...previo };
+      for (const c of capas) {
+        // Solo se inicializa lo que no estaba: si el usuario apagó una capa, un re-render del
+        // catálogo no debe volver a encenderla.
+        if (!(c.slug in siguiente)) siguiente[c.slug] = c.visible_por_defecto;
+      }
+      return siguiente;
+    });
+  }, [capas]);
   const [abierto, setAbierto] = useState(false);
 
   useImperativeHandle(
@@ -274,9 +340,14 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
               },
             ])
           ),
-          lagunas: { type: "vector", url: `pmtiles://${TILES}/lagunas.pmtiles` },
-          rios: { type: "vector", url: `pmtiles://${TILES}/rios.pmtiles` },
-          glaciares: { type: "vector", url: `pmtiles://${TILES}/glaciares.pmtiles` },
+          // Una fuente vectorial por capa del catálogo. `capa.url` es absoluta y apunta al
+          // dominio del backend, que sirve los .pmtiles con Range y CORS (ADR-A14).
+          ...Object.fromEntries(
+            capas.map((c) => [
+              c.slug,
+              { type: "vector" as const, url: `pmtiles://${c.url}` },
+            ])
+          ),
           // Arranca vacía: los datos llegan por prop y se inyectan con setData.
           ccpp: {
             type: "geojson",
@@ -305,31 +376,9 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
             },
           })),
 
-          {
-            id: "lagunas-fill", type: "fill", source: "lagunas", "source-layer": "lagunas",
-            paint: { "fill-color": "#0095A4", "fill-opacity": 0.35 },
-          },
-          {
-            id: "lagunas-line", type: "line", source: "lagunas", "source-layer": "lagunas",
-            paint: { "line-color": "#007480", "line-width": 0.6 },
-          },
-          {
-            id: "rios-line", type: "line", source: "rios", "source-layer": "rios",
-            paint: {
-              "line-color": "#0095A4",
-              // Los cauces menores se afinan al alejarse para no emborronar la región.
-              "line-width": ["interpolate", ["linear"], ["zoom"], 6, 0.4, 12, 1.6],
-              "line-opacity": 0.75,
-            },
-          },
-          {
-            id: "glaciares-fill", type: "fill", source: "glaciares", "source-layer": "glaciares",
-            paint: { "fill-color": "#CCEAED", "fill-opacity": 0.8 },
-          },
-          {
-            id: "glaciares-line", type: "line", source: "glaciares", "source-layer": "glaciares",
-            paint: { "line-color": "#007480", "line-width": 0.5 },
-          },
+          // El paint sale del JSON `estilo` de cada capa: recolorear o cambiar el grosor de
+          // una capa es editarla en el admin, no desplegar.
+          ...capas.flatMap((c) => capasDeContexto(c)),
 
           // Puntos sueltos debajo de los grupos: a zoom intermedio conviven ambos y el grupo,
           // que resume más información, debe quedar por encima.
@@ -380,7 +429,10 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
     map.addControl(new maplibregl.FullscreenControl(), "top-left");
     map.addControl(new MedirControl(), "top-left");
     map.addControl(new DescargarPNGControl(), "top-left");
-    map.addControl(new BuscarLugarControl(ccpp), "top-right");
+    // El buscador consulta el índice `ccpp` de Meilisearch. Si no está disponible,
+    // `buscarLugares` devuelve [] y el control simplemente no sugiere nada: el resto del visor
+    // sigue funcionando.
+    map.addControl(new BuscarLugarControl(buscarLugares), "top-right");
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: "metric" }), "bottom-left");
 
     map.on("load", () => setListo(true));
@@ -544,7 +596,7 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
     const map = mapa.current;
     if (!map || !listo) return;
     cuandoListo(map, () => {
-      for (const capa of CAPAS_CONTEXTO) {
+      for (const capa of listaConmutador) {
         for (const id of capa.ids) {
           map.setLayoutProperty(id, "visibility", visibles[capa.id] ? "visible" : "none");
         }
@@ -589,7 +641,7 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
               Capas
             </div>
             <div className="space-y-1">
-              {CAPAS_CONTEXTO.map((c) => (
+              {listaConmutador.map((c) => (
                 <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
                   <input
                     type="checkbox"

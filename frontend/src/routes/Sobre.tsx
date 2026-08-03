@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import Reveal from "@/components/Reveal";
+import { useBloque } from "@/lib/sitio";
 
 const PROPOSITOS = [
   {
@@ -56,6 +57,16 @@ const PRINCIPIOS = [
 ];
 
 export default function Sobre() {
+  const mision = useBloque(
+    "sobre.mision",
+    "<p>Es un espacio que integra, organiza y difunde información relevante sobre la GRD y la " +
+      "ACC en Cusco. Su propósito es convertir información dispersa en conocimiento útil para la " +
+      "toma de decisiones: datos confiables, mapas, indicadores, normativa, experiencias " +
+      "exitosas y herramientas al alcance de autoridades, comunidades, instituciones, " +
+      "investigadores y ciudadanía, para comprender mejor los riesgos del territorio y " +
+      "fortalecer la resiliencia de la población.</p>"
+  );
+
   return (
     <>
       <PageHeader
@@ -64,19 +75,16 @@ export default function Sobre() {
         descripcion="Plataforma pública de información, monitoreo y gestión del conocimiento sobre la Gestión del Riesgo de Desastres (GRD) y la Adaptación al Cambio Climático (ACC) en la región Cusco, impulsada por PREDES."
       />
       <div className="container-page py-8 max-w-4xl">
-        {/* ¿Qué es? */}
+        {/* ¿Qué es? — texto administrable desde `BloqueTexto` (clave `sobre.mision`). El
+            respaldo es el texto del prototipo aprobado, para que la página nunca salga vacía. */}
         <section>
           <h2 className="font-display text-2xl font-bold text-mountain-900 mb-3">
             ¿Qué es el observatorio?
           </h2>
-          <p className="text-ink-600 leading-relaxed">
-            Es un espacio que integra, organiza y difunde información relevante sobre la GRD y la
-            ACC en Cusco. Su propósito es convertir información dispersa en conocimiento útil para
-            la toma de decisiones: datos confiables, mapas, indicadores, normativa, experiencias
-            exitosas y herramientas al alcance de autoridades, comunidades, instituciones,
-            investigadores y ciudadanía, para comprender mejor los riesgos del territorio y
-            fortalecer la resiliencia de la población.
-          </p>
+          <div
+            className="text-ink-600 leading-relaxed contenido-rico"
+            dangerouslySetInnerHTML={{ __html: mision }}
+          />
         </section>
 
         {/* ¿Por qué nace? */}

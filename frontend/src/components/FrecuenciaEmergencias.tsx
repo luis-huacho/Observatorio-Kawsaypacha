@@ -15,16 +15,20 @@ const COLOR_CATEGORIA: Record<string, string> = {
 };
 
 type Props = {
-  frecuencia: FrecuenciaDistrito[];
+  /**
+   * Datos del distrito seleccionado, o `null`.
+   *
+   * `null` cubre dos situaciones que la UI distingue más abajo: que no haya distrito elegido, y
+   * que el distrito **no tenga fila** en el Excel de la fuente (hoy solo Acomayo, que el API
+   * responde con 404). Son estados vacíos distintos y el segundo es un dato en sí mismo.
+   */
+  frecuencia: FrecuenciaDistrito | null;
   /** Nombre del distrito seleccionado en el GeoSelector; vacío = ninguno. */
   distrito: string;
 };
 
 export default function FrecuenciaEmergencias({ frecuencia, distrito }: Props) {
-  const datos = useMemo(
-    () => (distrito ? frecuencia.find((d) => d.distrito === distrito) : undefined),
-    [frecuencia, distrito]
-  );
+  const datos = frecuencia ?? undefined;
 
   const barras = useMemo(() => {
     if (!datos) return [];

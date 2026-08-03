@@ -5,7 +5,6 @@
  */
 import type { IControl, Map as MapLibreMap } from "maplibre-gl";
 import maplibregl from "maplibre-gl";
-import type { CentroPoblado } from "@/lib/types";
 
 const RADIO_TIERRA = 6378137;
 const toRad = (d: number) => (d * Math.PI) / 180;
@@ -76,15 +75,29 @@ export class VistaInicialControl implements IControl {
  * Buscador de centros poblados sobre el mapa. Filtra por nombre sobre los datos ya cargados
  * (sin geocoder externo) y, al elegir un resultado, vuela al punto y lo resalta.
  */
+/** Lo mínimo que el control necesita de un lugar para pintarlo y volar hasta él. */
+export type LugarSugerido = {
+  nombre: string;
+  distrito: string;
+  provincia: string;
+  lat: number | null;
+  lon: number | null;
+};
+
 export class BuscarLugarControl implements IControl {
   private contenedor?: HTMLDivElement;
   private marcador?: maplibregl.Marker;
+  private peticion = 0;
 
-  constructor(private ccpp: CentroPoblado[]) {}
+  /**
+   * @param buscar Búsqueda de lugares. En la plataforma la resuelve el índice `ccpp` de
+   *   Meilisearch (spec 05/06): antes filtraba el padrón completo en memoria, lo que obligaba a
+   *   descargar los 8,968 centros poblados solo para autocompletar. La función se inyecta para
+   *   que el control no sepa de dónde salen los resultados.
+   */
+  constructor(private buscar: (q: string) => Promise<LugarSugerido[]>) {}
 
   onAdd(map: MapLibreMap) {
-    const conCoords = this.ccpp.filter((c) => c.lat != null && c.lon != null);
-
     const div = document.createElement("div");
     div.className = "maplibregl-ctrl maplibregl-ctrl-group";
     div.style.cssText = "background:#fff;overflow:hidden";
@@ -99,11 +112,22 @@ export class BuscarLugarControl implements IControl {
     lista.style.cssText =
       "list-style:none;margin:0;padding:0;max-height:220px;overflow:auto;background:#fff";
 
-    const render = () => {
+    const render = async () => {
+      const term = input.value.trim();
+      if (term.length < 2) {
+        lista.innerHTML = "";
+        return;
+      }
+      // Contador de petición: las respuestas de una búsqueda remota pueden llegar
+      // desordenadas, y sin esto teclear rápido deja en pantalla el resultado de un término
+      // anterior.
+      const mia = ++this.peticion;
+      const encontrados = await this.buscar(term);
+      if (mia !== this.peticion) return;
+
       lista.innerHTML = "";
-      const term = input.value.trim().toLowerCase();
-      if (term.length < 2) return;
-      for (const c of conCoords.filter((x) => x.nombre.toLowerCase().includes(term)).slice(0, 8)) {
+      for (const c of encontrados) {
+        if (c.lat == null || c.lon == null) continue;
         const li = document.createElement("li");
         li.style.cssText =
           "padding:6px 9px;cursor:pointer;border-top:1px solid #eee;font:12px system-ui";
@@ -130,7 +154,7 @@ export class BuscarLugarControl implements IControl {
       }
     };
 
-    input.addEventListener("input", render);
+    input.addEventListener("input", () => void render());
     // Sin esto, escribir sobre el mapa dispara los atajos de teclado de MapLibre.
     div.addEventListener("keydown", (e) => e.stopPropagation());
     div.addEventListener("click", (e) => e.stopPropagation());

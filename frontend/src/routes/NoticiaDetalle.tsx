@@ -1,8 +1,8 @@
 import { Link, useParams } from "react-router-dom";
 import { CalendarDays, UserRound } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import { useJsonData } from "@/lib/useJsonData";
-import type { Noticia } from "@/lib/types";
+import { useApi } from "@/lib/api";
+import type { NoticiaDetalle as TNoticia } from "@/lib/types";
 import { TIPOS_NOTICIA } from "@/lib/types";
 import { formatFecha } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
@@ -11,17 +11,12 @@ import PalabrasClave from "@/components/PalabrasClave";
 
 export default function NoticiaDetalle() {
   const { slug } = useParams();
-  const noticias = useJsonData<Noticia[]>("/data/noticias.mock.json");
+  const noticia = useApi<TNoticia>(slug ? `/noticias/${slug}/` : null);
 
-  if (noticias.status === "loading") return <div className="container-page py-12">Cargando…</div>;
-  if (noticias.status !== "ok")
-    return (
-      <div className="container-page py-12">
-        <EmptyState title="Error al cargar las noticias" />
-      </div>
-    );
-
-  const n = noticias.data.find((x) => x.slug === slug);
+  if (noticia.status === "loading") return <div className="container-page py-12">Cargando…</div>;
+  // Un 404 del API es "no existe o fue retirada", no un error del sitio: el flujo editorial
+  // permite despublicar, y un enlace compartido antes seguirá circulando.
+  const n = noticia.status === "ok" ? noticia.data : null;
   if (!n) {
     return (
       <div className="container-page py-12">
@@ -58,7 +53,7 @@ export default function NoticiaDetalle() {
           </span>
         </div>
 
-        <Portada tipo={n.tipo} imagen={n.imagen_portada} pie={n.imagen_titulo} alt={n.titulo} />
+        <Portada imagen={n.imagen_portada} pie={n.imagen_titulo} alt={n.titulo} />
 
         <p className="mt-6 text-lg text-ink-900 leading-relaxed">{n.bajada}</p>
         {/* whitespace-pre-line respeta los saltos de párrafo del JSON sin necesidad de rich text. */}

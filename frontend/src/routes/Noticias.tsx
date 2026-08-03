@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { CalendarDays } from "lucide-react";
-import { useJsonData } from "@/lib/useJsonData";
+import { useApiPaginado } from "@/lib/api";
 import type { Noticia } from "@/lib/types";
 import { TIPOS_NOTICIA } from "@/lib/types";
 import { formatFecha } from "@/lib/semaforo";
-import { portada } from "@/lib/imagenes";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import Reveal from "@/components/Reveal";
@@ -19,24 +18,24 @@ export const TIPO_ESTILO: Record<Noticia["tipo"], string> = {
 };
 
 export default function Noticias() {
-  const data = useJsonData<Noticia[]>("/data/noticias.mock.json");
   const [tipo, setTipo] = useState("");
   const [params, setParams] = useSearchParams();
   const tema = params.get("tema") ?? "";
 
-  const filtradas = useMemo(() => {
-    if (data.status !== "ok") return [];
-    return data.data
-      .filter((n) => (tipo ? n.tipo === tipo : true))
-      .filter((n) => (tema ? n.palabras_clave.includes(tema) : true))
-      .sort((a, b) => b.fecha.localeCompare(a.fecha));
-  }, [data, tipo, tema]);
+  // El filtrado lo hace el servidor: `?tipo=` y `?tema=` van al API en vez de recortar en
+  // memoria una lista que ya no se descarga completa.
+  const noticias = useApiPaginado<Noticia>("/noticias/", { tipo, tema });
+  const filtradas = noticias.resultados;
 
-  if (data.status === "loading") return <div className="container-page py-12">Cargando…</div>;
-  if (data.status !== "ok")
+  if (noticias.status === "loading" && !filtradas.length)
+    return <div className="container-page py-12">Cargando…</div>;
+  if (noticias.status === "error")
     return (
       <div className="container-page py-12">
-        <EmptyState title="Error al cargar las noticias" />
+        <EmptyState
+          title="No se pudieron cargar las noticias"
+          message={noticias.error?.message}
+        />
       </div>
     );
 
@@ -89,6 +88,15 @@ export default function Noticias() {
             ))}
           </div>
         )}
+
+        {noticias.hayMas && (
+          <div className="mt-8 text-center">
+            <button type="button" onClick={noticias.cargarMas} className="btn-ghost"
+                    disabled={noticias.cargando}>
+              {noticias.cargando ? "Cargando…" : `Ver más (${filtradas.length} de ${noticias.total})`}
+            </button>
+          </div>
+        )}
       </div>
     </>
   );
@@ -102,7 +110,7 @@ export function TarjetaNoticia({ noticia: n }: { noticia: Noticia }) {
       className="card block h-full overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition duration-300 no-underline"
     >
       <img
-        src={portada(n.tipo, n.imagen_portada)}
+        src={n.imagen_portada}
         alt={n.titulo}
         className="w-full aspect-[3/2] object-cover"
       />
@@ -131,7 +139,7 @@ export function TarjetaNoticiaCompacta({ noticia: n }: { noticia: Noticia }) {
       className="card flex gap-4 p-4 hover:shadow-md transition no-underline"
     >
       <img
-        src={portada(n.tipo, n.imagen_portada)}
+        src={n.imagen_portada}
         alt={n.titulo}
         className="w-24 h-24 shrink-0 object-cover rounded-lg"
       />
