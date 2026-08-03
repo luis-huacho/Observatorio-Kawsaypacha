@@ -1,0 +1,108 @@
+# Configuración, menú y textos del sitio. Son DATOS, no código: PREDES los edita desde el admin
+# y esto es solo el punto de partida (los textos vienen del prototipo aprobado).
+#
+# `manage.py seed` CREA lo que falta y NO toca lo que ya existe, así que volver a correr el seed
+# en un despliegue no le devuelve al cliente sus textos al valor de fábrica.
+
+configuracion:
+  nombre_sitio: Observatorio Kallpachakuy
+  descripcion_footer: >-
+    Monitoreo y seguimiento de la gestión del riesgo de desastres y la adaptación al cambio
+    climático en la región Cusco, Perú. Operado por PREDES.
+  email_contacto: postmaster@predes.org.pe
+  redes:
+    web: https://predes.org.pe/
+
+# --- Menú principal --------------------------------------------------------
+menu:
+  - {zona: header, texto: Exposición a peligros, url: /peligros, orden: 1}
+  - {zona: header, texto: Medidas, url: /medidas, orden: 2}
+  - {zona: header, texto: Inversión, url: /inversion, orden: 3}
+  - {zona: header, texto: Normativa, url: /normativa, orden: 4}
+  - {zona: header, texto: Comparar distritos, url: /comparar, orden: 5}
+  - {zona: header, texto: Sobre, url: /sobre, orden: 6}
+  # Prioridades existe con visible=false y NO se borra (ADR-P1): la decisión fue desactivar la
+  # ventana para este proyecto, no descartarla.
+  - {zona: header, texto: Prioridades, url: /prioridades, orden: 7, visible: false}
+
+  - {zona: footer, grupo: Secciones, texto: Exposición a peligros, url: /peligros, orden: 1}
+  - {zona: footer, grupo: Secciones, texto: Medidas, url: /medidas, orden: 2}
+  - {zona: footer, grupo: Secciones, texto: Inversión, url: /inversion, orden: 3}
+  - {zona: footer, grupo: Secciones, texto: Comparar distritos, url: /comparar, orden: 4}
+  - {zona: footer, grupo: Más, texto: Normativa, url: /normativa, orden: 5}
+  # Noticias no va en el menú principal (decisión del dueño del proyecto): se llega desde el
+  # bloque de actualidad de la portada y desde esta columna, que es su acceso permanente.
+  - {zona: footer, grupo: Más, texto: Noticias, url: /noticias, orden: 6}
+  - {zona: footer, grupo: Más, texto: Videos, url: /videos, orden: 7}
+  - {zona: footer, grupo: Más, texto: Eventos, url: /eventos, orden: 8}
+  - {zona: footer, grupo: Más, texto: Recursos, url: /recursos, orden: 9}
+  - {zona: footer, grupo: Más, texto: Sobre el observatorio, url: /sobre, orden: 10}
+
+# --- Textos administrables -------------------------------------------------
+bloques:
+  - clave: home.hero.titulo
+    pagina: home
+    titulo: Título del hero
+    cuerpo: <p>Observatorio del riesgo y la adaptación climática en Cusco.</p>
+
+  - clave: home.hero.subtitulo
+    pagina: home
+    titulo: Subtítulo del hero
+    cuerpo: >-
+      <p>Monitoreamos peligros, prácticas que funcionan, inversión pública y prioridades de los
+      gobiernos locales y regionales para reducir el riesgo de desastres.</p>
+
+  - clave: footer.fuentes
+    pagina: footer
+    titulo: Fuentes citadas en el pie
+    cuerpo: >-
+      <p>Datos provenientes de SIGRID-CENEPRED, INEI, MEF (PPR 0068), SENAMHI, INGEMMET, IGP,
+      ANA, INAIGEM.</p>
+
+  - clave: footer.creditos
+    pagina: footer
+    titulo: Créditos
+    cuerpo: <p>PREDES — Centro de Estudios y Prevención de Desastres</p>
+
+  - clave: sobre.mision
+    pagina: sobre
+    titulo: Qué hace el observatorio
+    cuerpo: >-
+      <p>El Observatorio Kallpachakuy sigue la evolución de los riesgos asociados a los
+      principales peligros que afectan a la región Cusco, difunde medidas y experiencias que
+      han demostrado reducir el riesgo y aportar a la adaptación al cambio climático, y acerca
+      la información pública sobre inversión, normativa e instrumentos de gestión vinculados a
+      la GRD y la ACC.</p>
+
+  - clave: sobre.principios
+    pagina: sobre
+    titulo: Principios
+    cuerpo: >-
+      <ul><li>Información pública y fuentes oficiales.</li><li>Calidad y actualización
+      permanente de los datos.</li><li>Cualquier persona puede consultar y usar los
+      contenidos.</li><li>Intercambio de aprendizajes entre instituciones y
+      comunidades.</li><li>Valora el conocimiento ancestral y las prácticas de las comunidades
+      andinas.</li><li>Articula Estado, academia, sociedad civil y cooperación.</li></ul>
+
+  - clave: peligros.aviso_sin_dato
+    pagina: peligros
+    titulo: Aviso sobre los centros poblados sin clasificación
+    cuerpo: >-
+      <p>Los centros poblados sin clasificación no aparecen como de peligro bajo, sino en gris:
+      la ausencia de dato no es ausencia de riesgo, sino un vacío de información que debe
+      cubrirse mediante evaluación técnica.</p>
+
+  - clave: inversion.en_preparacion
+    pagina: general
+    titulo: Estado de la ventana Inversión
+    cuerpo: >-
+      <p>PREDES está consolidando los datos de inversión del PPR 0068. La sección se publicará
+      en cuanto la información esté disponible.</p>
+
+  - clave: informe.firma
+    pagina: general
+    titulo: Firma institucional de las ayudas memoria
+    cuerpo: >-
+      <p>Documento generado por el Observatorio Kallpachakuy — PREDES, Centro de Estudios y
+      Prevención de Desastres, en el marco del proyecto «Incremento de la Resiliencia Ante el
+      Riesgo Climático en las Comunidades Altoandinas de Cusco, Perú».</p>

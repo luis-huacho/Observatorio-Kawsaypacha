@@ -1,0 +1,10 @@
+# Categorías del repositorio de documentos. Datos, no código: PREDES puede añadir o renombrar
+# desde el admin y el seed no vuelve a tocarlas.
+
+categorias:
+  - {slug: estudios-riesgo, nombre: Estudios y evaluaciones de riesgo, orden: 1}
+  - {slug: planes-gestion, nombre: Planes e instrumentos de gestión, orden: 2}
+  - {slug: guias-manuales, nombre: Guías y manuales, orden: 3}
+  - {slug: sistematizacion, nombre: Sistematización de experiencias, orden: 4}
+  - {slug: normas, nombre: Normas y marcos legales, orden: 5}
+  - {slug: difusion, nombre: Material de difusión, orden: 6}

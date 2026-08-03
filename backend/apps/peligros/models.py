@@ -4,8 +4,17 @@ from django.db import models
 from apps.core.models import TimeStampedMixin
 
 
+class PorSlugManager(models.Manager):
+    """Llave natural por slug, para que las fixtures no dependan de pks autoincrementales."""
+
+    def get_by_natural_key(self, slug):
+        return self.get(slug=slug)
+
+
 class TipoPeligro(TimeStampedMixin):
     """Los 9 peligros del Excel base (Sismo, Heladas, …, Movimientos en masa)."""
+
+    objects = PorSlugManager()
 
     # El slug lleva guion BAJO, no guion medio: es la clave de las propiedades `nivel_<slug>`
     # del tile de CCPP y de la constante PELIGROS del frontend. Un `slugify()` produciría
@@ -39,6 +48,9 @@ class TipoPeligro(TimeStampedMixin):
 
     def __str__(self) -> str:
         return self.nombre
+
+    def natural_key(self):
+        return (self.slug,)
 
 
 class Fuente(TimeStampedMixin):
@@ -109,6 +121,8 @@ class ClasificacionPeligro(TimeStampedMixin):
 class CategoriaEvento(TimeStampedMixin):
     """Agrupación SIGRID de los tipos de evento del Excel de frecuencia (4)."""
 
+    objects = PorSlugManager()
+
     slug = models.SlugField(max_length=50, unique=True)
     nombre = models.CharField(max_length=100)
     orden = models.PositiveSmallIntegerField(default=0)
@@ -124,9 +138,14 @@ class CategoriaEvento(TimeStampedMixin):
     def __str__(self) -> str:
         return self.nombre
 
+    def natural_key(self):
+        return (self.slug,)
+
 
 class TipoEvento(TimeStampedMixin):
     """Tipos de emergencia del Excel de frecuencia (~25: huayco, helada, …)."""
+
+    objects = PorSlugManager()
 
     slug = models.SlugField(max_length=60, unique=True)
     nombre = models.CharField(max_length=100, unique=True)
@@ -142,6 +161,9 @@ class TipoEvento(TimeStampedMixin):
 
     def __str__(self) -> str:
         return self.nombre
+
+    def natural_key(self):
+        return (self.slug,)
 
 
 class FrecuenciaEmergencia(TimeStampedMixin):

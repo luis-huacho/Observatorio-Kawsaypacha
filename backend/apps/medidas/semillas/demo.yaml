@@ -1,0 +1,204 @@
+# Contenido de DEMOSTRACIÓN, portado del prototipo aprobado por PREDES.
+# Se carga solo con `manage.py seed --demo`: sirve para que la plataforma no se vea vacía en la
+# presentación y para que las pruebas E2E tengan sobre qué correr. En producción el contenido
+# real lo carga el editor desde el admin.
+#
+# Todo entra en estado `publicado`: el objetivo es ver el sitio como lo verá el público.
+
+medidas:
+- slug: qochas-pampallacta
+  titulo: Qochas comunales en Pampallacta
+  peligro: sequia
+  ambito: comunal
+  resultado: exito
+  distrito: 080302
+  comunidad: Pampallacta
+  resumen_corto: Construcción de 12 qochas que abastecen riego en época seca y han recargado bofedales
+    aledaños.
+  contenido: |-
+    <p>La comunidad de Pampallacta, en alianza con la municipalidad de Pisac y PREDES, implementó un sistema de <strong>12 qochas</strong> que captan las lluvias estacionales y recargan los bofedales aguas abajo.</p>
+    <h2>Cómo se hizo</h2>
+    <p>El trabajo se organizó por faenas comunales durante dos temporadas de lluvia, combinando conocimiento local sobre dónde retiene el agua el terreno con el levantamiento topográfico del equipo técnico.</p>
+    <ul>
+    <li>Identificación participativa de los puntos de captación.</li>
+    <li>Excavación y compactación manual de los vasos.</li>
+    <li>Siembra de pasto nativo en los bordes para evitar erosión.</li>
+    <li>Acuerdo comunal de mantenimiento anual antes de la temporada de lluvias.</li>
+    </ul>
+    <h2>Resultados medidos</h2>
+    <figure class="table"><table><thead><tr><th>Indicador</th><th>Antes</th><th>Después</th></tr></thead><tbody>
+    <tr><td>Meses con agua para riego</td><td>5</td><td>7</td></tr>
+    <tr><td>Qochas operativas</td><td>0</td><td>12</td></tr>
+    <tr><td>Familias con riego en estiaje</td><td>18</td><td>63</td></tr>
+    </tbody></table></figure>
+    <blockquote><p>Antes bajábamos al río dos horas para regar. Ahora el agua se queda arriba, donde está la chacra.</p></blockquote>
+    <h3>Lecciones para replicar</h3>
+    <p>El factor decisivo no fue la obra sino el <strong>acuerdo de mantenimiento</strong>: las qochas sin faena anual se colmatan en tres años. Ver también el <a href="https://www.gob.pe/inaigem">portal de INAIGEM</a> sobre siembra y cosecha de agua.</p>
+  video_url: null
+  imagen_titulo: Qochas construidas por la comunidad de Pampallacta.
+  palabras_clave:
+  - Siembra de agua
+  - Qochas
+  - Pisac
+  - Gestión comunal
+  enlaces:
+  - titulo: INAIGEM — siembra y cosecha de agua
+    url: https://www.gob.pe/inaigem
+  destacada: true
+- slug: brigadas-incendios-calca
+  titulo: Brigadas comunales contra incendios forestales en Calca
+  peligro: incendios_forestales
+  ambito: distrital
+  resultado: exito
+  distrito: 080301
+  comunidad: Calca
+  resumen_corto: Conformación de 8 brigadas comunales con equipamiento básico y protocolo de respuesta
+    articulado al COER Cusco.
+  contenido: |-
+    <p>Tras los incendios de 2022, la municipalidad de Calca conformó <strong>ocho brigadas comunales</strong> con presupuesto del PPR 0068 y un protocolo de respuesta articulado con el COER Cusco.</p>
+    <h2>Composición y equipamiento</h2>
+    <p>Cada brigada reúne entre 10 y 15 personas de la comunidad, con equipamiento básico de ataque directo y comunicación por radio con el centro de operaciones distrital.</p>
+    <ol>
+    <li>Batefuegos, rastrillos forestales y mochilas de agua.</li>
+    <li>Equipo de protección personal certificado.</li>
+    <li>Radio VHF con frecuencia compartida con el COER.</li>
+    </ol>
+    <figure class="media"><oembed url="https://www.youtube.com/watch?v=aqz-KE-bpKQ"></oembed></figure>
+    <h2>Resultado</h2>
+    <p>En la temporada siguiente la superficie afectada se redujo un <strong>40%</strong>, con tiempos de primera respuesta que bajaron de horas a minutos en las zonas con brigada activa.</p>
+    <h3>Condición crítica</h3>
+    <p>La rotación de autoridades pone en riesgo la continuidad: el equipamiento se deteriora y la capacitación caduca si no hay presupuesto anual comprometido.</p>
+  video_url: https://www.youtube.com/watch?v=aqz-KE-bpKQ
+  imagen_titulo: Brigada comunal de Calca en ejercicio de campo.
+  palabras_clave:
+  - Brigadas comunales
+  - Calca
+  - Respuesta
+  - PPR 0068
+  enlaces:
+  - titulo: CENEPRED — gestión del riesgo
+    url: https://www.gob.pe/cenepred
+  destacada: true
+- slug: viviendas-heladas-chahuaytiri
+  titulo: Acondicionamiento térmico de viviendas en Chahuaytiri
+  peligro: heladas
+  ambito: comunal
+  resultado: exito
+  distrito: 080302
+  comunidad: Chahuaytiri
+  resumen_corto: Mejoramiento térmico de 80 viviendas con aislamiento de techos y muros trombe. Reducción
+    de IRA en menores de 5 años.
+  contenido: |-
+    <p>Trabajo conjunto entre la comunidad, la posta de salud y FONCODES para el mejoramiento térmico de <strong>80 viviendas</strong> mediante aislamiento de techos y muros trombe.</p>
+    <h2>La intervención</h2>
+    <p>El muro trombe capta radiación solar durante el día y la libera dentro de la vivienda por la noche, cuando la temperatura exterior cae por debajo de cero en la temporada de heladas.</p>
+    <ul>
+    <li>Aislamiento de techos con material local.</li>
+    <li>Muro trombe orientado al norte en el ambiente de dormir.</li>
+    <li>Sellado de vanos y mejora de ventilación cruzada.</li>
+    </ul>
+    <h2>Indicador de salud</h2>
+    <p>La posta registró una reducción del <strong>35% en consultas por infecciones respiratorias agudas en menores de cinco años</strong> durante la temporada de heladas siguiente a la intervención.</p>
+    <blockquote><p>El dato de la posta fue lo que convenció al resto de familias. No el folleto.</p></blockquote>
+  video_url: null
+  imagen_titulo: Vivienda con acondicionamiento térmico en Chahuaytiri.
+  palabras_clave:
+  - Vivienda térmica
+  - Muro trombe
+  - Salud
+  - Pisac
+  enlaces: []
+  destacada: true
+- slug: forestacion-anta
+  titulo: Forestación con especies nativas en cabeceras — Anta
+  peligro: sequia
+  ambito: distrital
+  resultado: exito
+  distrito: 080501
+  comunidad: Anta
+  resumen_corto: Plantación de 50 ha con queuña y q'olle para recuperar regulación hídrica en cabeceras
+    de cuenca.
+  contenido: |-
+    <p>Programa multianual de plantación con especies nativas en cabeceras de cuenca, con apoyo de INAIGEM y participación de seis comunidades campesinas.</p>
+    <h2>Especies y superficie</h2>
+    <p>Se plantaron <strong>50 hectáreas</strong> con queuña (<em>Polylepis</em>) y q'olle, elegidas por su capacidad de retención de humedad y su adaptación a la altitud de la zona.</p>
+    <h2>Por qué en cabecera</h2>
+    <p>La cobertura vegetal en cabecera regula la infiltración y retrasa la escorrentía, lo que sostiene el caudal de los manantes en la época seca. Es una intervención cuyo efecto se mide en años, no en campañas.</p>
+    <ul>
+    <li>Vivero comunal para producción de plantones.</li>
+    <li>Cercado temporal para proteger del pastoreo.</li>
+    <li>Monitoreo de prendimiento a los 6, 12 y 24 meses.</li>
+    </ul>
+  video_url: null
+  imagen_titulo: ''
+  palabras_clave:
+  - Forestación
+  - Especies nativas
+  - Cabeceras de cuenca
+  - Anta
+  enlaces:
+  - titulo: INAIGEM
+    url: https://www.gob.pe/inaigem
+  destacada: false
+- slug: mal-adaptacion-reservorio-paucartambo
+  titulo: 'Reservorio sin operación: caso de mal-adaptación en Paucartambo'
+  peligro: sequia
+  ambito: distrital
+  resultado: mal_adaptacion
+  distrito: 080701
+  comunidad: Paucartambo
+  resumen_corto: 'Obra ejecutada en 2021 sin canal de derivación ni capacitación a usuarios. Resultado:
+    infraestructura no operativa.'
+  contenido: |-
+    <p>Obra ejecutada en 2021 sin canal de derivación ni capacitación a usuarios. El resultado es una <strong>infraestructura no operativa</strong> documentada por PREDES como caso de mala adaptación.</p>
+    <h2>Qué salió mal</h2>
+    <ol>
+    <li>El expediente técnico no incluyó el canal que conecta el reservorio con las parcelas.</li>
+    <li>No se conformó ni capacitó la organización de usuarios de agua.</li>
+    <li>No se previó presupuesto de operación y mantenimiento.</li>
+    </ol>
+    <blockquote><p>Se inauguró el reservorio, pero el agua nunca llegó a la chacra.</p></blockquote>
+    <h2>La lección</h2>
+    <p>La inversión en infraestructura <strong>debe acompañarse de organización social, capacitación y mantenimiento</strong>. Sin esos tres componentes, la obra cuenta como ejecución presupuestal pero no como reducción de riesgo — y ocupa el lugar de una intervención que sí lo habría sido.</p>
+  video_url: null
+  imagen_titulo: ''
+  palabras_clave:
+  - Infraestructura
+  - Operación y mantenimiento
+  - Paucartambo
+  - Lecciones
+  enlaces:
+  - titulo: MEF — Consulta Amigable
+    url: https://www.gob.pe/institucion/mef/normas-legales
+  destacada: false
+- slug: leccion-evar-quispicanchi
+  titulo: 'EVAR distrital desactualizado: lección de Quispicanchi'
+  peligro: movimientos_en_masa
+  ambito: provincial
+  resultado: leccion
+  distrito: 080801
+  comunidad: Quispicanchi
+  resumen_corto: El EVAR del 2017 no incluyó nuevas zonas urbanizadas, dejando viviendas sin clasificación
+    de riesgo durante movimientos en masa del 2024.
+  contenido: |-
+    <p>El Estudio de Evaluación de Riesgos del 2017 no incorporó las zonas urbanizadas después de esa fecha, dejando viviendas sin clasificación de riesgo durante los movimientos en masa de 2024.</p>
+    <h2>El desfase</h2>
+    <p>Entre 2017 y 2024 la mancha urbana creció sobre laderas que el estudio no había evaluado. Cuando ocurrió el evento, esas viviendas no figuraban en ningún registro de riesgo y quedaron fuera de la respuesta priorizada.</p>
+    <h2>Recomendación</h2>
+    <ul>
+    <li>Actualización periódica del EVAR con cargo al PPR 0068.</li>
+    <li>Articulación con el catastro municipal para detectar nueva ocupación.</li>
+    <li>Revisión obligatoria tras cada evento de magnitud.</li>
+    </ul>
+    <p>Es el mismo vacío que el visor del observatorio muestra en gris: <a href="/peligros">centros poblados sin clasificación</a> que no son centros poblados sin riesgo.</p>
+  video_url: null
+  imagen_titulo: ''
+  palabras_clave:
+  - EVAR
+  - Catastro
+  - Quispicanchi
+  - Vacíos de información
+  enlaces:
+  - titulo: CENEPRED — EVAR
+    url: https://www.gob.pe/cenepred
+  destacada: false

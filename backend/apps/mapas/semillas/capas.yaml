@@ -1,0 +1,70 @@
+# Capas de contexto del visor. Los estilos son los ya validados en el prototipo; viven en la
+# base (y no en el código del frontend) porque el TDR exige que PREDES pueda reemplazar capas y
+# cambiar su apariencia sin asistencia técnica.
+#
+# `archivo_geojson` queda vacío a propósito: los archivos fuente son 140 MB que no se versionan.
+# `manage.py seed --capas` los adjunta desde DATOS_FUENTE_DIR y encola la generación de tiles.
+
+capas:
+  - slug: rios
+    nombre: Ríos
+    descripcion: >-
+      Red hidrográfica nacional recortada a Cusco (3,164 de 33,950 cauces).
+    tipo_geometria: linea
+    # El campo del departamento en esta fuente es DN99.
+    filtro_atributo: DN99=CUSCO
+    min_zoom: 0
+    max_zoom: 12
+    visible_por_defecto: true
+    orden: 2
+    fuente: ANA - Red hidrográfica del Perú
+    atribucion: ANA - Red hidrográfica del Perú
+    estilo:
+      tipo: line
+      line-color: "#0095A4"
+      # Los cauces menores se afinan al alejarse para no emborronar la región.
+      line-width: ["interpolate", ["linear"], ["zoom"], 6, 0.4, 12, 1.6]
+      line-opacity: 0.75
+
+  - slug: lagunas
+    nombre: Lagunas
+    descripcion: >-
+      Lagos y lagunas del inventario nacional recortados a Cusco (2,512 de 27,464).
+    tipo_geometria: poligono
+    # ILIKE y no `=`: la fuente escribe "Cusco" en 2,439 registros y "CUSCO" en 73, y una
+    # comparación sensible a mayúsculas pierde esos 73 polígonos.
+    filtro_atributo: DPTO ILIKE cusco
+    min_zoom: 0
+    max_zoom: 12
+    visible_por_defecto: true
+    orden: 3
+    fuente: ANA - Inventario nacional de lagunas
+    atribucion: ANA - Inventario nacional de lagunas
+    estilo:
+      tipo: fill
+      fill-color: "#0095A4"
+      fill-opacity: 0.35
+      line-color: "#007480"
+      line-width: 0.6
+
+  - slug: glaciares
+    nombre: Glaciares
+    descripcion: >-
+      Inventario nacional de glaciares; ~1,155 de 3,067 en las cordilleras de Cusco
+      (Vilcanota, Vilcabamba, Urubamba, La Raya y parte de Carabaya).
+    tipo_geometria: poligono
+    # Sin campo de departamento: se recorta espacialmente con el polígono regional. El archivo
+    # viene en EPSG:32718, así que la reproyección del pipeline es imprescindible.
+    filtro_atributo: ""
+    min_zoom: 0
+    max_zoom: 12
+    visible_por_defecto: true
+    orden: 4
+    fuente: INAIGEM - Inventario nacional de glaciares
+    atribucion: INAIGEM - Inventario nacional de glaciares
+    estilo:
+      tipo: fill
+      fill-color: "#CCEAED"
+      fill-opacity: 0.8
+      line-color: "#007480"
+      line-width: 0.5
