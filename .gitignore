@@ -51,9 +51,11 @@ backups/
 frontend/vite.config.js
 frontend/vite.config.d.ts
 
-# Documentación interna y data fuente (no se versionan).
+# Data fuente y documentación interna (no se versionan).
 # Anclados a la raíz: sin la barra inicial, "data/" también ignora prototype/public/data/,
 # donde sí viven los JSON que consume la app.
 /data/
-/_specs/
 /_docs/
+
+# _specs/ SÍ se versiona: acumula los ADR, el modelo de datos y los contratos de API con los que
+# se construye el backend. Tenerlo en un solo disco, sin historial, era un riesgo innecesario.
