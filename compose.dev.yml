@@ -1,10 +1,18 @@
 # Override de desarrollo.
-# Uso: docker compose -f compose.yml -f compose.dev.yml up --build
 #
-# - Expone db (5432), meilisearch (7700) y backend (8000) al host.
-# - Backend con runserver + código montado (hot reload).
-# - caddy/backup/frontend quedan fuera (perfil "prod" no activado);
-#   el frontend en dev se corre en el host con `npm run dev` (Vite proxy → :8000).
+#   Arriba:  docker compose -f compose.yaml -f compose.dev.yml up -d --build
+#   Abajo:   docker compose -f compose.yaml -f compose.dev.yml down
+#   Logs:    docker compose -f compose.yaml -f compose.dev.yml logs -f backend worker
+#
+# Qué cambia respecto de producción:
+# - Publica db (5432), meilisearch (7700) y backend (8000) en el host, para poder atacarlos
+#   desde herramientas locales y desde el Vite dev server.
+# - `runserver` con el código montado, para recarga en caliente.
+# - nginx, certbot, backup y frontend quedan fuera (perfil "prod"): el frontend en dev corre en
+#   el host con `npm run dev`, que da recarga instantánea y mapas de fuentes.
+#
+# Para probar el modo producción en local —SPA compilada servida por nginx— se levanta sin este
+# override y con SITE_DOMAIN=localhost.
 
 services:
   db:
@@ -17,21 +25,37 @@ services:
 
   backend:
     command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      DEBUG: "True"
+      # Sin SMTP configurado los correos del flujo editorial van a la consola del contenedor.
+      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      # El venv de la imagen no se pisa con el del host: son plataformas distintas y el del
+      # host puede no existir.
+      - /app/.venv
       - media:/app/media
+      - ./data/layers:/datos:ro
 
   worker:
+    environment:
+      DEBUG: "True"
+      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
     volumes:
       - ./backend:/app
+      - /app/.venv
       - media:/app/media
+      - ./data/layers:/datos:ro
 
   frontend:
     profiles: ["prod"]
 
-  caddy:
+  nginx:
+    profiles: ["prod"]
+
+  certbot:
     profiles: ["prod"]
 
   backup:

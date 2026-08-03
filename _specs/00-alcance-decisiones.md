@@ -78,7 +78,7 @@ Complementan a las ventanas: portada (hero administrable), buscador global, noti
 |---|---|---|
 | Data de Inversión (Excel) | Ventana vacía | Estado "información en preparación" u ocultar desde admin (ADR-D3) |
 | Capas SIG oficiales (especialista SIG) | Capas referenciales | Publicar capas nacionales recortadas a Cusco con atribución |
-| **Polígono oficial de Cusco** (`cusco_region.geojson`) | Sin recorte espacial para capas sin campo de departamento (glaciares) | Fuente pública (INEI / geoBoundaries ADM1). Provisional en la demo: filtro por `cordillera` + bbox regional (ver 05) |
+| **Polígono oficial de Cusco** (`cusco_region.geojson`) | Ninguno hoy: **resuelto de forma provisional** con geoBoundaries ADM1 (CC BY 4.0), versionado en `backend/apps/mapas/datos/`. Se sustituye por el del INEI cuando llegue | Ver 05 |
 | **Fila de frecuencia de ACOMAYO** (080201) | Un distrito sin historial de emergencias | Estado vacío explícito; pedir la fila al cliente |
 | Textos definitivos, dominio, SMTP | Bloqueo de despliegue/correos | Solicitud formal en semana 1 (ver `_docs/planner.md`) |
 
@@ -92,3 +92,4 @@ Detectadas al auditar los Excel (02/08/2026); ninguna bloquea el desarrollo, tod
 4. Descuadres entre subtotal y desglose en **Sangarará** y **Mollepata**.
 5. Dos grafías de la misma fuente (`SIGRID_CENEPRED` / `CENEPRED_SIGRID`) y 23 formatos de `RANGO FECHA`.
 6. `Incendio forestal` está clasificado como "inducido por acción humana" en un Excel y como "meteorológico" en el otro.
+7. En `lagos-y-lagunas.geojson`, 4 lagunas traen `DPTO` compuesto (`Arequipa/Cusco`, `Madre deDios/Cusco`, `Cusco/Junin`): cruzan el límite regional y ningún filtro por departamento las incluye. Conviene decidir con PREDES si deben mostrarse.

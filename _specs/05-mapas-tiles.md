@@ -12,14 +12,20 @@ El visor migra de Leaflet (prototipo) a **MapLibre GL JS** (ADR-A7) consumiendo 
 | `lagos-y-lagunas.geojson` | 51 MB | 27,464 | **2,512** | MultiPolygon | EPSG:4326 | `DPTO ILIKE 'cusco'` (props: NOMBRE, CUENCA, DISTRITO, PROVINCIA, DPTO…) |
 | `glaciares.geojson` | 32 MB | 3,067 | ~1,155 | MultiPolygon | **EPSG:32718** | sin campo dpto → cordillera + recorte espacial (props: nomb_base, cordillera, cuenca, area_km2, alt_max) |
 
-Dos trampas verificadas contra los archivos reales:
+Dos particularidades de los archivos, **con una corrección importante del 03/08/2026**:
 
-- **`glaciares.geojson` NO está en lat/lon.** Viene proyectado en UTM 18S (`urn:ogc:def:crs:EPSG::32718`), con X entre 184k y 1,123k — toda la sierra peruana forzada a una sola zona. Sin `-t_srs EPSG:4326` en el `ogr2ogr`, tippecanoe recibe coordenadas fuera del rango geográfico y produce tiles vacíos. Verificado: tras reproyectar, la capa cae en lon −73.21…−70.25 / lat −14.55…−12.95.
-- **El filtro de lagunas debe ignorar mayúsculas.** La fuente escribe `"Cusco"` (2,439) y `"CUSCO"` (73); comparar con `DPTO = 'Cusco'` pierde 73 polígonos. El `-where` de OGR no tiene `UPPER()`, pero sí `ILIKE`.
+- **`glaciares.geojson` está guardado en UTM 18S** (`EPSG:32718`), con X entre 184k y 1,123k — toda la sierra peruana forzada a una sola zona. Este spec afirmaba que sin `-t_srs EPSG:4326` los tiles saldrían vacíos. **Medido con GDAL 3.10.3: no ocurre.** El driver GeoJSON de OGR reproyecta a WGS84 por su cuenta al escribir la salida, porque RFC 7946 obliga a que un GeoJSON esté en WGS84; con y sin `-t_srs` el `.jsonl` sale idéntico (mismas coordenadas, mismo tile de 108,439 bytes, cero avisos de tippecanoe).
+- **El filtro de lagunas con `ILIKE`.** La fuente sí escribe `"Cusco"` (2,439) y `"CUSCO"` (73). Este spec afirmaba que `DPTO = 'Cusco'` pierde esos 73. **Medido: tampoco ocurre** — el `-where` de OGR sobre el driver GeoJSON compara texto sin distinguir mayúsculas, y las dos formas devuelven los 2,512.
+
+**Aun así el pipeline mantiene `-t_srs EPSG:4326` incondicional y el `ILIKE`.** No por las razones de arriba, sino porque ambas hacen explícita la intención y no dependen de un detalle de implementación del driver: el `=` insensible a mayúsculas del filtro de atributos de OGR no está documentado como garantía y no se cumple con un backend SQL real, y la reproyección automática solo aplica a formatos de salida que exigen WGS84. Escribir la intención cuesta dos palabras; descubrir por qué un tile sale vacío costó una tarde.
+
+**Hallazgo nuevo para devolver al cliente**: 4 lagunas tienen `DPTO` compuesto (`Arequipa/Cusco`, `Madre deDios/Cusco`, `Cusco/Junin`) y ningún filtro por departamento las captura. Son cuerpos de agua que cruzan el límite regional; 2,516 mencionan Cusco de alguna forma frente a los 2,512 que entran.
 
 Cordilleras presentes en Cusco: Vilcanota (449), Vilcabamba (355), Urubamba (164), La Raya (35) y parte de Carabaya (191, compartida con Puno).
 
-Reemplazan a los `*.demo.geojson` del prototipo (lagunas/rios/nevados → glaciares). Polígono regional para clip: `backend/apps/mapas/fixtures/cusco_region.geojson` — **todavía no existe en el repo**; hay que obtenerlo de una fuente pública (INEI, geoBoundaries ADM1). Mientras tanto, `prototype/scripts/build_tiles.sh` acota glaciares con `cordillera IN (…)` + `-spat` sobre el bbox regional, que es suficiente para la demo pero no para producción.
+Reemplazan a los `*.demo.geojson` del prototipo (lagunas/rios/nevados → glaciares).
+
+**Polígono regional para el clip: resuelto (03/08/2026).** Vive en `backend/apps/mapas/datos/cusco_region.geojson` (21 KB, 485 vértices), extraído de geoBoundaries gbOpen ADM1 (CC BY 4.0); la atribución va dentro del propio archivo, que es el único sitio donde sobrevive a una copia. Bbox verificado: lon −73.98…−70.35 / lat −15.47…−11.24, que contiene el rango de glaciares del spec. Sigue siendo **provisional**: se sustituye por el polígono oficial del INEI cuando PREDES lo entregue. Glaciares se acota además por `cordillera IN (…)` y por `-spat` sobre el bbox regional, como pre-filtro barato antes del `-clipsrc`.
 
 ## Pipeline: capas subidas por admin
 

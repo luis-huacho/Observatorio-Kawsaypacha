@@ -1,0 +1,131 @@
+# Observatorio Kallpachakuy — orquestación.
+#
+#   Producción:  docker compose up -d --build
+#   Desarrollo:  docker compose -f compose.yaml -f compose.dev.yml up -d --build
+#   Bajar todo:  docker compose -f compose.yaml -f compose.dev.yml down
+#
+# Secretos en backend/.env (nunca se commitea; ver backend/.env.example).
+#
+# Dos dominios (ADR-A14): observatorio.predes.org.pe sirve la SPA y obs.predes.org.pe el API,
+# el admin, media y tiles. nginx + certbot en contenedor (ADR-A6bis).
+
+services:
+  db:
+    image: postgres:16-alpine
+    env_file: backend/.env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    env_file: backend/.env
+    volumes:
+      - media:/app/media
+      - static:/app/staticfiles
+      # Los Excel y GeoJSON canónicos, de solo lectura: `manage.py seed` los importa desde aquí.
+      - ./data/layers:/datos:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+    restart: unless-stopped
+
+  # Mismo código e imagen que backend; procesa la cola de django-tasks (importaciones de Excel,
+  # tiles, resúmenes con Gemini, correos, agregación de métricas).
+  worker:
+    build: ./backend
+    env_file: backend/.env
+    command: python manage.py db_worker
+    volumes:
+      - media:/app/media
+      - ./data/layers:/datos:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.15
+    # Comparte backend/.env solo por MEILI_MASTER_KEY y MEILI_ENV.
+    env_file: backend/.env
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Compila la SPA y deja dist/ en el volumen que sirve nginx; termina al copiar.
+  frontend:
+    build: ./frontend
+    volumes:
+      - web_dist:/out
+    restart: "no"
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - web_dist:/srv/www:ro
+      - media:/srv/media:ro
+      - static:/srv/static:ro
+      - certbot_conf:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    depends_on:
+      - backend
+      - meilisearch
+    restart: unless-stopped
+
+  # Emisión y renovación de certificados por webroot. `renew` no hace nada si aún no toca, así
+  # que el bucle es seguro; nginx recarga por su cuenta cada 6 h para tomar el certificado nuevo.
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: >-
+      sh -c 'trap exit TERM;
+      while :; do certbot renew --webroot -w /var/www/certbot --quiet;
+      sleep 12h & wait $${!}; done'
+    restart: unless-stopped
+
+  # pg_dump diario con rotación (7 diarios / 4 semanales / 6 mensuales).
+  backup:
+    image: prodrigestivill/postgres-backup-local:16
+    env_file: backend/.env
+    environment:
+      POSTGRES_HOST: db
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: "7"
+      BACKUP_KEEP_WEEKS: "4"
+      BACKUP_KEEP_MONTHS: "6"
+      HEALTHCHECK_PORT: "8080"
+    volumes:
+      - backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  meili_data:
+  # media incluye tiles/, datasets/, informes/ y contenido/ — todo lo que sube PREDES.
+  media:
+  static:
+  web_dist:
+  certbot_conf:
+  certbot_www:
+  backups:
