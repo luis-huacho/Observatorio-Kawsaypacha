@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Portada por defecto de medidas del peligro "heladas": cristal de hielo. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+  <g stroke="#0095A4" stroke-width="6" stroke-linecap="round" fill="none">
+    <path d="M300 44 V 196"/><path d="M234 82 L366 158"/><path d="M366 82 L234 158"/>
+    <g stroke-width="4">
+      <path d="M300 74 L282 92"/><path d="M300 74 L318 92"/>
+      <path d="M300 166 L282 148"/><path d="M300 166 L318 148"/>
+      <path d="M262 98 L258 122"/><path d="M338 142 L342 118"/>
+      <path d="M338 98 L342 122"/><path d="M262 142 L258 118"/>
+    </g>
+  </g>
+  <path d="M0 400 L0 262 L120 182 L228 252 L338 168 L452 258 L600 196 L600 400 Z" fill="#5BBB5D" opacity="0.55"/>
+  <path d="M0 400 L0 312 L112 236 L224 306 L336 224 L456 312 L600 248 L600 400 Z" fill="#009257"/>
+  <path d="M0 400 L0 366 L160 348 L330 372 L480 346 L600 362 L600 400 Z" fill="#0B3B26"/>
+</svg>

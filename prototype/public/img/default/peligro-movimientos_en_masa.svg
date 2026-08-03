@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Portada por defecto de medidas del peligro "movimientos_en_masa": ladera con desprendimiento. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+  <path d="M0 400 L0 262 L120 182 L228 252 L338 168 L452 258 L600 196 L600 400 Z" fill="#5BBB5D" opacity="0.55"/>
+  <path d="M0 400 L0 312 L112 236 L224 306 L336 224 L456 312 L600 248 L600 400 Z" fill="#009257"/>
+  <path d="M0 400 L0 366 L160 348 L330 372 L480 346 L600 362 L600 400 Z" fill="#0B3B26"/>
+  <path d="M336 224 L456 312 L600 248 L600 400 L300 400 Z" fill="#B8753C" opacity="0.85"/>
+  <g fill="#7A4A28">
+    <circle cx="392" cy="300" r="15"/><circle cx="446" cy="338" r="11"/>
+    <circle cx="352" cy="348" r="9"/><circle cx="486" cy="300" r="8"/>
+    <circle cx="420" cy="372" r="13"/>
+  </g>
+</svg>

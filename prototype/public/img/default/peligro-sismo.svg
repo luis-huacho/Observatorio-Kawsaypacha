@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Portada por defecto de medidas del peligro "sismo": ondas sísmicas y grieta en el suelo. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+  <g fill="none" stroke="#970A00" stroke-width="4" stroke-linecap="round" opacity="0.75">
+    <path d="M300 120 m-38 0 a38 38 0 0 1 76 0"/>
+    <path d="M300 120 m-66 0 a66 66 0 0 1 132 0"/>
+    <path d="M300 120 m-94 0 a94 94 0 0 1 188 0"/>
+  </g>
+  <circle cx="300" cy="120" r="12" fill="#970A00"/>
+  <path d="M0 400 L0 262 L120 182 L228 252 L338 168 L452 258 L600 196 L600 400 Z" fill="#5BBB5D" opacity="0.55"/>
+  <path d="M0 400 L0 312 L112 236 L224 306 L336 224 L456 312 L600 248 L600 400 Z" fill="#009257"/>
+  <path d="M0 400 L0 366 L160 348 L330 372 L480 346 L600 362 L600 400 Z" fill="#0B3B26"/>
+  <path d="M250 400 L282 344 L268 336 L306 292 L292 340 L308 348 L282 400 Z" fill="#FAFAF7"/>
+</svg>

@@ -170,13 +170,14 @@ export default function Home() {
         <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Casos recientes</h2>
         <p className="text-ink-600 mt-1 text-center">Prácticas comunales y distritales con resultados.</p>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
+          {/* Cada tarjeta lleva a su ficha, no al listado genérico. */}
           {[
-            { img: "/img/caso-qochas.jpg", titulo: "Qochas comunales en Pampallacta", peligro: "Sequía" },
-            { img: "/img/caso-chahuaytiri.jpg", titulo: "Acondicionamiento térmico en Chahuaytiri", peligro: "Heladas" },
-            { img: "/img/caso-calca.jpg", titulo: "Brigadas contra incendios en Calca", peligro: "Incendios" },
+            { slug: "qochas-pampallacta", img: "/img/caso-qochas.jpg", titulo: "Qochas comunales en Pampallacta", peligro: "Sequía" },
+            { slug: "viviendas-heladas-chahuaytiri", img: "/img/caso-chahuaytiri.jpg", titulo: "Acondicionamiento térmico en Chahuaytiri", peligro: "Heladas" },
+            { slug: "brigadas-incendios-calca", img: "/img/caso-calca.jpg", titulo: "Brigadas contra incendios en Calca", peligro: "Incendios forestales" },
           ].map((c, i) => (
-            <Reveal key={c.img} delay={i * 80}>
-              <CasoPreview img={c.img} titulo={c.titulo} peligro={c.peligro} />
+            <Reveal key={c.slug} delay={i * 80}>
+              <CasoPreview slug={c.slug} img={c.img} titulo={c.titulo} peligro={c.peligro} />
             </Reveal>
           ))}
         </div>
@@ -279,10 +280,10 @@ function Stat({ label, value, accent = false }: { label: string; value: string; 
 }
 
 function CasoPreview({
-  img, titulo, peligro,
-}: { img: string; titulo: string; peligro: string }) {
+  slug, img, titulo, peligro,
+}: { slug: string; img: string; titulo: string; peligro: string }) {
   return (
-    <Link to="/medidas" className="card block h-full overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition duration-300 no-underline">
+    <Link to={`/medidas/${slug}`} className="card block h-full overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition duration-300 no-underline">
       <div className="relative aspect-[3/2]">
         <img src={img} alt={titulo} className="absolute inset-0 w-full h-full object-cover" />
         <span className="chip absolute top-3 left-3 bg-white/90 text-level-3 border border-level-3/30">

@@ -52,6 +52,18 @@ export type FrecuenciaDistrito = {
   categorias: CategoriaEmergencia[];
 };
 
+/** Una foto de la galería de una medida. Espejo del modelo hijo `MedidaImagen` del spec 01. */
+export type MedidaImagen = {
+  imagen: string;
+  pie: string;
+  orden: number;
+};
+
+export type EnlaceExterno = {
+  titulo: string;
+  url: string;
+};
+
 export type Medida = {
   _mock?: boolean;
   id: string;
@@ -63,10 +75,15 @@ export type Medida = {
   ubigeo: string;
   comunidad: string;
   resumen_corto: string;
-  contenido?: string;
+  /** HTML de CKEditor 5. Se renderiza con `ContenidoRico`, nunca como texto plano. */
+  contenido: string;
   video_url: string | null;
-  imagen: string | null;
-  tags: string[];
+  /** Nulo = ilustración por defecto del peligro. Ver `lib/imagenes.ts`. */
+  imagen_portada: string | null;
+  imagen_titulo: string | null;
+  galeria: MedidaImagen[];
+  enlaces: EnlaceExterno[];
+  palabras_clave: string[];
 };
 
 export type InversionDistrito = {

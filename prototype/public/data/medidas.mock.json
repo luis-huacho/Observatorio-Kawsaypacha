@@ -10,26 +10,79 @@
     "ubigeo": "080302",
     "comunidad": "Pampallacta",
     "resumen_corto": "Construcción de 12 qochas que abastecen riego en época seca y han recargado bofedales aledaños.",
-    "contenido": "La comunidad de Pampallacta, en alianza con la municipalidad de Pisac y PREDES, implementó un sistema de 12 qochas que captan lluvias estacionales. Resultado: disponibilidad de agua para riego se extendió 2 meses adicionales.",
+    "contenido": "<p>La comunidad de Pampallacta, en alianza con la municipalidad de Pisac y PREDES, implementó un sistema de <strong>12 qochas</strong> que captan las lluvias estacionales y recargan los bofedales aguas abajo.</p>\n<h2>Cómo se hizo</h2>\n<p>El trabajo se organizó por faenas comunales durante dos temporadas de lluvia, combinando conocimiento local sobre dónde retiene el agua el terreno con el levantamiento topográfico del equipo técnico.</p>\n<ul>\n<li>Identificación participativa de los puntos de captación.</li>\n<li>Excavación y compactación manual de los vasos.</li>\n<li>Siembra de pasto nativo en los bordes para evitar erosión.</li>\n<li>Acuerdo comunal de mantenimiento anual antes de la temporada de lluvias.</li>\n</ul>\n<h2>Resultados medidos</h2>\n<figure class=\"table\"><table><thead><tr><th>Indicador</th><th>Antes</th><th>Después</th></tr></thead><tbody>\n<tr><td>Meses con agua para riego</td><td>5</td><td>7</td></tr>\n<tr><td>Qochas operativas</td><td>0</td><td>12</td></tr>\n<tr><td>Familias con riego en estiaje</td><td>18</td><td>63</td></tr>\n</tbody></table></figure>\n<blockquote><p>Antes bajábamos al río dos horas para regar. Ahora el agua se queda arriba, donde está la chacra.</p></blockquote>\n<h3>Lecciones para replicar</h3>\n<p>El factor decisivo no fue la obra sino el <strong>acuerdo de mantenimiento</strong>: las qochas sin faena anual se colmatan en tres años. Ver también el <a href=\"https://www.gob.pe/inaigem\">portal de INAIGEM</a> sobre siembra y cosecha de agua.</p>",
     "video_url": null,
-    "imagen": null,
-    "tags": ["Sequía", "Siembra de agua", "Comunal", "Pisac"]
+    "imagen_portada": "/img/caso-qochas.jpg",
+    "imagen_titulo": "Qochas construidas por la comunidad de Pampallacta.",
+    "galeria": [
+      {
+        "imagen": "/img/caso-qochas.jpg",
+        "pie": "Qochas construidas por la comunidad de Pampallacta.",
+        "orden": 1
+      },
+      {
+        "imagen": "/img/default/foto-pendiente.svg",
+        "pie": "Faena comunal de excavación (fotografía pendiente de carga).",
+        "orden": 2
+      },
+      {
+        "imagen": "/img/default/foto-pendiente.svg",
+        "pie": "Bofedal recargado aguas abajo (fotografía pendiente de carga).",
+        "orden": 3
+      }
+    ],
+    "enlaces": [
+      {
+        "titulo": "INAIGEM — siembra y cosecha de agua",
+        "url": "https://www.gob.pe/inaigem"
+      }
+    ],
+    "palabras_clave": [
+      "Siembra de agua",
+      "Qochas",
+      "Pisac",
+      "Gestión comunal"
+    ]
   },
   {
     "_mock": true,
     "id": "brigadas-incendios-calca",
     "slug": "brigadas-incendios-calca",
     "titulo": "Brigadas comunales contra incendios forestales en Calca",
-    "peligro": "Incendios Forestales",
+    "peligro": "Incendios forestales",
     "ambito": "distrital",
     "resultado": "exito",
     "ubigeo": "080301",
     "comunidad": "Calca",
     "resumen_corto": "Conformación de 8 brigadas comunales con equipamiento básico y protocolo de respuesta articulado al COER Cusco.",
-    "contenido": "Tras los incendios de 2022, la municipalidad de Calca conformó 8 brigadas con presupuesto del PPR 0068. Reducción del 40% en hectáreas afectadas en la siguiente temporada.",
-    "video_url": null,
-    "imagen": null,
-    "tags": ["Incendios Forestales", "Brigadas", "Distrital", "Calca"]
+    "contenido": "<p>Tras los incendios de 2022, la municipalidad de Calca conformó <strong>ocho brigadas comunales</strong> con presupuesto del PPR 0068 y un protocolo de respuesta articulado con el COER Cusco.</p>\n<h2>Composición y equipamiento</h2>\n<p>Cada brigada reúne entre 10 y 15 personas de la comunidad, con equipamiento básico de ataque directo y comunicación por radio con el centro de operaciones distrital.</p>\n<ol>\n<li>Batefuegos, rastrillos forestales y mochilas de agua.</li>\n<li>Equipo de protección personal certificado.</li>\n<li>Radio VHF con frecuencia compartida con el COER.</li>\n</ol>\n<figure class=\"media\"><oembed url=\"https://www.youtube.com/watch?v=aqz-KE-bpKQ\"></oembed></figure>\n<h2>Resultado</h2>\n<p>En la temporada siguiente la superficie afectada se redujo un <strong>40%</strong>, con tiempos de primera respuesta que bajaron de horas a minutos en las zonas con brigada activa.</p>\n<h3>Condición crítica</h3>\n<p>La rotación de autoridades pone en riesgo la continuidad: el equipamiento se deteriora y la capacitación caduca si no hay presupuesto anual comprometido.</p>",
+    "video_url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+    "imagen_portada": "/img/caso-calca.jpg",
+    "imagen_titulo": "Brigada comunal de Calca en ejercicio de campo.",
+    "galeria": [
+      {
+        "imagen": "/img/caso-calca.jpg",
+        "pie": "Brigada comunal de Calca en ejercicio de campo.",
+        "orden": 1
+      },
+      {
+        "imagen": "/img/default/foto-pendiente.svg",
+        "pie": "Equipamiento entregado a las brigadas (fotografía pendiente de carga).",
+        "orden": 2
+      }
+    ],
+    "enlaces": [
+      {
+        "titulo": "CENEPRED — gestión del riesgo",
+        "url": "https://www.gob.pe/cenepred"
+      }
+    ],
+    "palabras_clave": [
+      "Brigadas comunales",
+      "Calca",
+      "Respuesta",
+      "PPR 0068"
+    ]
   },
   {
     "_mock": true,
@@ -42,10 +95,29 @@
     "ubigeo": "080302",
     "comunidad": "Chahuaytiri",
     "resumen_corto": "Mejoramiento térmico de 80 viviendas con aislamiento de techos y muros trombe. Reducción de IRA en menores de 5 años.",
-    "contenido": "Trabajo conjunto entre comunidad, posta de salud y FONCODES. Indicador clave: reducción del 35% en consultas por IRA durante temporada de heladas.",
+    "contenido": "<p>Trabajo conjunto entre la comunidad, la posta de salud y FONCODES para el mejoramiento térmico de <strong>80 viviendas</strong> mediante aislamiento de techos y muros trombe.</p>\n<h2>La intervención</h2>\n<p>El muro trombe capta radiación solar durante el día y la libera dentro de la vivienda por la noche, cuando la temperatura exterior cae por debajo de cero en la temporada de heladas.</p>\n<ul>\n<li>Aislamiento de techos con material local.</li>\n<li>Muro trombe orientado al norte en el ambiente de dormir.</li>\n<li>Sellado de vanos y mejora de ventilación cruzada.</li>\n</ul>\n<h2>Indicador de salud</h2>\n<p>La posta registró una reducción del <strong>35% en consultas por infecciones respiratorias agudas en menores de cinco años</strong> durante la temporada de heladas siguiente a la intervención.</p>\n<blockquote><p>El dato de la posta fue lo que convenció al resto de familias. No el folleto.</p></blockquote>",
     "video_url": null,
-    "imagen": null,
-    "tags": ["Heladas", "Vivienda", "Comunal", "Pisac"]
+    "imagen_portada": "/img/caso-chahuaytiri.jpg",
+    "imagen_titulo": "Vivienda con acondicionamiento térmico en Chahuaytiri.",
+    "galeria": [
+      {
+        "imagen": "/img/caso-chahuaytiri.jpg",
+        "pie": "Vivienda con acondicionamiento térmico en Chahuaytiri.",
+        "orden": 1
+      },
+      {
+        "imagen": "/img/default/foto-pendiente.svg",
+        "pie": "Detalle del muro trombe (fotografía pendiente de carga).",
+        "orden": 2
+      }
+    ],
+    "enlaces": [],
+    "palabras_clave": [
+      "Vivienda térmica",
+      "Muro trombe",
+      "Salud",
+      "Pisac"
+    ]
   },
   {
     "_mock": true,
@@ -58,10 +130,34 @@
     "ubigeo": "080501",
     "comunidad": "Anta",
     "resumen_corto": "Plantación de 50 ha con queuña y q'olle para recuperar regulación hídrica en cabeceras de cuenca.",
-    "contenido": "Programa multi-anual con apoyo de INAIGEM y participación de 6 comunidades campesinas.",
+    "contenido": "<p>Programa multianual de plantación con especies nativas en cabeceras de cuenca, con apoyo de INAIGEM y participación de seis comunidades campesinas.</p>\n<h2>Especies y superficie</h2>\n<p>Se plantaron <strong>50 hectáreas</strong> con queuña (<em>Polylepis</em>) y q'olle, elegidas por su capacidad de retención de humedad y su adaptación a la altitud de la zona.</p>\n<h2>Por qué en cabecera</h2>\n<p>La cobertura vegetal en cabecera regula la infiltración y retrasa la escorrentía, lo que sostiene el caudal de los manantes en la época seca. Es una intervención cuyo efecto se mide en años, no en campañas.</p>\n<ul>\n<li>Vivero comunal para producción de plantones.</li>\n<li>Cercado temporal para proteger del pastoreo.</li>\n<li>Monitoreo de prendimiento a los 6, 12 y 24 meses.</li>\n</ul>",
     "video_url": null,
-    "imagen": null,
-    "tags": ["Sequía", "Forestación", "Distrital", "Anta"]
+    "imagen_portada": null,
+    "imagen_titulo": null,
+    "galeria": [
+      {
+        "imagen": "/img/default/foto-pendiente.svg",
+        "pie": "Vivero comunal de plantones (fotografía pendiente de carga).",
+        "orden": 1
+      },
+      {
+        "imagen": "/img/default/foto-pendiente.svg",
+        "pie": "Plantación en cabecera de cuenca (fotografía pendiente de carga).",
+        "orden": 2
+      }
+    ],
+    "enlaces": [
+      {
+        "titulo": "INAIGEM",
+        "url": "https://www.gob.pe/inaigem"
+      }
+    ],
+    "palabras_clave": [
+      "Forestación",
+      "Especies nativas",
+      "Cabeceras de cuenca",
+      "Anta"
+    ]
   },
   {
     "_mock": true,
@@ -74,10 +170,29 @@
     "ubigeo": "080701",
     "comunidad": "Paucartambo",
     "resumen_corto": "Obra ejecutada en 2021 sin canal de derivación ni capacitación a usuarios. Resultado: infraestructura no operativa.",
-    "contenido": "Caso documentado por PREDES. Lecciones: la inversión en infraestructura debe acompañarse de organización social, capacitación y mantenimiento.",
+    "contenido": "<p>Obra ejecutada en 2021 sin canal de derivación ni capacitación a usuarios. El resultado es una <strong>infraestructura no operativa</strong> documentada por PREDES como caso de mala adaptación.</p>\n<h2>Qué salió mal</h2>\n<ol>\n<li>El expediente técnico no incluyó el canal que conecta el reservorio con las parcelas.</li>\n<li>No se conformó ni capacitó la organización de usuarios de agua.</li>\n<li>No se previó presupuesto de operación y mantenimiento.</li>\n</ol>\n<blockquote><p>Se inauguró el reservorio, pero el agua nunca llegó a la chacra.</p></blockquote>\n<h2>La lección</h2>\n<p>La inversión en infraestructura <strong>debe acompañarse de organización social, capacitación y mantenimiento</strong>. Sin esos tres componentes, la obra cuenta como ejecución presupuestal pero no como reducción de riesgo — y ocupa el lugar de una intervención que sí lo habría sido.</p>",
     "video_url": null,
-    "imagen": null,
-    "tags": ["Sequía", "Infraestructura", "Mal-adaptación", "Paucartambo"]
+    "imagen_portada": null,
+    "imagen_titulo": null,
+    "galeria": [
+      {
+        "imagen": "/img/default/foto-pendiente.svg",
+        "pie": "Reservorio sin canal de derivación (fotografía pendiente de carga).",
+        "orden": 1
+      }
+    ],
+    "enlaces": [
+      {
+        "titulo": "MEF — Consulta Amigable",
+        "url": "https://www.gob.pe/institucion/mef/normas-legales"
+      }
+    ],
+    "palabras_clave": [
+      "Infraestructura",
+      "Operación y mantenimiento",
+      "Paucartambo",
+      "Lecciones"
+    ]
   },
   {
     "_mock": true,
@@ -90,9 +205,22 @@
     "ubigeo": "080801",
     "comunidad": "Quispicanchi",
     "resumen_corto": "El EVAR del 2017 no incluyó nuevas zonas urbanizadas, dejando viviendas sin clasificación de riesgo durante movimientos en masa del 2024.",
-    "contenido": "Recomendación: actualización periódica del EVAR con cargo al PP 0068, articulando con catastro municipal.",
+    "contenido": "<p>El Estudio de Evaluación de Riesgos del 2017 no incorporó las zonas urbanizadas después de esa fecha, dejando viviendas sin clasificación de riesgo durante los movimientos en masa de 2024.</p>\n<h2>El desfase</h2>\n<p>Entre 2017 y 2024 la mancha urbana creció sobre laderas que el estudio no había evaluado. Cuando ocurrió el evento, esas viviendas no figuraban en ningún registro de riesgo y quedaron fuera de la respuesta priorizada.</p>\n<h2>Recomendación</h2>\n<ul>\n<li>Actualización periódica del EVAR con cargo al PPR 0068.</li>\n<li>Articulación con el catastro municipal para detectar nueva ocupación.</li>\n<li>Revisión obligatoria tras cada evento de magnitud.</li>\n</ul>\n<p>Es el mismo vacío que el visor del observatorio muestra en gris: <a href=\"/peligros\">centros poblados sin clasificación</a> que no son centros poblados sin riesgo.</p>",
     "video_url": null,
-    "imagen": null,
-    "tags": ["Movimientos en masa", "EVAR", "Provincial", "Quispicanchi"]
+    "imagen_portada": null,
+    "imagen_titulo": null,
+    "galeria": [],
+    "enlaces": [
+      {
+        "titulo": "CENEPRED — EVAR",
+        "url": "https://www.gob.pe/cenepred"
+      }
+    ],
+    "palabras_clave": [
+      "EVAR",
+      "Catastro",
+      "Quispicanchi",
+      "Vacíos de información"
+    ]
   }
 ]

@@ -111,6 +111,109 @@
   font-family: inherit;
 }
 
+/* --- Contenido de CKEditor 5 --------------------------------------------------------------
+   El Preflight de Tailwind deja los `h1..h6` a `font-size: inherit` y las listas sin viñeta ni
+   sangría, así que el HTML que llega del editor hay que devolverlo a la vida a mano. Se escribe
+   aquí y no con @tailwindcss/typography porque el plugin no conoce las clases propias de
+   CKEditor (`figure.image`, `figure.table`, `.image-style-side`, `.text-big`), que hay que
+   estilar igualmente.                                                                        */
+
+.contenido-rico {
+  @apply text-ink-600 leading-relaxed;
+}
+
+.contenido-rico > * + * {
+  @apply mt-4;
+}
+
+.contenido-rico h2 {
+  @apply font-display font-bold text-mountain-900 text-2xl mt-8 leading-tight;
+}
+.contenido-rico h3 {
+  @apply font-display font-bold text-mountain-900 text-xl mt-6 leading-tight;
+}
+.contenido-rico h4 {
+  @apply font-display font-semibold text-mountain-900 text-lg mt-5;
+}
+
+.contenido-rico ul,
+.contenido-rico ol {
+  @apply pl-6 space-y-1;
+}
+.contenido-rico ul {
+  @apply list-disc;
+}
+.contenido-rico ol {
+  @apply list-decimal;
+}
+.contenido-rico li::marker {
+  @apply text-mountain-500;
+}
+
+/* En texto corrido el color no basta para distinguir un enlace: la regla global del sitio los
+   deja sin subrayar, y aquí sí lo llevan. */
+.contenido-rico a {
+  @apply underline;
+}
+
+.contenido-rico blockquote {
+  @apply border-l-4 border-mountain-500 bg-mountain-100/50 pl-5 pr-4 py-3 rounded-r-xl italic;
+}
+
+.contenido-rico strong {
+  @apply font-semibold text-ink-900;
+}
+
+.contenido-rico hr {
+  @apply border-ink-300/40 my-8;
+}
+
+.contenido-rico figure {
+  @apply my-6;
+}
+.contenido-rico figure img {
+  @apply w-full rounded-xl border border-mountain-900/10;
+}
+.contenido-rico figcaption {
+  @apply mt-2 text-xs text-ink-600;
+}
+
+/* CKEditor deja la imagen flotada con estas clases cuando el editor la alinea. */
+.contenido-rico .image-style-side {
+  @apply md:float-right md:w-1/2 md:ml-6;
+}
+.contenido-rico .image-style-align-left {
+  @apply md:float-left md:w-1/2 md:mr-6;
+}
+
+.contenido-rico table {
+  @apply w-full border-collapse text-sm;
+}
+.contenido-rico th,
+.contenido-rico td {
+  @apply border border-ink-300/50 px-3 py-2 text-left align-top;
+}
+.contenido-rico th {
+  @apply bg-mountain-100 font-medium text-mountain-900;
+}
+.contenido-rico figure.table {
+  @apply overflow-x-auto;
+}
+
+/* Tamaños de fuente del editor. */
+.contenido-rico .text-tiny { font-size: 0.75em; }
+.contenido-rico .text-small { font-size: 0.875em; }
+.contenido-rico .text-big { font-size: 1.15em; }
+.contenido-rico .text-huge { font-size: 1.4em; }
+
+/* Video incrustado, sustituto del <oembed> que CKEditor deja en el HTML. */
+.contenido-rico .video-embebido {
+  @apply relative w-full aspect-video overflow-hidden rounded-xl border border-mountain-900/10 bg-mountain-900 my-6;
+}
+.contenido-rico .video-embebido iframe {
+  @apply absolute inset-0 w-full h-full;
+}
+
 /* --- Impresión: ayuda memoria -------------------------------------------------------------
    El documento vive oculto en el DOM y solo aparece al imprimir. En la plataforma real lo
    generará WeasyPrint desde una plantilla equivalente, así que estas reglas se mantienen en
@@ -137,6 +240,13 @@
 
   .solo-impresion {
     display: block !important;
+  }
+
+  /* La regla de arriba oculta header/footer por etiqueta para quitar el cromo del sitio, pero
+     el editor puede insertar esos elementos dentro del cuerpo de una medida. Ahí no son cromo. */
+  .contenido-rico header,
+  .contenido-rico footer {
+    display: revert !important;
   }
 
   /* Sin esto los navegadores descartan los fondos: los puntos de nivel y el membrete
