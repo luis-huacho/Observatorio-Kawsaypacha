@@ -25,7 +25,7 @@
 |---|---|---|
 | Exposición a peligros naturales | Activa | Excel `Base_Nivel Peligro_CCPP_Cusco.xlsx` (10,978 clasificaciones sobre 8,968 CCPP) + `Base_Frecuencia_Peligro_Cusco.xlsx` (111 distritos) — ver 01 |
 | Medidas (buenas prácticas) | Activa | Contenido editorial (admin) |
-| Inversión (PPR 0068) | Activa, **sin datos** | **Pendiente: el cliente aún no entrega la data.** Módulo completo con estado vacío elegante / ocultable desde admin |
+| Inversión (PPR 0068) | **Diferida** (ADR-D3) | **Pendiente: el cliente aún no tiene claridad sobre la data.** Solo se entrega la ruta con estado vacío; sin modelos ni importador |
 | Normativa | Activa | Contenido editorial (admin) |
 | Prioridades | **Desactivada** | — |
 
@@ -50,20 +50,25 @@ Complementan a las ventanas: portada (hero administrable), buscador global, noti
 | A1 | **PostgreSQL 16 plano** + pipeline geo offline | PostGIS | No hay consultas espaciales en runtime (CCPP son lat/lon planos; las capas solo se convierten a tiles). Evita GDAL/GEOS en la imagen Django |
 | A2 | **DRF** + django-filter + drf-spectacular | Django Ninja | API 95% lectura con filtros/paginación; ecosistema probado (throttling, exports) |
 | A3 | **django-tasks** (backend BD) + contenedor `worker` + cron | Celery + Redis | Sin broker extra; suficiente para Gemini, tiles, correos e importaciones con 1 desarrollador y 4 semanas |
-| A4 | Búsqueda: llave **search-only** de Meilisearch expuesta al navegador, proxy vía Caddy `/search/` | Proxy DRF | Las llaves search-only son seguras por diseño; facetas y typo-tolerance sin boilerplate. Las búsquedas se registran en métricas vía beacon |
-| A5 | Tiles: **PMTiles estáticos** servidos por Caddy con HTTP Range | tileserver dedicado / tiles dinámicos | MapLibre + protocolo `pmtiles://` lee por rangos; cero servicios adicionales. **Excepción: la capa CCPP** — ver A13 |
+| A4 | Búsqueda: llave **search-only** de Meilisearch expuesta al navegador, proxy vía nginx `/search/` | Proxy DRF | Las llaves search-only son seguras por diseño; facetas y typo-tolerance sin boilerplate. Las búsquedas se registran en métricas vía beacon |
+| A5 | Tiles: **PMTiles estáticos** servidos por nginx con HTTP Range | tileserver dedicado / tiles dinámicos | MapLibre + protocolo `pmtiles://` lee por rangos; cero servicios adicionales. **Excepción: la capa CCPP** — ver A13 |
 | A13 | Capa CCPP del visor: **fuente `geojson` agrupada** (clustering + símbolos proporcionales a población) | PMTiles como el resto de capas | El clustering se pidió como requisito y **MapLibre solo agrupa fuentes `geojson`**; no hay clustering sobre fuentes vectoriales. Solo afecta a CCPP: ríos, lagunas y glaciares siguen en PMTiles. Detalle y pendientes en 05 |
-| A6 | Edge: **Caddy** (auto-Let's Encrypt) | nginx + certbot | Un contenedor: SPA + media/tiles + proxy api/admin/search + HTTPS automático |
+| A6 | ~~Edge: **Caddy** (auto-Let's Encrypt)~~ | — | **Superado por A6bis.** Se conserva la fila para que el historial de la decisión quede legible |
 | A7 | Mapa: **MapLibre GL JS** (reescritura de `MapaPeligros`) | Leaflet + protomaps-leaflet | Soporte nativo MVT/PMTiles; mejor rendimiento con 8,968 puntos. Decisión del dueño del proyecto |
 | A8 | Admin: **django-unfold** | jazzmin / admin plano | UX moderna para editores no técnicos; dashboard personalizable. Decisión del dueño del proyecto |
-| A9 | PDF distrito: **WeasyPrint** | reportlab / Chrome headless | Reusa plantillas HTML con la paleta PREDES |
+| A9 | PDF distrito: **WeasyPrint** | reportlab / Chrome headless | Reusa plantillas HTML con la paleta PREDES. **Matiz**: el navegador headless sí entra, pero solo para capturar el PNG del mapa (ver 02) — la maquetación del documento sigue siendo WeasyPrint |
 | A10 | Gemini `gemini-2.5-flash` vía SDK `google-genai`, PDF como input nativo | extracción de texto local | Acepta PDF directo; barato y suficiente para resúmenes |
 | A11 | Métricas: app propia (eventos → agregados diarios, sin PII) | Google Analytics / Plausible | El TDR pide métricas *internas*; privacidad y cero dependencias externas |
 | A12 | Actualización de datos: **DatasetUpload** con reemplazo atómico | edición manual fila a fila | Requisito TDR: el cliente re-sube el mismo Excel actualizado y los datos se reemplazan |
+| A6bis | Edge: **nginx + certbot en contenedor** (sustituye a Caddy) | Caddy | Es lo que PREDES y su hosting saben operar; el ahorro de configuración de Caddy no compensa una pieza que nadie más sabe depurar. Decisión del dueño del proyecto. Coste asumido: la renovación de certificados depende del cron de certbot, no es automática por diseño |
+| A14 | **Dos dominios**: `observatorio.predes.org.pe` (SPA) y `obs.predes.org.pe` (API, admin, media, tiles, search) | dominio único con `/api` en el mismo origen | Deja el admin y el API fuera del dominio que se difunde, y permite mover cualquiera de los dos por separado. Coste asumido: CORS entre ambos, incluidas cabeceras en `/tiles` y `/media`. Decisión del dueño del proyecto |
+
+> **ADR-D3 — La ventana Inversión no se implementa en esta fase.** El TDR la incluye y sigue siendo parte del producto, pero **el cliente aún no tiene claridad sobre la data**: ni el formato del Excel ni el alcance del PPR 0068 están definidos, y modelar contra un formato imaginado se tira a la basura en cuanto llegue el real. No se crean la app `inversion` ni sus modelos; `GET /api/inversion/` responde `{"disponible": false}` de forma fija y `/inversion` muestra el estado vacío del spec 06. El enlace de menú existe con `EnlaceMenu.visible` editable, así que PREDES puede ocultarlo. Cuando llegue la data se añade la app sin tocar el frontend. Decisión del dueño del proyecto.
 
 ## Fuera de alcance (esta fase)
 
 - Ventana Prioridades (ADR-P1).
+- Ventana Inversión: modelos, importador y endpoint con datos (ADR-D3). La ruta y su estado vacío sí se entregan.
 - Scraping automático de Consulta Amigable MEF (la inversión se carga por Excel).
 - i18n quechua, series temporales, 7 procesos GRD, directorio de actores (roadmap futuro, ver `archive/05-roadmap.md`).
 
@@ -71,7 +76,7 @@ Complementan a las ventanas: portada (hero administrable), buscador global, noti
 
 | Dependencia | Impacto si no llega | Mitigación |
 |---|---|---|
-| Data de Inversión (Excel) | Ventana vacía | Estado "información en preparación" u ocultar desde admin |
+| Data de Inversión (Excel) | Ventana vacía | Estado "información en preparación" u ocultar desde admin (ADR-D3) |
 | Capas SIG oficiales (especialista SIG) | Capas referenciales | Publicar capas nacionales recortadas a Cusco con atribución |
 | **Polígono oficial de Cusco** (`cusco_region.geojson`) | Sin recorte espacial para capas sin campo de departamento (glaciares) | Fuente pública (INEI / geoBoundaries ADM1). Provisional en la demo: filtro por `cordillera` + bbox regional (ver 05) |
 | **Fila de frecuencia de ACOMAYO** (080201) | Un distrito sin historial de emergencias | Estado vacío explícito; pedir la fila al cliente |

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Portada por defecto de medidas del peligro "friaje": viento frío. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+  <g fill="none" stroke="#0095A4" stroke-width="7" stroke-linecap="round">
+    <path d="M150 96 H 366 a24 24 0 1 0 -24 -24"/>
+    <path d="M180 146 H 306 a20 20 0 1 1 -20 20"/>
+    <path d="M210 196 H 402 a22 22 0 1 0 -22 -22"/>
+  </g>
+  <path d="M0 400 L0 262 L120 182 L228 252 L338 168 L452 258 L600 196 L600 400 Z" fill="#5BBB5D" opacity="0.55"/>
+  <path d="M0 400 L0 312 L112 236 L224 306 L336 224 L456 312 L600 248 L600 400 Z" fill="#009257"/>
+  <path d="M0 400 L0 366 L160 348 L330 372 L480 346 L600 362 L600 400 Z" fill="#0B3B26"/>
+</svg>

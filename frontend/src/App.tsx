@@ -5,10 +5,12 @@ import Peligros from "./routes/Peligros";
 import PeligroDetalle from "./routes/PeligroDetalle";
 import Medidas from "./routes/Medidas";
 import MedidaDetalle from "./routes/MedidaDetalle";
+import Noticias from "./routes/Noticias";
+import NoticiaDetalle from "./routes/NoticiaDetalle";
 import Inversion from "./routes/Inversion";
-// Desactivada por decisión de reunión — ver _specs/00-alcance-decisiones.md
-// import Prioridades from "./routes/Prioridades";
+import Prioridades from "./routes/Prioridades";
 import Normativa from "./routes/Normativa";
+import NormaDetalle from "./routes/NormaDetalle";
 import Recursos from "./routes/Recursos";
 import Sobre from "./routes/Sobre";
 import Buscar from "./routes/Buscar";
@@ -23,10 +25,13 @@ export default function App() {
         <Route path="/peligros/:codigo" element={<PeligroDetalle />} />
         <Route path="/medidas" element={<Medidas />} />
         <Route path="/medidas/:slug" element={<MedidaDetalle />} />
+        {/* Noticias no está en el menú principal: se llega desde la portada y el pie. */}
+        <Route path="/noticias" element={<Noticias />} />
+        <Route path="/noticias/:slug" element={<NoticiaDetalle />} />
         <Route path="/inversion" element={<Inversion />} />
-        {/* Desactivada por decisión de reunión — ver _specs/00-alcance-decisiones.md
-        <Route path="/prioridades" element={<Prioridades />} /> */}
+        <Route path="/prioridades" element={<Prioridades />} />
         <Route path="/normativa" element={<Normativa />} />
+        <Route path="/normativa/:slug" element={<NormaDetalle />} />
         <Route path="/recursos" element={<Recursos />} />
         <Route path="/sobre" element={<Sobre />} />
         <Route path="/buscar" element={<Buscar />} />

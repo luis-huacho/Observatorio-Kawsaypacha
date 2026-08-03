@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Portada por defecto de medidas del peligro "sequia": sol y tierra agrietada. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+  <circle cx="300" cy="112" r="52" fill="#EBB320"/>
+  <g stroke="#EBB320" stroke-width="7" stroke-linecap="round">
+    <path d="M300 26 v-0.5"/><path d="M300 22 v14"/><path d="M300 188 v14"/>
+    <path d="M214 112 h-14"/><path d="M400 112 h14"/>
+    <path d="M239 51 l-10 -10"/><path d="M361 173 l10 10"/>
+    <path d="M361 51 l10 -10"/><path d="M239 173 l-10 10"/>
+  </g>
+  <path d="M0 400 L0 262 L120 182 L228 252 L338 168 L452 258 L600 196 L600 400 Z" fill="#5BBB5D" opacity="0.55"/>
+  <path d="M0 400 L0 312 L112 236 L224 306 L336 224 L456 312 L600 248 L600 400 Z" fill="#009257"/>
+  <path d="M0 400 L0 366 L160 348 L330 372 L480 346 L600 362 L600 400 Z" fill="#0B3B26"/>
+  <g stroke="#F1DCC0" stroke-width="3" stroke-linecap="round" opacity="0.8">
+    <path d="M90 384 L140 368 L128 400"/><path d="M240 396 L286 372 L330 392"/>
+    <path d="M420 380 L470 366 L516 386"/>
+  </g>
+</svg>

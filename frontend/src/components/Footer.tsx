@@ -37,6 +37,8 @@ export default function Footer() {
           <div className="text-xs uppercase tracking-wider text-mountain-100/60 mb-3">Más</div>
           <ul className="space-y-2 text-sm">
             <li><Link className="text-mountain-100 hover:text-white no-underline" to="/normativa">Normativa</Link></li>
+            {/* Noticias no está en el menú superior; este es su único acceso permanente. */}
+            <li><Link className="text-mountain-100 hover:text-white no-underline" to="/noticias">Noticias</Link></li>
             <li><Link className="text-mountain-100 hover:text-white no-underline" to="/recursos">Recursos</Link></li>
             <li><Link className="text-mountain-100 hover:text-white no-underline" to="/sobre">Sobre el observatorio</Link></li>
           </ul>

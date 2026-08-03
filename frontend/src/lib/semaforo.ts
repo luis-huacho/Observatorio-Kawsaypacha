@@ -35,6 +35,21 @@ export function formatNumber(n: number): string {
   return new Intl.NumberFormat("es-PE").format(n);
 }
 
+/**
+ * Fecha ISO ("2026-07-28") a texto legible.
+ *
+ * Se descompone a mano en vez de usar `new Date(iso)`: esa forma se interpreta como medianoche
+ * UTC y en Lima (UTC-5) acaba mostrando el día anterior.
+ */
+export function formatFecha(iso: string): string {
+  const [anio, mes, dia] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat("es-PE", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(anio, mes - 1, dia));
+}
+
 export function formatSoles(n: number): string {
   return new Intl.NumberFormat("es-PE", {
     style: "currency",

@@ -13,11 +13,37 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 | `GET /api/ccpp/` | `provincia`, `distrito` (ubigeo6), `peligro` (slug), `nivel_min` 1-4, `buscar`, `page` | tabla del visor |
 | `GET /api/ccpp/{codigo}/` | — | ficha con clasificaciones anidadas |
 | `GET /api/ccpp/export.xlsx` | mismos filtros que la lista | openpyxl, streaming |
-| `GET /api/ccpp/geojson/` | mismos filtros que la lista, **sin paginar** | **PENDIENTE DE DEFINIR** (ver 05 / ADR-A13). Puntos del visor: MapLibre solo agrupa fuentes `geojson`, así que la capa CCPP no sale del tile. Un `FeatureCollection` de `Point` con `codigo, nombre, categoria, distrito, provincia, poblacion, altitud, nivel` (nivel = máximo tras aplicar los filtros; `0` = sin dato). Incluye **también los no clasificados**, que el visor pinta en gris. Orden de magnitud: 8,968 features region-wide |
+| `GET /api/ccpp/geojson/` | mismos filtros que la lista, **sin paginar** | Puntos del visor (ver 05 / ADR-A13). `FeatureCollection` de `Point`; ver el ejemplo y la nota de tamaño más abajo |
 | `GET /api/peligros/tipos/` | — | catálogo (9) con orden y color |
 | `GET /api/peligros/resumen/` | `provincia`, `distrito`, `peligro`, `nivel_min` | agregados para cifras del home/visor. Devuelve **las dos unidades** (por CCPP y por clasificación) rotuladas; ver el ejemplo |
 | `GET /api/peligros/frecuencia/` | `distrito`, `provincia`, `categoria` | NUEVO: emergencias históricas por distrito |
 | `GET /api/peligros/frecuencia/export.xlsx` | ídem | |
+
+### `/api/ccpp/geojson/` — la fuente del visor
+
+MapLibre solo agrupa fuentes `geojson` (ADR-A13), así que la capa de centros poblados no sale del tile vectorial. El endpoint devuelve **el padrón que pasa los filtros**, sin paginar, e incluye **también los no clasificados** — el visor los pinta en gris, y ese vacío de información es en sí mismo un dato.
+
+```jsonc
+// GET /api/ccpp/geojson/?provincia=0803&peligro=sismo&nivel_min=3
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-71.97675606, -13.51927548] },
+      "properties": {
+        "codigo": "0801010001", "nombre": "CUSCO", "categoria": "CIUDAD",
+        "distrito": "CUSCO", "provincia": "CUSCO", "poblacion": 111930, "altitud": 3439,
+        // Máximo de los peligros que sobrevivieron a los filtros. 0 = sin dato.
+        "nivel": 4,
+        // Desglose para el popup, SERIALIZADO: las propiedades de un feature agrupado
+        // tienen que ser escalares (ver 05).
+        "peligros": "[{\"p\":\"Sismo\",\"n\":4}]"
+      } }
+  ]
+}
+```
+
+Decisión de tamaño: se sirve el `FeatureCollection` completo en vez de agrupar en servidor. Region-wide son 8,968 features (~2 MB, ~400 KB con gzip, que es del orden de lo que el prototipo ya descarga y funciona), y al filtrar por provincia o distrito baja mucho. Agrupar en servidor obligaría a reimplementar supercluster en Python y a pedir datos en cada paneo del mapa; se deja como salida si el payload llegara a molestar. Se responde con `ETag` para que el navegador revalide en vez de re-descargar.
 
 ```jsonc
 // GET /api/ccpp/0801010001/
@@ -171,7 +197,7 @@ Notas de contrato heredadas de la maqueta:
 
 - **El alcance es un distrito**, con `peligro` y `nivel_min` como refinamientos opcionales. Un reporte regional o provincial produce decenas de páginas y deja de servir para una mesa técnica.
 - La tabla lista **solo los centros poblados clasificados**; los "sin dato" se cuentan en el texto como vacío de información, que es en sí mismo un argumento de incidencia.
-- El mapa se incrusta como imagen. En el prototipo sale del canvas de MapLibre (`map.getCanvas().toDataURL()`); en el backend habrá que renderizarlo en servidor o aceptar que el cliente envíe el PNG de su vista actual.
+- **El mapa se renderiza en el servidor** (decisión del dueño del proyecto). El worker abre una página headless (Playwright + Chromium) con un visor mínimo que consume `/api/ccpp/geojson/` y las capas de contexto, encuadra el distrito y captura el PNG, que WeasyPrint incrusta. Se prefiere esto a que el cliente envíe el canvas de su vista: así el PDF se puede generar **desde el admin y por lotes**, sin depender de que alguien tenga el visor abierto, y el documento es reproducible a partir de sus parámetros. Coste asumido: Chromium en la imagen del backend (~400 MB) y un punto más de fallo — si la captura falla, el PDF sale **sin mapa** y con el resto del contenido intacto, nunca con un hueco roto.
 - Los textos de firma salen de `ConfiguracionSitio` y `BloqueTexto`, no cableados como en el prototipo.
 
 ## Sitio, mapas y métricas
@@ -203,5 +229,5 @@ La búsqueda global y las facetas van **directo a Meilisearch** (`/search/`, lla
 
 - Errores en JSON estándar DRF (`{"detail": …}`); 404 para slugs/códigos inexistentes.
 - Throttling anónimo global (p.ej. `1000/hour`), más estricto en exports y PDF (`30/hour`).
-- CORS innecesario en producción (mismo origen vía Caddy); en dev, `django-cors-headers` con `localhost:5173`.
+- **CORS activo también en producción** (ADR-A14: la SPA vive en `observatorio.predes.org.pe` y el API en `obs.predes.org.pe`). `django-cors-headers` con allowlist desde `CORS_ALLOWED_ORIGINS`; en dev, `localhost:5173`. nginx añade las cabeceras de `/media/` y `/tiles/`, que Django no sirve.
 - Los serializers viven en `backend/apps/api/`; sus formas se reflejan en `frontend/src/lib/types.ts`.

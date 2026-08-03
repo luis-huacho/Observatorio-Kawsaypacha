@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Portada por defecto de medidas del peligro "incendios_forestales": llama. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+  <path d="M300 40 c 34 52 68 74 68 124 a68 68 0 0 1 -136 0 c 0 -34 24 -50 38 -78 c 8 22 20 30 30 40 c -4 -32 -12 -54 0 -86 Z" fill="#F57C15"/>
+  <path d="M300 122 c 18 26 32 38 32 62 a32 32 0 0 1 -64 0 c 0 -20 20 -30 32 -62 Z" fill="#EBB320"/>
+  <path d="M0 400 L0 262 L120 182 L228 252 L338 168 L452 258 L600 196 L600 400 Z" fill="#5BBB5D" opacity="0.55"/>
+  <path d="M0 400 L0 312 L112 236 L224 306 L336 224 L456 312 L600 248 L600 400 Z" fill="#009257"/>
+  <path d="M0 400 L0 366 L160 348 L330 372 L480 346 L600 362 L600 400 Z" fill="#0B3B26"/>
+</svg>

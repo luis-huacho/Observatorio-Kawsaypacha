@@ -1,6 +1,6 @@
 # 05 — Mapas y Vector Tiles (Tippecanoe + PMTiles + MapLibre)
 
-El visor migra de Leaflet (prototipo) a **MapLibre GL JS** (ADR-A7) consumiendo **PMTiles estáticos** (ADR-A5). Tippecanoe (≥2.17, escribe PMTiles nativo) y GDAL (`ogr2ogr`) se instalan en la imagen del backend (multi-stage); el worker ejecuta el pipeline. Salida: `media/tiles/{slug}.pmtiles`, servidos por Caddy con HTTP Range.
+El visor migra de Leaflet (prototipo) a **MapLibre GL JS** (ADR-A7) consumiendo **PMTiles estáticos** (ADR-A5). Tippecanoe (≥2.17, escribe PMTiles nativo) y GDAL (`ogr2ogr`) se instalan en la imagen del backend (multi-stage); el worker ejecuta el pipeline. Salida: `media/tiles/{slug}.pmtiles`, servidos por nginx con HTTP Range.
 
 ## Capas fuente reales (`data/layers/`)
 
@@ -58,12 +58,12 @@ Disparo: guardar `CapaCartografica` con archivo nuevo, o acción "(Re)generar ti
 >   real: el visor solo conocía el ubigeo del distrito, así que al elegir únicamente una provincia
 >   seguía dibujando toda la región mientras la tabla sí se recortaba.
 >
-> **Pendiente para `frontend/`**: de dónde sale ese GeoJSON en la plataforma. Con 8,968 puntos
-> region-wide el payload es del orden de los 2 MB que el prototipo ya descarga, así que sirve un
-> endpoint `/api/ccpp/geojson/` que acepte los mismos filtros que `/api/ccpp/` y devuelva
-> `codigo, nombre, categoria, distrito, provincia, poblacion, altitud, nivel` — pero **no está
-> decidido ni especificado en 02**. Alternativa a evaluar si el payload molesta: agrupar en
-> servidor por zoom/bbox, que es bastante más trabajo.
+> **Resuelto (03/08/2026)**: el GeoJSON sale de **`GET /api/ccpp/geojson/`**, que acepta los mismos
+> filtros que `/api/ccpp/` y devuelve el `FeatureCollection` completo que pasa el filtro, sin
+> paginar, con un único `nivel` por punto y el desglose serializado para el popup. Contrato y
+> justificación del tamaño en 02. Se descartó agrupar en servidor por zoom/bbox: obliga a
+> reimplementar supercluster en Python y a pedir datos en cada paneo; queda como salida si el
+> payload llegara a molestar.
 
 ### Símbolos proporcionales y clusters
 
@@ -135,7 +135,7 @@ Implementación de referencia ya validada en local: `prototype/scripts/ccpp_to_g
 
 ## Servido
 
-Caddy sirve `/tiles/*` desde el volumen `media/tiles/` como estático: `Accept-Ranges` nativo, `Cache-Control: public, max-age=3600`. Mismo origen → sin CORS. Sin tileserver.
+**nginx** sirve `/tiles/*` desde el volumen `media/tiles/` como estático, bajo el dominio del backend (`obs.predes.org.pe`): `Accept-Ranges bytes`, `Cache-Control: public, max-age=3600` y **cabeceras CORS** para el dominio público — con dos dominios (ADR-A14) el visor lee los tiles cross-origin, y sin `Access-Control-Expose-Headers: Content-Length,Content-Range` el protocolo `pmtiles://` no puede leer por rangos. Sin tileserver.
 
 ## Frontend (MapLibre)
 

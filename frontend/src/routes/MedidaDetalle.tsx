@@ -1,16 +1,28 @@
 import { Link, useParams } from "react-router-dom";
-import { MapPin } from "lucide-react";
+import { ExternalLink, Link2, MapPin, PlayCircle } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { useJsonData } from "@/lib/useJsonData";
 import type { Medida } from "@/lib/types";
+import { claveMedida } from "@/lib/imagenes";
 import EmptyState from "@/components/EmptyState";
+import Portada from "@/components/Portada";
+import ContenidoRico from "@/components/ContenidoRico";
+import GaleriaMedida from "@/components/GaleriaMedida";
+import Video from "@/components/Video";
+import PalabrasClave from "@/components/PalabrasClave";
+import { RESULTADO_ESTILO } from "@/routes/Medidas";
 
 export default function MedidaDetalle() {
   const { slug } = useParams();
   const medidas = useJsonData<Medida[]>("/data/medidas.mock.json");
 
   if (medidas.status === "loading") return <div className="container-page py-12">Cargando…</div>;
-  if (medidas.status !== "ok") return <div className="container-page py-12"><EmptyState /></div>;
+  if (medidas.status !== "ok")
+    return (
+      <div className="container-page py-12">
+        <EmptyState title="Error al cargar las medidas" />
+      </div>
+    );
 
   const m = medidas.data.find((x) => x.slug === slug);
   if (!m) {
@@ -18,39 +30,89 @@ export default function MedidaDetalle() {
       <div className="container-page py-12">
         <EmptyState
           title="Caso no encontrado"
-          action={<Link to="/medidas" className="btn-primary">Ver todos</Link>}
+          message="La experiencia que buscas no existe o fue retirada."
+          action={<Link to="/medidas" className="btn-primary">Ver todas las medidas</Link>}
         />
       </div>
     );
   }
 
+  const r = RESULTADO_ESTILO[m.resultado];
+
   return (
     <>
       <PageHeader
-        eyebrow="Medida"
+        eyebrow="Experiencia documentada"
         titulo={m.titulo}
         backTo="/medidas"
         backLabel="Volver a medidas"
       />
       <article className="container-page py-8 max-w-3xl">
-      <div className="flex flex-wrap items-center gap-3 text-sm text-ink-600">
-        <span className="chip border border-level-3/30 bg-level-3/10 text-level-3">{m.peligro}</span>
-        <span><MapPin className="w-3 h-3 inline mr-1" />{m.comunidad}</span>
-        <span className="capitalize">Ámbito {m.ambito}</span>
-      </div>
-
-      <p className="mt-6 text-lg text-ink-900 leading-relaxed">{m.resumen_corto}</p>
-      {m.contenido && (
-        <div className="mt-4 text-ink-600 leading-relaxed whitespace-pre-wrap">{m.contenido}</div>
-      )}
-
-      <div className="mt-8 flex flex-wrap gap-1">
-        {m.tags.map((t) => (
-          <span key={t} className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
-            {t}
+        {/* El resultado es la clasificación que define la sección; hasta ahora la ficha no lo
+            mostraba y solo se veía en el listado. */}
+        <div className="flex flex-wrap items-center gap-3 text-sm text-ink-600">
+          <span className={`chip border ${r.color}`}>
+            <r.Icon className="w-3 h-3" />
+            {r.label}
           </span>
-        ))}
-      </div>
+          <span className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
+            {m.peligro}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="w-3.5 h-3.5" />
+            {m.comunidad}
+          </span>
+          <span className="capitalize">Ámbito {m.ambito}</span>
+        </div>
+
+        <Portada
+          tipo={claveMedida(m.peligro)}
+          imagen={m.imagen_portada}
+          pie={m.imagen_titulo}
+          alt={m.titulo}
+        />
+
+        <p className="mt-6 text-lg text-ink-900 leading-relaxed">{m.resumen_corto}</p>
+
+        <ContenidoRico html={m.contenido} className="mt-6" />
+
+        <GaleriaMedida imagenes={m.galeria} />
+
+        {m.video_url && (
+          <section className="mt-8">
+            <h2 className="flex items-center gap-2 font-display font-semibold text-mountain-900 mb-3">
+              <PlayCircle className="w-4 h-4 text-mountain-700" />
+              Video
+            </h2>
+            <Video url={m.video_url} titulo={m.titulo} />
+          </section>
+        )}
+
+        {m.enlaces.length > 0 && (
+          <section className="mt-8">
+            <h2 className="flex items-center gap-2 font-display font-semibold text-mountain-900 mb-3">
+              <Link2 className="w-4 h-4 text-mountain-700" />
+              Enlaces relacionados
+            </h2>
+            <ul className="space-y-2">
+              {m.enlaces.map((e) => (
+                <li key={e.url}>
+                  <a
+                    href={e.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm"
+                  >
+                    {e.titulo}
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <PalabrasClave palabras={m.palabras_clave} base="/medidas" />
       </article>
     </>
   );

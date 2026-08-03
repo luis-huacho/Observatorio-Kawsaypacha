@@ -1,56 +1,116 @@
 # 07 — Despliegue y operación
 
-Docker Compose en servidor propio (VPS) con dominio, HTTPS y backups automáticos (requisito TDR). Referencia de dominio: `observatorio.predes.org.pe` (confirmar con PREDES).
+Docker Compose en servidor propio (VPS) con dominio, HTTPS y backups automáticos (requisito TDR).
 
-## Servicios (`compose.yml` en la raíz)
+## Dominios (ADR-A14)
+
+| Dominio | Sirve |
+|---|---|
+| `observatorio.predes.org.pe` | La SPA estática (`dist/`). Es lo que el público conoce |
+| `obs.predes.org.pe` | `/api/`, el admin (`ADMIN_URL`), `/static/`, `/media/`, `/tiles/` y `/search/` |
+
+Separar el sitio público del backend deja el admin y el API fuera del dominio que se difunde, y permite mover cualquiera de los dos sin tocar el otro. El coste es que **el frontend deja de ser mismo-origen**: se activa `django-cors-headers` con allowlist de los dos dominios, y nginx añade cabeceras CORS en `/media/` y `/tiles/` (las necesitan PMTiles por HTTP Range y la exportación del mapa a PNG desde el canvas).
+
+## Servicios (`compose.yaml` en la raíz)
 
 | Servicio | Imagen | Rol |
 |---|---|---|
 | `db` | `postgres:16-alpine` | volumen `pgdata`; healthcheck `pg_isready` |
-| `backend` | build `backend/` | gunicorn `:8000`; volúmenes `media` (RW); depends_on db+meilisearch healthy |
+| `backend` | build `backend/` | **gunicorn** `:8000`; volúmenes `media` (RW) y `static`; depends_on db+meilisearch healthy |
 | `worker` | misma imagen | `manage.py db_worker` (django-tasks): importaciones, tiles, Gemini, correos, agregación de métricas |
 | `meilisearch` | `getmeili/meilisearch:v1.15` | volumen `meili_data`; `MEILI_MASTER_KEY`; sin puertos publicados |
 | `frontend` | build `frontend/` | compila y copia `dist/` al volumen `web_dist`; termina (perfil build) |
-| `caddy` | `caddy:2` | `:80/:443`; ver Caddyfile |
+| `nginx` | `nginx:1.27-alpine` | `:80/:443`; los dos server blocks; ver abajo |
+| `certbot` | `certbot/certbot` | emisión y renovación de certificados (webroot) |
 | `backup` | `prodrigestivill/postgres-backup-local` | `pg_dump` diario, retención 7d/4w/6m, volumen `backups` |
 
-Volúmenes: `pgdata`, `meili_data`, `media` (incluye `media/tiles/`, `media/datasets/`, `media/informes/`), `web_dist`, `caddy_data`, `backups`.
+Volúmenes: `pgdata`, `meili_data`, `media` (incluye `media/tiles/`, `media/datasets/`, `media/informes/`, `media/contenido/`), `static` (estáticos del admin tras `collectstatic`), `web_dist`, `certbot_conf`, `certbot_www`, `backups`.
 
-`compose.dev.yml` (override): puertos abiertos (5432, 7700, 8000), `runserver` con reload, Vite dev server aparte (`npm run dev`, no en compose), `EMAIL_BACKEND=console`, DEBUG=1.
+**ADR-A6bis — nginx en contenedor sustituye a Caddy.** El spec original usaba Caddy por el HTTPS automático. Se cambia a nginx + certbot por decisión del dueño del proyecto: es lo que PREDES y su proveedor de hosting ya saben operar, y el ahorro de Caddy (un fichero de configuración más corto) no compensa introducir una pieza que nadie más en la organización sabe depurar. El coste asumido es explícito: la renovación de certificados deja de ser automática por diseño y pasa a depender del contenedor `certbot` y de su cron.
 
-## Caddyfile (esquema)
+## Desarrollo local
 
+Un solo comando levanta y baja todo el sitio, backend incluido:
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yml up -d --build   # arriba
+docker compose -f compose.yaml -f compose.dev.yml down            # abajo
 ```
-observatorio.predes.org.pe {
-    encode gzip zstd
-    handle /api/* { reverse_proxy backend:8000 }
-    handle /admin/* { reverse_proxy backend:8000 }      # ruta real desde ADMIN_URL del .env
-    handle /search/* { uri strip_prefix /search; reverse_proxy meilisearch:7700 }
-    handle_path /tiles/* { root * /srv/media/tiles; file_server; header Cache-Control "public, max-age=3600" }
-    handle_path /media/* { root * /srv/media; file_server }
-    handle { root * /srv/web; try_files {path} /index.html; file_server }  # SPA
+
+El override de desarrollo:
+
+- publica `db` (5432), `meilisearch` (7700) y `backend` (8000) en el host;
+- corre `runserver` con el código montado (recarga en caliente);
+- deja `nginx`, `certbot`, `backup` y `frontend` fuera (perfil `prod`);
+- fuerza `DEBUG=1` y `EMAIL_BACKEND=console`.
+
+El frontend en desarrollo corre en el host con `npm run dev` (Vite en `:5173`) apuntando a `http://localhost:8000`. Para probar el modo producción completo en local —SPA compilada servida por nginx— se levanta con el perfil `prod` y `SITE_DOMAIN=localhost`.
+
+## nginx (esquema)
+
+```nginx
+# --- SPA pública -----------------------------------------------------------
+server {
+    server_name observatorio.predes.org.pe;
+    root /srv/www;
+    gzip on;
+    location / { try_files $uri /index.html; }          # client-side routing
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+}
+
+# --- Backend ---------------------------------------------------------------
+server {
+    server_name obs.predes.org.pe;
+    client_max_body_size 64M;                            # Excel de 5.4 MB, GeoJSON de 57 MB
+
+    location /api/     { proxy_pass http://backend:8000; }
+    location /gestion/ { proxy_pass http://backend:8000; }   # ADMIN_URL del .env
+    location /static/  { alias /srv/static/; }
+    location /search/  { proxy_pass http://meilisearch:7700/; }
+
+    location /media/ {
+        alias /srv/media/;
+        add_header Access-Control-Allow-Origin "https://observatorio.predes.org.pe";
+    }
+    location /tiles/ {
+        alias /srv/media/tiles/;
+        add_header Access-Control-Allow-Origin "https://observatorio.predes.org.pe";
+        add_header Access-Control-Expose-Headers "Content-Length,Content-Range";
+        add_header Accept-Ranges bytes;
+        add_header Cache-Control "public, max-age=3600";
+    }
 }
 ```
-HTTPS automático (Let's Encrypt) — solo requiere el DNS apuntando al servidor.
+
+Ambos bloques con `listen 443 ssl` y redirección desde `:80`. Los certificados los emite `certbot` por webroot y los renueva su cron; nginx recarga tras cada renovación.
 
 ## Dockerfile backend (multi-stage)
 
-1. Stage `tippecanoe`: compila tippecanoe ≥2.17.
-2. Stage final `python:3.12-slim`: deps apt (`gdal-bin`, libs de WeasyPrint: pango/cairo/gdk-pixbuf), binarios de tippecanoe, `uv sync` desde `pyproject.toml`, `collectstatic` (whitenoise para estáticos del admin), gunicorn.
+1. Stage `tippecanoe`: compila tippecanoe ≥2.17 (es la versión donde aparece la escritura nativa de PMTiles).
+2. Stage final `python:3.12-slim`: deps apt (`gdal-bin`, libs de WeasyPrint: pango/cairo/gdk-pixbuf), binarios de tippecanoe copiados del stage anterior, `uv sync` desde `pyproject.toml`, `collectstatic`, gunicorn.
+
+Al arranque el contenedor corre `migrate` y `meili_setup` (ambos idempotentes) antes de levantar gunicorn.
 
 ## Variables de entorno
 
-`backend/.env` (nunca commitear; `.env.example` versionado):
+`backend/.env` (nunca se commitea; `.env.example` versionado):
+
 ```
-SECRET_KEY=            DEBUG=0            ALLOWED_HOSTS=observatorio.predes.org.pe
-DATABASE_URL=postgres://observatorio:***@db:5432/observatorio
+SECRET_KEY=            DEBUG=0
+ALLOWED_HOSTS=obs.predes.org.pe,observatorio.predes.org.pe
+SITE_URL=https://observatorio.predes.org.pe        # el que se difunde y va en los correos
+BACKEND_URL=https://obs.predes.org.pe
+CORS_ALLOWED_ORIGINS=https://observatorio.predes.org.pe
+CSRF_TRUSTED_ORIGINS=https://obs.predes.org.pe,https://observatorio.predes.org.pe
+POSTGRES_DB= POSTGRES_USER= POSTGRES_PASSWORD= POSTGRES_HOST=db POSTGRES_PORT=5432
 MEILI_URL=http://meilisearch:7700        MEILI_MASTER_KEY=
 GEMINI_API_KEY=
 EMAIL_HOST= EMAIL_PORT= EMAIL_HOST_USER= EMAIL_HOST_PASSWORD= DEFAULT_FROM_EMAIL=
 ADMIN_URL=gestion/     # admin fuera de /admin/ por defecto
-SITE_URL=https://observatorio.predes.org.pe
+DJANGO_SUPERUSER_USERNAME= DJANGO_SUPERUSER_EMAIL= DJANGO_SUPERUSER_PASSWORD=   # los usa `manage.py seed`
 ```
-`frontend/.env`: ver spec 06.
+
+`frontend/.env`: ver spec 06. En producción las tres URL son absolutas contra `obs.predes.org.pe`.
 
 ## Backups (requisito TDR)
 
@@ -65,17 +125,21 @@ SITE_URL=https://observatorio.predes.org.pe
 |---|---|
 | Desplegar actualización | `git pull && docker compose build backend frontend && docker compose up -d` |
 | Migraciones | `docker compose exec backend python manage.py migrate` |
+| Sembrar datos iniciales | `docker compose exec backend python manage.py seed` |
 | Reindexar búsqueda | `docker compose exec backend python manage.py meili_rebuild` |
 | Regenerar tiles CCPP | `docker compose exec backend python manage.py generar_tiles_ccpp` |
+| Recargar nginx | `docker compose exec nginx nginx -s reload` |
+| Renovar certificados | `docker compose run --rm certbot renew` |
 | Logs | `docker compose logs -f backend worker` |
 | Backup manual | `docker compose exec backup /backup.sh` |
-| Restaurar BD | ver procedimiento en este doc (compose limpio + psql) |
+| Restaurar BD | ver procedimiento en `_docs/despliegue.md` |
 
-Seguridad: `DEBUG=0`, admin en `ADMIN_URL` no-default, throttling DRF, `SECURE_*` headers de Django, contenedores sin puertos publicados salvo Caddy, actualizaciones de imágenes mensuales.
+Seguridad: `DEBUG=0`, admin en `ADMIN_URL` no-default, throttling DRF, `SECURE_*` headers de Django, contenedores sin puertos publicados salvo nginx, actualizaciones de imágenes mensuales.
 
 ## Checklist de capacitación a PREDES (Fase III del TDR)
 
-Sesión grabada (registro audiovisual = anexo del informe final):
+Sesión grabada (registro audiovisual = anexo del informe final). El guion desarrollado está en `_docs/manual-admin-predes.md`:
+
 1. Ingreso al admin, roles y contraseñas.
 2. Subir/reemplazar el Excel de peligros y el de frecuencia (DatasetUpload) — ver el cambio en el visor.
 3. Subir/reemplazar una capa GeoJSON y regenerar tiles.
@@ -86,4 +150,4 @@ Sesión grabada (registro audiovisual = anexo del informe final):
 8. Leer el dashboard de métricas.
 9. Dónde están los backups y a quién llamar si algo falla.
 
-Pendientes de PREDES para producción: dominio/DNS, credenciales SMTP, API key de Gemini (o se entrega una), servidor (acceso SSH), data de inversión, capas SIG oficiales, textos definitivos.
+Pendientes de PREDES para producción: DNS de los dos dominios, credenciales SMTP, API key de Gemini (o se entrega una), servidor (acceso SSH), data de inversión, capas SIG oficiales, textos definitivos.

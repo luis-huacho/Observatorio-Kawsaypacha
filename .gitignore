@@ -55,7 +55,20 @@ frontend/vite.config.d.ts
 # Anclados a la raíz: sin la barra inicial, "data/" también ignora prototype/public/data/,
 # donde sí viven los JSON que consume la app.
 /data/
-/_docs/
+
+# `/_docs/*` y no `/_docs/`: excluir el directorio impide que git descienda en él, y entonces
+# ninguna negación posterior puede volver a incluir un archivo de dentro.
+/_docs/*
+
+# Excepción: la documentación TÉCNICA sí se versiona. PREDES recibe el runbook y el manual de
+# administración como parte del entregable, y una guía de despliegue que vive fuera del repo se
+# desincroniza del código que documenta. Lo comercial y contractual (propuesta, honorarios,
+# plan de trabajo) sigue ignorado.
+!/_docs/arquitectura.md
+!/_docs/desarrollo.md
+!/_docs/despliegue.md
+!/_docs/manual-admin-predes.md
+!/_docs/api.md
 
 # _specs/ SÍ se versiona: acumula los ADR, el modelo de datos y los contratos de API con los que
 # se construye el backend. Tenerlo en un solo disco, sin historial, era un riesgo innecesario.

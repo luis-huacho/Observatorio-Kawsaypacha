@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Portada por defecto de medidas del peligro "bajas_temperaturas": termómetro. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+  <rect x="286" y="48" width="28" height="118" rx="14" fill="#FAFAF7" stroke="#007480" stroke-width="4"/>
+  <circle cx="300" cy="186" r="30" fill="#FAFAF7" stroke="#007480" stroke-width="4"/>
+  <circle cx="300" cy="186" r="18" fill="#0095A4"/>
+  <rect x="294" y="116" width="12" height="62" fill="#0095A4"/>
+  <g stroke="#007480" stroke-width="3" stroke-linecap="round">
+    <path d="M322 74 h16"/><path d="M322 98 h10"/><path d="M322 122 h16"/><path d="M322 146 h10"/>
+  </g>
+  <path d="M0 400 L0 262 L120 182 L228 252 L338 168 L452 258 L600 196 L600 400 Z" fill="#5BBB5D" opacity="0.55"/>
+  <path d="M0 400 L0 312 L112 236 L224 306 L336 224 L456 312 L600 248 L600 400 Z" fill="#009257"/>
+  <path d="M0 400 L0 366 L160 348 L330 372 L480 346 L600 362 L600 400 Z" fill="#0B3B26"/>
+</svg>

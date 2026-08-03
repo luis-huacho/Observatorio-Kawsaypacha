@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Imagen por defecto para normas: la hoja con sello sobre la cordillera. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+
+  <!-- Cordillera de fondo -->
+  <path d="M0 400 L0 262 L120 182 L228 252 L338 168 L452 258 L600 196 L600 400 Z" fill="#5BBB5D" opacity="0.6"/>
+
+  <!-- Hoja -->
+  <g>
+    <rect x="186" y="66" width="228" height="290" rx="8" fill="#FAFAF7" stroke="#009257" stroke-width="3"/>
+    <g fill="#009257" opacity="0.5">
+      <rect x="216" y="106" width="168" height="9" rx="4.5"/>
+      <rect x="216" y="134" width="168" height="9" rx="4.5"/>
+      <rect x="216" y="162" width="122" height="9" rx="4.5"/>
+      <rect x="216" y="200" width="168" height="9" rx="4.5"/>
+      <rect x="216" y="228" width="140" height="9" rx="4.5"/>
+    </g>
+  </g>
+
+  <!-- Sello -->
+  <circle cx="366" cy="292" r="46" fill="#B8753C" opacity="0.16"/>
+  <circle cx="366" cy="292" r="46" fill="none" stroke="#B8753C" stroke-width="4"/>
+  <circle cx="366" cy="292" r="34" fill="none" stroke="#B8753C" stroke-width="2"/>
+  <path d="M344 292 L360 308 L390 276" fill="none" stroke="#B8753C" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Suelo -->
+  <path d="M0 400 L0 366 L160 348 L330 372 L480 346 L600 362 L600 400 Z" fill="#0B3B26"/>
+</svg>

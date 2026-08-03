@@ -84,4 +84,4 @@ La ayuda memoria de `/peligros` debe emitir `descarga_pdf` con el ubigeo en `det
 
 ## Build
 
-`npm run build` (tsc + vite) → `dist/` copiado al volumen `web_dist` que sirve Caddy (spec 07). `npm run lint` = `tsc --noEmit`.
+`npm run build` (tsc + vite) → `dist/` copiado al volumen `web_dist` que sirve nginx en `observatorio.predes.org.pe` (spec 07). `npm run lint` = `tsc --noEmit`.

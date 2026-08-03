@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Imagen por defecto para publicaciones de tipo "artículo".
+       Curvas de nivel con un vacío marcado: el análisis parte de lo que la data no cubre. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+
+  <g fill="none" stroke="#009257" stroke-width="3" opacity="0.55">
+    <path d="M-20 330 C 90 300, 150 250, 260 258 S 430 300, 620 250"/>
+    <path d="M-20 296 C 90 264, 158 212, 262 222 S 434 266, 620 214"/>
+    <path d="M-20 262 C 92 228, 166 176, 266 188 S 438 232, 620 178"/>
+    <path d="M-20 228 C 96 192, 174 142, 270 154 S 442 198, 620 142"/>
+    <path d="M-20 194 C 100 158, 182 110, 274 122 S 446 164, 620 106"/>
+    <path d="M-20 160 C 104 124, 190 78, 278 90 S 450 130, 620 70"/>
+  </g>
+
+  <!-- El vacío: recorte donde no hay curvas, con su borde punteado -->
+  <circle cx="404" cy="196" r="74" fill="#E5F4EE"/>
+  <circle cx="404" cy="196" r="74" fill="none" stroke="#B8753C" stroke-width="3" stroke-dasharray="9 9"/>
+  <circle cx="404" cy="196" r="9" fill="#B8753C"/>
+
+  <!-- Cordillera de cierre -->
+  <path d="M0 400 L0 322 L128 246 L242 318 L352 232 L470 322 L600 254 L600 400 Z" fill="#009257"/>
+  <path d="M0 400 L0 368 L160 348 L330 372 L480 346 L600 364 L600 400 Z" fill="#0B3B26"/>
+</svg>

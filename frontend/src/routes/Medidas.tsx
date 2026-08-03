@@ -1,14 +1,20 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Lightbulb, Sprout, AlertTriangle, MapPin } from "lucide-react";
 import { useJsonData } from "@/lib/useJsonData";
 import type { Medida } from "@/lib/types";
 import { TIPOS_PELIGRO } from "@/lib/types";
+import { portada, claveMedida } from "@/lib/imagenes";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 import Reveal from "@/components/Reveal";
+import FiltroTema from "@/components/FiltroTema";
 
-const RESULTADO_ESTILO: Record<Medida["resultado"], { label: string; color: string; Icon: typeof Lightbulb }> = {
+/** Se exporta porque la ficha muestra el mismo chip de resultado. */
+export const RESULTADO_ESTILO: Record<
+  Medida["resultado"],
+  { label: string; color: string; Icon: typeof Lightbulb }
+> = {
   exito: { label: "Práctica exitosa", color: "bg-level-1/15 text-level-1 border-level-1/30", Icon: Sprout },
   leccion: { label: "Lección aprendida", color: "bg-level-2/20 text-yellow-800 border-level-2/40", Icon: Lightbulb },
   mal_adaptacion: { label: "Mal-adaptación", color: "bg-level-4/15 text-level-4 border-level-4/30", Icon: AlertTriangle },
@@ -19,6 +25,8 @@ export default function Medidas() {
   const [peligro, setPeligro] = useState("");
   const [ambito, setAmbito] = useState("");
   const [resultado, setResultado] = useState("");
+  const [params, setParams] = useSearchParams();
+  const tema = params.get("tema") ?? "";
 
   const filtradas = useMemo(() => {
     if (medidas.status !== "ok") return [];
@@ -26,15 +34,26 @@ export default function Medidas() {
       if (peligro && m.peligro !== peligro) return false;
       if (ambito && m.ambito !== ambito) return false;
       if (resultado && m.resultado !== resultado) return false;
+      if (tema && !m.palabras_clave.includes(tema)) return false;
       return true;
     });
-  }, [medidas, peligro, ambito, resultado]);
+  }, [medidas, peligro, ambito, resultado, tema]);
+
+  // Sin estas guardas, durante el fetch `filtradas` es [] y se pinta "Sin medidas con esos
+  // filtros": un falso negativo que las demás rutas ya evitaban.
+  if (medidas.status === "loading") return <div className="container-page py-12">Cargando…</div>;
+  if (medidas.status !== "ok")
+    return (
+      <div className="container-page py-12">
+        <EmptyState title="Error al cargar las medidas" />
+      </div>
+    );
 
   return (
     <>
       <PageHeader
         titulo="Medidas"
-        descripcion="¿Qué prácticas están funcionando para enfrentar peligros climáticos? Casos de éxito, lecciones aprendidas y advertencias de mal-adaptación."
+        descripcion="¿Qué prácticas están funcionando para enfrentar peligros climáticos? Experiencias documentadas por PREDES y otras organizaciones: casos de éxito, lecciones aprendidas y advertencias de mal-adaptación."
       />
       <div className="container-page py-8">
       <div className="grid md:grid-cols-3 gap-3 mb-6">
@@ -57,40 +76,53 @@ export default function Medidas() {
         />
       </div>
 
+      <FiltroTema tema={tema} onLimpiar={() => setParams({})} />
+
       {filtradas.length === 0 ? (
-        <EmptyState title="Sin medidas con esos filtros" />
+        <EmptyState
+          title="Sin medidas con esos filtros"
+          message="Prueba con otro peligro, ámbito o palabra clave."
+        />
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtradas.map((m, i) => {
             const r = RESULTADO_ESTILO[m.resultado];
             return (
               <Reveal key={m.id} delay={(i % 3) * 70}>
-              <Link
-                to={`/medidas/${m.slug}`}
-                className="card block h-full p-5 hover:shadow-md hover:-translate-y-0.5 transition duration-300 no-underline relative"
-              >
-                <div className="flex items-center gap-2 mb-3 mt-1">
-                  <span className={`chip border ${r.color}`}>
-                    <r.Icon className="w-3 h-3" />
-                    {r.label}
-                  </span>
-                </div>
-                <h3 className="font-display font-bold text-mountain-900 text-lg leading-tight pr-16">
-                  {m.titulo}
-                </h3>
-                <div className="mt-2 flex items-center gap-1 text-xs text-ink-600">
-                  <MapPin className="w-3 h-3" />
-                  {m.comunidad}
-                </div>
-                <p className="mt-3 text-sm text-ink-600">{m.resumen_corto}</p>
-                <div className="mt-4 flex flex-wrap gap-1">
-                  {m.tags.slice(0, 3).map((t) => (
-                    <span key={t} className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </Link>
+                <Link
+                  to={`/medidas/${m.slug}`}
+                  className="card block h-full overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition duration-300 no-underline"
+                >
+                  <img
+                    src={portada(claveMedida(m.peligro), m.imagen_portada)}
+                    alt={m.titulo}
+                    loading="lazy"
+                    className="w-full aspect-[3/2] object-cover"
+                  />
+                  <div className="p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className={`chip border ${r.color}`}>
+                        <r.Icon className="w-3 h-3" />
+                        {r.label}
+                      </span>
+                    </div>
+                    <h3 className="font-display font-bold text-mountain-900 text-lg leading-tight">
+                      {m.titulo}
+                    </h3>
+                    <div className="mt-2 flex items-center gap-1 text-xs text-ink-600">
+                      <MapPin className="w-3 h-3" />
+                      {m.comunidad}
+                    </div>
+                    <p className="mt-3 text-sm text-ink-600">{m.resumen_corto}</p>
+                    <div className="mt-4 flex flex-wrap gap-1">
+                      {m.palabras_clave.slice(0, 3).map((t) => (
+                        <span key={t} className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </Link>
               </Reveal>
             );
           })}

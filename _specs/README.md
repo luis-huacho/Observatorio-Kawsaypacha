@@ -42,6 +42,15 @@ Los specs se escribieron contra una versión anterior de los datos. Al auditar l
 
 El pipeline del spec 05 se validó de punta a punta en el prototipo (`prototype/scripts/build_tiles.sh` + ruta `/peligros/mapa-nuevo`, solo en desarrollo). Los `.pmtiles` no se versionan.
 
+### Actualización 03/08/2026 — decisiones de despliegue y arranque de la construcción
+
+- **ADR-A6bis**: nginx + certbot en contenedor sustituyen a Caddy.
+- **ADR-A13**: dos dominios — `observatorio.predes.org.pe` (SPA) y `obs.predes.org.pe` (API, admin, media, tiles, search), con CORS entre ambos. 07 reescrito en consecuencia.
+- **ADR-D3**: la ventana Inversión se difiere; solo se entrega la ruta con su estado vacío.
+- Se cierran los dos pendientes que los specs arrastraban: **`GET /api/ccpp/geojson/`** queda definido en 02 (FeatureCollection completo con los mismos filtros que la tabla), y el **mapa de la ayuda memoria se renderiza en servidor** con navegador headless.
+- Nuevo **08-plan-pruebas.md**. Se evaluó añadir `data-model.md`, `infra.md`, `prod.md`, `tech.md` y `ui.md`: los cinco ya están cubiertos por 01, 07, 00 y 06, y duplicarlos solo garantiza que se desincronicen.
+- `frontend/` se recreó desde `prototype/`: la copia anterior era previa a la migración a MapLibre.
+
 ## Orden de lectura
 
 | Doc | Contenido |
@@ -53,7 +62,8 @@ El pipeline del spec 05 se validó de punta a punta en el prototipo (`prototype/
 | [04-busqueda.md](04-busqueda.md) | Índices Meilisearch, sincronización, llaves |
 | [05-mapas-tiles.md](05-mapas-tiles.md) | Pipeline Tippecanoe/PMTiles con recorte a Cusco, capa CCPP, migración a MapLibre |
 | [06-frontend.md](06-frontend.md) | Migración prototype→frontend, rutas nuevas, lib/api.ts, estados vacíos |
-| [07-despliegue-ops.md](07-despliegue-ops.md) | compose.yml, .env, HTTPS, backups, runbook, capacitación |
+| [07-despliegue-ops.md](07-despliegue-ops.md) | compose.yaml, nginx + gunicorn, los dos dominios, .env, HTTPS, backups, runbook, capacitación |
+| [08-plan-pruebas.md](08-plan-pruebas.md) | Qué se prueba y con qué; casos obligatorios derivados de la auditoría de datos; criterio de entrega |
 
 ## Archivo histórico
 

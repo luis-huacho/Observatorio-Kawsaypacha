@@ -1,6 +1,6 @@
 # 04 — Búsqueda y faceting (Meilisearch)
 
-Meilisearch v1.15 en contenedor propio (`meilisearch` en compose), volumen `meili_data`, `MEILI_MASTER_KEY` en `backend/.env`. No expuesto a internet directamente: Caddy proxya solo la ruta de búsqueda.
+Meilisearch v1.15 en contenedor propio (`meilisearch` en compose), volumen `meili_data`, `MEILI_MASTER_KEY` en `backend/.env`. No expuesto a internet directamente: nginx proxya solo la ruta de búsqueda, bajo el dominio del backend.
 
 ## Índices
 
@@ -42,7 +42,7 @@ Cliente Python: paquete `meilisearch` en `core/services/meili.py`.
 
 ## Consumo desde el frontend (ADR-A4)
 
-- Caddy proxya `/search/*` → `meilisearch:7700`. El navegador usa la **llave search-only** (segura por diseño: solo búsqueda, solo índices permitidos; la master key nunca sale del backend).
+- nginx proxya `obs.predes.org.pe/search/*` → `meilisearch:7700` (ADR-A14; el navegador lo llama cross-origin, con CORS). El navegador usa la **llave search-only** (segura por diseño: solo búsqueda, solo índices permitidos; la master key nunca sale del backend).
 - `/buscar` (búsqueda global): `POST /search/multi-search` federado sobre todos los índices de contenido; render agrupado por tipo con conteos.
 - `/medidas`: índice `medidas` con `facets: ["peligro","ambito","resultado","provincia"]` — reemplaza el filtrado client-side del prototipo y muestra conteos por faceta.
 - GeoSelector/buscador del mapa: índice `ccpp` con `limit: 8` para autocompletar.

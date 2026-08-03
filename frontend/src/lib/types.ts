@@ -17,10 +17,51 @@ export type Nivel = 1 | 2 | 3 | 4;
 export type ClasificacionPeligro = {
   codigo_ccpp: string;
   peligro: string;
+  peligro_slug: string;
   tipo: string | null;
   nivel: Nivel;
   fuente: string | null;
   fuente_url: string | null;
+};
+
+export type EventoEmergencia = {
+  evento: string;
+  slug: string;
+  conteo: number;
+};
+
+export type CategoriaEmergencia = {
+  categoria: string;
+  slug: string;
+  total: number;
+  /** La fuente declaró un subtotal pero no lo desagregó por tipo de evento. */
+  solo_total: boolean;
+  eventos: EventoEmergencia[];
+};
+
+export type FrecuenciaDistrito = {
+  ubigeo: string;
+  distrito: string;
+  provincia: string;
+  /** Cada distrito trae su propio periodo de observación; no hay uno regional. */
+  rango_fecha: string | null;
+  fuente: string | null;
+  fuente_url: string | null;
+  desglose_disponible: boolean;
+  total: number;
+  categorias: CategoriaEmergencia[];
+};
+
+/** Una foto de la galería de una medida. Espejo del modelo hijo `MedidaImagen` del spec 01. */
+export type MedidaImagen = {
+  imagen: string;
+  pie: string;
+  orden: number;
+};
+
+export type EnlaceExterno = {
+  titulo: string;
+  url: string;
 };
 
 export type Medida = {
@@ -34,10 +75,15 @@ export type Medida = {
   ubigeo: string;
   comunidad: string;
   resumen_corto: string;
-  contenido?: string;
+  /** HTML de CKEditor 5. Se renderiza con `ContenidoRico`, nunca como texto plano. */
+  contenido: string;
   video_url: string | null;
-  imagen: string | null;
-  tags: string[];
+  /** Nulo = ilustración por defecto del peligro. Ver `lib/imagenes.ts`. */
+  imagen_portada: string | null;
+  imagen_titulo: string | null;
+  galeria: MedidaImagen[];
+  enlaces: EnlaceExterno[];
+  palabras_clave: string[];
 };
 
 export type InversionDistrito = {
@@ -91,28 +137,68 @@ export type Prioridades = {
   scores: PrioridadDistrito[];
 };
 
+/** Espejo del modelo `contenidos.Noticia` del spec 01, para que el port a la API no renombre nada. */
+export type Noticia = {
+  _mock?: boolean;
+  slug: string;
+  titulo: string;
+  bajada: string;
+  cuerpo: string;
+  fecha: string;
+  tipo: "noticia" | "articulo" | "opinion";
+  autor: string;
+  /** Nulo = se usa la ilustración por defecto del tipo. Ver `lib/imagenes.ts`. */
+  imagen_portada: string | null;
+  /** Pie de imagen. Nulo = pie genérico. */
+  imagen_titulo: string | null;
+  palabras_clave: string[];
+  destacada: boolean;
+};
+
+export const TIPOS_NOTICIA: Record<Noticia["tipo"], string> = {
+  noticia: "Noticia",
+  articulo: "Artículo",
+  opinion: "Opinión",
+};
+
 export type Norma = {
   _mock?: boolean;
   id: string;
+  /** Estrenado con la ficha `/normativa/:slug`; antes no había detalle al que enrutar. */
+  slug: string;
   titulo: string;
   tipo: "Ley" | "DS" | "RM" | "RJ" | "Ordenanza";
   ambito: "nacional" | "regional" | "local";
   fecha: string;
   resumen: string;
+  /** Análisis desarrollado para la ficha; `analisis_predes` es la nota breve del listado. */
+  contenido: string;
   url_oficial: string | null;
   analisis_predes: string | null;
+  imagen_portada: string | null;
+  imagen_titulo: string | null;
+  palabras_clave: string[];
 };
 
-export const TIPOS_PELIGRO = [
-  "Sismo",
-  "Heladas",
-  "Bajas temperaturas",
-  "Friaje",
-  "Sequía",
-  "Lluvias",
-  "Inundación",
-  "Incendios Forestales",
-  "Movimientos en masa",
+/**
+ * Los nueve peligros del Excel canónico, con el nombre EXACTO que trae la columna PELIGRO.
+ * Ojo: no coincide con el nombre de la hoja en dos casos ("Lluvias" → "Lluvias intensas",
+ * "Incendios Forestales" → "Incendios forestales"). El slug es la clave que usan los tiles
+ * vectoriales del visor (propiedad `nivel_<slug>`).
+ */
+export const PELIGROS = [
+  { nombre: "Sismo", slug: "sismo" },
+  { nombre: "Heladas", slug: "heladas" },
+  { nombre: "Bajas temperaturas", slug: "bajas_temperaturas" },
+  { nombre: "Friaje", slug: "friaje" },
+  { nombre: "Sequía", slug: "sequia" },
+  { nombre: "Lluvias intensas", slug: "lluvias_intensas" },
+  { nombre: "Inundación", slug: "inundacion" },
+  { nombre: "Incendios forestales", slug: "incendios_forestales" },
+  { nombre: "Movimientos en masa", slug: "movimientos_en_masa" },
 ] as const;
 
-export type TipoPeligro = (typeof TIPOS_PELIGRO)[number];
+export const TIPOS_PELIGRO = PELIGROS.map((p) => p.nombre) as readonly string[];
+
+export type TipoPeligro = (typeof PELIGROS)[number]["nombre"];
+export type SlugPeligro = (typeof PELIGROS)[number]["slug"];
