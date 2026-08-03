@@ -43,6 +43,66 @@ function cuandoListo(map: maplibregl.Map, fn: () => void) {
   else map.once("load", fn);
 }
 
+type MapaBase = {
+  id: string;
+  nombre: string;
+  tiles: string[];
+  atribucion: string;
+  /** Último zoom que sirve la fuente; MapLibre sobre-escala a partir de ahí en vez de dar 404. */
+  maxzoom: number;
+};
+
+/**
+ * El primero es el que arranca visible. OpenTopoMap es un servicio voluntario con política de uso
+ * restrictiva: sirve para el prototipo, pero en producción hay que sustituirlo (ver spec 05).
+ */
+const MAPAS_BASE: MapaBase[] = [
+  {
+    id: "osm",
+    nombre: "OpenStreetMap",
+    tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+    atribucion:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxzoom: 19,
+  },
+  {
+    id: "claro",
+    nombre: "Claro",
+    tiles: [
+      "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
+      "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
+      "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
+    ],
+    atribucion:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxzoom: 20,
+  },
+  {
+    id: "satelite",
+    nombre: "Satélite",
+    // Ojo al orden: Esri sirve las teselas como /{z}/{y}/{x}, no /{z}/{x}/{y}.
+    tiles: [
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    ],
+    atribucion: "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics",
+    maxzoom: 19,
+  },
+  {
+    id: "topografico",
+    nombre: "Topográfico",
+    tiles: [
+      "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
+      "https://b.tile.opentopomap.org/{z}/{x}/{y}.png",
+      "https://c.tile.opentopomap.org/{z}/{x}/{y}.png",
+    ],
+    atribucion:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> — Relieve: <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+    maxzoom: 17,
+  },
+];
+
+const BASE_POR_DEFECTO = MAPAS_BASE[0].id;
+
 type CapaContexto = {
   id: string;
   nombre: string;
@@ -74,6 +134,7 @@ export default function MapaPeligros({ ccpp, peligroSlug, nivelMin, ubigeoDistri
   const navegar = useRef(navigate);
   navegar.current = navigate;
   const [listo, setListo] = useState(false);
+  const [base, setBase] = useState(BASE_POR_DEFECTO);
   const [visibles, setVisibles] = useState<Record<string, boolean>>({
     lagunas: true,
     rios: true,
@@ -101,20 +162,36 @@ export default function MapaPeligros({ ccpp, peligroSlug, nivelMin, ubigeoDistri
         version: 8,
         glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
         sources: {
-          base: {
-            type: "raster",
-            tiles: ["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png"],
-            tileSize: 256,
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          },
+          // Una fuente por mapa base. Las que no tienen ninguna capa visible no descargan
+          // teselas, y el control de atribución solo publica las que están en uso: al conmutar,
+          // la firma legal del pie cambia sola.
+          ...Object.fromEntries(
+            MAPAS_BASE.map((m) => [
+              `base-${m.id}`,
+              {
+                type: "raster" as const,
+                tiles: m.tiles,
+                tileSize: 256,
+                maxzoom: m.maxzoom,
+                attribution: m.atribucion,
+              },
+            ])
+          ),
           lagunas: { type: "vector", url: `pmtiles://${TILES}/lagunas.pmtiles` },
           rios: { type: "vector", url: `pmtiles://${TILES}/rios.pmtiles` },
           glaciares: { type: "vector", url: `pmtiles://${TILES}/glaciares.pmtiles` },
           ccpp: { type: "vector", url: `pmtiles://${TILES}/ccpp.pmtiles` },
         },
         layers: [
-          { id: "base", type: "raster", source: "base" },
+          // Al fondo de la pila y todas ocultas menos la de por defecto.
+          ...MAPAS_BASE.map((m) => ({
+            id: `base-${m.id}`,
+            type: "raster" as const,
+            source: `base-${m.id}`,
+            layout: {
+              visibility: (m.id === BASE_POR_DEFECTO ? "visible" : "none") as "visible" | "none",
+            },
+          })),
 
           {
             id: "lagunas-fill", type: "fill", source: "lagunas", "source-layer": "lagunas",
@@ -242,9 +319,15 @@ export default function MapaPeligros({ ccpp, peligroSlug, nivelMin, ubigeoDistri
         SIN_DATO,
       ] as maplibregl.ExpressionSpecification);
 
-      map.setPaintProperty("ccpp-puntos", "circle-opacity", [
-        "case", [">", nivel, 0], 0.8, 0.35,
-      ] as maplibregl.ExpressionSpecification);
+      // Los sin dato se atenúan para que el semáforo destaque. Hay que bajar también el borde:
+      // `circle-stroke-opacity` es independiente de `circle-opacity` y vale 1 por defecto, así
+      // que un relleno translúcido con anillo opaco convierte los 5,730 puntos sin clasificar
+      // en una masa blanca, sobre todo encima de la ortofoto.
+      const atenuar: maplibregl.ExpressionSpecification = [
+        "case", [">", nivel, 0], 0.85, 0.3,
+      ];
+      map.setPaintProperty("ccpp-puntos", "circle-opacity", atenuar);
+      map.setPaintProperty("ccpp-puntos", "circle-stroke-opacity", atenuar);
 
       const condiciones: maplibregl.ExpressionSpecification[] = [];
       if (nivelMin > 0) condiciones.push([">=", nivel, nivelMin]);
@@ -281,6 +364,21 @@ export default function MapaPeligros({ ccpp, peligroSlug, nivelMin, ubigeoDistri
     map.fitBounds(limites, { padding: 60, maxZoom: 12, duration: 800 });
   }, [listo, ubigeoDistrito, ccpp]);
 
+  // --- Mapa base -----------------------------------------------------------------------------
+  useEffect(() => {
+    const map = mapa.current;
+    if (!map || !listo) return;
+    cuandoListo(map, () => {
+      for (const m of MAPAS_BASE) {
+        map.setLayoutProperty(`base-${m.id}`, "visibility", m.id === base ? "visible" : "none");
+      }
+      // El halo blanco separa el punto del fondo. Sobre el gris casi liso de CARTO basta un
+      // trazo fino; sobre OSM, ortofoto o relieve el fondo tiene textura y etiquetas y hace
+      // falta algo más. Pasado ~1 px el anillo se come el relleno a zoom bajo.
+      map.setPaintProperty("ccpp-puntos", "circle-stroke-width", base === "claro" ? 0.5 : 0.8);
+    });
+  }, [listo, base]);
+
   // --- Conmutador de capas de contexto -------------------------------------------------------
   useEffect(() => {
     const map = mapa.current;
@@ -298,35 +396,58 @@ export default function MapaPeligros({ ccpp, peligroSlug, nivelMin, ubigeoDistri
     <div className="relative w-full h-full">
       <div ref={contenedor} className="w-full h-full rounded-lg" />
 
-      {/* Conmutador de capas */}
+      {/* Mapa base y capas de contexto, con la misma disposición que el LayersControl de
+          Leaflet: bases arriba (radios), superposiciones abajo (casillas). */}
       <div className="absolute top-2 right-2 z-10" style={{ marginTop: 78 }}>
         <button
           type="button"
           onClick={() => setAbierto((v) => !v)}
           className="bg-white rounded shadow px-2 py-1.5 flex items-center gap-1.5 text-xs text-ink-900 hover:bg-mountain-100"
-          title="Capas geográficas"
+          title={`Mapa base: ${MAPAS_BASE.find((m) => m.id === base)?.nombre ?? ""}`}
         >
           <Layers className="w-3.5 h-3.5" />
           Capas
         </button>
         {abierto && (
-          <div className="mt-1 bg-white rounded shadow p-2 space-y-1">
-            {CAPAS_CONTEXTO.map((c) => (
-              <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={visibles[c.id]}
-                  onChange={(e) => setVisibles((v) => ({ ...v, [c.id]: e.target.checked }))}
-                />
-                {c.nombre}
-              </label>
-            ))}
+          <div className="mt-1 bg-white rounded shadow p-2 min-w-[9.5rem]">
+            <div className="text-[10px] uppercase tracking-wide text-ink-600 mb-1">Mapa base</div>
+            <div className="space-y-1">
+              {MAPAS_BASE.map((m) => (
+                <label key={m.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="radio"
+                    name="mapa-base"
+                    checked={base === m.id}
+                    onChange={() => setBase(m.id)}
+                  />
+                  {m.nombre}
+                </label>
+              ))}
+            </div>
+
+            <div className="text-[10px] uppercase tracking-wide text-ink-600 mt-3 mb-1 pt-2 border-t border-ink-300/40">
+              Capas
+            </div>
+            <div className="space-y-1">
+              {CAPAS_CONTEXTO.map((c) => (
+                <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={visibles[c.id]}
+                    onChange={(e) => setVisibles((v) => ({ ...v, [c.id]: e.target.checked }))}
+                  />
+                  {c.nombre}
+                </label>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
       {/* Leyenda semáforo */}
-      <div className="absolute bottom-8 right-2 z-10 bg-white/92 rounded-lg shadow px-3 py-2">
+      {/* bg-white/95: la escala de opacidad de Tailwind va de 5 en 5, así que un /92 no genera
+          ninguna clase y la leyenda se queda sin fondo. */}
+      <div className="absolute bottom-8 right-2 z-10 bg-white/95 rounded-lg shadow px-3 py-2">
         <div className="text-[11px] font-semibold text-ink-900 mb-1">
           Nivel de peligro{peligroSlug ? "" : " (máximo)"}
         </div>

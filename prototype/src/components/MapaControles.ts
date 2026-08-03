@@ -332,20 +332,28 @@ export class DescargarPNGControl implements IControl {
     b.addEventListener("click", () => {
       const previo = b.innerHTML;
       b.innerHTML = "…";
-      try {
-        // Forzar un repintado antes de leer el buffer, si no puede salir en blanco.
-        map.triggerRepaint();
-        map.once("render", () => {
+      // Forzar un repintado antes de leer el buffer, si no puede salir en blanco.
+      map.triggerRepaint();
+      map.once("render", () => {
+        // El try va aquí dentro: el fallo ocurre en este callback, no en el clic. Si el mapa
+        // base no envía cabeceras CORS, sus teselas contaminan el canvas y toDataURL lanza
+        // SecurityError. Los cuatro bases actuales lo permiten, pero las capas son
+        // administrables, así que el aviso tiene que llegar al usuario y no a la consola.
+        try {
           const enlace = document.createElement("a");
           enlace.download = "observatorio-mapa-cusco.png";
           enlace.href = map.getCanvas().toDataURL("image/png");
           enlace.click();
+        } catch (err) {
+          console.error("No se pudo exportar el PNG:", err);
+          window.alert(
+            "No se pudo exportar la imagen: el mapa base actual no permite descargar la vista. " +
+              "Prueba con otro mapa base."
+          );
+        } finally {
           b.innerHTML = previo;
-        });
-      } catch (err) {
-        console.error("No se pudo exportar el PNG:", err);
-        b.innerHTML = previo;
-      }
+        }
+      });
     });
     this.contenedor.appendChild(b);
     return this.contenedor;
