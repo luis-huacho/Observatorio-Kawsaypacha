@@ -130,8 +130,11 @@ export type Noticia = {
   fecha: string;
   tipo: "noticia" | "articulo" | "opinion";
   autor: string;
-  /** Sin uso en el prototipo: no hay banco de imágenes. El admin real sí permitirá subirlas. */
+  /** Nulo = se usa la ilustración por defecto del tipo. Ver `lib/imagenes.ts`. */
   imagen_portada: string | null;
+  /** Pie de imagen. Nulo = pie genérico. */
+  imagen_titulo: string | null;
+  palabras_clave: string[];
   destacada: boolean;
 };
 
@@ -144,13 +147,20 @@ export const TIPOS_NOTICIA: Record<Noticia["tipo"], string> = {
 export type Norma = {
   _mock?: boolean;
   id: string;
+  /** Estrenado con la ficha `/normativa/:slug`; antes no había detalle al que enrutar. */
+  slug: string;
   titulo: string;
   tipo: "Ley" | "DS" | "RM" | "RJ" | "Ordenanza";
   ambito: "nacional" | "regional" | "local";
   fecha: string;
   resumen: string;
+  /** Análisis desarrollado para la ficha; `analisis_predes` es la nota breve del listado. */
+  contenido: string;
   url_oficial: string | null;
   analisis_predes: string | null;
+  imagen_portada: string | null;
+  imagen_titulo: string | null;
+  palabras_clave: string[];
 };
 
 /**

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Imagen por defecto para publicaciones de tipo "opinión".
+       Siluetas en semicírculo bajo el sol: la conversación pública. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+  <circle cx="300" cy="112" r="46" fill="#EBB320"/>
+
+  <!-- Cordillera de fondo -->
+  <path d="M0 400 L0 258 L124 176 L232 248 L342 162 L458 254 L600 190 L600 400 Z" fill="#5BBB5D" opacity="0.75"/>
+
+  <!-- Siluetas en semicírculo: las de los extremos más bajas, como en una mesa -->
+  <g fill="#0B3B26">
+    <circle cx="96" cy="292" r="24"/>
+    <path d="M52 400 C 52 340, 140 340, 140 400 Z"/>
+    <circle cx="504" cy="292" r="24"/>
+    <path d="M460 400 C 460 340, 548 340, 548 400 Z"/>
+  </g>
+  <g fill="#007480">
+    <circle cx="196" cy="266" r="28"/>
+    <path d="M146 400 C 146 330, 246 330, 246 400 Z"/>
+    <circle cx="404" cy="266" r="28"/>
+    <path d="M354 400 C 354 330, 454 330, 454 400 Z"/>
+  </g>
+  <g fill="#009257">
+    <circle cx="300" cy="248" r="32"/>
+    <path d="M242 400 C 242 322, 358 322, 358 400 Z"/>
+  </g>
+</svg>

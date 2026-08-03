@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { CalendarDays } from "lucide-react";
 import { useJsonData } from "@/lib/useJsonData";
 import type { Noticia } from "@/lib/types";
 import { TIPOS_NOTICIA } from "@/lib/types";
 import { formatFecha } from "@/lib/semaforo";
+import { portada } from "@/lib/imagenes";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import Reveal from "@/components/Reveal";
+import FiltroTema from "@/components/FiltroTema";
 
 /** Un color por tipo, para distinguir de un vistazo lo informativo de lo editorializado. */
 export const TIPO_ESTILO: Record<Noticia["tipo"], string> = {
@@ -19,13 +21,16 @@ export const TIPO_ESTILO: Record<Noticia["tipo"], string> = {
 export default function Noticias() {
   const data = useJsonData<Noticia[]>("/data/noticias.mock.json");
   const [tipo, setTipo] = useState("");
+  const [params, setParams] = useSearchParams();
+  const tema = params.get("tema") ?? "";
 
   const filtradas = useMemo(() => {
     if (data.status !== "ok") return [];
     return data.data
       .filter((n) => (tipo ? n.tipo === tipo : true))
+      .filter((n) => (tema ? n.palabras_clave.includes(tema) : true))
       .sort((a, b) => b.fecha.localeCompare(a.fecha));
-  }, [data, tipo]);
+  }, [data, tipo, tema]);
 
   if (data.status === "loading") return <div className="container-page py-12">Cargando…</div>;
   if (data.status !== "ok")
@@ -56,12 +61,21 @@ export default function Noticias() {
           </select>
         </div>
 
+        <FiltroTema tema={tema} onLimpiar={() => setParams({})} />
+
         {filtradas.length === 0 ? (
           <EmptyState
-            title="Sin publicaciones de ese tipo"
-            message="Prueba con otro tipo de publicación o consulta todas."
+            title="Sin publicaciones con esos filtros"
+            message="Prueba con otro tipo de publicación o quita la palabra clave."
             action={
-              <button type="button" onClick={() => setTipo("")} className="btn-primary">
+              <button
+                type="button"
+                onClick={() => {
+                  setTipo("");
+                  setParams({});
+                }}
+                className="btn-primary"
+              >
                 Ver todas
               </button>
             }
@@ -80,24 +94,55 @@ export default function Noticias() {
   );
 }
 
-/** Se usa también en el teaser de la portada. */
+/** Tarjeta del listado: portada arriba, como `CasoPreview` de la portada. */
 export function TarjetaNoticia({ noticia: n }: { noticia: Noticia }) {
   return (
     <Link
       to={`/noticias/${n.slug}`}
-      className="card block h-full p-5 hover:shadow-md hover:-translate-y-0.5 transition duration-300 no-underline"
+      className="card block h-full overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition duration-300 no-underline"
     >
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        <span className={`chip ${TIPO_ESTILO[n.tipo]}`}>{TIPOS_NOTICIA[n.tipo]}</span>
-        <span className="inline-flex items-center gap-1 text-xs text-ink-600">
-          <CalendarDays className="w-3 h-3" />
-          {formatFecha(n.fecha)}
-        </span>
+      <img
+        src={portada(n.tipo, n.imagen_portada)}
+        alt={n.titulo}
+        className="w-full aspect-[3/2] object-cover"
+      />
+      <div className="p-5">
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span className={`chip ${TIPO_ESTILO[n.tipo]}`}>{TIPOS_NOTICIA[n.tipo]}</span>
+          <span className="inline-flex items-center gap-1 text-xs text-ink-600">
+            <CalendarDays className="w-3 h-3" />
+            {formatFecha(n.fecha)}
+          </span>
+        </div>
+        <h3 className="font-display font-bold text-mountain-900 text-lg leading-tight">
+          {n.titulo}
+        </h3>
+        <p className="mt-2 text-sm text-ink-600">{n.bajada}</p>
       </div>
-      <h3 className="font-display font-bold text-mountain-900 text-lg leading-tight">
-        {n.titulo}
-      </h3>
-      <p className="mt-2 text-sm text-ink-600">{n.bajada}</p>
+    </Link>
+  );
+}
+
+/** Variante compacta para el bloque de actualidad de la portada, donde la columna es estrecha. */
+export function TarjetaNoticiaCompacta({ noticia: n }: { noticia: Noticia }) {
+  return (
+    <Link
+      to={`/noticias/${n.slug}`}
+      className="card flex gap-4 p-4 hover:shadow-md transition no-underline"
+    >
+      <img
+        src={portada(n.tipo, n.imagen_portada)}
+        alt={n.titulo}
+        className="w-24 h-24 shrink-0 object-cover rounded-lg"
+      />
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2 mb-1">
+          <span className={`chip ${TIPO_ESTILO[n.tipo]}`}>{TIPOS_NOTICIA[n.tipo]}</span>
+          <span className="text-xs text-ink-600">{formatFecha(n.fecha)}</span>
+        </div>
+        <h3 className="font-display font-bold text-mountain-900 leading-tight">{n.titulo}</h3>
+        <p className="mt-1 text-sm text-ink-600 line-clamp-2">{n.bajada}</p>
+      </div>
     </Link>
   );
 }

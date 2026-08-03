@@ -10,6 +10,7 @@ import NoticiaDetalle from "./routes/NoticiaDetalle";
 import Inversion from "./routes/Inversion";
 import Prioridades from "./routes/Prioridades";
 import Normativa from "./routes/Normativa";
+import NormaDetalle from "./routes/NormaDetalle";
 import Recursos from "./routes/Recursos";
 import Sobre from "./routes/Sobre";
 import Buscar from "./routes/Buscar";
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/inversion" element={<Inversion />} />
         <Route path="/prioridades" element={<Prioridades />} />
         <Route path="/normativa" element={<Normativa />} />
+        <Route path="/normativa/:slug" element={<NormaDetalle />} />
         <Route path="/recursos" element={<Recursos />} />
         <Route path="/sobre" element={<Sobre />} />
         <Route path="/buscar" element={<Buscar />} />

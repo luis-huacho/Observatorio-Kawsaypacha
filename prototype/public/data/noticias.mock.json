@@ -9,6 +9,13 @@
     "tipo": "noticia",
     "autor": "Equipo del Observatorio Kallpachakuy",
     "imagen_portada": null,
+    "imagen_titulo": null,
+    "palabras_clave": [
+      "SIGRID-CENEPRED",
+      "centros poblados",
+      "exposición",
+      "datos abiertos"
+    ],
     "destacada": true
   },
   {
@@ -21,6 +28,13 @@
     "tipo": "noticia",
     "autor": "Equipo del Observatorio Kallpachakuy",
     "imagen_portada": null,
+    "imagen_titulo": null,
+    "palabras_clave": [
+      "Quispicanchi",
+      "movimientos en masa",
+      "mesa técnica",
+      "PPR 0068"
+    ],
     "destacada": false
   },
   {
@@ -33,6 +47,13 @@
     "tipo": "articulo",
     "autor": "Área de gestión del conocimiento — PREDES",
     "imagen_portada": null,
+    "imagen_titulo": null,
+    "palabras_clave": [
+      "vacíos de información",
+      "cobertura",
+      "priorización",
+      "incidencia"
+    ],
     "destacada": true
   },
   {
@@ -45,6 +66,13 @@
     "tipo": "noticia",
     "autor": "Equipo del Observatorio Kallpachakuy",
     "imagen_portada": null,
+    "imagen_titulo": null,
+    "palabras_clave": [
+      "capacitación",
+      "municipalidades",
+      "ayuda memoria",
+      "gestión municipal"
+    ],
     "destacada": false
   },
   {
@@ -57,6 +85,13 @@
     "tipo": "opinion",
     "autor": "Área de incidencia — PREDES",
     "imagen_portada": null,
+    "imagen_titulo": null,
+    "palabras_clave": [
+      "PPR 0068",
+      "MEF",
+      "prevención",
+      "presupuesto"
+    ],
     "destacada": false
   },
   {
@@ -69,6 +104,13 @@
     "tipo": "noticia",
     "autor": "Equipo del Observatorio Kallpachakuy",
     "imagen_portada": null,
+    "imagen_titulo": null,
+    "palabras_clave": [
+      "cartografía",
+      "glaciares",
+      "visor",
+      "capas SIG"
+    ],
     "destacada": false
   }
 ]

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Imagen por defecto para publicaciones de tipo "noticia".
+       Lenguaje visual del favicon: cordillera, sol y la retícula de centros poblados. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+  <circle cx="478" cy="96" r="40" fill="#EBB320"/>
+
+  <!-- Retícula de centros poblados sobre el cielo -->
+  <g fill="#009257" opacity="0.3">
+    <circle cx="60" cy="70" r="5"/><circle cx="120" cy="52" r="4"/><circle cx="180" cy="82" r="6"/>
+    <circle cx="240" cy="58" r="4"/><circle cx="300" cy="88" r="5"/><circle cx="360" cy="62" r="4"/>
+    <circle cx="90" cy="130" r="4"/><circle cx="150" cy="112" r="6"/><circle cx="210" cy="142" r="4"/>
+    <circle cx="270" cy="118" r="5"/><circle cx="330" cy="148" r="4"/><circle cx="390" cy="124" r="6"/>
+    <circle cx="60" cy="190" r="6"/><circle cx="126" cy="176" r="4"/><circle cx="192" cy="200" r="5"/>
+    <circle cx="258" cy="182" r="4"/>
+  </g>
+
+  <!-- Cordillera de fondo -->
+  <path d="M0 400 L0 246 L118 158 L222 234 L326 142 L438 248 L524 192 L600 254 L600 400 Z" fill="#5BBB5D"/>
+  <!-- Cordillera principal -->
+  <path d="M0 400 L0 306 L112 224 L218 300 L332 212 L456 310 L600 238 L600 400 Z" fill="#009257"/>
+  <!-- Valle -->
+  <path d="M0 400 L0 362 L150 340 L320 366 L470 338 L600 358 L600 400 Z" fill="#0B3B26"/>
+</svg>

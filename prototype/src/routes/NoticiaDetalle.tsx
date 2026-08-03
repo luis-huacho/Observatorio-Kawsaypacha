@@ -6,6 +6,8 @@ import type { Noticia } from "@/lib/types";
 import { TIPOS_NOTICIA } from "@/lib/types";
 import { formatFecha } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
+import Portada from "@/components/Portada";
+import PalabrasClave from "@/components/PalabrasClave";
 
 export default function NoticiaDetalle() {
   const { slug } = useParams();
@@ -56,9 +58,13 @@ export default function NoticiaDetalle() {
           </span>
         </div>
 
+        <Portada tipo={n.tipo} imagen={n.imagen_portada} pie={n.imagen_titulo} alt={n.titulo} />
+
         <p className="mt-6 text-lg text-ink-900 leading-relaxed">{n.bajada}</p>
         {/* whitespace-pre-line respeta los saltos de párrafo del JSON sin necesidad de rich text. */}
         <div className="mt-4 text-ink-600 leading-relaxed whitespace-pre-line">{n.cuerpo}</div>
+
+        <PalabrasClave palabras={n.palabras_clave} base="/noticias" />
       </article>
     </>
   );

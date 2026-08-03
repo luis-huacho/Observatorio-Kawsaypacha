@@ -6,7 +6,7 @@ import { useJsonData } from "@/lib/useJsonData";
 import Reveal from "@/components/Reveal";
 import type { CentroPoblado, ClasificacionPeligro, Noticia, Norma } from "@/lib/types";
 import { formatNumber, formatFecha } from "@/lib/semaforo";
-import { TarjetaNoticia } from "@/routes/Noticias";
+import { TarjetaNoticiaCompacta } from "@/routes/Noticias";
 
 const SECCIONES = [
   {
@@ -208,7 +208,7 @@ export default function Home() {
             <div className="mt-5 space-y-4">
               {ultimasNoticias.map((n, i) => (
                 <Reveal key={n.slug} delay={i * 70}>
-                  <TarjetaNoticia noticia={n} />
+                  <TarjetaNoticiaCompacta noticia={n} />
                 </Reveal>
               ))}
             </div>
@@ -248,7 +248,10 @@ export default function Home() {
     en los dos sitios. */
 function NormaPreview({ norma: n }: { norma: Norma }) {
   return (
-    <Link to="/normativa" className="card block p-5 hover:shadow-md transition no-underline">
+    <Link
+      to={`/normativa/${n.slug}`}
+      className="card block p-5 hover:shadow-md transition no-underline"
+    >
       <div className="flex flex-wrap items-center gap-2 mb-1">
         <span className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
           {n.tipo}
