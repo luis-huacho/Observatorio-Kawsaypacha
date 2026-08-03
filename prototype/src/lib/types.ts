@@ -17,10 +17,39 @@ export type Nivel = 1 | 2 | 3 | 4;
 export type ClasificacionPeligro = {
   codigo_ccpp: string;
   peligro: string;
+  peligro_slug: string;
   tipo: string | null;
   nivel: Nivel;
   fuente: string | null;
   fuente_url: string | null;
+};
+
+export type EventoEmergencia = {
+  evento: string;
+  slug: string;
+  conteo: number;
+};
+
+export type CategoriaEmergencia = {
+  categoria: string;
+  slug: string;
+  total: number;
+  /** La fuente declaró un subtotal pero no lo desagregó por tipo de evento. */
+  solo_total: boolean;
+  eventos: EventoEmergencia[];
+};
+
+export type FrecuenciaDistrito = {
+  ubigeo: string;
+  distrito: string;
+  provincia: string;
+  /** Cada distrito trae su propio periodo de observación; no hay uno regional. */
+  rango_fecha: string | null;
+  fuente: string | null;
+  fuente_url: string | null;
+  desglose_disponible: boolean;
+  total: number;
+  categorias: CategoriaEmergencia[];
 };
 
 export type Medida = {
@@ -103,16 +132,25 @@ export type Norma = {
   analisis_predes: string | null;
 };
 
-export const TIPOS_PELIGRO = [
-  "Sismo",
-  "Heladas",
-  "Bajas temperaturas",
-  "Friaje",
-  "Sequía",
-  "Lluvias",
-  "Inundación",
-  "Incendios Forestales",
-  "Movimientos en masa",
+/**
+ * Los nueve peligros del Excel canónico, con el nombre EXACTO que trae la columna PELIGRO.
+ * Ojo: no coincide con el nombre de la hoja en dos casos ("Lluvias" → "Lluvias intensas",
+ * "Incendios Forestales" → "Incendios forestales"). El slug es la clave que usan los tiles
+ * vectoriales del visor (propiedad `nivel_<slug>`).
+ */
+export const PELIGROS = [
+  { nombre: "Sismo", slug: "sismo" },
+  { nombre: "Heladas", slug: "heladas" },
+  { nombre: "Bajas temperaturas", slug: "bajas_temperaturas" },
+  { nombre: "Friaje", slug: "friaje" },
+  { nombre: "Sequía", slug: "sequia" },
+  { nombre: "Lluvias intensas", slug: "lluvias_intensas" },
+  { nombre: "Inundación", slug: "inundacion" },
+  { nombre: "Incendios forestales", slug: "incendios_forestales" },
+  { nombre: "Movimientos en masa", slug: "movimientos_en_masa" },
 ] as const;
 
-export type TipoPeligro = (typeof TIPOS_PELIGRO)[number];
+export const TIPOS_PELIGRO = PELIGROS.map((p) => p.nombre) as readonly string[];
+
+export type TipoPeligro = (typeof PELIGROS)[number]["nombre"];
+export type SlugPeligro = (typeof PELIGROS)[number]["slug"];

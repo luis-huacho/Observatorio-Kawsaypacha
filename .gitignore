@@ -51,7 +51,13 @@ backups/
 frontend/vite.config.js
 frontend/vite.config.d.ts
 
-# Documentación interna y data fuente (no se versionan)
-data/
-_specs/
-_docs/
+# Documentación interna y data fuente (no se versionan).
+# Anclados a la raíz: sin la barra inicial, "data/" también ignora prototype/public/data/,
+# donde sí viven los JSON que consume la app.
+/data/
+/_specs/
+/_docs/
+
+# Vector tiles: binarios pesados, regenerables con prototype/scripts/build_tiles.sh.
+# La demo del visor MapLibre solo corre en local (no se despliega).
+*.pmtiles

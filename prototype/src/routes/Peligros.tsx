@@ -1,20 +1,22 @@
 import { useMemo, useState, Suspense, lazy } from "react";
 import { Link } from "react-router-dom";
-import { Filter } from "lucide-react";
+import { ArrowRight, Filter } from "lucide-react";
 import { useJsonData } from "@/lib/useJsonData";
-import type { CentroPoblado, ClasificacionPeligro, Nivel } from "@/lib/types";
+import type { CentroPoblado, ClasificacionPeligro, FrecuenciaDistrito, Nivel } from "@/lib/types";
 import { TIPOS_PELIGRO } from "@/lib/types";
 import { NIVEL_BG, NIVEL_LABEL, formatNumber } from "@/lib/semaforo";
 import GeoSelector from "@/components/GeoSelector";
 import SemaforoChip from "@/components/SemaforoChip";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
+import FrecuenciaEmergencias from "@/components/FrecuenciaEmergencias";
 
 const MapaPeligros = lazy(() => import("@/components/MapaPeligros"));
 
 export default function Peligros() {
   const ccpp = useJsonData<CentroPoblado[]>("/data/ccpp.json");
   const peligros = useJsonData<ClasificacionPeligro[]>("/data/peligros.json");
+  const frecuencia = useJsonData<FrecuenciaDistrito[]>("/data/frecuencia.json");
 
   const [provincia, setProvincia] = useState("");
   const [distrito, setDistrito] = useState("");
@@ -45,6 +47,17 @@ export default function Peligros() {
     const counts: Record<Nivel, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
     for (const p of peligrosFiltrados) counts[p.nivel as Nivel]++;
     return counts;
+  }, [peligrosFiltrados]);
+
+  // Nivel máximo por centro poblado, precalculado una vez: la tabla lo leía con un filter()
+  // por fila, lo que con 10,978 clasificaciones se notaba al teclear en los filtros.
+  const nivelMaxPorCcpp = useMemo(() => {
+    const max = new Map<string, Nivel>();
+    for (const p of peligrosFiltrados) {
+      const actual = max.get(p.codigo_ccpp);
+      if (actual === undefined || p.nivel > actual) max.set(p.codigo_ccpp, p.nivel as Nivel);
+    }
+    return max;
   }, [peligrosFiltrados]);
 
   const cargando = ccpp.status === "loading" || peligros.status === "loading";
@@ -129,10 +142,20 @@ export default function Peligros() {
 
         {/* Mapa */}
         <section>
-          <div className="mb-2">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-ink-600">
               Capas geográficas activables: lagunas, ríos y nevados.
             </span>
+            {/* La demo depende de tiles que no se versionan: solo existe en desarrollo. */}
+            {import.meta.env.DEV && (
+              <Link
+                to="/peligros/mapa-nuevo"
+                className="inline-flex items-center gap-1 text-xs text-sky-700 hover:text-mountain-700"
+              >
+                Ver visor MapLibre + PMTiles (evaluación técnica)
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            )}
           </div>
           <div className="card p-1 h-[600px] overflow-hidden">
             {cargando ? (
@@ -149,6 +172,12 @@ export default function Peligros() {
               <EmptyState title="Error al cargar datos" message="No pudimos leer los datasets de centros poblados." />
             )}
           </div>
+
+          {/* Frecuencia histórica de emergencias del distrito seleccionado */}
+          <FrecuenciaEmergencias
+            frecuencia={frecuencia.status === "ok" ? frecuencia.data : []}
+            distrito={distrito}
+          />
 
           {/* Lista compacta */}
           <div className="card mt-4 p-5">
@@ -172,10 +201,7 @@ export default function Peligros() {
                 </thead>
                 <tbody>
                   {ccppFiltrados.slice(0, 100).map((c) => {
-                    const niveles = peligrosFiltrados
-                      .filter((p) => p.codigo_ccpp === c.codigo)
-                      .map((p) => p.nivel as Nivel);
-                    const max = niveles.length ? (Math.max(...niveles) as Nivel) : null;
+                    const max = nivelMaxPorCcpp.get(c.codigo) ?? null;
                     return (
                       <tr key={c.codigo} className="border-t border-ink-300/20 hover:bg-mountain-100/40">
                         <td className="px-2 py-2">
