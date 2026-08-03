@@ -1,7 +1,7 @@
 /**
- * Controles del visor MapLibre. Son los mismos tres de `MapaControles.tsx` (que están escritos
- * contra `L.Control`), traducidos a la interfaz `IControl` de MapLibre. La leyenda y el
- * conmutador de capas viven en el componente React porque son UI pura.
+ * Controles del visor: buscador de lugares, medición y export PNG, sobre la interfaz `IControl`
+ * de MapLibre. La leyenda y el conmutador de capas viven en el componente React porque son
+ * UI pura y se estilan con Tailwind.
  */
 import type { IControl, Map as MapLibreMap } from "maplibre-gl";
 import maplibregl from "maplibre-gl";

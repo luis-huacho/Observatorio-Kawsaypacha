@@ -106,7 +106,7 @@
   }
 }
 
-/* Leaflet fix: marker icons */
-.leaflet-container {
+/* El visor usa la tipografía del sitio, no la de MapLibre. */
+.maplibregl-map {
   font-family: inherit;
 }

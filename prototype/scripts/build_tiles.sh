@@ -8,8 +8,13 @@
 #
 #   bash prototype/scripts/build_tiles.sh
 #
-# La salida (prototype/public/tiles/) NO se versiona: son binarios pesados y este script los
-# regenera. La demo solo corre en local.
+# La salida (prototype/public/tiles/, ~6 MB) SÍ se versiona: /peligros depende de ella, así que
+# un clon sin los tiles mostraría el visor en blanco y no todo el mundo tiene Docker.
+#
+# OJO: son un artefacto derivado. Si cambia Base_Nivel Peligro_CCPP_Cusco.xlsx o alguna capa de
+# data/layers/, hay que volver a correr este script y commitear los .pmtiles resultantes, o el
+# mapa quedará desincronizado de los JSON que ve la tabla. En la plataforma real esto no aplica:
+# el worker de Django regenera los tiles tras cada importación (ver _specs/05-mapas-tiles.md).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

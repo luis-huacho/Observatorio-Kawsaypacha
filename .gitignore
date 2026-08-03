@@ -57,7 +57,3 @@ frontend/vite.config.d.ts
 /data/
 /_specs/
 /_docs/
-
-# Vector tiles: binarios pesados, regenerables con prototype/scripts/build_tiles.sh.
-# La demo del visor MapLibre solo corre en local (no se despliega).
-*.pmtiles

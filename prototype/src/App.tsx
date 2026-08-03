@@ -3,7 +3,6 @@ import Layout from "./components/Layout";
 import Home from "./routes/Home";
 import Peligros from "./routes/Peligros";
 import PeligroDetalle from "./routes/PeligroDetalle";
-import PeligrosMapaNuevo from "./routes/PeligrosMapaNuevo";
 import Medidas from "./routes/Medidas";
 import MedidaDetalle from "./routes/MedidaDetalle";
 import Inversion from "./routes/Inversion";
@@ -20,11 +19,6 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Home />} />
         <Route path="/peligros" element={<Peligros />} />
-        {/* Debe ir antes de /peligros/:codigo, si no el parámetro captura "mapa-nuevo".
-            Solo en desarrollo: depende de tiles que no se versionan. */}
-        {import.meta.env.DEV && (
-          <Route path="/peligros/mapa-nuevo" element={<PeligrosMapaNuevo />} />
-        )}
         <Route path="/peligros/:codigo" element={<PeligroDetalle />} />
         <Route path="/medidas" element={<Medidas />} />
         <Route path="/medidas/:slug" element={<MedidaDetalle />} />

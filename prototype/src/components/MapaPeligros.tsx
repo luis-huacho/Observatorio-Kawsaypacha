@@ -1,287 +1,358 @@
-import { useEffect, useMemo } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, LayersControl, GeoJSON, ScaleControl, useMap } from "react-leaflet";
-import L from "leaflet";
-import type { Layer, PathOptions } from "leaflet";
-import type { Feature } from "geojson";
-import type { CentroPoblado, ClasificacionPeligro, Nivel } from "@/lib/types";
+/**
+ * Visor de exposición sobre MapLibre GL + PMTiles.
+ *
+ * Sustituye a la versión Leaflet, donde cada cambio de peligro o de nivel rehacía 8,968
+ * CircleMarker desde React. Aquí los puntos llegan en un tile vectorial con una propiedad
+ * `nivel_<slug>` por peligro, y filtrar es reescribir una expresión sobre el tile ya
+ * descargado — sin red y sin re-render.
+ *
+ * Los tiles se generan con `prototype/scripts/build_tiles.sh` y se sirven desde
+ * `public/tiles/`.
+ */
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import maplibregl from "maplibre-gl";
+import { Protocol } from "pmtiles";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { Layers } from "lucide-react";
+import type { CentroPoblado, Nivel } from "@/lib/types";
+import { PELIGROS } from "@/lib/types";
 import { NIVEL_COLOR, NIVEL_LABEL, formatNumber } from "@/lib/semaforo";
-import { useJsonData } from "@/lib/useJsonData";
-import { BuscarLugarControl, MedirControl, DescargarPNGControl } from "@/components/MapaControles";
-import { Link } from "react-router-dom";
+import {
+  BuscarLugarControl,
+  DescargarPNGControl,
+  MedirControl,
+  VistaInicialControl,
+} from "@/components/MapaControles";
+
+const CENTRO: [number, number] = [-72.0, -13.5];
+const ZOOM_INICIAL = 7;
+const TILES = "/tiles";
+const SIN_DATO = "#BDBDBD";
+
+// El protocolo pmtiles:// se registra una sola vez por sesión, no por instancia de mapa.
+let protocoloRegistrado = false;
+
+/**
+ * Toda mutación del estilo (paint, filtros, visibilidad) exige que el estilo esté cargado.
+ * El estado `listo` basta en el flujo normal, pero tras un hot reload React conserva el estado
+ * mientras el mapa se reconstruye, así que se comprueba también contra el propio mapa.
+ */
+function cuandoListo(map: maplibregl.Map, fn: () => void) {
+  if (map.isStyleLoaded()) fn();
+  else map.once("load", fn);
+}
+
+type CapaContexto = {
+  id: string;
+  nombre: string;
+  ids: string[];
+};
+
+const CAPAS_CONTEXTO: CapaContexto[] = [
+  { id: "lagunas", nombre: "Lagunas", ids: ["lagunas-fill", "lagunas-line"] },
+  { id: "rios", nombre: "Ríos", ids: ["rios-line"] },
+  { id: "glaciares", nombre: "Glaciares", ids: ["glaciares-fill", "glaciares-line"] },
+];
 
 type Props = {
+  /** Solo para el buscador de lugares; los puntos del mapa vienen del tile. */
   ccpp: CentroPoblado[];
-  peligros: ClasificacionPeligro[];
-  tipoPeligroFiltro: string | null;
+  /** Slug del peligro activo, o null para "todos" (usa nivel_max). */
+  peligroSlug: string | null;
+  nivelMin: number;
+  /** Ubigeo del distrito seleccionado, o "" para toda la región. */
+  ubigeoDistrito: string;
 };
 
-type CapaGeo = {
-  type: "FeatureCollection";
-  features: Feature[];
-};
+export default function MapaPeligros({ ccpp, peligroSlug, nivelMin, ubigeoDistrito }: Props) {
+  const contenedor = useRef<HTMLDivElement>(null);
+  const mapa = useRef<maplibregl.Map | null>(null);
+  // El popup se construye una sola vez dentro del efecto de montaje, así que necesita una
+  // referencia estable para navegar sin recrear el mapa.
+  const navigate = useNavigate();
+  const navegar = useRef(navigate);
+  navegar.current = navigate;
+  const [listo, setListo] = useState(false);
+  const [visibles, setVisibles] = useState<Record<string, boolean>>({
+    lagunas: true,
+    rios: true,
+    glaciares: true,
+  });
+  const [abierto, setAbierto] = useState(false);
 
-// Centro aproximado de Cusco
-const CENTER: [number, number] = [-13.5, -72.0];
-const ZOOM_INICIAL = 8;
-
-// Estilos de las capas geográficas (paleta del proyecto)
-const ESTILO_LAGUNAS: PathOptions = { color: "#007480", weight: 1, fillColor: "#0095A4", fillOpacity: 0.55 };
-const ESTILO_RIOS: PathOptions = { color: "#007480", weight: 2, opacity: 0.85 };
-const ESTILO_NEVADOS: PathOptions = { color: "#7A93A6", weight: 1, fillColor: "#CFE4F2", fillOpacity: 0.7 };
-
-function bindNombre(feature: Feature | undefined, layer: Layer) {
-  const nombre = (feature?.properties as { nombre?: string } | undefined)?.nombre;
-  if (nombre) layer.bindTooltip(nombre, { sticky: true });
-}
-
-/** Crea un botón de control Leaflet con un ícono y una acción. */
-function useBotonControl(
-  posicion: L.ControlPosition,
-  titulo: string,
-  html: string,
-  onClick: (map: L.Map) => void,
-) {
-  const map = useMap();
+  // --- Construcción del mapa (una sola vez) --------------------------------------------------
   useEffect(() => {
-    const ctrl = new L.Control({ position: posicion });
-    ctrl.onAdd = () => {
-      const div = L.DomUtil.create("div", "leaflet-bar leaflet-control");
-      const a = L.DomUtil.create("a", "", div) as HTMLAnchorElement;
-      a.href = "#";
-      a.title = titulo;
-      a.setAttribute("aria-label", titulo);
-      a.innerHTML = html;
-      a.style.fontSize = "16px";
-      a.style.fontWeight = "bold";
-      L.DomEvent.disableClickPropagation(div);
-      L.DomEvent.on(a, "click", (e) => {
-        L.DomEvent.preventDefault(e);
-        onClick(map);
+    if (!contenedor.current || mapa.current) return;
+
+    if (!protocoloRegistrado) {
+      maplibregl.addProtocol("pmtiles", new Protocol().tile);
+      protocoloRegistrado = true;
+    }
+
+    const map = new maplibregl.Map({
+      container: contenedor.current,
+      center: CENTRO,
+      zoom: ZOOM_INICIAL,
+      // Necesario para poder leer el canvas en el export PNG.
+      preserveDrawingBuffer: true,
+      attributionControl: { compact: true },
+      style: {
+        version: 8,
+        glyphs: "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
+        sources: {
+          base: {
+            type: "raster",
+            tiles: ["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png"],
+            tileSize: 256,
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          },
+          lagunas: { type: "vector", url: `pmtiles://${TILES}/lagunas.pmtiles` },
+          rios: { type: "vector", url: `pmtiles://${TILES}/rios.pmtiles` },
+          glaciares: { type: "vector", url: `pmtiles://${TILES}/glaciares.pmtiles` },
+          ccpp: { type: "vector", url: `pmtiles://${TILES}/ccpp.pmtiles` },
+        },
+        layers: [
+          { id: "base", type: "raster", source: "base" },
+
+          {
+            id: "lagunas-fill", type: "fill", source: "lagunas", "source-layer": "lagunas",
+            paint: { "fill-color": "#0095A4", "fill-opacity": 0.35 },
+          },
+          {
+            id: "lagunas-line", type: "line", source: "lagunas", "source-layer": "lagunas",
+            paint: { "line-color": "#007480", "line-width": 0.6 },
+          },
+          {
+            id: "rios-line", type: "line", source: "rios", "source-layer": "rios",
+            paint: {
+              "line-color": "#0095A4",
+              // Los cauces menores se afinan al alejarse para no emborronar la región.
+              "line-width": ["interpolate", ["linear"], ["zoom"], 6, 0.4, 12, 1.6],
+              "line-opacity": 0.75,
+            },
+          },
+          {
+            id: "glaciares-fill", type: "fill", source: "glaciares", "source-layer": "glaciares",
+            paint: { "fill-color": "#CCEAED", "fill-opacity": 0.8 },
+          },
+          {
+            id: "glaciares-line", type: "line", source: "glaciares", "source-layer": "glaciares",
+            paint: { "line-color": "#007480", "line-width": 0.5 },
+          },
+
+          {
+            id: "ccpp-puntos", type: "circle", source: "ccpp", "source-layer": "ccpp",
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 2.5, 9, 4, 14, 7],
+              "circle-color": SIN_DATO,
+              "circle-opacity": 0.75,
+              "circle-stroke-width": 0.5,
+              "circle-stroke-color": "#ffffff",
+            },
+          },
+        ],
+      },
+    });
+
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
+    map.addControl(new VistaInicialControl(CENTRO, ZOOM_INICIAL), "top-left");
+    map.addControl(new maplibregl.FullscreenControl(), "top-left");
+    map.addControl(new MedirControl(), "top-left");
+    map.addControl(new DescargarPNGControl(), "top-left");
+    map.addControl(new BuscarLugarControl(ccpp), "top-right");
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: "metric" }), "bottom-left");
+
+    map.on("load", () => setListo(true));
+
+    // Popup con la ficha del centro poblado. El enlace al detalle no puede ser un <a> normal:
+    // recargaría la SPA entera, así que se delega al router.
+    map.on("click", "ccpp-puntos", (e) => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const p = f.properties as Record<string, unknown>;
+
+      const clasificados = Object.entries(p)
+        .filter(([k, v]) => k.startsWith("nivel_") && k !== "nivel_max" && typeof v === "number")
+        .map(([k, v]) => ({ slug: k.slice("nivel_".length), nivel: v as Nivel }));
+
+      const nodo = document.createElement("div");
+      nodo.className = "text-sm";
+      nodo.innerHTML =
+        `<div class="font-bold text-base">${p.nombre}</div>` +
+        `<div class="text-ink-600 text-xs">${p.categoria || "s/c"} — ${p.distrito}, ${p.provincia}</div>` +
+        `<div class="mt-2 text-xs">` +
+        `<div>Población: <strong>${p.poblacion != null ? formatNumber(Number(p.poblacion)) : "s/d"}</strong></div>` +
+        `<div>Altitud: <strong>${p.altitud != null ? `${formatNumber(Number(p.altitud))} msnm` : "s/d"}</strong></div>` +
+        `</div>` +
+        (clasificados.length
+          ? `<div class="mt-2"><div class="text-xs font-semibold text-ink-900">Peligros clasificados:</div>` +
+            `<ul class="text-xs mt-1 space-y-0.5">` +
+            clasificados
+              .map(
+                (c) =>
+                  `<li><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;margin-right:6px;vertical-align:middle;background:${NIVEL_COLOR[c.nivel]}"></span>` +
+                  `${nombreDePeligro(c.slug)}: <strong>${NIVEL_LABEL[c.nivel]}</strong></li>`
+              )
+              .join("") +
+            `</ul></div>`
+          : `<div class="mt-2 text-xs italic text-ink-600">Sin clasificación de peligro registrada.</div>`) +
+        `<button type="button" class="block mt-3 text-xs font-medium text-mountain-700 bg-transparent border-0 p-0 cursor-pointer">Ver detalle →</button>`;
+
+      nodo.querySelector("button")?.addEventListener("click", () => {
+        navegar.current(`/peligros/${p.codigo}`);
       });
-      return div;
-    };
-    ctrl.addTo(map);
+
+      new maplibregl.Popup({ offset: 8, maxWidth: "260px" })
+        .setLngLat(e.lngLat)
+        .setDOMContent(nodo)
+        .addTo(map);
+    });
+
+    map.on("mouseenter", "ccpp-puntos", () => (map.getCanvas().style.cursor = "pointer"));
+    map.on("mouseleave", "ccpp-puntos", () => (map.getCanvas().style.cursor = ""));
+
+    mapa.current = map;
     return () => {
-      ctrl.remove();
+      map.remove();
+      mapa.current = null;
     };
+    // El buscador se alimenta del padrón completo, que no cambia con los filtros.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map]);
-  return null;
-}
+  }, []);
 
-/** Botón: volver a la vista inicial de la región. */
-function VistaInicialControl() {
-  return useBotonControl("topleft", "Vista inicial (toda la región)", "⌂", (map) => {
-    map.setView(CENTER, ZOOM_INICIAL);
-  });
-}
-
-/** Botón: pantalla completa del mapa (API nativa del navegador). */
-function PantallaCompletaControl() {
-  return useBotonControl("topleft", "Pantalla completa", "⛶", (map) => {
-    const el = map.getContainer();
-    if (!document.fullscreenElement) {
-      el.requestFullscreen?.();
-    } else {
-      document.exitFullscreen?.();
-    }
-    window.setTimeout(() => map.invalidateSize(), 250);
-  });
-}
-
-/** Leyenda de niveles de exposición (esquina inferior derecha). */
-function LeyendaControl() {
-  const map = useMap();
+  // --- Filtro y color: la parte que antes obligaba a rehacer los marcadores ------------------
   useEffect(() => {
-    const ctrl = new L.Control({ position: "bottomright" });
-    ctrl.onAdd = () => {
-      const div = L.DomUtil.create("div", "leaflet-control");
-      div.style.background = "rgba(255,255,255,0.92)";
-      div.style.padding = "8px 10px";
-      div.style.borderRadius = "8px";
-      div.style.boxShadow = "0 1px 4px rgba(0,0,0,0.2)";
-      div.style.font = "11px/1.4 system-ui, sans-serif";
-      div.style.color = "#1A1A1A";
-      const filas = ([1, 2, 3, 4] as Nivel[])
-        .map(
-          (n) =>
-            `<div style="display:flex;align-items:center;gap:6px;margin-top:2px">
-               <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${NIVEL_COLOR[n]}"></span>
-               <span>${NIVEL_LABEL[n]}</span>
-             </div>`,
-        )
-        .join("");
-      div.innerHTML = `<div style="font-weight:600;margin-bottom:2px">Nivel de exposición</div>${filas}`;
-      return div;
-    };
-    ctrl.addTo(map);
-    return () => {
-      ctrl.remove();
-    };
-  }, [map]);
-  return null;
-}
+    const map = mapa.current;
+    if (!map || !listo) return;
 
-export default function MapaPeligros({ ccpp, peligros, tipoPeligroFiltro }: Props) {
-  // Para cada CCPP, buscar el máximo nivel del peligro filtrado (o de todos)
-  const ccppNivel = useMemo(() => {
-    const map = new Map<string, Nivel | null>();
-    for (const c of ccpp) {
-      if (c.lat == null || c.lon == null) continue;
-      map.set(c.codigo, null);
-    }
-    for (const p of peligros) {
-      if (tipoPeligroFiltro && p.peligro !== tipoPeligroFiltro) continue;
-      const cur = map.get(p.codigo_ccpp);
-      if (cur === undefined) continue; // CCPP sin coords
-      if (cur == null || p.nivel > cur) map.set(p.codigo_ccpp, p.nivel as Nivel);
-    }
-    return map;
-  }, [ccpp, peligros, tipoPeligroFiltro]);
+    cuandoListo(map, () => {
+      const campo = peligroSlug ? `nivel_${peligroSlug}` : "nivel_max";
+      // coalesce(…, 0) hace que "sin dato" sea un valor propio y no un nivel bajo.
+      const nivel: maplibregl.ExpressionSpecification = ["coalesce", ["get", campo], 0];
 
-  const peligrosByCcpp = useMemo(() => {
-    const map = new Map<string, ClasificacionPeligro[]>();
-    for (const p of peligros) {
-      if (!map.has(p.codigo_ccpp)) map.set(p.codigo_ccpp, []);
-      map.get(p.codigo_ccpp)!.push(p);
-    }
-    return map;
-  }, [peligros]);
+      map.setPaintProperty("ccpp-puntos", "circle-color", [
+        "match",
+        nivel,
+        1, NIVEL_COLOR[1],
+        2, NIVEL_COLOR[2],
+        3, NIVEL_COLOR[3],
+        4, NIVEL_COLOR[4],
+        SIN_DATO,
+      ] as maplibregl.ExpressionSpecification);
 
-  // Capas geográficas de prueba (geoJSON). En Fase 1 se reemplazan por las oficiales.
-  const lagunas = useJsonData<CapaGeo>("/data/geo/lagunas.demo.geojson");
-  const rios = useJsonData<CapaGeo>("/data/geo/rios.demo.geojson");
-  const nevados = useJsonData<CapaGeo>("/data/geo/nevados.demo.geojson");
+      map.setPaintProperty("ccpp-puntos", "circle-opacity", [
+        "case", [">", nivel, 0], 0.8, 0.35,
+      ] as maplibregl.ExpressionSpecification);
+
+      const condiciones: maplibregl.ExpressionSpecification[] = [];
+      if (nivelMin > 0) condiciones.push([">=", nivel, nivelMin]);
+      if (ubigeoDistrito) condiciones.push(["==", ["get", "ubigeo_distrito"], ubigeoDistrito]);
+
+      map.setFilter(
+        "ccpp-puntos",
+        condiciones.length ? (["all", ...condiciones] as maplibregl.FilterSpecification) : null
+      );
+    });
+  }, [listo, peligroSlug, nivelMin, ubigeoDistrito]);
+
+  // --- Encuadre al elegir un distrito --------------------------------------------------------
+  // El filtro de arriba oculta los puntos de fuera, pero sin mover la cámara el usuario se queda
+  // mirando toda la región. Los límites salen del padrón, que ya está en memoria.
+  useEffect(() => {
+    const map = mapa.current;
+    if (!map || !listo) return;
+    if (!ubigeoDistrito) {
+      map.flyTo({ center: CENTRO, zoom: ZOOM_INICIAL });
+      return;
+    }
+    const puntos = ccpp.filter(
+      (c) => c.ubigeo_distrito === ubigeoDistrito && c.lat != null && c.lon != null
+    );
+    if (!puntos.length) return;
+    const limites = puntos.reduce(
+      (b, c) => b.extend([c.lon as number, c.lat as number]),
+      new maplibregl.LngLatBounds(
+        [puntos[0].lon as number, puntos[0].lat as number],
+        [puntos[0].lon as number, puntos[0].lat as number]
+      )
+    );
+    map.fitBounds(limites, { padding: 60, maxZoom: 12, duration: 800 });
+  }, [listo, ubigeoDistrito, ccpp]);
+
+  // --- Conmutador de capas de contexto -------------------------------------------------------
+  useEffect(() => {
+    const map = mapa.current;
+    if (!map || !listo) return;
+    cuandoListo(map, () => {
+      for (const capa of CAPAS_CONTEXTO) {
+        for (const id of capa.ids) {
+          map.setLayoutProperty(id, "visibility", visibles[capa.id] ? "visible" : "none");
+        }
+      }
+    });
+  }, [listo, visibles]);
 
   return (
-    <MapContainer
-      center={CENTER}
-      zoom={ZOOM_INICIAL}
-      scrollWheelZoom={true}
-      className="w-full h-full rounded-lg"
-      preferCanvas={true}
-    >
-      {/* Herramientas del visor */}
-      <ScaleControl position="bottomleft" imperial={false} />
-      <VistaInicialControl />
-      <PantallaCompletaControl />
-      <MedirControl />
-      <DescargarPNGControl />
-      <BuscarLugarControl ccpp={ccpp} />
-      <LeyendaControl />
+    <div className="relative w-full h-full">
+      <div ref={contenedor} className="w-full h-full rounded-lg" />
 
-      <LayersControl position="topright">
-        {/* Mapas base */}
-        <LayersControl.BaseLayer checked name="Mapa claro">
-          <TileLayer
-            crossOrigin="anonymous"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          />
-        </LayersControl.BaseLayer>
-        <LayersControl.BaseLayer name="Satélite">
-          <TileLayer
-            crossOrigin="anonymous"
-            attribution='Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          />
-        </LayersControl.BaseLayer>
-        <LayersControl.BaseLayer name="OpenStreetMap">
-          <TileLayer
-            crossOrigin="anonymous"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-        </LayersControl.BaseLayer>
+      {/* Conmutador de capas */}
+      <div className="absolute top-2 right-2 z-10" style={{ marginTop: 78 }}>
+        <button
+          type="button"
+          onClick={() => setAbierto((v) => !v)}
+          className="bg-white rounded shadow px-2 py-1.5 flex items-center gap-1.5 text-xs text-ink-900 hover:bg-mountain-100"
+          title="Capas geográficas"
+        >
+          <Layers className="w-3.5 h-3.5" />
+          Capas
+        </button>
+        {abierto && (
+          <div className="mt-1 bg-white rounded shadow p-2 space-y-1">
+            {CAPAS_CONTEXTO.map((c) => (
+              <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={visibles[c.id]}
+                  onChange={(e) => setVisibles((v) => ({ ...v, [c.id]: e.target.checked }))}
+                />
+                {c.nombre}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* Capas geográficas */}
-        <LayersControl.Overlay checked name="Lagunas">
-          {lagunas.status === "ok" ? (
-            <GeoJSON key="lagunas" data={lagunas.data} style={() => ESTILO_LAGUNAS} onEachFeature={bindNombre} />
-          ) : (
-            <span />
-          )}
-        </LayersControl.Overlay>
-        <LayersControl.Overlay checked name="Ríos">
-          {rios.status === "ok" ? (
-            <GeoJSON key="rios" data={rios.data} style={() => ESTILO_RIOS} onEachFeature={bindNombre} />
-          ) : (
-            <span />
-          )}
-        </LayersControl.Overlay>
-        <LayersControl.Overlay checked name="Nevados">
-          {nevados.status === "ok" ? (
-            <GeoJSON key="nevados" data={nevados.data} style={() => ESTILO_NEVADOS} onEachFeature={bindNombre} />
-          ) : (
-            <span />
-          )}
-        </LayersControl.Overlay>
-      </LayersControl>
-      {ccpp.map((c) => {
-        if (c.lat == null || c.lon == null) return null;
-        const nivel = ccppNivel.get(c.codigo);
-        const color = nivel ? NIVEL_COLOR[nivel] : "#BDBDBD";
-        const radius = nivel ? 4 + nivel * 0.8 : 3;
-        const allP = peligrosByCcpp.get(c.codigo) ?? [];
-
-        return (
-          <CircleMarker
-            key={c.codigo}
-            center={[c.lat, c.lon]}
-            radius={radius}
-            pathOptions={{
-              color,
-              weight: 1,
-              fillColor: color,
-              fillOpacity: nivel ? 0.7 : 0.35,
-            }}
-          >
-            <Tooltip direction="top" opacity={0.95}>
-              <strong>{c.nombre}</strong>
-              <br />
-              {c.distrito} / {c.provincia}
-            </Tooltip>
-            <Popup>
-              <div className="text-sm">
-                <div className="font-bold text-base">{c.nombre}</div>
-                <div className="text-ink-600 text-xs">
-                  {c.categoria} — {c.distrito}, {c.provincia}
-                </div>
-                <div className="mt-2 text-xs">
-                  <div>Población: <strong>{c.poblacion != null ? formatNumber(c.poblacion) : "s/d"}</strong></div>
-                  <div>Altitud: <strong>{c.altitud != null ? `${formatNumber(c.altitud)} msnm` : "s/d"}</strong></div>
-                </div>
-                {allP.length > 0 ? (
-                  <div className="mt-2">
-                    <div className="text-xs font-semibold text-ink-900">Peligros clasificados:</div>
-                    <ul className="text-xs mt-1 space-y-0.5">
-                      {allP.map((p, i) => (
-                        <li key={i}>
-                          <span
-                            className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
-                            style={{ background: NIVEL_COLOR[p.nivel] }}
-                          />
-                          {p.peligro}: <strong>{NIVEL_LABEL[p.nivel]}</strong>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : (
-                  <div className="mt-2 text-xs italic text-ink-600">
-                    Sin clasificación de peligro registrada.
-                  </div>
-                )}
-                <Link
-                  to={`/peligros/${c.codigo}`}
-                  className="block mt-3 text-xs font-medium text-mountain-700"
-                >
-                  Ver detalle →
-                </Link>
-              </div>
-            </Popup>
-          </CircleMarker>
-        );
-      })}
-    </MapContainer>
+      {/* Leyenda semáforo */}
+      <div className="absolute bottom-8 right-2 z-10 bg-white/92 rounded-lg shadow px-3 py-2">
+        <div className="text-[11px] font-semibold text-ink-900 mb-1">
+          Nivel de peligro{peligroSlug ? "" : " (máximo)"}
+        </div>
+        <div className="space-y-0.5">
+          {([4, 3, 2, 1] as Nivel[]).map((n) => (
+            <div key={n} className="flex items-center gap-1.5 text-[11px] text-ink-600">
+              <span
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: NIVEL_COLOR[n] }}
+              />
+              {NIVEL_LABEL[n]}
+            </div>
+          ))}
+          <div className="flex items-center gap-1.5 text-[11px] text-ink-600">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SIN_DATO }} />
+            Sin dato
+          </div>
+        </div>
+      </div>
+    </div>
   );
+}
+
+/** Los tiles guardan el slug; para el popup hace falta el nombre legible del catálogo. */
+const NOMBRE_POR_SLUG = new Map<string, string>(PELIGROS.map((p) => [p.slug, p.nombre]));
+
+function nombreDePeligro(slug: string): string {
+  return NOMBRE_POR_SLUG.get(slug) ?? slug.replace(/_/g, " ");
 }
