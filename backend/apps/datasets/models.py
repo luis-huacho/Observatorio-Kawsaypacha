@@ -5,29 +5,33 @@ from apps.core.models import TimeStampedMixin
 
 
 class DatasetUpload(TimeStampedMixin):
-    """Carga de un Excel canónico que reemplaza los datos activos.
+    """Carga de un Excel canónico que reemplaza los datos activos (ADR-A12).
 
-    Requisito central del TDR: PREDES actualiza la información subiendo el
-    archivo, sin asistencia técnica. La importación valida, reemplaza en una
-    transacción y deja un log legible de lo ocurrido.
+    Requisito central del TDR: PREDES actualiza la información subiendo el archivo, sin
+    asistencia técnica. La importación valida, reemplaza en una transacción y deja un log
+    legible — el log es lo que el cliente lee para saber qué corregir en su Excel, así que
+    va en español y cita hoja y fila.
     """
 
     class Tipo(models.TextChoices):
-        NIVEL_PELIGRO = "nivel_peligro_ccpp", "Nivel de peligro por CCPP"
+        PELIGROS_CCPP = "peligros_ccpp", "Nivel de peligro por centro poblado"
         FRECUENCIA = "frecuencia_emergencias", "Frecuencia de emergencias por distrito"
-        INVERSION = "inversion_mef", "Inversión PPR 0068 (MEF)"
+        # Existe como opción para no tener que migrar cuando llegue la data, pero no hay
+        # importador: la ventana Inversión está diferida (ADR-D3).
+        INVERSION = "inversion_mef", "Inversión PPR 0068 (MEF) — pendiente de definir"
 
     class Estado(models.TextChoices):
-        PENDIENTE = "pendiente", "Pendiente"
+        SUBIDO = "subido", "Subido"
         VALIDANDO = "validando", "Validando"
         PROCESANDO = "procesando", "Procesando"
-        OK = "ok", "Importado"
+        ACTIVO = "activo", "Activo"
+        REEMPLAZADO = "reemplazado", "Reemplazado"
         ERROR = "error", "Error"
 
-    tipo_dataset = models.CharField(max_length=30, choices=Tipo.choices)
+    tipo = models.CharField("tipo de dataset", max_length=30, choices=Tipo.choices)
     archivo = models.FileField(upload_to="datasets/%Y/%m/")
     estado = models.CharField(
-        max_length=12, choices=Estado.choices, default=Estado.PENDIENTE, db_index=True
+        max_length=12, choices=Estado.choices, default=Estado.SUBIDO, db_index=True
     )
     log = models.JSONField(default=dict, blank=True)
     filas_leidas = models.PositiveIntegerField(default=0)
@@ -35,14 +39,27 @@ class DatasetUpload(TimeStampedMixin):
     subido_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
     )
-    activo = models.BooleanField(default=False, help_text="Versión vigente de este dataset")
     activado_en = models.DateTimeField(null=True, blank=True)
+    reemplaza_a = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reemplazado_por",
+        help_text="Carga anterior del mismo tipo, que este archivo deja obsoleta.",
+    )
     checksum_sha256 = models.CharField(max_length=64, blank=True, editable=False)  # [+] futuro
+    parametros = models.JSONField(default=dict, blank=True)  # [+] futuro
 
     class Meta:
         ordering = ["-creado_en"]
         verbose_name = "carga de dataset"
         verbose_name_plural = "cargas de datasets"
+        indexes = [models.Index(fields=["tipo", "estado"])]
 
     def __str__(self) -> str:
-        return f"{self.get_tipo_dataset_display()} · {self.creado_en:%Y-%m-%d %H:%M}"
+        return f"{self.get_tipo_display()} · {self.creado_en:%Y-%m-%d %H:%M}"
+
+    @property
+    def advertencias(self) -> list[str]:
+        return self.log.get("advertencias", []) if isinstance(self.log, dict) else []

@@ -11,21 +11,48 @@ dependencies = [
     "django-unfold>=0.42",
     "django-tasks>=0.12",
     "django-tasks-db>=0.12",
+    "django-cors-headers>=4.6",
+    "django-ckeditor-5>=0.2.15",
+    # Saneamiento del HTML de CKEditor con lista blanca, al guardar (ADR-D2). El frontend
+    # inyecta con dangerouslySetInnerHTML y no puede ser la última línea de defensa.
+    "nh3>=0.2.19",
     "meilisearch>=0.33",
     "google-genai>=1.0",
     "openpyxl>=3.1",
     "weasyprint>=63",
+    # Captura del mapa del PDF en navegador headless (ver 02).
+    "playwright>=1.49",
     "gunicorn>=23",
     "psycopg[binary]>=3.2",
     "django-environ>=0.11",
     "whitenoise>=6.8",
     "pillow>=10.4",
+    # Django necesita PyYAML para cargar fixtures .yaml (catálogos y contenido demo).
+    "pyyaml>=6.0",
 ]
 
 [dependency-groups]
 dev = [
     "django-debug-toolbar>=4.4",
+    "pytest>=8.3",
+    "pytest-django>=4.9",
+    "pytest-cov>=6.0",
 ]
 
 [tool.uv]
 package = false
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+testpaths = ["tests"]
+addopts = "-q --strict-markers -m 'not lento'"
+markers = [
+    # Pruebas que corren contra los Excel reales de data/layers (5.4 MB, ~1 min).
+    # Fuera de la corrida por defecto: `pytest -m lento` para incluirlas.
+    "lento: usa los archivos de datos completos en vez de las muestras reducidas",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

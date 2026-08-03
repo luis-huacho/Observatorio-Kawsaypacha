@@ -7,22 +7,15 @@ from .tasks import procesar_dataset
 
 @admin.register(DatasetUpload)
 class DatasetUploadAdmin(ModelAdmin):
-    list_display = [
-        "tipo_dataset",
-        "estado",
-        "activo",
-        "filas_importadas",
-        "subido_por",
-        "creado_en",
-    ]
-    list_filter = ["tipo_dataset", "estado", "activo"]
+    list_display = ["tipo", "estado", "filas_importadas", "subido_por", "creado_en"]
+    list_filter = ["tipo", "estado"]
     readonly_fields = [
         "estado",
         "log",
         "filas_leidas",
         "filas_importadas",
-        "activo",
         "activado_en",
+        "reemplaza_a",
         "subido_por",
     ]
     actions = ["validar_e_importar"]
