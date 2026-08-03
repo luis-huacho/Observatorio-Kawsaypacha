@@ -4,8 +4,9 @@ import {
 } from "lucide-react";
 import { useJsonData } from "@/lib/useJsonData";
 import Reveal from "@/components/Reveal";
-import type { CentroPoblado, ClasificacionPeligro } from "@/lib/types";
-import { formatNumber } from "@/lib/semaforo";
+import type { CentroPoblado, ClasificacionPeligro, Noticia, Norma } from "@/lib/types";
+import { formatNumber, formatFecha } from "@/lib/semaforo";
+import { TarjetaNoticia } from "@/routes/Noticias";
 
 const SECCIONES = [
   {
@@ -45,6 +46,16 @@ export default function Home() {
     ccpp.status === "ok"
       ? new Set(ccpp.data.map((c) => c.ubigeo_distrito)).size
       : null;
+
+  // Bloque de actualidad: lo más reciente de cada sección editorial.
+  const noticias = useJsonData<Noticia[]>("/data/noticias.mock.json");
+  const normas = useJsonData<Norma[]>("/data/normativa.mock.json");
+
+  const porFechaDesc = <T extends { fecha: string }>(items: T[]) =>
+    [...items].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 3);
+
+  const ultimasNoticias = noticias.status === "ok" ? porFechaDesc(noticias.data) : [];
+  const ultimasNormas = normas.status === "ok" ? porFechaDesc(normas.data) : [];
 
   return (
     <>
@@ -174,7 +185,82 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Actualidad — noticias y normativa a dos columnas. Van juntas y no como dos bandas
+          apiladas: la portada ya encadena tres grillas de tarjetas y agruparlas las lee
+          como lo que son, un solo bloque de lo más reciente. */}
+      <section className="container-page mt-16 mb-4">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-12">
+          <div>
+            <div className="flex items-baseline justify-between gap-4 mb-1">
+              <h2 className="font-display text-2xl font-bold text-mountain-700">
+                Últimas noticias
+              </h2>
+              <Link
+                to="/noticias"
+                className="inline-flex items-center gap-1 text-sm text-mountain-700 shrink-0"
+              >
+                Ver todas <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <p className="text-ink-600 text-sm">
+              Publicaciones y artículos del observatorio.
+            </p>
+            <div className="mt-5 space-y-4">
+              {ultimasNoticias.map((n, i) => (
+                <Reveal key={n.slug} delay={i * 70}>
+                  <TarjetaNoticia noticia={n} />
+                </Reveal>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-baseline justify-between gap-4 mb-1">
+              <h2 className="font-display text-2xl font-bold text-mountain-700">
+                Últimas normas
+              </h2>
+              <Link
+                to="/normativa"
+                className="inline-flex items-center gap-1 text-sm text-mountain-700 shrink-0"
+              >
+                Ver todas <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <p className="text-ink-600 text-sm">
+              Marco normativo de la GRD con el análisis de PREDES.
+            </p>
+            <div className="mt-5 space-y-4">
+              {ultimasNormas.map((n, i) => (
+                <Reveal key={n.id} delay={i * 70}>
+                  <NormaPreview norma={n} />
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
     </>
+  );
+}
+
+/** Mismos chips y fecha en mono que la lista de /normativa, para que la norma se vea igual
+    en los dos sitios. */
+function NormaPreview({ norma: n }: { norma: Norma }) {
+  return (
+    <Link to="/normativa" className="card block p-5 hover:shadow-md transition no-underline">
+      <div className="flex flex-wrap items-center gap-2 mb-1">
+        <span className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
+          {n.tipo}
+        </span>
+        <span className="chip bg-sky-200/40 text-sky-700 border border-sky-500/20 capitalize">
+          {n.ambito}
+        </span>
+        <span className="text-xs text-ink-600">{formatFecha(n.fecha)}</span>
+      </div>
+      <h3 className="font-display font-bold text-mountain-900 leading-tight">{n.titulo}</h3>
+      <p className="text-sm text-ink-600 mt-1">{n.resumen}</p>
+    </Link>
   );
 }
 

@@ -1,0 +1,74 @@
+[
+  {
+    "_mock": true,
+    "slug": "actualizacion-base-peligros-2026",
+    "titulo": "El observatorio actualiza la base de exposición a peligros de los 112 distritos",
+    "bajada": "La nueva carga de SIGRID-CENEPRED eleva a 10,978 las clasificaciones de nivel de peligro sobre los 8,968 centros poblados del padrón regional.",
+    "cuerpo": "El equipo técnico del observatorio incorporó la versión actualizada de la base de niveles de peligro por centro poblado elaborada a partir de los estudios de SIGRID-CENEPRED. La actualización eleva de 6,566 a 10,978 el número de clasificaciones disponibles y amplía la cobertura a 3,238 centros poblados con al menos un peligro evaluado.\n\nLa incorporación también permitió depurar inconsistencias en los nombres de los peligros y sumar por primera vez el registro histórico de emergencias por distrito, que cubre el periodo 2000-2025 según la fuente.\n\nQuedan 5,730 centros poblados sin clasificación en la base consultada. El observatorio insiste en que esa ausencia no equivale a ausencia de riesgo: identifica un vacío de información que debe cubrirse mediante evaluación técnica, y por eso se reporta de forma explícita en el visor y en las ayudas memoria.",
+    "fecha": "2026-07-28",
+    "tipo": "noticia",
+    "autor": "Equipo del Observatorio Kallpachakuy",
+    "imagen_portada": null,
+    "destacada": true
+  },
+  {
+    "_mock": true,
+    "slug": "mesa-tecnica-quispicanchi",
+    "titulo": "Mesa técnica en Quispicanchi revisa la exposición a movimientos en masa",
+    "bajada": "Autoridades de seis distritos analizaron con PREDES los centros poblados en nivel alto y muy alto para orientar la formulación presupuestal.",
+    "cuerpo": "Representantes de las municipalidades distritales de Quispicanchi participaron en una mesa técnica convocada para revisar la información de exposición a movimientos en masa, el peligro con mayor número de clasificaciones en la región.\n\nDurante la sesión se trabajó con las ayudas memoria generadas desde el observatorio, que reúnen en un solo documento el mapa del distrito, la distribución de centros poblados por nivel de peligro y el historial de emergencias registradas.\n\nLos participantes acordaron priorizar la evaluación de los centros poblados que hoy figuran sin clasificación, y usar los reportes como insumo en la formulación del PPR 0068.",
+    "fecha": "2026-06-12",
+    "tipo": "noticia",
+    "autor": "Equipo del Observatorio Kallpachakuy",
+    "imagen_portada": null,
+    "destacada": false
+  },
+  {
+    "_mock": true,
+    "slug": "que-significa-sin-dato",
+    "titulo": "Qué significa \"sin dato\" en un mapa de peligros (y por qué importa)",
+    "bajada": "Dos de cada tres centros poblados de Cusco no tienen nivel de peligro asignado. Confundir esa ausencia con seguridad es el error más costoso al priorizar inversión.",
+    "cuerpo": "Cuando un centro poblado aparece en gris en el visor, no está diciendo que sea seguro. Está diciendo que nadie ha evaluado todavía a qué peligros está expuesto.\n\nLa diferencia es decisiva al momento de asignar recursos. Un distrito puede mostrar pocos centros poblados en nivel alto simplemente porque se han evaluado pocos, y ese vacío suele coincidir con las zonas más alejadas y con menos capacidad de gestión, que son justamente las que concentran mayor vulnerabilidad.\n\nPor eso el observatorio muestra siempre el dato de cobertura junto a las cifras de exposición, y las ayudas memoria por distrito consignan cuántos centros poblados quedan sin clasificar. Es información que sirve para pedir estudios, no solo para reportar los que ya existen.",
+    "fecha": "2026-05-20",
+    "tipo": "articulo",
+    "autor": "Área de gestión del conocimiento — PREDES",
+    "imagen_portada": null,
+    "destacada": true
+  },
+  {
+    "_mock": true,
+    "slug": "taller-municipalidades-uso-plataforma",
+    "titulo": "Talleres de uso de la plataforma con equipos técnicos municipales",
+    "bajada": "Ciclo de sesiones prácticas sobre consulta del visor, generación de ayudas memoria y descarga de tablas para sustento ante autoridades.",
+    "cuerpo": "El observatorio inició un ciclo de talleres dirigido a los equipos técnicos de las municipalidades distritales de la región, orientado al uso práctico de la plataforma.\n\nLas sesiones cubren la consulta del visor de exposición con filtros por peligro y nivel, la lectura del historial de emergencias por distrito y la generación de las ayudas memoria en PDF que sirven de sustento en mesas técnicas y espacios de coordinación.\n\nLos talleres forman parte del componente de fortalecimiento de capacidades del proyecto y continuarán durante el segundo semestre.",
+    "fecha": "2026-04-08",
+    "tipo": "noticia",
+    "autor": "Equipo del Observatorio Kallpachakuy",
+    "imagen_portada": null,
+    "destacada": false
+  },
+  {
+    "_mock": true,
+    "slug": "lectura-directiva-ppr-0068-2025",
+    "titulo": "La directiva del PPR 0068 cambia el peso entre prevención y respuesta",
+    "bajada": "Lectura del instrumento desde la experiencia en comunidades altoandinas: qué habilita, qué deja fuera y cómo aprovecharlo en la formulación distrital.",
+    "cuerpo": "Los lineamientos del Programa Presupuestal 0068 para el ejercicio fiscal ajustan la relación entre las actividades de prevención y las de atención de emergencias. El cambio abre espacio para financiar intervenciones estructurales, pero exige sustentar la priorización con información de exposición.\n\nEn la práctica, eso significa que un distrito necesita poder demostrar dónde están sus centros poblados más expuestos y con qué respaldo documental. Es exactamente el tipo de sustento que el observatorio busca poner al alcance de los equipos municipales.\n\nLa lectura completa del instrumento, junto con el análisis de PREDES, está disponible en la sección de Normativa.",
+    "fecha": "2026-03-03",
+    "tipo": "opinion",
+    "autor": "Área de incidencia — PREDES",
+    "imagen_portada": null,
+    "destacada": false
+  },
+  {
+    "_mock": true,
+    "slug": "capas-glaciares-rios-lagunas",
+    "titulo": "El visor incorpora las capas de glaciares, ríos y lagunas de Cusco",
+    "bajada": "Las tres capas cartográficas nacionales fueron recortadas a la región: 3,164 tramos de río, 2,512 lagunas y 1,155 glaciares.",
+    "cuerpo": "El visor de exposición suma tres capas de contexto territorial que pueden activarse y desactivarse sobre el mapa: la red hidrográfica, los cuerpos de agua y los glaciares de la región.\n\nLas capas provienen de fuentes nacionales y fueron recortadas al ámbito de Cusco para que el visor cargue con agilidad. El mapa también permite alternar entre cuatro fondos, incluido uno topográfico con relieve, especialmente útil para leer quebradas y pendientes al analizar movimientos en masa y huaicos.\n\nLas capas oficiales del especialista SIG de la región reemplazarán a las actuales cuando estén disponibles.",
+    "fecha": "2026-02-17",
+    "tipo": "noticia",
+    "autor": "Equipo del Observatorio Kallpachakuy",
+    "imagen_portada": null,
+    "destacada": false
+  }
+]

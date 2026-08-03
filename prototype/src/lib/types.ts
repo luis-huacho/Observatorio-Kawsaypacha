@@ -120,6 +120,27 @@ export type Prioridades = {
   scores: PrioridadDistrito[];
 };
 
+/** Espejo del modelo `contenidos.Noticia` del spec 01, para que el port a la API no renombre nada. */
+export type Noticia = {
+  _mock?: boolean;
+  slug: string;
+  titulo: string;
+  bajada: string;
+  cuerpo: string;
+  fecha: string;
+  tipo: "noticia" | "articulo" | "opinion";
+  autor: string;
+  /** Sin uso en el prototipo: no hay banco de imágenes. El admin real sí permitirá subirlas. */
+  imagen_portada: string | null;
+  destacada: boolean;
+};
+
+export const TIPOS_NOTICIA: Record<Noticia["tipo"], string> = {
+  noticia: "Noticia",
+  articulo: "Artículo",
+  opinion: "Opinión",
+};
+
 export type Norma = {
   _mock?: boolean;
   id: string;
