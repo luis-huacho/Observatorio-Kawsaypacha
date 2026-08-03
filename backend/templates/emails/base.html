@@ -1,0 +1,29 @@
+{# Marco de los correos del flujo editorial. CSS en línea a propósito: los clientes de correo
+   ignoran las hojas de estilo, y una tabla es lo único que maqueta igual en todos. #}
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<body style="margin:0;padding:0;background:#FAFAF7;font-family:Helvetica,Arial,sans-serif;color:#1F2937">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAFAF7">
+    <tr><td align="center" style="padding:24px 12px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+             style="max-width:560px;background:#FFFFFF;border-radius:10px;overflow:hidden;
+                    border:1px solid #E5E7EB">
+        <tr><td style="background:#0B3B26;padding:16px 20px">
+          <div style="color:#FFFFFF;font-weight:700;font-size:16px">{{ nombre_sitio }}</div>
+          <div style="color:#C9D8CF;font-size:12px;margin-top:2px">
+            PREDES · Gestión del Riesgo de Desastres y Adaptación al Cambio Climático · Cusco
+          </div>
+        </td></tr>
+        <tr><td style="padding:22px 20px">
+          {% block contenido %}{% endblock %}
+        </td></tr>
+        <tr><td style="background:#F3F4F6;padding:14px 20px;font-size:11px;color:#6B7280">
+          Este aviso se envía automáticamente desde el panel de administración del
+          Observatorio. Si no esperabas recibirlo, avisa al administrador de la plataforma.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

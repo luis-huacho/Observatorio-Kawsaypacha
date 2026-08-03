@@ -69,7 +69,9 @@ class WorkflowMixin(models.Model):
         related_name="+",
     )
     nota_revision = models.TextField(
-        blank=True, help_text="Comentario del revisor al devolver el contenido a borrador."
+        "nota de revisión",
+        blank=True,
+        help_text="Comentario del revisor al devolver el contenido a borrador.",
     )
 
     objects = models.Manager()

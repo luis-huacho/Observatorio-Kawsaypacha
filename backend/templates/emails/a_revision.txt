@@ -1,0 +1,8 @@
+«{{ titulo }}» espera revisión
+
+{% if usuario %}{{ usuario.get_full_name|default:usuario.username }} envió{% else %}Se envió{% endif %} {{ tipo }} «{{ titulo }}» a revisión.
+Está pendiente de que alguien con permiso de publicación la revise.
+
+Revisar en el panel: {{ url_admin }}
+
+Mientras esté en revisión no aparece en el sitio público.

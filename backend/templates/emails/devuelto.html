@@ -1,0 +1,27 @@
+{% extends "emails/base.html" %}
+{% block contenido %}
+  <h1 style="margin:0 0 10px;font-size:18px;color:#8A5A00">
+    «{{ titulo }}» fue devuelto a borrador
+  </h1>
+  <p style="margin:0 0 10px;font-size:14px;line-height:1.5">
+    {{ tipo|capfirst }} <strong>«{{ titulo }}»</strong> volvió a borrador
+    {% if usuario %}a pedido de <strong>{{ usuario.get_full_name|default:usuario.username }}</strong>
+    {% endif %}para que se corrija antes de publicarla.
+  </p>
+  {# La nota es el motivo de este correo: sin ella el editor no sabe qué cambiar. #}
+  {% if nota_revision %}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="background:#FFF8E6;border-left:3px solid #EBB320;margin:0 0 6px">
+      <tr><td style="padding:12px 14px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#8A5A00;
+                    font-weight:700;margin-bottom:4px">Observaciones</div>
+        <div style="font-size:14px;line-height:1.5;white-space:pre-line">{{ nota_revision }}</div>
+      </td></tr>
+    </table>
+  {% else %}
+    <p style="margin:0 0 10px;font-size:13px;color:#8A5A00">
+      No se registraron observaciones. Consulta con quien la devolvió antes de rehacerla.
+    </p>
+  {% endif %}
+  {% include "emails/_boton.html" with url=url_admin texto="Corregir en el panel" %}
+{% endblock %}

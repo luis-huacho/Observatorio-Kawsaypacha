@@ -22,7 +22,7 @@ class Norma(TimeStampedMixin, WorkflowMixin):
     slug = models.SlugField(max_length=120, unique=True)
     titulo = models.CharField(max_length=300)
     tipo = models.CharField(max_length=12, choices=Tipo.choices)
-    ambito = models.CharField(max_length=10, choices=Ambito.choices, db_index=True)
+    ambito = models.CharField("ámbito", max_length=10, choices=Ambito.choices, db_index=True)
     fecha = models.DateField(db_index=True)
     resumen = models.TextField(max_length=700)
     contenido = models.TextField(
@@ -42,7 +42,8 @@ class Norma(TimeStampedMixin, WorkflowMixin):
         help_text="PDF alojado por PREDES. Vía preferente; habilita el resumen con IA.",
     )
     analisis_predes = models.TextField(
-        blank=True, null=True, help_text="Nota breve para el listado."
+        "análisis de PREDES", blank=True, null=True,
+        help_text="Nota breve que se muestra en el listado."
     )
     imagen_portada = models.ImageField(
         upload_to="normativa/%Y/%m/",
@@ -50,12 +51,18 @@ class Norma(TimeStampedMixin, WorkflowMixin):
         blank=True,
         help_text="Si lo dejas vacío se usa la ilustración institucional de normativa.",
     )
-    imagen_titulo = models.CharField(max_length=300, blank=True)
-    palabras_clave = ArrayField(models.CharField(max_length=60), default=list, blank=True)
+    imagen_titulo = models.CharField("pie de la imagen", max_length=300, blank=True)
+    palabras_clave = ArrayField(
+        models.CharField(max_length=60),
+        verbose_name="palabras clave",
+        default=list,
+        blank=True,
+    )
 
     # [+] futuro
     numero = models.CharField(max_length=80, blank=True, help_text='P. ej. "DS 048-2011-PCM".')
     estado_vigencia = models.CharField(
+        "estado de vigencia",
         max_length=12,
         blank=True,
         choices=[("vigente", "Vigente"), ("derogada", "Derogada"), ("modificada", "Modificada")],

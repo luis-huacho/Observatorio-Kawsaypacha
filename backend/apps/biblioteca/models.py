@@ -31,15 +31,16 @@ class Documento(TimeStampedMixin, WorkflowMixin):
         CategoriaDocumento, on_delete=models.PROTECT, related_name="documentos"
     )
     archivo = models.FileField(upload_to="biblioteca/%Y/%m/", null=True, blank=True)
-    url_externa = models.URLField(blank=True, null=True)
+    url_externa = models.URLField("enlace externo", blank=True, null=True)
     resumen = models.TextField(blank=True)
-    resumen_generado_por_ia = models.BooleanField(default=False)
-    autor_institucion = models.CharField(max_length=200, blank=True)
-    fecha_publicacion = models.DateField(null=True, blank=True)
+    resumen_generado_por_ia = models.BooleanField("resumen generado por IA", default=False)
+    autor_institucion = models.CharField("autor o institución", max_length=200, blank=True)
+    fecha_publicacion = models.DateField("fecha de publicación", null=True, blank=True)
     ia_estado = models.CharField(
-        max_length=12, choices=EstadoIA.choices, default=EstadoIA.PENDIENTE
+        "estado de la IA", max_length=12, choices=EstadoIA.choices,
+        default=EstadoIA.PENDIENTE,
     )
-    log_ia = models.TextField(blank=True)
+    log_ia = models.TextField("registro de la IA", blank=True)
 
     # [+] futuro
     portada = models.ImageField(upload_to="biblioteca/portadas/", null=True, blank=True)

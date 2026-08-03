@@ -1,0 +1,116 @@
+{% extends "unfold/layouts/base_simple.html" %}
+{# Sustituye la portada del admin. Unfold rellena el contexto con DASHBOARD_CALLBACK; el
+   template a usar se elige overrideando admin/index.html, no desde el callback. #}
+{% load i18n informes %}
+
+{% block title %}Panel | Observatorio Kallpachakuy{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="font-semibold text-xl text-font-important-light dark:text-font-important-dark">
+    Panel del Observatorio Kallpachakuy
+  </h1>
+  <p class="text-sm text-font-subtle-light dark:text-font-subtle-dark mt-1">
+    Uso del sitio en los últimos 30 días y estado del contenido y de los datos.
+  </p>
+</div>
+
+{% if pendientes_revision %}
+  <div class="mb-6 rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-3">
+    <strong class="text-sm">{{ pendientes_revision }} contenido(s) esperando revisión.</strong>
+    <span class="text-sm">Mientras estén en revisión no aparecen en el sitio público.</span>
+  </div>
+{% endif %}
+
+{% for capa in capas_con_error %}
+  <div class="mb-3 rounded-lg border border-red-300 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm">
+    La capa <strong>{{ capa.nombre }}</strong> falló al generar sus tiles y no se está mostrando
+    en el visor. <a class="underline" href="{% url 'admin:mapas_capacartografica_change' capa.pk %}">Ver el error</a>.
+  </div>
+{% endfor %}
+
+{# --- Cifras de uso --- #}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+  {% for etiqueta, valor in cifras %}
+    <div class="rounded-lg border border-base-200 dark:border-base-800 p-4">
+      <div class="text-xs uppercase tracking-wide text-font-subtle-light dark:text-font-subtle-dark">
+        {{ etiqueta }}
+      </div>
+      <div class="text-2xl font-semibold mt-1">{{ valor|miles }}</div>
+    </div>
+  {% endfor %}
+</div>
+
+{% if sin_metricas %}
+  <p class="mb-8 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+    Todavía no hay métricas agregadas. Se consolidan cada noche; las cifras de hoy aparecerán
+    mañana.
+  </p>
+{% endif %}
+
+{# --- Tablas --- #}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+  {% for tabla in tablas %}
+    <div class="rounded-lg border border-base-200 dark:border-base-800 overflow-hidden">
+      <div class="px-4 py-3 border-b border-base-200 dark:border-base-800 font-semibold text-sm">
+        {{ tabla.titulo }}
+      </div>
+      <table class="w-full text-sm">
+        {% for fila in tabla.filas %}
+          <tr class="border-b border-base-100 dark:border-base-900 last:border-0">
+            <td class="px-4 py-2 truncate">{{ fila.etiqueta|default:"—" }}</td>
+            <td class="px-4 py-2 text-right font-medium">{{ fila.conteo|miles }}</td>
+          </tr>
+        {% empty %}
+          <tr><td class="px-4 py-3 text-font-subtle-light dark:text-font-subtle-dark">
+            Sin datos todavía.
+          </td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  {% endfor %}
+</div>
+
+{# --- Contenido por estado --- #}
+<div class="rounded-lg border border-base-200 dark:border-base-800 overflow-hidden mb-8">
+  <div class="px-4 py-3 border-b border-base-200 dark:border-base-800 font-semibold text-sm">
+    Contenido por estado
+  </div>
+  <table class="w-full text-sm">
+    <thead class="text-xs uppercase text-font-subtle-light dark:text-font-subtle-dark">
+      <tr>
+        <th class="px-4 py-2 text-left font-medium">Tipo</th>
+        <th class="px-4 py-2 text-right font-medium">Borrador</th>
+        <th class="px-4 py-2 text-right font-medium">En revisión</th>
+        <th class="px-4 py-2 text-right font-medium">Publicado</th>
+        <th class="px-4 py-2 text-right font-medium">Archivado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in contenido %}
+        <tr class="border-t border-base-100 dark:border-base-900">
+          <td class="px-4 py-2">{{ c.nombre }}</td>
+          <td class="px-4 py-2 text-right">{{ c.borrador }}</td>
+          <td class="px-4 py-2 text-right {% if c.revision %}font-semibold text-yellow-700{% endif %}">
+            {{ c.revision }}
+          </td>
+          <td class="px-4 py-2 text-right">{{ c.publicado }}</td>
+          <td class="px-4 py-2 text-right">{{ c.archivado }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# --- Estado de los datos --- #}
+<div class="rounded-lg border border-base-200 dark:border-base-800 px-4 py-3 text-sm">
+  <span class="font-semibold">Datos de exposición.</span>
+  {{ datos.ccpp|miles }} centros poblados y {{ datos.clasificaciones|miles }} clasificaciones.
+  {% if datos.ultima_carga %}
+    Última carga: {{ datos.ultima_carga.get_tipo_display }},
+    {{ datos.ultima_carga.activado_en|date:"j \d\e F \d\e Y, H:i" }} h.
+  {% else %}
+    <span class="text-yellow-700">Todavía no se ha activado ninguna carga de datos.</span>
+  {% endif %}
+</div>
+{% endblock %}

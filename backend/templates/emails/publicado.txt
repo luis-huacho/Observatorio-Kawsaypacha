@@ -1,0 +1,6 @@
+«{{ titulo }}» ya está publicado
+
+{{ tipo|capfirst }} «{{ titulo }}» fue publicada{% if usuario %} por {{ usuario.get_full_name|default:usuario.username }}{% endif %} y ya es visible en el sitio público.
+
+Ver el sitio: {{ url_sitio }}
+Abrir en el panel: {{ url_admin }}

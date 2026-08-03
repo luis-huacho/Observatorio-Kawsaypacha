@@ -27,7 +27,7 @@ class CapaCartografica(TimeStampedMixin):
         help_text="Nombre de la capa dentro del tile y del archivo .pmtiles (rios, lagunas…).",
     )
     nombre = models.CharField(max_length=120)
-    descripcion = models.TextField(blank=True)
+    descripcion = models.TextField("descripción", blank=True)
     archivo_geojson = models.FileField(upload_to="capas/%Y/%m/")
     tipo_geometria = models.CharField(
         max_length=10, choices=Geometria.choices, blank=True, editable=False
@@ -50,9 +50,10 @@ class CapaCartografica(TimeStampedMixin):
     )
     visible_por_defecto = models.BooleanField(default=False)
     orden = models.PositiveSmallIntegerField(default=0)
-    atribucion = models.CharField(max_length=250, blank=True)
+    atribucion = models.CharField("atribución", max_length=250, blank=True)
     fuente = models.CharField(max_length=200, blank=True)
     simplificacion = models.FloatField(
+        "simplificación",
         null=True, blank=True, help_text="Tolerancia de -simplify de ogr2ogr, en grados."
     )
 

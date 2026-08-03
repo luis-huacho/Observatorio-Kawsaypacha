@@ -1,0 +1,14 @@
+{% extends "emails/base.html" %}
+{% block contenido %}
+  <h1 style="margin:0 0 10px;font-size:18px;color:#0B3B26">«{{ titulo }}» espera revisión</h1>
+  <p style="margin:0 0 10px;font-size:14px;line-height:1.5">
+    {% if usuario %}<strong>{{ usuario.get_full_name|default:usuario.username }}</strong> envió
+    {% else %}Se envió {% endif %}
+    {{ tipo }} <strong>«{{ titulo }}»</strong> a revisión. Está pendiente de que alguien con
+    permiso de publicación la revise y decida si se publica o se devuelve con observaciones.
+  </p>
+  {% include "emails/_boton.html" with url=url_admin texto="Revisar en el panel" %}
+  <p style="margin:0;font-size:12px;color:#6B7280">
+    Mientras esté en revisión no aparece en el sitio público.
+  </p>
+{% endblock %}

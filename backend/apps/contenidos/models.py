@@ -25,8 +25,13 @@ class Noticia(TimeStampedMixin, WorkflowMixin):
         blank=True,
         help_text="Si lo dejas vacío se usa la ilustración institucional del tipo de contenido.",
     )
-    imagen_titulo = models.CharField(max_length=300, blank=True)
-    palabras_clave = ArrayField(models.CharField(max_length=60), default=list, blank=True)
+    imagen_titulo = models.CharField("pie de la imagen", max_length=300, blank=True)
+    palabras_clave = ArrayField(
+        models.CharField(max_length=60),
+        verbose_name="palabras clave",
+        default=list,
+        blank=True,
+    )
     destacada = models.BooleanField(default=False, help_text="Aparece en la portada.")
 
     class Meta:
@@ -45,7 +50,7 @@ class Noticia(TimeStampedMixin, WorkflowMixin):
 
 class Video(TimeStampedMixin, WorkflowMixin):
     titulo = models.CharField(max_length=250)
-    descripcion = models.TextField(blank=True)
+    descripcion = models.TextField("descripción", blank=True)
     url = models.URLField(help_text="Enlace de YouTube o Vimeo.")
     fecha = models.DateField(db_index=True)
     tema = models.ForeignKey(

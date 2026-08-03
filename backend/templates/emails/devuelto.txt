@@ -1,0 +1,8 @@
+«{{ titulo }}» fue devuelto a borrador
+
+{{ tipo|capfirst }} «{{ titulo }}» volvió a borrador{% if usuario %} a pedido de {{ usuario.get_full_name|default:usuario.username }}{% endif %} para que se corrija antes de publicarla.
+
+{% if nota_revision %}Observaciones:
+{{ nota_revision }}{% else %}No se registraron observaciones. Consulta con quien la devolvió antes de rehacerla.{% endif %}
+
+Corregir en el panel: {{ url_admin }}

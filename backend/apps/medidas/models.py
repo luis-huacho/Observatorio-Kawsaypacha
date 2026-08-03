@@ -23,7 +23,7 @@ class Medida(TimeStampedMixin, WorkflowMixin):
     tipo_peligro = models.ForeignKey(
         "peligros.TipoPeligro", on_delete=models.PROTECT, related_name="medidas"
     )
-    ambito = models.CharField(max_length=12, choices=Ambito.choices)
+    ambito = models.CharField("ámbito", max_length=12, choices=Ambito.choices)
     resultado = models.CharField(max_length=16, choices=Resultado.choices, db_index=True)
     distrito = models.ForeignKey(
         "territorio.Distrito",
@@ -33,11 +33,11 @@ class Medida(TimeStampedMixin, WorkflowMixin):
         related_name="medidas",
     )
     comunidad = models.CharField(max_length=150, blank=True)
-    resumen_corto = models.TextField(max_length=500)
+    resumen_corto = models.TextField("resumen corto", max_length=500)
     contenido = models.TextField(
         blank=True, help_text="HTML de CKEditor 5. Se sanea al guardar (ADR-D2)."
     )
-    video_url = models.URLField(blank=True, null=True)
+    video_url = models.URLField("URL del video", blank=True, null=True)
     imagen_portada = models.ImageField(
         upload_to="medidas/%Y/%m/",
         null=True,
@@ -45,9 +45,15 @@ class Medida(TimeStampedMixin, WorkflowMixin):
         help_text="Si lo dejas vacío se usa la ilustración institucional del peligro.",
     )
     imagen_titulo = models.CharField(
-        max_length=300, blank=True, help_text="Pie de la imagen de portada."
+        "pie de la imagen", max_length=300, blank=True,
+        help_text="Se muestra debajo de la portada."
     )
-    palabras_clave = ArrayField(models.CharField(max_length=60), default=list, blank=True)
+    palabras_clave = ArrayField(
+        models.CharField(max_length=60),
+        verbose_name="palabras clave",
+        default=list,
+        blank=True,
+    )
     enlaces = models.JSONField(
         default=list, blank=True, help_text='Lista de {"titulo": …, "url": …}.'
     )

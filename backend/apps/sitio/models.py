@@ -8,10 +8,10 @@ class ConfiguracionSitio(TimeStampedMixin):
     """Singleton con la marca y los datos de contacto. Se edita, no se crea."""
 
     nombre_sitio = models.CharField(max_length=150, default="Observatorio Kallpachakuy")
-    descripcion_footer = models.TextField(blank=True)
-    email_contacto = models.EmailField(blank=True)
+    descripcion_footer = models.TextField("descripción del pie", blank=True)
+    email_contacto = models.EmailField("correo de contacto", blank=True)
     telefono = models.CharField(max_length=60, blank=True)
-    direccion = models.CharField(max_length=250, blank=True)
+    direccion = models.CharField("dirección", max_length=250, blank=True)
     redes = models.JSONField(
         default=dict, blank=True, help_text='P. ej. {"facebook": "https://…"}.'
     )
@@ -72,7 +72,7 @@ class BloqueTexto(TimeStampedMixin):
 
 class HeroSlide(TimeStampedMixin, WorkflowMixin):
     titulo = models.CharField(max_length=200)
-    subtitulo = models.CharField(max_length=300, blank=True)
+    subtitulo = models.CharField("subtítulo", max_length=300, blank=True)
     imagen = models.ImageField(upload_to="hero/", null=True, blank=True)
     cta_texto = models.CharField("texto del botón", max_length=80, blank=True)
     cta_url = models.CharField("destino del botón", max_length=200, blank=True)

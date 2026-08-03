@@ -32,12 +32,13 @@ class TipoPeligro(TimeStampedMixin):
         "hoja → peligro; difiere del nombre en Lluvias e Incendios Forestales.",
     )
     categoria_geo = models.CharField(
+        "categoría geodinámica",
         max_length=100,
         blank=True,
         help_text="El TIP_PELIG de la fuente (Geodinamica interna/externa, Metereologicas).",
     )
     orden = models.PositiveSmallIntegerField(default=0)
-    descripcion = models.TextField(blank=True)  # [+] futuro
+    descripcion = models.TextField("descripción", blank=True)  # [+] futuro
     icono = models.CharField(max_length=50, blank=True)  # [+] futuro
     color = models.CharField(max_length=7, blank=True)  # [+] futuro (hex)
 

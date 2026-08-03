@@ -6,6 +6,7 @@ variables de entorno / backend/.env (django-environ). Ver .env.example.
 from pathlib import Path
 
 import environ
+from django.urls import reverse_lazy
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -25,6 +26,10 @@ SITE_URL = env("SITE_URL", default="http://localhost:5173")
 # media y tiles: la SPA vive en otro origen y una ruta relativa apuntaría al sitio público.
 BACKEND_URL = env("BACKEND_URL", default="http://localhost:8000")
 ADMIN_URL = env("ADMIN_URL", default="admin/")
+# Sin esto, entrar al admin sin `?next=` aterriza en /accounts/profile/, que no existe: el
+# editor ve un 404 justo después de escribir bien su contraseña.
+LOGIN_REDIRECT_URL = f"/{ADMIN_URL}"
+LOGIN_URL = f"/{ADMIN_URL}login/"
 
 INSTALLED_APPS = [
     # Theme del admin: debe ir antes de django.contrib.admin.
@@ -164,6 +169,106 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:4173"],
 )
 CORS_ALLOW_CREDENTIALS = False
+
+# --- Admin (django-unfold, ADR-A8) -----------------------------------------
+# El sidebar reproduce los seis grupos del spec 03. El orden no es alfabético: es el orden en
+# que PREDES trabaja — primero lo que revisa a diario (contenido), luego los datos, y al final
+# la configuración, que se toca una vez.
+UNFOLD = {
+    "SITE_TITLE": "Observatorio Kallpachakuy",
+    "SITE_HEADER": "Observatorio Kallpachakuy",
+    "SITE_SUBHEADER": "PREDES · GRD y ACC · Región Cusco",
+    "SITE_URL": SITE_URL,
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": False,
+    "DASHBOARD_CALLBACK": "apps.core.dashboard.datos_panel",
+    "LOGIN": {"image": lambda request: None},
+    "COLORS": {
+        # Verde institucional de predes.org.pe. Unfold espera los canales RGB sueltos.
+        "primary": {
+            "50": "229 244 238", "100": "229 244 238", "200": "199 230 214",
+            "300": "150 209 181", "400": "91 187 93", "500": "0 146 87",
+            "600": "27 127 79", "700": "20 101 74", "800": "11 59 38",
+            "900": "11 59 38", "950": "6 36 23",
+        },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "navigation": [
+            {
+                "title": "Panel",
+                "items": [
+                    {"title": "Inicio", "icon": "dashboard",
+                     "link": lambda r: reverse_lazy("admin:index")},
+                ],
+            },
+            {
+                "title": "Contenido",
+                "items": [
+                    {"title": "Medidas", "icon": "eco",
+                     "link": lambda r: reverse_lazy("admin:medidas_medida_changelist")},
+                    {"title": "Normativa", "icon": "gavel",
+                     "link": lambda r: reverse_lazy("admin:normativa_norma_changelist")},
+                    {"title": "Noticias", "icon": "feed",
+                     "link": lambda r: reverse_lazy("admin:contenidos_noticia_changelist")},
+                    {"title": "Videos", "icon": "play_circle",
+                     "link": lambda r: reverse_lazy("admin:contenidos_video_changelist")},
+                    {"title": "Eventos", "icon": "event",
+                     "link": lambda r: reverse_lazy("admin:contenidos_evento_changelist")},
+                    {"title": "Biblioteca", "icon": "library_books",
+                     "link": lambda r: reverse_lazy("admin:biblioteca_documento_changelist")},
+                ],
+            },
+            {
+                "title": "Datos",
+                "items": [
+                    {"title": "Cargas de datos", "icon": "upload_file",
+                     "link": lambda r: reverse_lazy("admin:datasets_datasetupload_changelist")},
+                    {"title": "Centros poblados", "icon": "location_city",
+                     "link": lambda r: reverse_lazy("admin:territorio_centropoblado_changelist")},
+                    {"title": "Clasificaciones", "icon": "warning",
+                     "link": lambda r: reverse_lazy(
+                         "admin:peligros_clasificacionpeligro_changelist")},
+                    {"title": "Emergencias", "icon": "crisis_alert",
+                     "link": lambda r: reverse_lazy(
+                         "admin:peligros_frecuenciaemergencia_changelist")},
+                ],
+            },
+            {
+                "title": "Mapa",
+                "items": [
+                    {"title": "Capas cartográficas", "icon": "layers",
+                     "link": lambda r: reverse_lazy("admin:mapas_capacartografica_changelist")},
+                ],
+            },
+            {
+                "title": "Sitio",
+                "items": [
+                    {"title": "Configuración", "icon": "settings",
+                     "link": lambda r: reverse_lazy(
+                         "admin:sitio_configuracionsitio_changelist")},
+                    {"title": "Textos", "icon": "text_fields",
+                     "link": lambda r: reverse_lazy("admin:sitio_bloquetexto_changelist")},
+                    {"title": "Hero de portada", "icon": "wallpaper",
+                     "link": lambda r: reverse_lazy("admin:sitio_heroslide_changelist")},
+                    {"title": "Menú", "icon": "menu",
+                     "link": lambda r: reverse_lazy("admin:sitio_enlacemenu_changelist")},
+                ],
+            },
+            {
+                "title": "Uso y usuarios",
+                "items": [
+                    {"title": "Resumen diario", "icon": "insights",
+                     "link": lambda r: reverse_lazy("admin:metricas_resumendiario_changelist")},
+                    {"title": "Usuarios", "icon": "person",
+                     "link": lambda r: reverse_lazy("admin:auth_user_changelist")},
+                    {"title": "Grupos", "icon": "group",
+                     "link": lambda r: reverse_lazy("admin:auth_group_changelist")},
+                ],
+            },
+        ],
+    },
+}
 
 # --- CKEditor 5 (ADR-D2) ---------------------------------------------------
 # Barra corta a propósito: cuanto menos HTML raro se pueda generar, menos hay que sanear
