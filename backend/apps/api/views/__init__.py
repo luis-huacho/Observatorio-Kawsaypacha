@@ -4,6 +4,7 @@ Se parte en módulos y no en un único `views.py` porque son ~25 endpoints de cu
 tocan por separado: peligros (los datos reales), editorial (lo que administra PREDES), sitio
 (el cascarón y las métricas) e incidencia (los productos para mesas técnicas).
 """
+from .busqueda import BusquedaView, EstadoBusquedaView
 from .editorial import (
     CategoriaDocumentoListaView,
     DocumentoViewSet,
@@ -31,6 +32,7 @@ from .sitio import CapasMapaView, InversionView, MetricaEventoView, SitioView
 
 __all__ = [
     "AyudaMemoriaView",
+    "BusquedaView",
     "CapasMapaView",
     "CategoriaDocumentoListaView",
     "CentroPobladoExportView",
@@ -39,6 +41,7 @@ __all__ = [
     "ComparadorView",
     "DistritoViewSet",
     "DocumentoViewSet",
+    "EstadoBusquedaView",
     "EventoListaView",
     "FrecuenciaDetalleView",
     "FrecuenciaExportView",

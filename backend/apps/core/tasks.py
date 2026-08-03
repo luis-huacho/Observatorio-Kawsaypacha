@@ -175,10 +175,35 @@ def generar_resumen_ia(modelo: str, pk) -> None:
 
 @task()
 def reindexar_meili(indice: str = "") -> None:
-    """Reconstruye uno o todos los índices de búsqueda. Ver spec 04."""
-    from django.core.management import call_command
+    """Reconstruye uno o todos los índices de búsqueda (spec 04)."""
+    from apps.core.services import meili
 
-    call_command("meili_rebuild", indice) if indice else call_command("meili_rebuild")
+    if not meili.disponible():
+        logger.warning("Meilisearch no responde: se omite la reindexación de «%s».", indice or "todos")
+        return
+    for slug in ([indice] if indice else list(meili.INDICES)):
+        total = meili.reconstruir(slug)
+        logger.info("Índice «%s» reconstruido con %s documentos.", slug, total)
+
+
+@task()
+def sincronizar_meili(indice: str, pk: str) -> None:
+    """Indexa o borra un documento tras un guardado o un borrado.
+
+    Un Meilisearch caído no puede hacer fallar la tarea de forma ruidosa: el contenido ya está
+    guardado, la búsqueda es una función degradable, y `meili_rebuild` recupera el índice.
+    """
+    from apps.core.services import meili
+
+    if not meili.disponible():
+        logger.info("Meilisearch no responde: «%s» %s se sincronizará en el próximo rebuild.",
+                    indice, pk)
+        return
+    try:
+        resultado = meili.sincronizar(indice, pk)
+        logger.debug("Meili «%s» %s: %s", indice, pk, resultado)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudo sincronizar «%s» %s: %s", indice, pk, exc)
 
 
 @task()

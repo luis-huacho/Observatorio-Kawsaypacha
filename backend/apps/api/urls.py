@@ -53,6 +53,9 @@ urlpatterns = [
         views.AyudaMemoriaView.as_view(),
         name="ayuda-memoria",
     ),
+    # --- Búsqueda (fallback de Meilisearch; ver 04) --------------------------
+    path("buscar/", views.BusquedaView.as_view(), name="buscar"),
+    path("buscar/estado/", views.EstadoBusquedaView.as_view(), name="buscar-estado"),
     # --- Sitio, mapas, métricas e inversión ---------------------------------
     path("sitio/", views.SitioView.as_view(), name="sitio"),
     path("mapas/capas/", views.CapasMapaView.as_view(), name="mapas-capas"),

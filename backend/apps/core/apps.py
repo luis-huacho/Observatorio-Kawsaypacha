@@ -14,3 +14,9 @@ class CoreConfig(AppConfig):
         admin.site.site_header = "Observatorio Kallpachakuy"
         admin.site.site_title = "Observatorio Kallpachakuy"
         admin.site.index_title = "Panel de administración"
+
+        # Señales de sincronización de la búsqueda. Se conectan en `ready()` porque necesitan
+        # que el registro de modelos esté completo.
+        from apps.core import signals
+
+        signals.conectar()
