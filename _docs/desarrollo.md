@@ -135,12 +135,12 @@ hasta que la añadas.
 ## Pruebas
 
 ```bash
-dc exec backend pytest                 # 112 pruebas, ~35 s (sin las lentas)
+dc exec backend pytest                 # 113 pruebas, ~30 s (sin las lentas)
 dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
 npm install && npx playwright install chromium   # una sola vez, en la raíz
-npx playwright test                    # 47 E2E en escritorio y móvil
+npx playwright test                    # 50 E2E en escritorio y móvil
 ```
 
 `pytest` vive **dentro del contenedor**, para correr con las mismas versiones de GDAL, tippecanoe
@@ -185,6 +185,11 @@ encontró, está en `_specs/08-plan-pruebas.md`.
   fácil: `GET /search/health` devolvía 200 **porque la raíz de Meilisearch también devuelve 200**.
 - **El HTML rico se sanea en `save()` del modelo** (`HtmlRicoMixin.campos_html`), no en el admin.
   Si añades un campo de CKEditor, declárarlo ahí: `campos_rich` del admin solo elige el widget.
+- **El menú vive en tres sitios.** Ocultar o añadir una entrada exige tocar la semilla
+  (`apps/sitio/semillas/sitio.yaml`), **la base ya sembrada** —el seed no pisa lo que existe, así que
+  un cambio de visibilidad necesita migración de datos, como `sitio.0002`— y el menú de respaldo de
+  `frontend/src/lib/sitio.tsx`, que es el que se pinta mientras carga `/api/sitio/` y cuando el API
+  no responde. Cambiar solo uno «funciona» en la máquina de quien lo cambió y no en la siguiente.
 
 ## Estructura
 

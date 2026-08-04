@@ -171,7 +171,9 @@ cliente no tiene que decidir nada ni llevar un catálogo de imágenes por defect
 
 **`GET /api/comparador/distritos/?ubigeos=080101,080301`** — **entre 2 y 4** distritos lado a lado
 con sus cifras de peligro y emergencias; fuera de ese rango responde `400`. Trae
-`inversion_disponible: false` mientras esa sección siga diferida (ver abajo).
+`inversion_disponible: false` mientras esa sección siga diferida (ver abajo). Sigue publicado y
+soportado aunque **su página ya no se anuncie en el menú del sitio** (ADR-P2): `/comparar` responde
+por URL directa y el enlace se recupera desde el admin.
 
 **`GET /api/distritos/{ubigeo}/ayuda-memoria.pdf`** — la ayuda memoria de dos caras, generada en
 el servidor con su mapa. Tarda unos segundos porque captura el mapa con un navegador headless. Si

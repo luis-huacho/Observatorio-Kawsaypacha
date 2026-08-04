@@ -41,7 +41,9 @@
 
 > **ADR-P1 — Prioridades desactivada.** El TDR menciona "cinco ventanas temáticas". En **reunión de trabajo** se decidió desactivar "Prioridades" para este proyecto porque no se dispondrá de la información dentro del plazo. El código del prototipo se conserva pero **sin ruta registrada** y fuera del menú (menú controlado por datos: `EnlaceMenu.visible=False`). No reactivar sin pedido explícito.
 
-Complementan a las ventanas: portada (hero administrable), buscador global, noticias, videos, eventos, biblioteca/recursos, comparador de distritos, sección Sobre.
+> **ADR-P2 — El comparador de distritos sale de la navegación.** `/comparar` deja de ofrecerse en el menú principal y en el pie. **No se retira nada más**: la ruta del SPA sigue registrada y responde por URL directa, `GET /api/comparador/distritos/` sigue publicado y probado, y el enlace de menú se conserva con `EnlaceMenu.visible=False`, así que volver a mostrarlo es marcar una casilla en el admin. Es un grado más suave que ADR-P1, donde la ruta ni existe. Hizo falta además una migración de datos (`sitio.0002`), porque el seed crea lo que falta y no toca lo que ya existe: sin ella las bases ya sembradas seguirían sirviendo el enlace. Decisión del dueño del proyecto.
+
+Complementan a las ventanas: portada (hero administrable), buscador global, noticias, videos, eventos, biblioteca/recursos, comparador de distritos (accesible por URL, fuera del menú — ADR-P2), sección Sobre.
 
 ## ADRs de arquitectura
 

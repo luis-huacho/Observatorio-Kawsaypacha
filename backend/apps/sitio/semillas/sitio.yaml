@@ -19,7 +19,10 @@ menu:
   - {zona: header, texto: Medidas, url: /medidas, orden: 2}
   - {zona: header, texto: Inversión, url: /inversion, orden: 3}
   - {zona: header, texto: Normativa, url: /normativa, orden: 4}
-  - {zona: header, texto: Comparar distritos, url: /comparar, orden: 5}
+  # El comparador sale de la navegación (ADR-P2): la ruta del SPA y `/api/comparador/distritos/`
+  # siguen vivos y se llega por URL, pero no se anuncia. Se oculta, no se borra: volver a mostrarlo
+  # es marcar la casilla «visible» en el admin.
+  - {zona: header, texto: Comparar distritos, url: /comparar, orden: 5, visible: false}
   - {zona: header, texto: Sobre, url: /sobre, orden: 6}
   # Prioridades existe con visible=false y NO se borra (ADR-P1): la decisión fue desactivar la
   # ventana para este proyecto, no descartarla.
@@ -28,7 +31,7 @@ menu:
   - {zona: footer, grupo: Secciones, texto: Exposición a peligros, url: /peligros, orden: 1}
   - {zona: footer, grupo: Secciones, texto: Medidas, url: /medidas, orden: 2}
   - {zona: footer, grupo: Secciones, texto: Inversión, url: /inversion, orden: 3}
-  - {zona: footer, grupo: Secciones, texto: Comparar distritos, url: /comparar, orden: 4}
+  - {zona: footer, grupo: Secciones, texto: Comparar distritos, url: /comparar, orden: 4, visible: false}
   - {zona: footer, grupo: Más, texto: Normativa, url: /normativa, orden: 5}
   # Noticias no va en el menú principal (decisión del dueño del proyecto): se llega desde el
   # bloque de actualidad de la portada y desde esta columna, que es su acceso permanente.

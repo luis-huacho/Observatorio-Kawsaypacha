@@ -51,8 +51,8 @@ export default function Header() {
       </div>
 
       <div className="bg-mountain-700 text-white">
-        <div className="container-page flex items-center gap-6 h-16">
-          <Link to="/" className="flex items-center gap-3 text-white no-underline">
+        <div className="container-page flex items-center gap-4 xl:gap-6 h-16">
+          <Link to="/" className="flex items-center gap-3 shrink-0 text-white no-underline">
             <img src="/logo-predes-white.svg" alt="PREDES" className="h-8 w-auto" />
             <span className="font-display text-lg font-bold leading-none border-l border-white/30 pl-3">
               Kallpachakuy
@@ -62,13 +62,17 @@ export default function Header() {
             </span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-1 ml-2">
+          {/* En escritorio el menú va en **una sola línea**: `whitespace-nowrap` para que ningún
+              enlace parta su texto en dos, y `shrink-0` aquí (con `min-w-0` en el buscador) para
+              que cuando falte sitio ceda el campo de búsqueda y no el menú. Por debajo de `xl` se
+              recorta el espaciado, que es lo que falta a 1024 px. */}
+          <nav aria-label="Principal" className="hidden lg:flex items-center gap-0.5 xl:gap-1 ml-1 xl:ml-2 shrink-0">
             {nav.map((item) => (
               <NavLink
                 key={item.url}
                 to={item.url}
                 className={({ isActive }) =>
-                  `px-3 py-2 rounded-md text-sm font-medium no-underline transition ${
+                  `px-2.5 xl:px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap no-underline transition ${
                     isActive
                       ? "text-white bg-white/15 font-semibold"
                       : "text-white/85 hover:text-white hover:bg-white/10"
@@ -80,16 +84,18 @@ export default function Header() {
             ))}
           </nav>
 
+          {/* El buscador es el que cede el espacio: `min-w-0` aquí y en el input —un `<input>` trae
+              ancho mínimo intrínseco y sin eso no bajaría de `w-56`, comprimiendo el menú. */}
           <form
             onSubmit={onSubmit}
-            className="hidden md:flex items-center ml-auto bg-white/95 rounded-lg border border-white/30 px-3 py-1.5 focus-within:border-white transition"
+            className="hidden md:flex items-center ml-auto min-w-0 bg-white/95 rounded-lg border border-white/30 px-3 py-1.5 focus-within:border-white transition"
           >
-            <Search className="w-4 h-4 text-ink-600" />
+            <Search className="w-4 h-4 shrink-0 text-ink-600" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar distrito, peligro, medida…"
-              className="bg-transparent border-0 outline-none text-sm ml-2 w-56 text-ink-900"
+              className="bg-transparent border-0 outline-none text-sm ml-2 w-40 xl:w-56 min-w-0 text-ink-900"
               aria-label="Buscar"
             />
           </form>

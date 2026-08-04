@@ -15,7 +15,7 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (112 pruebas, ~35 s)
+$DC exec backend pytest                 # suite backend (113 pruebas, ~30 s)
 $DC exec backend pytest -m lento        # los Excel completos y el PDF con mapa (~35 s más)
 cd frontend && npm run lint && npm run build    # tipos + build
 npx playwright test                             # E2E contra el stack levantado
@@ -101,7 +101,7 @@ Un módulo por familia. El criterio es el **contrato del spec 02**, no la implem
 ### `test_seed.py`
 
 - Idempotencia: `seed` corre en **cada despliegue**, así que no puede pisar los textos que PREDES haya editado. El catálogo de peligros es la excepción deliberada —es código, no contenido— y sí se restaura.
-- Grupos con sus permisos y con los nombres exactos de `core.grupos`; Prioridades oculta y no borrada.
+- Grupos con sus permisos y con los nombres exactos de `core.grupos`; Prioridades oculta y no borrada, y el comparador sembrado fuera del menú (ADR-P2) con sus dos enlaces intactos.
 - Conteos canónicos tras `manage.py seed` sobre los Excel reales (marcado `lento`): **13 provincias · 112 distritos · 8,968 CCPP · 3,238 clasificados · 5,730 sin dato · 10,978 clasificaciones · 644 frecuencias en 64 distritos · 104 totales declarados en 26 distritos**. Si un refactor del importador pierde filas, esta prueba es la que lo dice.
 - Las anomalías conocidas siguen reportándose (229 sin nivel, 2 sin código, ACOMAYO sin fila, 21 con fila vacía, 90 con datos). **Las advertencias son un entregable**: son lo que PREDES le lleva a la fuente de los datos, así que silenciarlas es perder trabajo del cliente, no mejorar el importador.
 
@@ -114,7 +114,7 @@ Un módulo por familia. El criterio es el **contrato del spec 02**, no la implem
 
 ## Casos obligatorios — E2E (Playwright)
 
-Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. 47 pruebas, ~1 min.
+Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. 50 pruebas, ~1 min.
 
 | Spec | Comprueba |
 |---|---|
@@ -123,12 +123,15 @@ Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** 
 | `buscar.spec.ts` | Una búsqueda devuelve resultados agrupados · **cuando Meilisearch está disponible se usa Meilisearch** · con él inalcanzable el fallback de DRF responde igual · una consulta sin resultados lo dice y ofrece a dónde ir |
 | `medidas.spec.ts` | El listado sale del API y cada tarjeta tiene imagen (el default lo resuelve el servidor) · el filtro manda el **slug** al API y recorta · la ficha abre con su contenido · una medida inexistente no deja la página en blanco · los chips de tema llevan al listado recortado |
 | `inversion.spec.ts` | Se muestra el estado vacío «información en preparación», **no un cero ni un gráfico en blanco** · la sección sigue anunciada en el menú (diferida no es oculta) |
+| `header.spec.ts` | «Comparar distritos» no se ofrece en la navegación (ADR-P2), y el resto del menú sí sigue ahí · en escritorio el menú **cabe en una línea** a 1024, 1280 y 1440 px, sin que la página desborde a lo ancho |
 
 Tres convenciones que la suite impone desde `e2e/apoyo.ts` y `e2e/fixtures.ts`:
 
 1. **Se vigila la consola.** Un error de JavaScript no rompe la página de forma visible —React sigue pintando lo que puede—, así que sin esto se puede dar por bueno un visor que perdió su capa de puntos.
 2. **El beacon de métricas se descarta.** El tráfico de las pruebas no es uso real y no debe acabar en el panel del admin.
 3. **Los enlaces del menú se buscan con `:visible`.** Existen dos veces —nav de escritorio y panel móvil— y solo una se muestra según el ancho; `.first()` cae siempre en la de escritorio.
+
+Y una trampa de medición, que costó una prueba que no comprobaba nada: **`elemento.getClientRects().length` no detecta que un texto se parta en dos líneas.** Los enlaces del menú son bloques, así que devuelven un solo rectángulo aunque su contenido ocupe dos líneas (se midió: 56 px de alto, un rectángulo). Las líneas se cuentan con un `Range` sobre el contenido del elemento, que devuelve un rectángulo por caja de línea.
 
 **La corrida contra nginx no es opcional.** `E2E_URL=http://localhost npx playwright test` sobre `compose.local.yml` es lo que destapó que el proxy `/search/` mandaba todas las peticiones a la raíz de Meilisearch: en desarrollo el navegador ataca a Meilisearch directamente y el fallo no existe.
 

@@ -57,7 +57,7 @@ En dev apuntan a `http://localhost:8000/api` etc. (o proxy de Vite). `.env` no s
 | `/noticias`, `/noticias/:slug` | **Ya construidas en el prototipo** (`Noticias.tsx`, `NoticiaDetalle.tsx`): listado con filtro por tipo y detalle. Portar cambiando el JSON por `/api/noticias/`. **No va en el menú principal** por decisión del dueño del proyecto: se llega desde el bloque de actualidad de la portada y desde la columna "Más" del pie |
 | `/videos` | **NUEVA** — grilla con embeds YouTube/Vimeo |
 | `/eventos` | **NUEVA** — calendario público (vista mes + lista; `desde/hasta`) |
-| `/comparar` | **NUEVA** — tablero comparativo: selector de 2–4 distritos → `/api/comparador/distritos/` → tarjetas lado a lado (población, semáforo por peligro, frecuencia, inversión si hay, medidas) |
+| `/comparar` | **NUEVA** — tablero comparativo: selector de 2–4 distritos → `/api/comparador/distritos/` → tarjetas lado a lado (población, semáforo por peligro, frecuencia, inversión si hay, medidas). **Fuera del menú (ADR-P2)**: la ruta sigue registrada y responde por URL directa, pero no se anuncia ni en el header ni en el pie — a diferencia de `/prioridades`, que no tiene ruta |
 | `/buscar` | Multi-search federado Meili, agrupado por tipo |
 | `/sobre` | Texto desde bloques `sobre.*` de `/api/sitio/` |
 | `/prioridades` | **RUTA NO REGISTRADA** (decisión de reunión). `Prioridades.tsx` se conserva en el código |
@@ -66,7 +66,8 @@ En dev apuntan a `http://localhost:8000/api` etc. (o proxy de Vite). `.env` no s
 ## Layout y textos administrables
 
 - `Layout.tsx` pide `/api/sitio/` una vez (contexto React `SitioContext`); `Header`/`Footer` renderizan menú (`EnlaceMenu`) y textos desde ahí — se eliminan los arrays hardcodeados (`NAV` en `Header.tsx`, fuentes en `Footer.tsx`).
-- Mientras carga: skeleton con los textos por defecto actuales (fallback estático para no parpadear).
+- Mientras carga: skeleton con los textos por defecto actuales (fallback estático para no parpadear). Ese respaldo **es el menú en modo degradado**, así que lo que se oculte en `EnlaceMenu` hay que quitarlo también de ahí o reaparece en cada carga y cuando el API no responde.
+- **El menú de escritorio va en una sola línea** (desde `lg`). La barra tiene altura fija, así que un enlace que parte su texto en dos se sale por arriba y por abajo: los enlaces llevan `whitespace-nowrap`, logo y `nav` van con `shrink-0`, y el que cede espacio cuando falta es el buscador (`min-w-0` en el `form` y en el `input`, `w-40` hasta `xl` y `w-56` desde ahí). Medido a 1024, 1280 y 1440 px en `e2e/header.spec.ts`.
 - Hero de portada: carrusel/slide único según nº de `HeroSlide` publicados.
 
 ## Métricas (beacon)

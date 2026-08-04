@@ -7,6 +7,24 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 - Fase 0 (prototipo estático) **completada y aprobada** por PREDES.
 - Fase actual: construcción de `frontend/` (Vite + React + TS + MapLibre) y `backend/` (Django 5.2 LTS + PostgreSQL + Meilisearch + PMTiles), desplegados con Docker Compose.
 
+### Actualización 03/08/2026 — el comparador fuera del menú y el header en una línea
+
+Dos cambios pedidos sobre el cascarón del sitio. Se corrigieron 00, 06 y 08:
+
+- **Nuevo ADR-P2**: `/comparar` sale del menú principal y del pie, pero **la ruta y el endpoint se
+  quedan** y responden por URL directa. Es un grado más suave que ADR-P1. El enlace vive en tres
+  sitios y hay que tocar los tres o reaparece: la semilla (`visible: false`), la base ya sembrada
+  —de ahí la migración `sitio.0002`, porque el seed crea lo que falta y no pisa lo que existe— y el
+  **menú de respaldo del frontend**, que es el que se pinta mientras carga `/api/sitio/` y en modo
+  degradado.
+- **El menú de escritorio va en una línea.** No lo estaba: a 1024 px «Exposición a peligros» partía
+  su texto en dos dentro de una barra de altura fija. Se fija en 06 quién cede el espacio —los
+  enlaces con `whitespace-nowrap`, logo y `nav` con `shrink-0`, el buscador con `min-w-0`— y se mide
+  en `e2e/header.spec.ts`.
+- Trampa de medición anotada en 08: **`getClientRects().length` sobre el elemento no detecta el
+  salto de línea** (los enlaces son bloques: un solo rectángulo aunque midan 56 px de alto). Las
+  líneas se cuentan con un `Range` sobre el contenido.
+
 ### Actualización 03/08/2026 — auditoría de cifras del visor y clustering
 
 Auditar por qué `/peligros` mostraba 225 en "Distribución" y 75 en la tabla para ACOMAYO destapó

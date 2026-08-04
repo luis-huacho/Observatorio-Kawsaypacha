@@ -130,6 +130,21 @@ def test_prioridades_queda_oculta_y_no_borrada(db):
     assert not prioridades.filter(visible=True).exists()
 
 
+def test_comparar_se_siembra_fuera_del_menu(db):
+    """ADR-P2: el comparador deja de anunciarse, pero su enlace queda para poder reactivarlo.
+
+    A diferencia de Prioridades, aquí **la ruta del SPA y el endpoint siguen vivos**: lo único que
+    cambia es que no se ofrece en la navegación.
+    """
+    from apps.sitio.models import EnlaceMenu
+
+    _seed("--solo-catalogos")
+    comparar = EnlaceMenu.objects.filter(url="/comparar")
+
+    assert comparar.count() == 2, "el enlace vive en el header y en el pie"
+    assert not comparar.filter(visible=True).exists()
+
+
 # --- Conteos canónicos sobre los Excel reales -------------------------------
 
 

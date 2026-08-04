@@ -37,14 +37,15 @@ const POR_DEFECTO: SitioPayload = {
       { texto: "Medidas", url: "/medidas", grupo: "", orden: 2 },
       { texto: "Inversión", url: "/inversion", grupo: "", orden: 3 },
       { texto: "Normativa", url: "/normativa", grupo: "", orden: 4 },
-      { texto: "Comparar distritos", url: "/comparar", grupo: "", orden: 5 },
+      // «Comparar distritos» no va en el menú (ADR-P2). La ruta sigue viva y se llega por URL,
+      // pero tampoco se anuncia aquí: este respaldo se pinta mientras carga `/api/sitio/` y si el
+      // API no responde, así que dejarla haría parpadear el enlace en cada carga.
       { texto: "Sobre", url: "/sobre", grupo: "", orden: 6 },
     ],
     footer: [
       { texto: "Exposición a peligros", url: "/peligros", grupo: "Secciones", orden: 1 },
       { texto: "Medidas", url: "/medidas", grupo: "Secciones", orden: 2 },
       { texto: "Inversión", url: "/inversion", grupo: "Secciones", orden: 3 },
-      { texto: "Comparar distritos", url: "/comparar", grupo: "Secciones", orden: 4 },
       { texto: "Normativa", url: "/normativa", grupo: "Más", orden: 5 },
       { texto: "Noticias", url: "/noticias", grupo: "Más", orden: 6 },
       { texto: "Videos", url: "/videos", grupo: "Más", orden: 7 },

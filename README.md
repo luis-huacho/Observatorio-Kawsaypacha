@@ -17,7 +17,7 @@ Plataforma web pública de PREDES para monitorear la **Gestión del Riesgo de De
 | `/normativa`, `/normativa/:slug` | Normativa GRD/ACC con enlace a la publicación oficial y export Excel |
 | `/recursos` | Biblioteca documental |
 | `/noticias`, `/eventos`, `/videos` | Actualidad |
-| `/comparar` | Comparativa entre distritos |
+| `/comparar` | Comparativa entre distritos. **Fuera del menú** (ADR-P2): la página funciona y se llega por URL, pero no se anuncia; se reactiva desde **Menú** en el admin |
 | `/buscar` | Búsqueda global con facetas (Meilisearch) |
 
 ## Stack
@@ -191,14 +191,14 @@ Las cinco comprobaciones **manuales previas a la entrega** —más exigentes que
 ## 6. Probar
 
 ```bash
-dc exec backend pytest                 # 112 pruebas, ~35 s
+dc exec backend pytest                 # 113 pruebas, ~30 s
 dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
 
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
 
 npm install && npx playwright install chromium   # una sola vez, en la raíz
-npx playwright test                    # 47 E2E en escritorio y móvil
+npx playwright test                    # 50 E2E en escritorio y móvil
 ```
 
 `pytest` corre **dentro del contenedor**, con las mismas versiones de GDAL, tippecanoe y WeasyPrint

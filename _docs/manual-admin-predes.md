@@ -166,7 +166,10 @@ Merece la pena recorrerlo en la capacitación, porque es donde se ve el efecto d
 - **`/peligros`** — el visor. Filtros por provincia, distrito, peligro y nivel; la tabla de centros
   poblados; el gráfico de distribución; la descarga en Excel; y la **ayuda memoria en PDF** de cada
   distrito, de dos caras y con su mapa, pensada para llevarla impresa a una reunión.
-- **`/comparar`** — hasta cuatro distritos lado a lado.
+- **`/comparar`** — hasta cuatro distritos lado a lado. **Hoy no está en el menú**: la página
+  funciona y se abre escribiendo la dirección, pero no se ofrece en la navegación. Para volver a
+  anunciarla, en **Menú** se marca «visible» en los dos enlaces «Comparar distritos» (el del menú
+  principal y el del pie). Es el mismo mecanismo con el que se puede ocultar cualquier sección.
 - **`/buscar`** — busca en todo el contenido publicado, tolera errores de tecleo.
 - **`/inversion`** — hoy vacía, a la espera de los datos.
 
