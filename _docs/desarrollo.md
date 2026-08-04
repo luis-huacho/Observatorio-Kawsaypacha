@@ -147,10 +147,32 @@ dc exec backend pytest                 # 144 pruebas, ~30 s (sin las lentas)
 dc exec backend pytest -m lento        # 5 más: los Excel completos y el PDF con mapa
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
-npm install && npx playwright install chromium   # una sola vez, en la raíz
+./e2e/instalar-dependencias.sh         # una sola vez, en la raíz
 npx playwright test                    # 56 E2E en escritorio y móvil
 ```
 
+### Preparar la máquina para las E2E
+
+`e2e/instalar-dependencias.sh` hace **tres** cosas, y hasta el 04/08/2026 aquí solo se documentaban
+dos: las librerías de sistema de Chromium, `npm install` y la descarga del navegador. La que
+faltaba es la que rompe.
+
+El detalle que lo explica: **Playwright no soporta oficialmente la familia RHEL**. En Debian y
+Ubuntu, `playwright install --with-deps` instala esos paquetes por su cuenta; en Rocky, Fedora o
+RHEL descarga el binario compilado para Ubuntu —lo avisa con un `BEWARE: your OS is not officially
+supported`— y **no instala ninguna dependencia**, porque solo sabe de `apt`. El resultado es que
+las 62 pruebas fallan con `browserType.launch: Target page, context or browser has been closed`,
+que se lee como si el sitio estuviera caído cuando lo que falta es una `.so`.
+
+El script detecta la familia de la distribución, delega en Playwright si es Debian/Ubuntu, instala
+la lista con `dnf` si es RHEL, y **termina arrancando el navegador** para que el fallo salga en dos
+segundos y no tras seis minutos de suite. Es idempotente. Se ejecuta **como tu usuario, no con
+sudo**: Node viene de nvm (que es por usuario) y los navegadores van a `~/.cache/ms-playwright`, así
+que con `sudo` acabarían en `/root` y las pruebas seguirían fallando igual. También acepta
+`--dry-run` y `--help`.
+
+No instala Docker ni Node: eso corresponde a la provisión del servidor, y el script se limita a
+comprobarlo.
 
 `pytest` vive **dentro del contenedor**, para correr con las mismas versiones de GDAL, tippecanoe
 y WeasyPrint que producción. Se instala porque `compose.dev.yml` construye la imagen con

@@ -129,10 +129,12 @@ de `peligros.spec.ts` en sus dos perfiles, la cifra de la portada (`home.spec.ts
 `total_ccpp > 1000`) y el buscador de lugares del visor. Cuando entren los Excel, se vuelve a
 correr la suite y tienen que pasar las 56.
 
-> Para correr Playwright en este servidor hizo falta instalar las librerías de sistema de Chromium
-> (`atk`, `at-spi2-atk`, `cups-libs`, `libdrm`, `libxkbcommon`, `libX*`, `mesa-libgbm`, `pango`,
-> `alsa-lib`, `nss`). Sin ellas, las 62 pruebas fallan con `libatk-1.0.so.0: cannot open shared
-> object file`, que se lee como si el sitio estuviera caído y no lo está.
+> Para correr Playwright en este servidor hizo falta instalar a mano las librerías de sistema de
+> Chromium: sin ellas, las 62 pruebas fallan con `libatk-1.0.so.0: cannot open shared object file`,
+> que se lee como si el sitio estuviera caído y no lo está. De ahí salió
+> **`e2e/instalar-dependencias.sh`**, que ya lo hace por su cuenta —librerías, `npm install`,
+> navegador y una comprobación de que arranca—. La provisión del servidor
+> (`install-rocky-10.sh`) deja Docker y Node 22; este script cubre lo que falta encima.
 
 ## Tareas de cron instaladas
 

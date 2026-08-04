@@ -3,6 +3,12 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * E2E del Observatorio Kallpachakuy (ver `_specs/08-plan-pruebas.md`).
  *
+ * En una máquina nueva, primero `./e2e/instalar-dependencias.sh`: instala las librerías de sistema
+ * de Chromium, las dependencias de npm y el navegador. Sin las primeras, la suite falla ENTERA con
+ * «browserType.launch: Target page, context or browser has been closed», que parece el sitio
+ * caído y es una librería ausente. En RHEL/Rocky/Fedora es obligatorio, porque
+ * `playwright install --with-deps` solo sabe instalar dependencias en Debian y Ubuntu.
+ *
  * Corren contra un stack **ya levantado y sembrado**, no contra un servidor que arranque
  * Playwright: lo que estas pruebas cubren es justo lo que las de API no ven —que el mapa pinte,
  * que los filtros lleguen a la pantalla, que el bundle hable con el backend correcto—, y eso

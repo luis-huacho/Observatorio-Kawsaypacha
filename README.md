@@ -202,12 +202,21 @@ dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF co
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
 
-npm install && npx playwright install chromium   # una sola vez, en la raíz
+./e2e/instalar-dependencias.sh         # una sola vez, en la raíz
 npx playwright test                    # 56 E2E en escritorio y móvil
 ```
 
 `pytest` corre **dentro del contenedor**, con las mismas versiones de GDAL, tippecanoe y WeasyPrint
 que producción. Si responde `executable file not found`, ver §9.
+
+**`instalar-dependencias.sh` sustituye al `npm install && npx playwright install chromium` que
+había aquí**, porque ese par se dejaba fuera el paso que rompe: las librerías de sistema de
+Chromium. En Debian/Ubuntu no se nota —`playwright install --with-deps` las instala solo—, pero en
+RHEL/Rocky/Fedora **Playwright solo sabe de apt** y no instala nada, así que las 62 pruebas fallan
+con `browserType.launch: Target page, context or browser has been closed`, que parece el sitio
+caído y es una `.so` ausente. El script cubre los tres pasos y termina arrancando el navegador
+para comprobarlo. Se ejecuta **como tu usuario, no con sudo**; da por hecho un servidor ya
+provisionado con Docker y Node 22, y si falta algo avisa en vez de instalarlo.
 
 Con el dev server recién arrancado conviene visitar las rutas una vez antes de lanzar Playwright:
 Vite compila cada módulo la primera vez que se lo piden, y con varios navegadores en paralelo esa

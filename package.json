@@ -3,6 +3,7 @@
   "private": true,
   "description": "Pruebas de extremo a extremo del Observatorio Kallpachakuy (ver _specs/08-plan-pruebas.md)",
   "scripts": {
+    "e2e:preparar": "bash e2e/instalar-dependencias.sh",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:informe": "playwright show-report"

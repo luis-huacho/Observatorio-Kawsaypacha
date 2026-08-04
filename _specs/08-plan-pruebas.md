@@ -18,9 +18,18 @@ DC="docker compose -f compose.yaml -f compose.dev.yml"
 $DC exec backend pytest                 # suite backend (144 pruebas, ~30 s)
 $DC exec backend pytest -m lento        # los Excel completos y el PDF con mapa (~35 s más)
 cd frontend && npm run lint && npm run build    # tipos + build
+./e2e/instalar-dependencias.sh                  # una sola vez por máquina (ver abajo)
 npx playwright test                             # E2E contra el stack levantado
 E2E_URL=http://localhost npx playwright test    # E2E contra el bundle servido por nginx
 ```
+
+**`instalar-dependencias.sh` no es un `npm install` con otro nombre.** Instala además las librerías
+de sistema de Chromium, que es el paso que faltaba en esta lista hasta el 04/08/2026 y el que
+rompe: Playwright **no soporta oficialmente la familia RHEL**, así que en Rocky/Fedora descarga el
+binario de Ubuntu y no instala ninguna dependencia —solo sabe de `apt`—. La suite entera falla con
+`browserType.launch: Target page, context or browser has been closed`, que parece el sitio caído
+y es una `.so` ausente. El script termina arrancando el navegador, para que eso salga en dos
+segundos en vez de tras seis minutos de suite.
 
 `pytest` corre **dentro del contenedor** para usar las mismas versiones de GDAL, tippecanoe y WeasyPrint que producción. La imagen de `compose.dev.yml` se construye con `GRUPOS_UV=--group dev`, que es lo que instala pytest; tras cambiar esa opción hace falta `up -d --renew-anon-volumes backend`, porque `/app/.venv` es un volumen anónimo que sobrevive a la reconstrucción.
 

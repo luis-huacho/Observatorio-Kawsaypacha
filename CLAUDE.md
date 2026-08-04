@@ -40,7 +40,7 @@ Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PRED
 - Siembra: `seed` (+ `--demo`, `--capas`, `--tiles`, `--solo-catalogos`). Es idempotente y no pisa lo editado
 - Backend: `manage.py migrate | createsuperuser | check`; Meilisearch: `meili_setup` (crea índices/llaves), `meili_rebuild`; tiles: `generar_tiles_ccpp`, `generar_tiles`
 - Frontend: `npm run dev | build | lint` (lint = `tsc --noEmit`)
-- Pruebas: `pytest` **dentro del contenedor** (`-m lento` para las 4 caras) y `npx playwright test` desde la raíz. La corrida que encuentra los fallos de integración es la de `compose.local.yml` con `E2E_URL=http://localhost` — ver `_docs/desarrollo.md`
+- Pruebas: `pytest` **dentro del contenedor** (`-m lento` para las 4 caras) y `npx playwright test` desde la raíz, precedido **una vez por máquina** de `./e2e/instalar-dependencias.sh`. La corrida que encuentra los fallos de integración es la de `compose.local.yml` con `E2E_URL=http://localhost` — ver `_docs/desarrollo.md`
 
 ## Convenciones
 

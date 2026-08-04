@@ -204,8 +204,20 @@ El del resumen debe decir `8968`.
 > pasar si se cambia la master key o si el bundle se construyó con un `.env` desactualizado.
 
 Y en el navegador, `/peligros` tiene que pintar los puntos: es lo que confirma de una vez que el
-API, los tiles, CORS y el bundle están todos bien. La verificación completa es
-`E2E_URL=https://$SITE_DOMAIN npx playwright test`.
+API, los tiles, CORS y el bundle están todos bien. La verificación completa es la suite E2E:
+
+```bash
+./e2e/instalar-dependencias.sh                        # una sola vez por máquina
+E2E_URL=https://$SITE_DOMAIN npx playwright test
+```
+
+> **El primer comando no es opcional en un servidor recién provisionado**, y menos en la familia
+> RHEL. Playwright no la soporta oficialmente: descarga el binario de Ubuntu y **no instala sus
+> dependencias**, porque solo sabe de `apt`. Sin ellas la suite entera falla con
+> `browserType.launch: Target page, context or browser has been closed`, que **parece el sitio
+> caído** justo cuando acabas de desplegarlo. El script instala las librerías, `npm install` y el
+> navegador, y termina arrancándolo para comprobar que va. Se ejecuta como tu usuario, **no con
+> sudo** (Node viene de nvm y los navegadores van a `~/.cache/ms-playwright`).
 
 ## Runbook
 

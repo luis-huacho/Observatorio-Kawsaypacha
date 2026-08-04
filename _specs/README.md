@@ -71,6 +71,17 @@ fragmentos, el mismo fallo es un `include` inexistente y nginx no arranca.
 Quedan abiertos en [09-errores.md](09-errores.md), anotados y no corregidos: E-006 (caché declarada
 y nunca usada), E-007 (`--solo-catalogos` se come `--demo`) y E-008 (`ssl_stapling` ya no aplica).
 
+Y un séptimo hallazgo, del mismo día y de la misma naturaleza —documentación que describe algo que
+no basta—: **correr las E2E en el servidor exigía un paso que la guía no mencionaba.** `README.md` y
+`desarrollo.md` decían `npm install && npx playwright install chromium`, y faltaban las librerías de
+sistema de Chromium. Sin ellas las 62 pruebas fallan con `browserType.launch: Target page, context
+or browser has been closed`, que se lee como si el sitio estuviera caído. Y no se veía venir, porque
+en Debian/Ubuntu `--with-deps` las instala solo: **Playwright no soporta oficialmente la familia
+RHEL** y ahí no instala nada, solo sabe de `apt`. Ahora lo hace `e2e/instalar-dependencias.sh`, que
+detecta la distribución, cubre los tres pasos y **termina arrancando el navegador**, de modo que un
+fallo de este tipo sale en dos segundos en vez de tras seis minutos de suite y disfrazado de caída
+del sitio.
+
 ### Actualización 04/08/2026 — la ayuda memoria salía sin mapa en producción
 
 Reportado desde `/peligros` con Kunturkanki. Reproducido y corregido; las reglas quedan en 02:

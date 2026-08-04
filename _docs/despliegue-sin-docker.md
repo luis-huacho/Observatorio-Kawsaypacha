@@ -165,6 +165,22 @@ sudo -u observatorio bash -lc 'cd /srv/observatorio/backend && .venv/bin/playwri
 plataforma funciona igual**: la ayuda memoria se genera sin el mapa y el motivo queda en el log del
 worker. Es una degradación prevista, no un error.
 
+> **Ojo en RHEL/Rocky/Fedora: `--with-deps` ahí no instala nada.** Playwright no soporta esa
+> familia oficialmente —descarga el binario compilado para Ubuntu, avisando con un `BEWARE: your OS
+> is not officially supported`— y **solo sabe instalar dependencias con `apt`**. El comando termina
+> sin error y las librerías siguen sin estar, así que el PDF sale sin mapa por un motivo que parece
+> otro. En esa familia hay que instalarlas aparte:
+>
+> ```bash
+> sudo dnf install -y alsa-lib atk at-spi2-atk at-spi2-core cups-libs \
+>   libdrm libX11 libXcomposite libXdamage libXext libXfixes libXrandr libxkbcommon \
+>   mesa-libgbm nspr nss pango
+> ```
+>
+> Es la misma lista que instala `e2e/instalar-dependencias.sh` para las pruebas E2E (§13), medida
+> con `ldd` sobre el binario de Chromium. Con Docker esto no aparece porque la imagen del backend
+> es Debian y `--with-deps` sí funciona ahí.
+
 > Y por eso **hay que comprobar que el mapa sale**, no solo que el PDF se descargue: el documento se
 > genera igual sin él. La comprobación está en §13. El mapa base son teselas de openstreetmap.org: si
 > este servidor no tiene salida a internet, el mapa sale con los centros poblados y las capas propias
@@ -597,11 +613,22 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 > fallback de DRF. Un **405** en `multi-search` es la señal de proxy mal configurado; 401 (sin llave)
 > o 200 (con ella) significan que llega bien.
 
-Y la comprobación completa, si tienes Node en algún sitio:
+Y la comprobación completa. Aquí Node sí está en el propio servidor —hace falta para construir el
+frontend (§8)—, así que la suite E2E se puede correr en el sitio:
 
 ```bash
+./e2e/instalar-dependencias.sh                     # una sola vez por máquina
 E2E_URL=https://observatorio.predes.org.pe npx playwright test
 ```
+
+> El script instala las librerías de sistema de Chromium, las dependencias de npm y el navegador.
+> **En esta vía importa más que en la de Docker**, porque aquí no hay ninguna imagen que traiga
+> Chromium hecho: el único que existe es el que instalaste en §3 para el PDF, que vive en el venv
+> del backend y no es el que usa Playwright. En RHEL/Rocky/Fedora es imprescindible — Playwright no
+> soporta esa familia oficialmente y **no instala dependencias fuera de `apt`**, así que la suite
+> falla entera con `browserType.launch: Target page, context or browser has been closed`, que
+> parece el sitio caído y es una librería ausente. Se ejecuta como el usuario que corre las
+> pruebas, **no con sudo**.
 
 En el navegador, `/peligros` tiene que pintar los puntos: confirma de una vez el API, los tiles,
 CORS y el bundle.
@@ -662,7 +689,14 @@ Honestidad sobre qué está comprobado:
 | Que `PGSSLMODE` llega a libpq desde `backend/.env` | Un valor inválido produce `invalid sslmode value`, y `read_env()` deja la variable en `os.environ` |
 | Que nginx no arranca sin los certificados | `nginx -t` con la configuración real y sin `/etc/letsencrypt` |
 | Los comandos de Django, gunicorn y el worker | Son los mismos que ejecuta la imagen, en uso |
+| Las librerías de Chromium en la familia RHEL | Instaladas y en uso en un Rocky Linux 10 real (04/08/2026). La lista sale de `ldd` sobre el binario de Chromium de Playwright y `rpm -qf` sobre cada librería resuelta, no de un foro |
+| Que `--with-deps` no instala nada fuera de `apt` | Observado en ese mismo servidor: el comando termina bien y las librerías siguen sin estar |
 
 **Sin verificar, a falta de un servidor**: las unidades de systemd tal cual, la emisión con certbot,
 los contextos de SELinux y la conexión a un PostgreSQL gestionado real. Conviene recorrer §13 en la
 primera puesta en marcha y corregir aquí lo que haga falta.
+
+**Sin verificar en campo**, aunque el código exista: la rama **Debian/Ubuntu** de
+`e2e/instalar-dependencias.sh`. Delega en `playwright install --with-deps chromium`, que es el
+camino oficial y el que ya usa `backend/Dockerfile`, pero no se ha ejecutado en una máquina Debian
+recién instalada.
