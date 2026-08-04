@@ -15,7 +15,7 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (118 pruebas, ~28 s)
+$DC exec backend pytest                 # suite backend (136 pruebas, ~37 s)
 $DC exec backend pytest -m lento        # los Excel completos y el PDF con mapa (~35 s más)
 cd frontend && npm run lint && npm run build    # tipos + build
 npx playwright test                             # E2E contra el stack levantado
@@ -104,6 +104,23 @@ Un módulo por familia. El criterio es el **contrato del spec 02**, no la implem
 - Grupos con sus permisos y con los nombres exactos de `core.grupos`; Prioridades oculta y no borrada, y el comparador sembrado fuera del menú (ADR-P2) con sus dos enlaces intactos.
 - Conteos canónicos tras `manage.py seed` sobre los Excel reales (marcado `lento`): **13 provincias · 112 distritos · 8,968 CCPP · 3,238 clasificados · 5,730 sin dato · 10,978 clasificaciones · 644 frecuencias en 64 distritos · 104 totales declarados en 26 distritos**. Si un refactor del importador pierde filas, esta prueba es la que lo dice.
 - Las anomalías conocidas siguen reportándose (229 sin nivel, 2 sin código, ACOMAYO sin fila, 21 con fila vacía, 90 con datos). **Las advertencias son un entregable**: son lo que PREDES le lleva a la fuente de los datos, así que silenciarlas es perder trabajo del cliente, no mejorar el importador.
+
+### `test_meili_estado.py` y `test_urls_admin.py`
+
+- El desfase del índice **se detecta**: un índice con más o menos documentos que la base se señala sin
+  arrastrar a los demás, y el comando sale con código ≠ 0 diciendo cómo arreglarlo.
+- **El conteo no puede volver a salir de `numberOfDocuments`**: el cliente falso no expone
+  `get_all_stats`, así que usarlo rompe las pruebas. Ese conteo está cacheado —tras vaciar un índice
+  sigue informando del valor anterior— y con él la comprobación fallaba justo en el caso que existe
+  para detectar. Se descubrió vaciando un índice de verdad, no leyendo el diff.
+- Un índice que **no existe** se distingue de uno **vacío**: lo primero significa que `meili_setup` no
+  ha corrido en esa instancia.
+- Meilisearch caído → `disponible: False` **sin excepción**, y la portada del admin sigue abriendo.
+- **`resolve()` de las rutas que cuelgan del prefijo del admin no cae en `catch_all_view`.** Es la
+  prueba de regresión del 404 de la subida de imágenes del editor, y tiene que mirar *a qué vista
+  resuelve*: un 404 del catch-all y uno legítimo son indistinguibles desde fuera.
+- El botón de reindexar: sin sesión de staff no hace nada, por `GET` responde 405, y por `POST`
+  **encola** la tarea (no la ejecuta) y vuelve al panel con su aviso.
 
 ### `test_tiles.py`
 

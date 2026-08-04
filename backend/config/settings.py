@@ -302,6 +302,10 @@ CKEDITOR_5_CONFIGS = {
         "table": {"contentToolbar": ["tableColumn", "tableRow", "mergeTableCells"]},
     }
 }
+# ⚠️ `django-ckeditor-5` 0.2.x **ignora** este ajuste: `storage_utils.handle_uploaded_file` guarda
+# con `fs.save(f.name, f)`, sin prefijo, así que las imágenes que se insertan desde el editor caen en
+# la raíz de `media/` y no en `contenido/`. Se deja escrito para que nadie lo dé por hecho; moverlas
+# exige un `CKEDITOR_5_FILE_STORAGE` propio.
 CKEDITOR_5_UPLOAD_PATH = "contenido/"
 CKEDITOR_5_FILE_UPLOAD_PERMISSION = "staff"
 # Una foto de campo sin recortar ronda los 6 MB; se aceptan y se reescalan al guardar.

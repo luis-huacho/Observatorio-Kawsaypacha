@@ -24,6 +24,7 @@ def datos_panel(request, contexto: dict | None = None) -> dict:
 
 
 def _metricas(request) -> dict:
+    from apps.core.services import meili
     from apps.biblioteca.models import Documento
     from apps.contenidos.models import Evento, Noticia, Video
     from apps.datasets.models import DatasetUpload
@@ -98,4 +99,8 @@ def _metricas(request) -> dict:
         },
         "capas_con_error": capas_con_error,
         "sin_metricas": not resumenes.exists(),
+        # Estado de la búsqueda: si está arriba y si lo indexado cuadra con la base. Es la única
+        # forma que tiene PREDES de enterarse de un índice desfasado, que por sí solo no da ningún
+        # síntoma más que «el buscador no encuentra algo que sí está publicado».
+        "buscador": meili.estado_indices(),
     }

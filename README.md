@@ -169,6 +169,7 @@ Comandos propios del proyecto:
 | --- | --- |
 | `seed [--demo] [--capas] [--tiles] [--solo-catalogos]` | Sembrar. Idempotente y **no pisa lo editado** |
 | `meili_setup` | Crear índices e imprimir la llave de solo búsqueda |
+| `meili_estado` | ¿Está arriba el buscador y al día? Sale con código ≠ 0 si no |
 | `meili_rebuild [indice]` | Reconstruir la búsqueda desde la base |
 | `generar_tiles_ccpp` | Regenerar los PMTiles de centros poblados |
 | `generar_tiles [--rehacer]` | Regenerar los PMTiles de las capas de contexto |
@@ -185,7 +186,8 @@ el API responde 200 y la cifra que se publica es otra.
 | Los tiles salen por rangos | `curl -sr 0-99 -D - -o /dev/null localhost:8000/tiles/ccpp.pmtiles` | **206**, no 200: sin Range el visor descarga 3 MB por tesela |
 | Las capas se anuncian | `curl -s localhost:8000/api/mapas/capas/` | tres capas con su URL: los PMTiles se generaron |
 | Los filtros llegan al API | filtrar por peligro y nivel en `/peligros` | la tabla se recorta y el total lo da el servidor, no las filas cargadas |
-| La búsqueda usa Meilisearch **con la llave del navegador** | `curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:7700/multi-search -H "Authorization: Bearer $VITE_MEILI_SEARCH_KEY" -H 'Content-Type: application/json' -d '{"queries":[{"indexUid":"medidas","q":"cusco","limit":1}]}'` | **200**. Un **403** es la llave del bundle caducada, y hay que mirarlo así: `/api/buscar/estado/` dice `meili_disponible: true` igualmente, porque el backend consulta con la master key, y `/search/health` responde 200 sin credencial |
+| El buscador está arriba **y al día** | `dm meili_estado` | La tabla con los documentos de cada índice frente a la base. Sale con **código ≠ 0** si el servicio no responde o si algo está desfasado, que no da ningún otro síntoma: lo publicado se ve en su página y no aparece al buscarlo |
+| La búsqueda usa Meilisearch **con la llave del navegador** | `curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:7700/multi-search -H "Authorization: Bearer $VITE_MEILI_SEARCH_KEY" -H 'Content-Type: application/json' -d '{"queries":[{"indexUid":"medidas","q":"cusco","limit":1}]}'` | **200**. Mide otra cosa que la fila anterior: un **403** es la llave del bundle caducada. `/api/buscar/estado/` dice `meili_disponible: true` igualmente, porque el backend consulta con la master key, y `/search/health` responde 200 sin credencial |
 | El admin y el flujo editorial | entrar, crear una noticia, enviarla a revisión y publicarla | credenciales, permisos y avisos por correo (van a `logs -f worker`) |
 | La ayuda memoria | `curl -so /tmp/am.pdf localhost:8000/api/distritos/080101/ayuda-memoria.pdf` | WeasyPrint y la captura del mapa con Chromium |
 
@@ -195,7 +197,7 @@ Las cinco comprobaciones **manuales previas a la entrega** —más exigentes que
 ## 6. Probar
 
 ```bash
-dc exec backend pytest                 # 118 pruebas, ~28 s
+dc exec backend pytest                 # 136 pruebas, ~37 s
 dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
 
 cd frontend && npm run lint            # tsc --noEmit
@@ -287,7 +289,7 @@ levantar y 29 s en sembrar con tiles.
 | `pytest: executable file not found` | La imagen de dev se reconstruyó sin el grupo `dev`, o el venv del volumen anónimo es el viejo: `dc up -d --build --renew-anon-volumes backend worker` |
 | El visor sale sin capas | Los tiles no se generaron: `dm seed --capas --tiles`, y comprobar `/api/mapas/capas/` |
 | El visor sale sin puntos | `/api/ccpp/geojson/` con los mismos filtros que manda la página; si devuelve `features: []`, el filtro está de más |
-| El buscador no encuentra algo publicado | `dm meili_rebuild` |
+| El buscador no encuentra algo publicado | `dm meili_estado` para ver qué índice está desfasado, y `dm meili_rebuild` (o el botón de la tarjeta «Buscador» del panel del admin) |
 | El sitio carga pero sin datos | `frontend/.env`: `VITE_API_URL` no apunta a `http://localhost:8000/api` |
 | **403** al buscar, o el aviso «modo básico», o los filtros de `/medidas` sin conteos | La `VITE_MEILI_SEARCH_KEY` con la que se construyó el frontend no existe en Meilisearch. `dm meili_setup` y copiarla a **los dos** `.env` (`frontend/.env` y el de la raíz); si estás en modo producción local, además **reconstruir**: `docker compose -f compose.yaml -f compose.local.yml build frontend && … run --rm frontend`. La consola del navegador lo dice con todas las letras (`[buscador] Meilisearch rechazó la llave…`) |
 | El admin da 404 | El prefijo es `ADMIN_URL`, no `/admin/`: mira `backend/.env` |

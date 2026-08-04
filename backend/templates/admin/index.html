@@ -102,6 +102,78 @@
   </table>
 </div>
 
+{# --- Estado del buscador ---
+   Lo que responde: si Meilisearch está arriba y si lo indexado cuadra con lo publicado. Un índice
+   desfasado no da ningún síntoma salvo «el buscador no encuentra algo que sí está publicado», así
+   que sin esta tarjeta nadie se enteraría. #}
+<div class="rounded-lg border border-base-200 dark:border-base-800 overflow-hidden mb-8">
+  <div class="px-4 py-3 border-b border-base-200 dark:border-base-800 flex items-center justify-between gap-3">
+    <div class="font-semibold text-sm">
+      Buscador
+      {% if buscador.disponible %}
+        {% if buscador.al_dia %}
+          <span class="text-green-700 font-normal">· activo y al día</span>
+        {% else %}
+          <span class="text-red-700 font-normal">· activo, con índices desfasados</span>
+        {% endif %}
+      {% else %}
+        <span class="text-red-700 font-normal">· no responde</span>
+      {% endif %}
+    </div>
+    {% if buscador.disponible %}
+      <form method="post" action="{% url 'reindexar-busqueda' %}">
+        {% csrf_token %}
+        <button type="submit"
+                class="rounded-md border border-base-200 dark:border-base-800 px-3 py-1.5 text-xs font-medium hover:bg-base-100 dark:hover:bg-base-900">
+          Reindexar la búsqueda
+        </button>
+      </form>
+    {% endif %}
+  </div>
+
+  {% if buscador.disponible %}
+    {% if not buscador.al_dia %}
+      <div class="px-4 py-3 border-b border-base-200 dark:border-base-800 bg-red-50 dark:bg-red-900/20 text-sm">
+        Hay contenido publicado que <strong>no está en el buscador</strong>: quien lo busque no lo
+        encontrará, aunque en el sitio sí se vea.
+        {% if buscador.pendientes %}
+          Puede que se esté indexando ahora mismo ({{ buscador.pendientes }} tarea(s) en cola):
+          recarga en unos segundos antes de reindexar.
+        {% else %}
+          Pulsa «Reindexar la búsqueda»: tarda unos segundos y el buscador sigue funcionando
+          mientras.
+        {% endif %}
+      </div>
+    {% endif %}
+    <table class="w-full text-sm">
+      <thead class="text-xs uppercase text-font-subtle-light dark:text-font-subtle-dark">
+        <tr>
+          <th class="px-4 py-2 text-left font-medium">Contenido</th>
+          <th class="px-4 py-2 text-right font-medium">En el buscador</th>
+          <th class="px-4 py-2 text-right font-medium">Publicado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for indice in buscador.indices %}
+          <tr class="border-t border-base-100 dark:border-base-900">
+            <td class="px-4 py-2">{{ indice.etiqueta }}</td>
+            <td class="px-4 py-2 text-right {% if not indice.al_dia %}font-semibold text-red-700{% endif %}">
+              {% if indice.en_meili == None %}—{% else %}{{ indice.en_meili|miles }}{% endif %}
+            </td>
+            <td class="px-4 py-2 text-right">{{ indice.en_bd|miles }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="px-4 py-3 text-sm">
+      El servicio de búsqueda no está respondiendo. El sitio <strong>sigue funcionando</strong>: el
+      buscador pasa a un modo básico —sin tolerancia a erratas ni acentos omitidos— y lo avisa en
+      pantalla. Hay que revisar el servicio; no es algo que se arregle desde aquí.
+    </div>
+  {% endif %}
+</div>
+
 {# --- Estado de los datos --- #}
 <div class="rounded-lg border border-base-200 dark:border-base-800 px-4 py-3 text-sm">
   <span class="font-semibold">Datos de exposición.</span>

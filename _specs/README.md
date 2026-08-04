@@ -7,6 +7,28 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 - Fase 0 (prototipo estático) **completada y aprobada** por PREDES.
 - Fase actual: construcción de `frontend/` (Vite + React + TS + MapLibre) y `backend/` (Django 5.2 LTS + PostgreSQL + Meilisearch + PMTiles), desplegados con Docker Compose.
 
+### Actualización 03/08/2026 — estado del buscador en el panel, y un 404 escondido bajo el admin
+
+Tres preguntas operativas —¿está caído el buscador?, ¿está indexado al 100%?, ¿cómo se reindexa?— de
+las que **solo la primera tenía respuesta**. Se corrigieron 03, 04 y 08:
+
+- **`meili.estado_indices()`**, con dos consumidores: `manage.py meili_estado` (sale con código ≠ 0,
+  así que sirve de cron con `|| mail`) y una **tarjeta «Buscador» en el panel del admin** con un botón
+  que encola `reindexar_meili`. PREDES puede ver el desfase y arreglarlo sin que nadie entre al
+  servidor.
+- **`numberOfDocuments` de `/stats` no sirve para esto**: está cacheado. Vaciando un índice de verdad
+  se vio que seguía informando de 6 documentos mientras la búsqueda devolvía 0 —la primera versión de
+  la comprobación daba el índice por bueno justo en el caso que debía detectar—. El total exacto es
+  `get_documents({"limit": 0}).total`. Anotado en 04 y fijado con una prueba.
+- **Las consultas de estado llevan timeout** (3 s). Sin él, un Meilisearch que acepta la conexión y no
+  contesta cuelga `/api/buscar/estado/` —que el navegador pide en cada búsqueda— y la portada del
+  admin.
+- **Un 404 silencioso**: `admin.site.urls` iba **antes** que la ruta de subida de imágenes de
+  CKEditor, y el `catch_all_view` del admin se queda con todo lo que cuelga de su prefijo. Insertar
+  una imagen desde el texto rico devolvía 404 sin que nada lo dijera; el botón sí está en la barra del
+  editor. Corregido el orden y con prueba de regresión, porque no se distingue desde fuera de un 404
+  legítimo. Regla en 03.
+
 ### Actualización 03/08/2026 — botón de limpiar en las cajas de búsqueda
 
 Las cinco cajas del sitio ganan una «X» para vaciarlas. Se corrigieron 06 y 08:

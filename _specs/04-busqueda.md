@@ -38,6 +38,37 @@ Doble mecanismo (señales para el día a día, comando para recuperación):
 2. **Comando** `manage.py meili_rebuild [indice]` — reconstrucción total (swap por índice temporal para no dejar huecos). Se corre: al desplegar, tras `DatasetUpload` de peligros (índice `ccpp`) y ante cualquier inconsistencia.
 3. **Comando** `manage.py meili_setup` — idempotente, corre en el arranque del backend: crea índices, aplica settings (searchable/filterable/sortable, ranking, synonyms es-PE opcionales: "helada"≈"friaje" NO — son peligros distintos; sinónimos solo ortográficos) y **genera la llave search-only** restringida a los índices públicos, imprimiéndola para copiarla a los `.env` (`VITE_MEILI_SEARCH_KEY`, ver abajo).
 
+### Observabilidad: cómo se sabe que está arriba y al día
+
+Tres respuestas, y la del medio es la que no existía:
+
+| Pregunta | Dónde |
+|---|---|
+| ¿Está arriba? | `GET /api/buscar/estado/` (`meili_disponible`), la tarjeta «Buscador» del panel del admin, y el aviso «modo básico» que ve el visitante |
+| ¿Está indexado al 100%? | `meili.estado_indices()`, que alimenta la tarjeta del panel y `manage.py meili_estado` (código ≠ 0 si hay desfase: sirve de cron con `\|\| mail`) |
+| ¿Cómo se reindexa? | `manage.py meili_rebuild [índice]`, la tarea `core.tasks.reindexar_meili`, y el **botón de la tarjeta**, que encola esa misma tarea |
+
+Por qué hace falta vigilarlo: **el desfase del índice no da ningún síntoma**. La sincronización va por
+señales hacia el worker, así que si el worker estuvo caído, si Meilisearch no respondía al guardar, o
+si alguien escribió fuera del ORM, lo publicado sigue viéndose en su página y simplemente no aparece
+al buscarlo. Es el mismo tipo de fallo silencioso que el proxy `/search/` mal configurado.
+
+Dos detalles que no se pueden deshacer sin volver a romperlo:
+
+- **El conteo de documentos NO se toma de `numberOfDocuments` de `/stats`.** Está cacheado:
+  comprobado en Meilisearch 1.15, tras vaciar un índice sigue devolviendo el conteo anterior mientras
+  la búsqueda ya no encuentra nada, así que una comprobación basada en él da el índice por bueno
+  justo en el caso que tiene que detectar. El total exacto es `get_documents({"limit": 0}).total`,
+  una petición por índice (~17 ms los siete).
+- **Las consultas de estado llevan timeout** (`meili.TIMEOUT_ESTADO`, 3 s). Un Meilisearch que acepta
+  la conexión y no contesta colgaría `/api/buscar/estado/` —que el navegador pide en cada búsqueda— y
+  la portada del admin. El timeout **no** se aplica a indexar: `reconstruir` espera hasta 180 s por
+  tarea.
+
+Y una regla de reparto: el comando **comprueba y no arregla**. Reindexar es una decisión de una
+persona (o del importador de peligros, que ya encola `reindexar_meili` tras un `DatasetUpload`); un
+vigilante que reconstruya índices por su cuenta a las cuatro de la mañana no es lo que se quiere.
+
 ### La llave search-only es determinista, y tiene que serlo
 
 Se crea con un **uid fijo** (`meili.UID_LLAVE_BUSQUEDA`). La documentación de Meilisearch lo dice así: *«Custom API keys are deterministic: the key itself is a SHA256 hash of the key's UID and the master key»*. Con uid fijo, el mismo `MEILI_MASTER_KEY` devuelve **siempre la misma llave**, de modo que recrear el volumen de Meilisearch o restaurar un respaldo no la invalida.

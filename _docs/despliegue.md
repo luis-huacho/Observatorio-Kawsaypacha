@@ -168,7 +168,8 @@ API, los tiles, CORS y el bundle están todos bien. La verificación completa es
 | Desplegar una actualización | `git pull && docker compose build backend frontend && docker compose up -d && docker compose run --rm frontend` |
 | Migraciones (normalmente automáticas) | `docker compose exec backend python manage.py migrate` |
 | Sembrar o resembrar datos | `docker compose exec backend python manage.py seed` |
-| Reindexar la búsqueda | `docker compose exec backend python manage.py meili_rebuild` |
+| **Comprobar el buscador** (servicio + índices al día) | `docker compose exec backend python manage.py meili_estado` |
+| Reindexar la búsqueda | `docker compose exec backend python manage.py meili_rebuild` — o el botón de la tarjeta «Buscador» del panel del admin, que hace lo mismo en segundo plano |
 | Regenerar los tiles de CCPP | `docker compose exec backend python manage.py generar_tiles_ccpp` |
 | Regenerar los tiles de las capas | `docker compose exec backend python manage.py generar_tiles --rehacer` |
 | Agregar métricas y purgar | `docker compose exec backend python manage.py shell -c "from apps.core.tasks import agregar_metricas; agregar_metricas.func()"` |
@@ -191,6 +192,24 @@ del host:
 
 Sin esto el panel del admin se queda en blanco (lee del agregado, no de los eventos crudos) y la
 tabla de eventos crece sin límite.
+
+### Vigilancia del buscador
+
+`meili_estado` termina con **código distinto de 0** si el servicio no responde o si algún índice está
+desfasado, así que sirve de comprobación desatendida:
+
+```cron
+30 4 * * * cd /ruta/al/observatorio && docker compose exec -T backend python manage.py meili_estado || mail -s "Observatorio: revisar el buscador" alguien@predes.org.pe
+```
+
+**Comprueba, no arregla**, a propósito: reconstruir índices por su cuenta a las cuatro de la mañana
+no es lo que se quiere de un vigilante. Reindexar es una decisión de una persona, y tiene su botón en
+el panel del admin.
+
+Por qué hace falta vigilarlo: el índice se sincroniza por señales hacia el worker, así que si el
+worker estuvo caído, si Meilisearch no respondía al guardar, o si alguien escribió en la base fuera
+de la aplicación, **el índice se queda atrás sin ningún síntoma**. Lo publicado se ve en su página y
+simplemente no aparece al buscarlo.
 
 ## Backups
 

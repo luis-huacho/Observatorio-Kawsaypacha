@@ -21,9 +21,33 @@ Al entrar se ve el **Panel**, que responde de un vistazo las preguntas del día:
 - **Páginas más vistas**, **búsquedas más frecuentes** y **distritos con más ayudas memoria
   descargadas**. Esta última lista dice qué distritos se están llevando a mesas técnicas.
 - La última carga de datos activa, y un aviso si alguna capa del mapa quedó con error.
+- **El estado del buscador**, con su propio apartado más abajo.
 
 Las búsquedas más frecuentes son la lista más útil para planificar contenido: dice qué le está
 pidiendo la gente al Observatorio.
+
+### La tarjeta «Buscador»
+
+Dos columnas, y lo único que hay que mirar es que los números de cada fila **sean iguales**:
+
+| Contenido | En el buscador | Publicado |
+|---|---|---|
+| Medidas | 6 | 6 |
+| Centros poblados | 8,968 | 8,968 |
+
+«Publicado» es lo que hay en el sitio; «En el buscador» es lo que se puede encontrar buscándolo. Son
+dos cosas distintas: el buscador guarda su propia copia del contenido y la actualiza cada vez que se
+publica algo, así que **puede quedarse atrás** —si el servicio estuvo apagado un rato, por ejemplo—.
+Cuando eso pasa, lo publicado sigue viéndose en su página y simplemente no aparece al buscarlo, sin
+ningún otro síntoma. Por eso está la tarjeta.
+
+- **«activo y al día»**, en verde: todo correcto, no hay nada que hacer.
+- **«con índices desfasados»**, en rojo: pulsa **Reindexar la búsqueda**. Tarda unos segundos, se
+  puede repetir sin riesgo y el buscador **sigue funcionando mientras**. Si el aviso dice que hay
+  tareas en cola, espera unos segundos y recarga antes de pulsar: puede que ya se esté actualizando.
+- **«no responde»**: el servicio de búsqueda está caído. Esto **no se arregla desde el panel**: hay
+  que avisar. Mientras tanto el sitio sigue funcionando y el buscador pasa a un modo básico —sin
+  tolerancia a erratas ni acentos omitidos— y lo dice en pantalla a quien busque.
 
 ## Los tres roles
 
@@ -196,7 +220,7 @@ eso es en sí mismo un argumento para pedir que se haga.
 | Lo que se ve | Qué hacer |
 |---|---|
 | Publiqué algo y no sale en el sitio | Recargar. Comprobar que el estado quedó en **Publicado** |
-| Sale en su página pero el buscador no lo encuentra | Avisar: el buscador necesita reconstruir su índice |
+| Sale en su página pero el buscador no lo encuentra | Panel → tarjeta **Buscador** → **Reindexar la búsqueda**. Si la tarjeta dice «no responde», avisar |
 | El Excel no entró | Leer el registro de la carga: dice hoja y fila |
 | Una capa quedó en **error** | Leer el campo de errores de esa capa |
 | No llegan los correos de revisión | Comprobar que los usuarios tienen correo en su ficha, y avisar |

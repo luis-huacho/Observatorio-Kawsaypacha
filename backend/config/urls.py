@@ -4,13 +4,25 @@ from django.contrib import admin
 from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from apps.core.vistas_admin import reindexar_busqueda
 from apps.mapas.vistas_tiles import servir_tile
 
 urlpatterns = [
-    path(settings.ADMIN_URL, admin.site.urls),
+    # ⚠️ Todo lo que cuelgue del prefijo del admin va **ANTES** de `admin.site.urls`. El AdminSite
+    # de Django termina sus URLs con un `catch_all_view` que casa con cualquier cosa bajo su
+    # prefijo y responde 404, así que una ruta declarada después nunca se alcanza. Estas dos
+    # estuvieron detrás y la subida de imágenes del editor daba 404 sin que nada lo dijera.
+    #
     # Subida de imágenes desde el editor. Va bajo el prefijo del admin porque solo la usa el
     # personal autenticado; expuesta aparte sería una vía de subida sin dueño claro.
     path(f"{settings.ADMIN_URL}ckeditor5/", include("django_ckeditor_5.urls")),
+    # Botón «reindexar la búsqueda» del panel.
+    path(
+        f"{settings.ADMIN_URL}buscador/reindexar/",
+        reindexar_busqueda,
+        name="reindexar-busqueda",
+    ),
+    path(settings.ADMIN_URL, admin.site.urls),
     path("api/", include("apps.api.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),

@@ -28,7 +28,18 @@ NOMBRE_LLAVE_BUSQUEDA = "frontend-search-only"
 UID_LLAVE_BUSQUEDA = "3401f070-db11-4dd8-a6b5-1f1ea06033dc"
 
 
-def cliente():
+#: Segundos de espera para las consultas de **estado** (`disponible`, `estado_indices`).
+#:
+#: Sin timeout, un Meilisearch que acepta la conexión y no contesta —reindexando algo enorme,
+#: swap agotando memoria, la red a medias— deja colgada la petición que preguntaba por él: la de
+#: `/api/buscar/estado/` que hace el navegador en cada búsqueda, y la portada del admin. Una
+#: comprobación de salud que se puede quedar esperando no es una comprobación de salud.
+#:
+#: **No se aplica a indexar**: `reconstruir` espera hasta 180 s por tarea y así debe seguir.
+TIMEOUT_ESTADO = 3
+
+
+def cliente(timeout: int | None = None):
     """Cliente con la master key. Solo para el backend."""
     import meilisearch
 
@@ -36,7 +47,7 @@ def cliente():
         raise RuntimeError(
             "MEILI_MASTER_KEY no está configurada: sin ella no se puede administrar el índice."
         )
-    return meilisearch.Client(settings.MEILI_URL, settings.MEILI_MASTER_KEY)
+    return meilisearch.Client(settings.MEILI_URL, settings.MEILI_MASTER_KEY, timeout=timeout)
 
 
 def cliente_url() -> str:
@@ -47,7 +58,7 @@ def cliente_url() -> str:
 def disponible() -> bool:
     """¿Está Meilisearch arriba? El frontend degrada a DRF si no (spec 04)."""
     try:
-        return bool(cliente().is_healthy())
+        return bool(cliente(timeout=TIMEOUT_ESTADO).is_healthy())
     except Exception:  # noqa: BLE001 — la indisponibilidad es un estado, no un error
         return False
 
@@ -370,6 +381,64 @@ def reconstruir(slug: str) -> int:
     cli.wait_for_task(cli.swap_indexes([{"indexes": [slug, temporal]}]).task_uid)
     cli.wait_for_task(cli.delete_index(temporal).task_uid)
     return len(docs)
+
+
+def estado_indices() -> dict:
+    """¿Está arriba la búsqueda, y está al día?
+
+    Devuelve `{disponible, pendientes, al_dia, indices: [{slug, etiqueta, en_meili, en_bd,
+    al_dia}]}`. Alimenta el panel del admin y `manage.py meili_estado`, que son las dos formas de
+    responder esas preguntas sin abrir un shell.
+
+    Por qué hace falta: **el desfase del índice es silencioso**. La sincronización va por señales
+    hacia el worker (`core/signals.py`), así que si el worker estuvo caído, si Meilisearch no
+    respondía al guardar, o si alguien escribió fuera del ORM, el índice se queda atrás y el único
+    síntoma es «el buscador no encuentra algo que sí está publicado». Nadie se entera hasta que
+    alguien lo nota.
+
+    Se compara contra `queryset()`, el mismo del que salen los documentos: el número de la derecha
+    es lo que **debería** estar indexado, no el total de la tabla.
+
+    `pendientes` son las tareas que Meilisearch tiene en cola: justo después de un rebuild los
+    conteos van con retraso, y eso es «indexando», no «desfasado».
+
+    **No se usa `numberOfDocuments` de `/stats`, y esa es la parte que hay que no romper.** Está
+    cacheado: tras vaciar un índice —comprobado en Meilisearch 1.15— sigue devolviendo el conteo
+    anterior mientras la búsqueda ya no encuentra nada, así que una comprobación basada en él da el
+    índice por bueno justo en el caso que tiene que detectar. El total exacto es el de
+    `get_documents({"limit": 0})`, que no devuelve documentos y cuesta ~17 ms para los siete.
+
+    **No lanza nunca.** Un buscador caído no puede tumbar la portada del admin.
+    """
+    vacio = {"disponible": False, "pendientes": 0, "al_dia": False, "indices": []}
+    try:
+        cli = cliente(timeout=TIMEOUT_ESTADO)
+        pendientes = cli.get_tasks({"statuses": "enqueued,processing"}).total
+    except Exception:  # noqa: BLE001 — la indisponibilidad es un estado, no un error
+        return vacio
+
+    indices = []
+    for slug, indice in INDICES.items():
+        try:
+            en_meili = cli.index(slug).get_documents({"limit": 0}).total
+        except Exception:  # noqa: BLE001 — el índice puede no existir todavía
+            en_meili = None
+        en_bd = indice.queryset().count()
+        indices.append({
+            "slug": slug,
+            "etiqueta": indice.etiqueta,
+            # `None` = el índice no existe todavía en Meilisearch, que no es lo mismo que 0
+            # documentos: significa que `meili_setup` no ha llegado a correr contra esta instancia.
+            "en_meili": en_meili,
+            "en_bd": en_bd,
+            "al_dia": en_meili == en_bd,
+        })
+    return {
+        "disponible": True,
+        "pendientes": pendientes,
+        "al_dia": all(i["al_dia"] for i in indices),
+        "indices": indices,
+    }
 
 
 def _crear_llave_busqueda(cli):

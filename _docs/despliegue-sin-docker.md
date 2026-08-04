@@ -505,6 +505,11 @@ comprueba con `sudo certbot renew --dry-run`.
 # tabla de eventos crece sin límite.
 15 3 * * * cd /srv/observatorio/backend && sudo -u observatorio .venv/bin/python manage.py shell -c "from apps.core.tasks import agregar_metricas; agregar_metricas.func()" >> /var/log/observatorio-metricas.log 2>&1
 
+# Vigilancia del buscador. Sale con código ≠ 0 si el servicio no responde o si algún índice está
+# desfasado, y eso pasa **sin ningún síntoma**: lo publicado se ve en su página y no aparece al
+# buscarlo. Comprueba y avisa; reindexar es una decisión de una persona (botón en el panel del admin).
+30 4 * * * cd /srv/observatorio/backend && sudo -u observatorio .venv/bin/python manage.py meili_estado || mail -s "Observatorio: revisar el buscador" alguien@predes.org.pe
+
 # Volcado diario de la base gestionada, con 14 días de retención.
 30 2 * * * PGPASSWORD=<contraseña> pg_dump -h <host> -U <usuario> -d observatorio --clean --if-exists | gzip > /var/backups/observatorio/db-$(date +\%F).sql.gz && find /var/backups/observatorio -name 'db-*.sql.gz' -mtime +14 -delete
 
@@ -542,6 +547,9 @@ Y dos cosas que tampoco están en el volcado: el contenido de `media/` (se resta
 
 ```bash
 systemctl is-active meilisearch observatorio-backend observatorio-worker nginx
+
+# Buscador: servicio arriba **y** índices al día. Sale con código ≠ 0 si algo falla.
+cd /srv/observatorio/backend && sudo -u observatorio .venv/bin/python manage.py meili_estado
 
 curl -sI https://observatorio.predes.org.pe/ | head -1          # 200, la SPA
 curl -s  https://obs.predes.org.pe/api/sitio/ | head -c 80      # JSON de configuración
@@ -585,7 +593,8 @@ CORS y el bundle.
 |---|---|
 | Desplegar una actualización | `git pull`, `uv sync --no-dev`, `migrate`, `collectstatic`, `systemctl restart observatorio-backend observatorio-worker`, y rehacer el build del frontend |
 | Sembrar o resembrar datos | `manage.py seed` |
-| Reindexar la búsqueda | `manage.py meili_rebuild` |
+| **Comprobar el buscador** (servicio + índices al día) | `manage.py meili_estado` |
+| Reindexar la búsqueda | `manage.py meili_rebuild` — o el botón de la tarjeta «Buscador» del panel del admin |
 | Regenerar tiles | `manage.py generar_tiles_ccpp` · `manage.py generar_tiles --rehacer` |
 | Logs | `journalctl -u observatorio-backend -u observatorio-worker -f` |
 | Recargar nginx | `sudo nginx -t && sudo systemctl reload nginx` |

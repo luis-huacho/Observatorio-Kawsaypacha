@@ -90,6 +90,10 @@ Admin de `CapaCartografica`: subir/reemplazar GeoJSON → acción **"(Re)generar
 
 Página de inicio del admin con: visitas últimos 30 días (ResumenDiario), top páginas, búsquedas más frecuentes, descargas de PDF/Excel/documentos, conteos de contenido por estado. Tablas + gráficas simples (componentes de Unfold). Tarea nocturna (cron del worker): agregación a `ResumenDiario` + purga de `EventoUso` > 90 días.
 
+Además, **tarjeta «Buscador»** (`meili.estado_indices()`): si el servicio responde y, por índice, documentos indexados frente a publicados. Es la única forma que tiene PREDES de enterarse de un índice desfasado, que no da ningún otro síntoma que «lo publicado no aparece al buscarlo» (ver 04). Con un botón **Reindexar la búsqueda** que encola `core.tasks.reindexar_meili` —encolar y no ejecutar: reconstruir `ccpp` son ~16 s y 8.968 documentos—, en `apps/core/vistas_admin.py`, con `staff_member_required` + `require_POST`.
+
+> **Todo lo que se monte bajo `ADMIN_URL` va ANTES de `admin.site.urls`.** `AdminSite` termina sus URLs con un `catch_all_view` que casa con cualquier cosa bajo su prefijo y responde 404, así que una ruta declarada después nunca se alcanza. La subida de imágenes de CKEditor estuvo así y devolvía 404 sin decirlo; hay prueba de regresión en `tests/test_urls_admin.py`.
+
 ## Pantallas de mantenimiento de textos estáticos
 
 - `BloqueTexto` agrupado por `pagina` en el admin (fieldsets/filtros): el editor encuentra "Portada", "Sobre", "Footer" y edita el texto con rich text.

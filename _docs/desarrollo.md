@@ -86,6 +86,13 @@ dm seed --tiles            # genera los PMTiles (necesita tippecanoe: usar el co
 dm seed --solo-catalogos   # solo catálogos, grupos y textos; sin importar Excel
 ```
 
+Y para el buscador:
+
+```bash
+dm meili_estado            # ¿está arriba y al día? sale con código ≠ 0 si no
+dm meili_rebuild [indice]  # reconstruir; también hay un botón en el panel del admin
+```
+
 Es **idempotente** y **no pisa lo que hayas editado**: crea lo que falta y deja en paz lo que ya
 existe. Se puede correr en cada despliegue sin miedo a devolverle a PREDES sus textos al valor de
 fábrica.
@@ -136,7 +143,7 @@ hasta que la añadas.
 ## Pruebas
 
 ```bash
-dc exec backend pytest                 # 118 pruebas, ~28 s (sin las lentas)
+dc exec backend pytest                 # 136 pruebas, ~37 s (sin las lentas)
 dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
@@ -186,6 +193,14 @@ encontró, está en `_specs/08-plan-pruebas.md`.
   fácil: `GET /search/health` devolvía 200 **porque la raíz de Meilisearch también devuelve 200**.
 - **El HTML rico se sanea en `save()` del modelo** (`HtmlRicoMixin.campos_html`), no en el admin.
   Si añades un campo de CKEditor, declárarlo ahí: `campos_rich` del admin solo elige el widget.
+- **Lo que cuelgue del prefijo del admin va antes de `admin.site.urls`.** El `AdminSite` de Django
+  termina con un `catch_all_view` que se queda con todo su prefijo y responde 404: una ruta
+  declarada después nunca se alcanza. Pasó con la subida de imágenes del editor, que daba 404 sin
+  decirlo. Hay prueba de regresión en `tests/test_urls_admin.py`.
+- **`numberOfDocuments` de las estadísticas de Meilisearch está cacheado.** Tras vaciar un índice
+  sigue devolviendo el conteo anterior mientras la búsqueda ya no encuentra nada, así que no sirve
+  para comprobar si el índice está al día: se usa `get_documents({"limit": 0}).total`. Lo comprueba
+  `manage.py meili_estado`.
 - **La llave de búsqueda va dentro del bundle**, no se lee en runtime, y vive en **dos** `.env`:
   `frontend/.env` para `npm run dev` y el de la raíz para el sitio compilado. Actualizar solo el
   primero deja el bundle con una llave que Meilisearch rechaza, y entonces se degradan tres cosas
