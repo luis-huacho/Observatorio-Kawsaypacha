@@ -173,6 +173,40 @@ Comandos propios del proyecto:
 | `generar_tiles_ccpp` | Regenerar los PMTiles de centros poblados |
 | `generar_tiles [--rehacer]` | Regenerar los PMTiles de las capas de contexto |
 
+### ¿Reconstruir, recrear o reiniciar?
+
+Depende de si lo que cambiaste vive **dentro de la imagen** o **montado desde el disco**.
+
+| Qué cambias | Qué hace falta |
+| --- | --- |
+| Código Python, plantillas, migraciones | `docker compose build backend && docker compose up -d backend worker` |
+| `pyproject.toml` / `uv.lock` | Lo mismo: reconstruir |
+| Código del frontend o cualquier `VITE_*` | `docker compose build frontend && docker compose run --rm frontend` |
+| `deploy/nginx/conf.d/*.conf` y `*.inc` | `docker compose exec nginx nginx -s reload` |
+| `deploy/nginx/templates/*` y `docker-entrypoint.d/*` | `docker compose restart nginx` |
+| `SITE_DOMAIN`, `API_DOMAIN` o cualquier cosa de `backend/.env` | `docker compose up -d` — **recrear**, no `restart` |
+
+**`restart` no relee los `.env`.** Las variables de entorno se fijan cuando se **crea** el
+contenedor, no cuando arranca: si cambias `backend/.env` o los dominios y haces `restart`, el
+contenedor sigue con los valores viejos **y no lo dice**. `up -d` sí recrea al detectar que la
+configuración cambió.
+
+**En producción el backend no monta el código.** `compose.yaml` solo monta `media`, `static` y
+`data/layers`; el código va horneado por el `COPY` del Dockerfile, así que un `restart` tras editar
+un `.py` no hace nada. En **desarrollo** es al revés: `compose.dev.yml` monta `./backend:/app` y
+`runserver` recarga solo, de modo que ahí no se reconstruye salvo que cambien las dependencias.
+
+**Y el que más se olvida: `docker compose run --rm frontend`.** Ese servicio es de un solo disparo
+—construye el bundle y lo copia al volumen que sirve nginx— y **no es opcional en cada
+despliegue**. Sin él, el backend se actualiza y el sitio se queda con el bundle anterior, sin un
+solo error. `restart frontend` tampoco sirve: ese contenedor ya terminó su trabajo.
+
+```bash
+# Desplegar una actualización, entera y en orden
+git pull && docker compose build backend frontend && docker compose up -d \
+  && docker compose run --rm frontend
+```
+
 ## 5. Revisar que el sistema está bien
 
 Ocho comprobaciones, elegidas porque cada una cubre algo que **falla en silencio**: la página carga,
