@@ -15,8 +15,17 @@ from django.conf import settings
 
 from apps.core.sanitizar import a_texto_plano
 
-#: Nombre de la llave search-only. `meili_setup` la busca por aquí para no duplicarla.
+#: Nombre de la llave search-only, solo para poder reconocerla en el panel de Meilisearch.
 NOMBRE_LLAVE_BUSQUEDA = "frontend-search-only"
+
+#: uid **fijo** de la llave search-only, y la razón de que la llave sea estable.
+#:
+#: Las llaves de Meilisearch son deterministas: `key` es el SHA-256 del uid con la master key. Con
+#: un uid fijo, el mismo `MEILI_MASTER_KEY` devuelve siempre la misma llave, así que recrear el
+#: volumen de Meilisearch o restaurar un respaldo **ya no invalida el bundle del frontend**.
+#:
+#: Cambiar este valor rota la llave: obliga a actualizar los dos `.env` y a reconstruir el frontend.
+UID_LLAVE_BUSQUEDA = "3401f070-db11-4dd8-a6b5-1f1ea06033dc"
 
 
 def cliente():
@@ -363,22 +372,58 @@ def reconstruir(slug: str) -> int:
     return len(docs)
 
 
-def llave_busqueda() -> str:
-    """Devuelve la llave search-only, creándola si no existe.
-
-    Idempotente a propósito: `meili_setup` corre en cada arranque del backend, y crear una
-    llave nueva cada vez llenaría Meilisearch de llaves y obligaría a reconfigurar el frontend
-    después de cada despliegue.
-    """
-    cli = cliente()
-    for llave in cli.get_keys().results:
-        if llave.name == NOMBRE_LLAVE_BUSQUEDA:
-            return llave.key
-    creada = cli.create_key({
+def _crear_llave_busqueda(cli):
+    return cli.create_key({
+        "uid": UID_LLAVE_BUSQUEDA,
         "name": NOMBRE_LLAVE_BUSQUEDA,
         "description": "Solo búsqueda, para el frontend del Observatorio Kallpachakuy.",
         "actions": ["search"],
         "indexes": INDICES_PUBLICOS,
         "expiresAt": None,
     })
-    return creada.key
+
+
+def _llave_al_dia(llave) -> bool:
+    """La llave sirve tal cual: mismos permisos y mismos índices públicos.
+
+    Si se añade un índice público, la llave existente no lo cubre y ese índice responde 403 **solo
+    él**, con el resto de la búsqueda funcionando: un fallo parcial y silencioso.
+    """
+    return set(llave.actions) == {"search"} and set(llave.indexes) == set(INDICES_PUBLICOS)
+
+
+def llave_busqueda() -> str:
+    """Devuelve la llave search-only, creándola si no existe.
+
+    Se identifica **por su uid fijo**, no por su nombre, y eso es lo que la hace estable: las
+    llaves de Meilisearch son deterministas —`key` es el SHA-256 del uid con la master key—, así
+    que el mismo `MEILI_MASTER_KEY` con el mismo uid devuelve siempre la misma llave. Antes se
+    creaba con uid aleatorio y por tanto vivía en el volumen de Meilisearch: recrear el volumen (o
+    restaurar un respaldo) cambiaba la llave y **dejaba el bundle del frontend con una llave que ya
+    no existía**, con el buscador cayendo al fallback de DRF, las facetas de `/medidas` sin conteos
+    y el autocompletado de lugares sin resultados. Solo el primero avisaba.
+
+    Idempotente: `meili_setup` corre en cada arranque del backend.
+    """
+    cli = cliente()
+
+    actual = None
+    try:
+        actual = cli.get_key(UID_LLAVE_BUSQUEDA)
+    except Exception:  # noqa: BLE001 — «no existe» es un estado, y el SDK lo comunica lanzando
+        actual = None
+
+    if actual is not None:
+        if _llave_al_dia(actual):
+            return actual.key
+        # `PATCH /keys/{uid}` solo admite `name` y `description`: para cambiar los índices hay que
+        # borrar y volver a crear. Con el mismo uid la llave sale idéntica, así que el frontend
+        # que ya esté desplegado sigue siendo válido.
+        cli.delete_key(UID_LLAVE_BUSQUEDA)
+
+    # Llaves heredadas de cuando el uid era aleatorio: se retiran para no dejar dos válidas.
+    for llave in cli.get_keys().results:
+        if llave.name == NOMBRE_LLAVE_BUSQUEDA and llave.uid != UID_LLAVE_BUSQUEDA:
+            cli.delete_key(llave.uid)
+
+    return _crear_llave_busqueda(cli).key

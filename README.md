@@ -84,8 +84,9 @@ docker compose -f compose.yaml -f compose.dev.yml up -d --build
 docker compose -f compose.yaml -f compose.dev.yml exec backend \
   python manage.py seed --demo --capas --tiles
 
-# e. Copiar a frontend/.env la llave de búsqueda que imprime el paso anterior
-#    (también la reimprime `manage.py meili_setup`)
+# e. Copiar la llave de búsqueda que imprime el paso anterior a LOS DOS .env
+#    (también la reimprime `manage.py meili_setup`): frontend/.env para `npm run dev`
+#    y el .env de la raíz para el bundle compilado (§7). No cambia con el tiempo.
 #      VITE_MEILI_SEARCH_KEY=...
 
 # f. El frontend, en el host
@@ -142,7 +143,10 @@ Es la confusión más habitual: son tres archivos, con tres consumidores distint
 Ninguno se versiona; los tres `.env.example` sí. Dos cosas que conviene saber:
 
 - **Las `VITE_*` se hornean en el bundle durante el build**, no se leen en runtime. Cambiarlas exige
-  reconstruir la imagen del frontend, no reiniciarla.
+  reconstruir la imagen del frontend, no reiniciarla. Ojo con la consecuencia: la
+  `VITE_MEILI_SEARCH_KEY` es **la misma en los dos últimos archivos** y hay que cambiarla en los dos.
+  Actualizar solo `frontend/.env` arregla `npm run dev` y deja el sitio compilado con una llave
+  inválida — es exactamente lo que pasó una vez.
 - **`backend/.env` lo lee Django directamente**, así que también sirve para correr `manage.py` desde
   el host (ver §9).
 
@@ -181,7 +185,7 @@ el API responde 200 y la cifra que se publica es otra.
 | Los tiles salen por rangos | `curl -sr 0-99 -D - -o /dev/null localhost:8000/tiles/ccpp.pmtiles` | **206**, no 200: sin Range el visor descarga 3 MB por tesela |
 | Las capas se anuncian | `curl -s localhost:8000/api/mapas/capas/` | tres capas con su URL: los PMTiles se generaron |
 | Los filtros llegan al API | filtrar por peligro y nivel en `/peligros` | la tabla se recorta y el total lo da el servidor, no las filas cargadas |
-| La búsqueda usa Meilisearch | `curl -s localhost:8000/api/buscar/estado/` | `meili_disponible: true`; si es `false`, está en modo degradado |
+| La búsqueda usa Meilisearch **con la llave del navegador** | `curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:7700/multi-search -H "Authorization: Bearer $VITE_MEILI_SEARCH_KEY" -H 'Content-Type: application/json' -d '{"queries":[{"indexUid":"medidas","q":"cusco","limit":1}]}'` | **200**. Un **403** es la llave del bundle caducada, y hay que mirarlo así: `/api/buscar/estado/` dice `meili_disponible: true` igualmente, porque el backend consulta con la master key, y `/search/health` responde 200 sin credencial |
 | El admin y el flujo editorial | entrar, crear una noticia, enviarla a revisión y publicarla | credenciales, permisos y avisos por correo (van a `logs -f worker`) |
 | La ayuda memoria | `curl -so /tmp/am.pdf localhost:8000/api/distritos/080101/ayuda-memoria.pdf` | WeasyPrint y la captura del mapa con Chromium |
 
@@ -191,7 +195,7 @@ Las cinco comprobaciones **manuales previas a la entrega** —más exigentes que
 ## 6. Probar
 
 ```bash
-dc exec backend pytest                 # 113 pruebas, ~30 s
+dc exec backend pytest                 # 118 pruebas, ~28 s
 dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
 
 cd frontend && npm run lint            # tsc --noEmit
@@ -258,18 +262,23 @@ Meilisearch directamente, así que un proxy `/search/` mal configurado es invisi
 dc down -v      # ⚠️ -v BORRA los volúmenes: base de datos, índices, media y tiles
 dc up -d
 dm seed --demo --capas --tiles
-dm meili_setup  # ← imprime una llave de búsqueda NUEVA: cópiala a frontend/.env
+dm meili_setup  # reimprime la llave de búsqueda, que NO cambia con el reset
 ```
 
 `down` sin `-v` conserva los datos; `down -v` los borra. Es la forma de comprobar que las
 instrucciones de §1 funcionan en una máquina limpia — en un reset real tarda unos 50 s: 20 s en
 levantar y 29 s en sembrar con tiles.
 
-> **La llave de búsqueda cambia con el reset**, porque vive en los datos de Meilisearch. Si dejas la
-> vieja en `frontend/.env`, el navegador recibe **403** al buscar y el sitio cae al fallback de DRF:
-> sigue funcionando, sin facetas y sin tolerancia a errores de tecleo, y lo único que lo delata son
-> los 403 en la consola del navegador. Es el mismo tipo de degradación silenciosa que el fallo del
-> proxy `/search/`.
+> **La llave de búsqueda ya no cambia con el reset.** Se deriva del uid fijo de la llave y de
+> `MEILI_MASTER_KEY` (las llaves de Meilisearch son deterministas: `key` es el SHA-256 de las dos
+> cosas), así que borrar el volumen la deja igual. Antes se creaba con uid aleatorio y **esto pasó de
+> verdad**: tras un `down -v` el bundle se quedó con una llave inexistente y el buscador cayó al
+> fallback de DRF, con las facetas de `/medidas` sin conteos y el autocompletado de lugares vacío.
+>
+> La llave **solo** cambia si cambias `MEILI_MASTER_KEY`. Y entonces va a **los dos** `.env`:
+> `frontend/.env` para `npm run dev` y el **`.env` de la raíz** para el bundle compilado, que es lo
+> que sirve nginx. Vite hornea las `VITE_*` en el build: hay que **reconstruir** el frontend, no
+> reiniciarlo.
 
 ## 9. Cuando algo no arranca
 
@@ -280,7 +289,7 @@ levantar y 29 s en sembrar con tiles.
 | El visor sale sin puntos | `/api/ccpp/geojson/` con los mismos filtros que manda la página; si devuelve `features: []`, el filtro está de más |
 | El buscador no encuentra algo publicado | `dm meili_rebuild` |
 | El sitio carga pero sin datos | `frontend/.env`: `VITE_API_URL` no apunta a `http://localhost:8000/api` |
-| **403** al buscar, en la consola del navegador | La `VITE_MEILI_SEARCH_KEY` de `frontend/.env` ya no existe (pasa tras un `down -v`): `dm meili_setup` y copiar la nueva |
+| **403** al buscar, o el aviso «modo básico», o los filtros de `/medidas` sin conteos | La `VITE_MEILI_SEARCH_KEY` con la que se construyó el frontend no existe en Meilisearch. `dm meili_setup` y copiarla a **los dos** `.env` (`frontend/.env` y el de la raíz); si estás en modo producción local, además **reconstruir**: `docker compose -f compose.yaml -f compose.local.yml build frontend && … run --rm frontend`. La consola del navegador lo dice con todas las letras (`[buscador] Meilisearch rechazó la llave…`) |
 | El admin da 404 | El prefijo es `ADMIN_URL`, no `/admin/`: mira `backend/.env` |
 | «port is already allocated» | Otro proyecto ocupa 5432, 7700, 8000 o 80. `dc down` en el otro, o cambia el puerto publicado en `compose.dev.yml` |
 | Un Excel no entra | Admin → Cargas de datos → el `log` de la carga, que cita hoja y fila |

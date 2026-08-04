@@ -7,6 +7,27 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 - Fase 0 (prototipo estático) **completada y aprobada** por PREDES.
 - Fase actual: construcción de `frontend/` (Vite + React + TS + MapLibre) y `backend/` (Django 5.2 LTS + PostgreSQL + Meilisearch + PMTiles), desplegados con Docker Compose.
 
+### Actualización 03/08/2026 — la llave de búsqueda pasa a ser determinista
+
+El buscador apareció en «modo básico» en el sitio compilado. La causa: la llave *search-only* se
+creaba con **uid aleatorio**, así que vivía en el volumen de Meilisearch; un `down -v` la cambió, se
+actualizó `frontend/.env` y no el `.env` de la raíz —el que Compose hornea en el bundle— y el sitio
+quedó buscando con una llave inexistente (403). Se corrigieron 04 y 08:
+
+- **La llave se crea con un uid fijo**, y por eso ya no caduca: la documentación de Meilisearch
+  garantiza que `key` es el SHA-256 del uid con la master key, de modo que el mismo
+  `MEILI_MASTER_KEY` devuelve siempre la misma llave. Comprobado destruyendo el volumen: sale
+  idéntica. Cambiar los índices públicos obliga a borrar y recrear —`PATCH /keys` no admite tocar
+  `indexes`—, y al recrear con el mismo uid la llave no cambia.
+- **Un rechazo de llave degrada tres cosas y solo una avisa** (documentado en 04): la búsqueda global
+  cae al fallback y lo dice; las facetas de `/medidas` se quedan sin conteos y el autocompletado de
+  lugares sin resultados, las dos en silencio. `lib/search.ts` pasa a distinguir el 401/403 del «no
+  responde» y a escribirlo en consola.
+- **Dos pruebas que no probaban lo que decían** (en 08): la de «se usa Meilisearch» comprobaba que se
+  llamara a `multi-search`, no que respondiera 200, así que pasaba con el 403; y la corrida en
+  desarrollo no puede detectar este fallo, porque la llave del bundle solo se usa en el sitio
+  compilado.
+
 ### Actualización 03/08/2026 — el comparador fuera del menú y el header en una línea
 
 Dos cambios pedidos sobre el cascarón del sitio. Se corrigieron 00, 06 y 08:

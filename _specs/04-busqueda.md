@@ -36,7 +36,23 @@ Doble mecanismo (señales para el día a día, comando para recuperación):
 
 1. **Signals** `post_save`/`post_delete` en los modelos Workflow → encolan tarea `sync_meili(indice, pk)` (django-tasks; nunca bloquea el admin). Lógica: si `estado=publicado` → upsert del documento; en cualquier otro estado o borrado → delete del índice.
 2. **Comando** `manage.py meili_rebuild [indice]` — reconstrucción total (swap por índice temporal para no dejar huecos). Se corre: al desplegar, tras `DatasetUpload` de peligros (índice `ccpp`) y ante cualquier inconsistencia.
-3. **Comando** `manage.py meili_setup` — idempotente, corre en el arranque del backend: crea índices, aplica settings (searchable/filterable/sortable, ranking, synonyms es-PE opcionales: "helada"≈"friaje" NO — son peligros distintos; sinónimos solo ortográficos) y **genera la llave search-only** restringida a los índices públicos, imprimiéndola para copiarla a `frontend/.env` (`VITE_MEILI_SEARCH_KEY`).
+3. **Comando** `manage.py meili_setup` — idempotente, corre en el arranque del backend: crea índices, aplica settings (searchable/filterable/sortable, ranking, synonyms es-PE opcionales: "helada"≈"friaje" NO — son peligros distintos; sinónimos solo ortográficos) y **genera la llave search-only** restringida a los índices públicos, imprimiéndola para copiarla a los `.env` (`VITE_MEILI_SEARCH_KEY`, ver abajo).
+
+### La llave search-only es determinista, y tiene que serlo
+
+Se crea con un **uid fijo** (`meili.UID_LLAVE_BUSQUEDA`). La documentación de Meilisearch lo dice así: *«Custom API keys are deterministic: the key itself is a SHA256 hash of the key's UID and the master key»*. Con uid fijo, el mismo `MEILI_MASTER_KEY` devuelve **siempre la misma llave**, de modo que recrear el volumen de Meilisearch o restaurar un respaldo no la invalida.
+
+No es un detalle de elegancia: **la llave va horneada en el bundle compilado del frontend** (`VITE_*` son variables de build), así que una llave que cambia obliga a reconstruir y republicar el frontend, y si alguien no lo hace el sitio se degrada en tres sitios a la vez y **solo uno avisa**:
+
+| Qué usa la llave | Qué pasa si la rechazan |
+|---|---|
+| `/buscar` (multi-search) | Cae al fallback de DRF **y lo dice en pantalla**: «el buscador está en modo básico» |
+| Facetas de `/medidas` | `facetasDe` devuelve `{}` y los filtros se quedan **sin conteos**, sin ningún aviso |
+| Autocompletado de lugares (visor, GeoSelector) | `buscarLugares` devuelve `[]`: el buscador de lugares no encuentra nada, sin ningún aviso |
+
+Pasó en desarrollo: la llave se creaba con uid aleatorio, un `down -v` la cambió, se actualizó `frontend/.env` y no el `.env` de la raíz —el que Compose hornea en el bundle—, y el sitio compilado se quedó buscando con una llave inexistente. Por eso, además del uid fijo: `frontend/src/lib/search.ts` distingue el rechazo de credencial (401/403) del «no responde» y escribe en consola un mensaje explícito, que es la única pista disponible para quien opera el sitio.
+
+Cambiar los índices públicos obliga a **borrar y recrear** la llave (`PATCH /keys/{uid}` solo admite `name` y `description`); al recrearla con el mismo uid vuelve a salir idéntica, así que el frontend ya desplegado sigue siendo válido. Sin eso, añadir un índice público dejaría a la llave sin permiso sobre él y ese índice devolvería 403 **solo él**, con el resto funcionando.
 
 Cliente Python: paquete `meilisearch` en `core/services/meili.py`.
 

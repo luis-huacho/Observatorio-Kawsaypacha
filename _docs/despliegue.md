@@ -125,10 +125,18 @@ curl -sI https://obs.predes.org.pe/gestion/login/ | head -1     # 200, el admin
 curl -sr 0-99 -D - -o /dev/null https://obs.predes.org.pe/tiles/ccpp.pmtiles | grep -i 206
 curl -s https://obs.predes.org.pe/api/peligros/resumen/ | grep -o '"total_ccpp":[0-9]*'
 
-# Buscador: 401 es la respuesta CORRECTA sin llave. Lo que importa es que Meilisearch reciba
-# la ruta, no la raíz.
+# Buscador, dos comprobaciones distintas y las dos necesarias:
+# a. Sin llave → 401. Confirma que el proxy manda la ruta y no la raíz (un 405 sería el proxy mal).
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
   -H 'Content-Type: application/json' -d '{"queries":[]}' \
+  https://obs.predes.org.pe/search/multi-search
+
+# b. CON la llave del .env → 200. Confirma que la llave con la que se construyó el bundle sigue
+#    siendo válida. Es la que faltaba, y su ausencia costó un buscador en modo básico.
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  -H "Authorization: Bearer $VITE_MEILI_SEARCH_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"queries":[{"indexUid":"medidas","q":"cusco","limit":1}]}' \
   https://obs.predes.org.pe/search/multi-search
 ```
 
@@ -139,6 +147,15 @@ El del resumen debe decir `8968`.
 > lo destaparon— esa comprobación pasa igual y el buscador cae al fallback de DRF en cada
 > búsqueda, sin un error a la vista. Por eso se comprueba `multi-search` con POST: **405 significa
 > proxy mal configurado**, y 401 (sin llave) o 200 (con ella) significa que llega bien.
+
+> **Y un 401/403 *con* la llave tampoco es un problema del proxy: es la llave del bundle.** La
+> `VITE_MEILI_SEARCH_KEY` va horneada en el frontend compilado, así que si no coincide con la de
+> Meilisearch el sitio se degrada en tres sitios —búsqueda, conteos de las facetas de `/medidas` y
+> autocompletado de lugares— y **solo el primero lo dice en pantalla**. La consola del navegador
+> escribe `[buscador] Meilisearch rechazó la llave…`. Arreglo: `meili_setup`, copiar la llave al
+> `.env` de la raíz y **reconstruir** el frontend (`build frontend` + `run --rm frontend`).
+> La llave es estable —se deriva del uid fijo y de `MEILI_MASTER_KEY`—, así que esto solo puede
+> pasar si se cambia la master key o si el bundle se construyó con un `.env` desactualizado.
 
 Y en el navegador, `/peligros` tiene que pintar los puntos: es lo que confirma de una vez que el
 API, los tiles, CORS y el bundle están todos bien. La verificación completa es

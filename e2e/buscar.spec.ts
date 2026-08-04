@@ -54,24 +54,41 @@ test.describe("Búsqueda", () => {
     // Se observa qué hace la página en vez de preguntar antes por el estado del servicio: la URL
     // del API depende del entorno (en desarrollo vive en otro puerto), así que consultarla desde
     // la prueba obligaría a duplicar aquí la configuración del frontend.
-    const meili: string[] = [];
+    //
+    // Y se miran los **status**, no solo que la petición se haya hecho. En su primera versión esta
+    // prueba comprobaba que se llamara a `multi-search` y pasaba con la llave caducada: la llamada
+    // se hacía, Meilisearch devolvía 403 y el sitio se iba al fallback igualmente. Una prueba que
+    // comprueba la intención en vez del resultado es el mismo error que dar por bueno el buscador
+    // porque `GET /search/health` respondía 200.
+    const multiSearch: number[] = [];
+    const otrasDeMeili: string[] = [];
     const fallback: string[] = [];
-    page.on("request", (r) => {
-      if (/multi-search|\/search\//.test(r.url())) meili.push(`${r.method()} ${r.url()}`);
+    page.on("response", (r) => {
+      if (r.url().includes("multi-search")) multiSearch.push(r.status());
+      else if (r.url().includes("/search/") || /:7700\//.test(r.url()))
+        otrasDeMeili.push(`${r.status()} ${r.url()}`);
       else if (r.url().includes("/api/buscar/")) fallback.push(r.url());
     });
 
     await page.goto(`/buscar?q=${CONSULTA}`);
     await expect(page.getByText(new RegExp(`Resultados para .${CONSULTA}`, "i"))).toBeVisible();
-    await expect.poll(() => meili.length + fallback.length).toBeGreaterThan(0);
+    await expect.poll(() => multiSearch.length + fallback.length).toBeGreaterThan(0);
 
-    if (!meili.length) {
-      test.skip(true, "Meilisearch no está disponible en este entorno: se usó el fallback de DRF");
+    if (!multiSearch.length && !otrasDeMeili.length) {
+      test.skip(true, "Meilisearch no está configurado en este entorno: se usó el fallback de DRF");
     }
+
     expect(
-      meili.filter((p) => p.includes("multi-search")).length,
-      `se llamó a /search/ pero no a multi-search:\n${meili.join("\n")}`,
-    ).toBeGreaterThan(0);
+      multiSearch,
+      `se habló con Meilisearch pero no por multi-search:\n${otrasDeMeili.join("\n")}`,
+    ).not.toEqual([]);
+    expect(
+      multiSearch.filter((s) => s === 200),
+      "multi-search respondió, pero no con 200. Un 401/403 significa que la llave con la que se " +
+        `construyó el bundle ya no existe en Meilisearch. Status: ${multiSearch.join(", ")}`,
+    ).not.toEqual([]);
+    // La confirmación desde la pantalla: el aviso solo se pinta con `motor === "drf"`.
+    await expect(page.getByText(/modo básico/i)).toHaveCount(0);
   });
 
   test("con Meilisearch inalcanzable el fallback de DRF responde igual", async ({ page }) => {

@@ -15,7 +15,7 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (113 pruebas, ~30 s)
+$DC exec backend pytest                 # suite backend (118 pruebas, ~28 s)
 $DC exec backend pytest -m lento        # los Excel completos y el PDF con mapa (~35 s más)
 cd frontend && npm run lint && npm run build    # tipos + build
 npx playwright test                             # E2E contra el stack levantado
@@ -130,6 +130,19 @@ Tres convenciones que la suite impone desde `e2e/apoyo.ts` y `e2e/fixtures.ts`:
 1. **Se vigila la consola.** Un error de JavaScript no rompe la página de forma visible —React sigue pintando lo que puede—, así que sin esto se puede dar por bueno un visor que perdió su capa de puntos.
 2. **El beacon de métricas se descarta.** El tráfico de las pruebas no es uso real y no debe acabar en el panel del admin.
 3. **Los enlaces del menú se buscan con `:visible`.** Existen dos veces —nav de escritorio y panel móvil— y solo una se muestra según el ancho; `.first()` cae siempre en la de escritorio.
+
+Y dos trampas más, las dos con la misma forma —**la prueba comprobaba la intención y no el
+resultado**—, las dos encontradas por un fallo real:
+
+- **La prueba «se usa Meilisearch» pasaba con la llave caducada.** Comprobaba que *se llamara* a
+  `multi-search`; la llamada se hacía, devolvía **403** y el sitio se iba al fallback igualmente. Y si
+  no se llamaba, hacía `test.skip` en vez de fallar. Ahora mira los **status** —exige al menos un
+  200— y que el aviso «modo básico» no esté en pantalla; el `skip` queda solo para el entorno sin
+  buscador configurado. Es el mismo error que dar por bueno el proxy porque `GET /search/health`
+  devolvía 200.
+- **Correr la suite en desarrollo no cubre la llave de búsqueda.** En `npm run dev` el navegador ataca
+  a Meilisearch con `frontend/.env`; la llave que puede estar mal es la que **se horneó en el bundle**
+  desde el `.env` de la raíz. Otra razón por la que la corrida contra nginx no es opcional.
 
 Y una trampa de medición, que costó una prueba que no comprobaba nada: **`elemento.getClientRects().length` no detecta que un texto se parta en dos líneas.** Los enlaces del menú son bloques, así que devuelven un solo rectángulo aunque su contenido ocupe dos líneas (se midió: 56 px de alto, un rectángulo). Las líneas se cuentan con un `Range` sobre el contenido del elemento, que devuelve un rectángulo por caja de línea.
 

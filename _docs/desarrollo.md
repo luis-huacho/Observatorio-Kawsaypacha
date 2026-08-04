@@ -26,8 +26,9 @@ docker compose -f compose.yaml -f compose.dev.yml up -d --build
 docker compose -f compose.yaml -f compose.dev.yml exec backend \
   python manage.py seed --demo --capas --tiles
 
-# 4. Copiar la llave de búsqueda que imprime el paso anterior a frontend/.env
-#    (también la imprime `manage.py meili_setup`)
+# 4. Copiar la llave de búsqueda que imprime el paso anterior a LOS DOS .env:
+#    frontend/.env (para `npm run dev`) y el .env de la raíz (para el bundle compilado).
+#    También la imprime `manage.py meili_setup`, y no cambia con el tiempo.
 
 # 5. El frontend, en el host
 cd frontend && npm install && npm run dev
@@ -135,7 +136,7 @@ hasta que la añadas.
 ## Pruebas
 
 ```bash
-dc exec backend pytest                 # 113 pruebas, ~30 s (sin las lentas)
+dc exec backend pytest                 # 118 pruebas, ~28 s (sin las lentas)
 dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
@@ -185,6 +186,12 @@ encontró, está en `_specs/08-plan-pruebas.md`.
   fácil: `GET /search/health` devolvía 200 **porque la raíz de Meilisearch también devuelve 200**.
 - **El HTML rico se sanea en `save()` del modelo** (`HtmlRicoMixin.campos_html`), no en el admin.
   Si añades un campo de CKEditor, declárarlo ahí: `campos_rich` del admin solo elige el widget.
+- **La llave de búsqueda va dentro del bundle**, no se lee en runtime, y vive en **dos** `.env`:
+  `frontend/.env` para `npm run dev` y el de la raíz para el sitio compilado. Actualizar solo el
+  primero deja el bundle con una llave que Meilisearch rechaza, y entonces se degradan tres cosas
+  —búsqueda global, conteos de las facetas de `/medidas` y autocompletado de lugares— de las que
+  **solo la primera avisa en pantalla**. Pasó. La llave ya no cambia por sí sola (uid fijo +
+  `MEILI_MASTER_KEY`), así que esto solo ocurre si se cambia la master key.
 - **El menú vive en tres sitios.** Ocultar o añadir una entrada exige tocar la semilla
   (`apps/sitio/semillas/sitio.yaml`), **la base ya sembrada** —el seed no pisa lo que existe, así que
   un cambio de visibilidad necesita migración de datos, como `sitio.0002`— y el menú de respaldo de

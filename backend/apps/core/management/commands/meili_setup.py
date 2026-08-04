@@ -40,8 +40,17 @@ class Command(BaseCommand):
             )
 
         llave = meili.llave_busqueda()
-        self.stdout.write(self.style.MIGRATE_HEADING("\nLlave de solo búsqueda (frontend/.env)"))
+        self.stdout.write(self.style.MIGRATE_HEADING("\nLlave de solo búsqueda"))
         self.stdout.write(f"  VITE_MEILI_SEARCH_KEY={llave}")
+        self.stdout.write(
+            "\n  Va en LOS DOS .env: `frontend/.env` para `npm run dev`, y el `.env` de la raíz "
+            "para el bundle compilado, que es el que sirve nginx. Vite hornea las VITE_* en el "
+            "build, así que cambiarla exige reconstruir el frontend, no reiniciarlo."
+        )
+        self.stdout.write(
+            "\n  No cambia: se deriva del uid fijo y de MEILI_MASTER_KEY, así que recrear el "
+            "volumen de Meilisearch o restaurar un respaldo la deja igual."
+        )
         self.stdout.write(
             "\n  Es segura por diseño: solo permite buscar, y solo en los índices públicos. "
             "La master key nunca sale del backend."

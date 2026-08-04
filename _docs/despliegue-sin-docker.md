@@ -273,11 +273,13 @@ El `seed` imprime los conteos al terminar: **8.968 centros poblados, 10.978 clas
 provincias, 112 distritos**. Si no coinciden, algo se perdió en la importación. Las advertencias que
 imprime son esperadas y son un entregable para PREDES (calidad de los datos de origen).
 
-> **Guarda la llave que imprime `meili_setup`**: es la `VITE_MEILI_SEARCH_KEY` del paso 8. Vive en los
-> datos de Meilisearch, así que **si algún día se borra `/var/lib/meilisearch` la llave cambia** y hay
-> que rehacer el build del frontend con la nueva. Con la vieja, el navegador recibe 403 al buscar y el
-> sitio cae al fallback de DRF: sigue funcionando, sin facetas, y lo único que lo delata son los 403
-> en la consola.
+> **Guarda la llave que imprime `meili_setup`**: es la `VITE_MEILI_SEARCH_KEY` del paso 8. **No
+> cambia** aunque se borre `/var/lib/meilisearch`: se deriva del uid fijo de la llave y de
+> `MEILI_MASTER_KEY` (las llaves de Meilisearch son deterministas). Solo cambia si cambias la master
+> key, y entonces hay que **rehacer el build del frontend**, porque la llave va horneada en el bundle.
+> Con una llave que Meilisearch no reconozca, el sitio se degrada en tres sitios a la vez —búsqueda,
+> conteos de las facetas de `/medidas` y autocompletado de lugares— y **solo el primero lo dice en
+> pantalla**; la consola del navegador escribe `[buscador] Meilisearch rechazó la llave…`.
 
 ## 7. gunicorn y el worker, bajo systemd
 
@@ -549,9 +551,17 @@ curl -s https://obs.predes.org.pe/api/peligros/resumen/ | grep -o '"total_ccpp":
 # Tiles por rangos: 206 y con Content-Range expuesto, o el visor se queda sin capas
 curl -sr 0-127 -D - -o /dev/null https://obs.predes.org.pe/tiles/ccpp.pmtiles | grep -iE '206|content-range'
 
-# Buscador. 401 sin llave es CORRECTO: lo que importa es que Meilisearch reciba la ruta.
+# Buscador, las dos comprobaciones:
+# a. Sin llave → 401. Confirma que Meilisearch recibe la ruta y no la raíz.
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
   -H 'Content-Type: application/json' -d '{"queries":[]}' \
+  https://obs.predes.org.pe/search/multi-search
+
+# b. Con la llave del build → 200. Confirma que el bundle publicado puede buscar de verdad.
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  -H "Authorization: Bearer $VITE_MEILI_SEARCH_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"queries":[{"indexUid":"medidas","q":"cusco","limit":1}]}' \
   https://obs.predes.org.pe/search/multi-search
 ```
 
@@ -594,7 +604,7 @@ CORS y el bundle.
 | El backend no arranca tras reiniciar el servidor | La base gestionada aún no acepta conexiones; systemd reintenta cada 5 s. Se ve en `journalctl -u observatorio-backend` |
 | `could not connect to server` / `SSL is required` | `POSTGRES_HOST`/`PORT`, o falta `PGSSLMODE=require` |
 | El visor sin capas | `/api/mapas/capas/`, y que `/tiles/` responda **206** |
-| El buscador sin facetas | `POST /search/multi-search` (ver arriba) |
+| El buscador sin facetas, o «modo básico» | `POST /search/multi-search` **con la llave** (ver arriba). Un 401/403 ahí es el bundle construido con otra llave: `meili_setup`, actualizar `VITE_MEILI_SEARCH_KEY` y **rehacer el build** del frontend |
 | Los correos no llegan | Log del worker, y que los usuarios del grupo tengan correo |
 | El PDF sale sin mapa | Degradación prevista: falta Chromium o falló la captura. El motivo, en el log del worker |
 | `ImportError` tras un `git pull` | El venv quedó desincronizado: `uv sync --no-dev` |

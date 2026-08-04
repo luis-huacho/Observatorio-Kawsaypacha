@@ -59,6 +59,37 @@ function cabeceras(): HeadersInit {
 /** Meilisearch está configurado y responde. Se comprueba una vez por sesión. */
 let disponibilidad: Promise<boolean> | null = null;
 
+/** El aviso de llave rechazada se da una vez por sesión, no en cada búsqueda. */
+let llaveDenunciada = false;
+
+/**
+ * Meilisearch rechazó la llave. **No es lo mismo que estar caído** y hay que distinguirlo: el
+ * servicio responde, los índices están, y sin embargo el sitio se degrada en tres sitios a la vez
+ * —búsqueda global, conteos de las facetas de `/medidas` y autocompletado de lugares del visor— y
+ * solo el primero lo dice en pantalla.
+ *
+ * Pasa cuando la llave que quedó horneada en el bundle ya no existe en Meilisearch. Las `VITE_*` se
+ * hornean en el build, así que la salida es reconstruir el frontend con la llave que imprime
+ * `manage.py meili_setup`, no reiniciar nada. Se escribe en consola porque es la única pista que
+ * puede seguir quien opera el sitio: `/api/buscar/estado/` y `/search/health` responden que todo
+ * está bien —el backend consulta con la master key y `health` no pide credencial—.
+ */
+function denunciarLlave(estado: number): void {
+  if (llaveDenunciada) return;
+  llaveDenunciada = true;
+  console.error(
+    `[buscador] Meilisearch rechazó la llave de búsqueda (${estado}). El sitio queda en modo ` +
+      "básico y las facetas se quedan sin conteos. La VITE_MEILI_SEARCH_KEY con la que se " +
+      "construyó este bundle ya no existe: copiar la de `manage.py meili_setup` a los dos .env y " +
+      "reconstruir el frontend.",
+  );
+}
+
+/** Una respuesta de Meilisearch que falló por credencial, no por estar caído. */
+function esLlaveRechazada(estado: number): boolean {
+  return estado === 401 || estado === 403;
+}
+
 export function meiliDisponible(): Promise<boolean> {
   if (!SEARCH_KEY) return Promise.resolve(false);
   if (disponibilidad === null) {
@@ -116,7 +147,10 @@ export async function buscarGlobal(q: string, limite = 8): Promise<RespuestaBusq
           })),
         }),
       });
-      if (!respuesta.ok) throw new Error(`multi-search ${respuesta.status}`);
+      if (!respuesta.ok) {
+        if (esLlaveRechazada(respuesta.status)) denunciarLlave(respuesta.status);
+        throw new Error(`multi-search ${respuesta.status}`);
+      }
       const cuerpo = (await respuesta.json()) as {
         results: { indexUid: string; hits: Record<string, unknown>[]; estimatedTotalHits: number }[];
       };
@@ -173,7 +207,12 @@ export async function buscarLugares(q: string, limite = 8): Promise<Lugar[]> {
       headers: cabeceras(),
       body: JSON.stringify({ q: consulta, limit: limite }),
     });
-    if (!respuesta.ok) return [];
+    if (!respuesta.ok) {
+      // Aquí la degradación es invisible —el visor sigue usando el padrón que tiene en memoria—,
+      // así que la consola es el único aviso.
+      if (esLlaveRechazada(respuesta.status)) denunciarLlave(respuesta.status);
+      return [];
+    }
     const cuerpo = (await respuesta.json()) as { hits: Lugar[] };
     return cuerpo.hits ?? [];
   } catch {
@@ -196,7 +235,11 @@ export async function facetasDe(
       headers: cabeceras(),
       body: JSON.stringify({ q: "", facets: campos, filter: filtros, limit: 0 }),
     });
-    if (!respuesta.ok) return {};
+    if (!respuesta.ok) {
+      // Los filtros se quedan sin conteos y no hay nada en pantalla que lo explique.
+      if (esLlaveRechazada(respuesta.status)) denunciarLlave(respuesta.status);
+      return {};
+    }
     const cuerpo = (await respuesta.json()) as { facetDistribution?: Facetas };
     return cuerpo.facetDistribution ?? {};
   } catch {
