@@ -1,11 +1,10 @@
 # 00 — Alcance y registro de decisiones
 
-## Marco contractual
+## Marco
 
-- **Contrato N°0362026/PREDES** (locación de servicios, firmado 14/07/2026 en Lima). Comitente: PREDES (RUC 20109358658). Locador: Luis Huacho. Marco: proyecto "Incremento de la Resiliencia Ante el Riesgo Climático en las Comunidades Altoandinas de Cusco, Perú" (Brot für die Welt).
-- **Objeto**: implementar la plataforma web pública de monitoreo de la GRD y la ACC en la región Cusco, para el funcionamiento del observatorio.
-- **Entregables**: E1 Plan de trabajo (16/07/2026, 40%); E2 Informe final + plataforma funcionando en internet (13/08/2026, 60%). Penalidad por mora: 1%/día hasta 10%.
-- Fuentes: `data/contrato/TDR Plataforma y Diseño observatorio GRD Y ACC (1).pdf` y `data/contrato/Contrato de Servicio_Luis Huacho_Plataforma y Diseño Observatorio GRD y ACC.pdf`.
+- **Objeto**: implementar la plataforma web pública de monitoreo de la GRD y la ACC en la región Cusco, para el funcionamiento del observatorio. Encargo de PREDES, dentro del proyecto de resiliencia ante el riesgo climático en comunidades altoandinas de Cusco.
+- **Fecha de puesta en línea: 13/08/2026.** Es la restricción que decide el alcance: lo que no quepa antes de esa fecha se difiere con un ADR, no se recorta en silencio.
+- El detalle contractual —partes, entregables, calendario de pagos y penalidades— **no se versiona**: vive en `_docs/producto1-plan-de-trabajo.md` y en los PDF de `data/contrato/`, ambos fuera del repo publicado. Aquí solo queda lo que condiciona decisiones técnicas.
 
 ## Requisitos obligatorios del TDR
 

@@ -1,11 +1,15 @@
 # Specs — Observatorio Kallpachakuy (fase de construcción)
 
-Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobado (`prototype/`, congelado como referencia). Contrato N°0362026/PREDES; plataforma en línea el **13/08/2026**.
+Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobado (`prototype/`, congelado como referencia). Plataforma en línea el **13/08/2026**.
 
 ## Estado
 
 - Fase 0 (prototipo estático) **completada y aprobada** por PREDES.
 - Fase actual: construcción de `frontend/` (Vite + React + TS + MapLibre) y `backend/` (Django 5.2 LTS + PostgreSQL + Meilisearch + PMTiles), desplegados con Docker Compose.
+
+> Las entradas `### Actualización` de más abajo son la bitácora de **lo ya corregido**. Lo que se
+> sabe roto y sigue sin arreglar vive en **[09-errores.md](09-errores.md)**; al cerrarse un error,
+> sale de allí y entra aquí como una entrada nueva.
 
 ### Actualización 04/08/2026 — la ayuda memoria salía sin mapa en producción
 
@@ -196,7 +200,7 @@ comprobar nada.
 
 | Doc | Contenido |
 |---|---|
-| [00-alcance-decisiones.md](00-alcance-decisiones.md) | Alcance contractual, ventanas temáticas, ADRs (decisiones de arquitectura y de producto) |
+| [00-alcance-decisiones.md](00-alcance-decisiones.md) | Alcance, ventanas temáticas, ADRs (decisiones de arquitectura y de producto) |
 | [01-modelo-datos.md](01-modelo-datos.md) | Apps y modelos Django, campos futuros `[+]`, índices, diagrama ER, datasets Excel canónicos |
 | [02-api.md](02-api.md) | Contrato de endpoints DRF con ejemplos de payload |
 | [03-admin-editorial.md](03-admin-editorial.md) | Admin Unfold, roles, flujo editorial + correos, importadores, Gemini |
@@ -205,6 +209,7 @@ comprobar nada.
 | [06-frontend.md](06-frontend.md) | Migración prototype→frontend, rutas nuevas, lib/api.ts, estados vacíos |
 | [07-despliegue-ops.md](07-despliegue-ops.md) | compose.yaml, nginx + gunicorn, los dos dominios, .env, HTTPS, backups, runbook, capacitación |
 | [08-plan-pruebas.md](08-plan-pruebas.md) | Qué se prueba y con qué; casos obligatorios derivados de la auditoría de datos; criterio de entrega |
+| [09-errores.md](09-errores.md) | **Errores abiertos**: lo que se sabe roto y todavía no está corregido, con su prueba en rojo |
 
 ## Archivo histórico
 

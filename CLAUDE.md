@@ -1,6 +1,6 @@
 # Observatorio Kallpachakuy — Guía del proyecto
 
-Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PREDES (contrato N°0362026/PREDES; plataforma en línea el 13/08/2026). El prototipo aprobado vive en `prototype/` y está **congelado como referencia**; el trabajo activo está en `frontend/` y `backend/`.
+Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PREDES; en línea el 13/08/2026. El prototipo aprobado vive en `prototype/` y está **congelado como referencia**; el trabajo activo está en `frontend/` y `backend/`.
 
 ## Arquitectura
 
@@ -21,7 +21,7 @@ Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PRED
 
 `_specs/` es la fuente de verdad (los specs de la fase prototipo están en `_specs/archive/`, solo histórico):
 
-- `00-alcance-decisiones.md` — alcance contractual y ADRs (incluye por qué Prioridades está desactivada)
+- `00-alcance-decisiones.md` — alcance y ADRs (incluye por qué Prioridades está desactivada)
 - `01-modelo-datos.md` — modelos Django, índices, campos futuros [+]
 - `02-api.md` — contrato de endpoints y payloads
 - `03-admin-editorial.md` — Unfold, roles, flujo editorial, importadores, Gemini
@@ -30,6 +30,7 @@ Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PRED
 - `06-frontend.md` — rutas, api.ts, estados vacíos
 - `07-despliegue-ops.md` — compose, nginx, los dos dominios, HTTPS, backups, runbook
 - `08-plan-pruebas.md` — qué se prueba y con qué; criterio de entrega, y los seis fallos silenciosos que la suite encontró
+- `09-errores.md` — **errores abiertos**. Consultarlo antes de tocar un área y anotar ahí todo hallazgo que no se arregle en el momento; al corregir uno, se cierra según el ciclo que describe el propio archivo
 
 `_docs/` contiene la documentación técnica versionada (`arquitectura`, `desarrollo`, `despliegue`, `despliegue-sin-docker`, `api`, `manual-admin-predes`) más documentos para la dirección que no se versionan. Sirve para operar; **para implementar manda `_specs/`**. Ojo al añadir un documento: `.gitignore` ignora `/_docs/*` y hay que negar el archivo nuevo explícitamente.
 

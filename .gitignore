@@ -29,7 +29,6 @@ prototype/vite.config.d.ts
 
 # Playwright MCP artifacts
 .playwright-mcp/
-home-fixed.png
 
 # Logs
 *.log

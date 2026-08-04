@@ -3,9 +3,8 @@
 Plataforma web pública de PREDES para monitorear la **Gestión del Riesgo de Desastres (GRD)** y la
 **Adaptación al Cambio Climático (ACC)** en la región Cusco, Perú.
 
-> Contrato N°0362026/PREDES. En línea el **13/08/2026**. El prototipo aprobado vive en
-> `prototype/` y está congelado como referencia visual; el trabajo activo es `backend/` +
-> `frontend/`.
+> El prototipo aprobado vive en `prototype/` y está congelado como referencia visual; el trabajo
+> activo es `backend/` + `frontend/`.
 
 ## Qué ofrece
 
@@ -46,7 +45,7 @@ Plataforma web pública de PREDES para monitorear la **Gestión del Riesgo de De
 ├── compose.yaml       Base (= producción con Docker)
 ├── compose.dev.yml    Override de desarrollo
 ├── compose.local.yml  Override para probar el modo producción en local, sobre HTTP
-├── Claude.md          Guía del proyecto para el agente
+├── CLAUDE.md          Guía del proyecto para el agente
 └── README.md          Este archivo
 ```
 
@@ -447,6 +446,7 @@ producción.
 | Administrar contenido (para PREDES) | [`_docs/manual-admin-predes.md`](./_docs/manual-admin-predes.md) |
 | **Implementar algo** | [`_specs/`](./_specs/) — modelo de datos, contrato de API, ADR |
 | Saber por qué se decidió algo | [`_specs/00-alcance-decisiones.md`](./_specs/00-alcance-decisiones.md) |
+| **Ver qué está roto y pendiente** | [`_specs/09-errores.md`](./_specs/09-errores.md) — errores abiertos; lo ya corregido está en la bitácora de [`_specs/README.md`](./_specs/README.md) |
 | Ver el historial del prototipo | [`_specs/archive/`](./_specs/archive/) |
 
 ## Licencia y créditos
