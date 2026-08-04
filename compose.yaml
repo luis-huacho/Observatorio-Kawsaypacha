@@ -6,8 +6,9 @@
 #
 # Secretos en backend/.env (nunca se commitea; ver backend/.env.example).
 #
-# Dos dominios (ADR-A14): observatorio.predes.org.pe sirve la SPA y obs.predes.org.pe el API,
-# el admin, media y tiles. nginx + certbot en contenedor (ADR-A6bis).
+# Dos dominios (ADR-A14): SITE_DOMAIN sirve la SPA y API_DOMAIN el API, el admin, media y tiles.
+# Los dos salen del .env de la RAÍZ (ver .env.example) y nginx los toma por envsubst, de modo que
+# no hay ningún dominio escrito en el repositorio. nginx + certbot en contenedor (ADR-A6bis).
 
 services:
   db:
@@ -80,13 +81,33 @@ services:
       - web_dist:/out
     restart: "no"
 
+  # Los dominios NO están escritos en la configuración: `server_name`, las rutas del certificado y
+  # el origen de CORS se generan al arrancar con envsubst —el mecanismo nativo de la imagen, que
+  # renderiza /etc/nginx/templates en NGINX_ENVSUBST_OUTPUT_DIR— a partir de SITE_DOMAIN y
+  # API_DOMAIN. Así el mismo árbol sirve para el entorno de desarrollo y para producción.
   nginx:
     image: nginx:1.27-alpine
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?falta SITE_DOMAIN en el .env de la raíz}
+      API_DOMAIN: ${API_DOMAIN:?falta API_DOMAIN en el .env de la raíz}
+      # Se genera FUERA de conf.d a propósito: ver la cabecera de observatorio.conf.
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx/generado
+      # Acota envsubst a estas dos variables, para que no pueda tocar $$host, $$uri o
+      # $$destino_django si algún día este servicio hereda un env_file. `$$` es el escape de
+      # compose para un `$` literal.
+      NGINX_ENVSUBST_FILTER: "^(SITE_DOMAIN|API_DOMAIN)$$"
+    # El directorio de salida tiene que existir Y ser escribible ANTES de que corra
+    # /docker-entrypoint.d/20-envsubst-on-templates.sh, que comprueba `-w` antes de crear nada.
+    tmpfs:
+      - /etc/nginx/generado
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./deploy/nginx/templates:/etc/nginx/templates:ro
+      # Añade la recarga periódica que toma el certificado renovado (40-recarga-periodica.sh).
+      - ./deploy/nginx/docker-entrypoint.d:/docker-entrypoint.d/observatorio:ro
       - web_dist:/srv/www:ro
       - media:/srv/media:ro
       - static:/srv/static:ro
@@ -97,8 +118,13 @@ services:
       - meilisearch
     restart: unless-stopped
 
-  # Emisión y renovación de certificados por webroot. `renew` no hace nada si aún no toca, así
-  # que el bucle es seguro; nginx recarga por su cuenta cada 6 h para tomar el certificado nuevo.
+  # Renovación de certificados por webroot. `renew` no hace nada si aún no toca, así que el bucle
+  # es seguro. Quien recoge el certificado renovado es el propio nginx, que se recarga cada 6 h
+  # desde deploy/nginx/docker-entrypoint.d/40-recarga-periodica.sh.
+  #
+  # La PRIMERA emisión no la hace este servicio: nginx no arranca sin los .pem, así que no puede
+  # servir el reto de /.well-known/ antes de que exista el primer certificado. Se rompe el círculo
+  # con `certonly --standalone` y nginx parado — ver el paso 2 de _docs/despliegue.md.
   certbot:
     image: certbot/certbot
     volumes:

@@ -6,6 +6,6 @@ ssl_session_timeout 1d;
 ssl_stapling on;
 ssl_stapling_verify on;
 
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-add_header X-Content-Type-Options "nosniff" always;
-add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+# Las cabeceras de seguridad viven en `seguridad-comun.inc`, que este archivo incluye y que además
+# hay que repetir en cada `location` con `add_header` propio (ahí se explica por qué).
+include /etc/nginx/conf.d/seguridad-comun.inc;

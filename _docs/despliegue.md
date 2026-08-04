@@ -8,13 +8,18 @@ va mal. Requisito 8 del TDR: servidor propio, dominio, HTTPS y backups automáti
 | Cosa | Quién la entrega | Sin ella |
 |---|---|---|
 | VPS con Docker y acceso SSH | PREDES / su proveedor | No hay dónde desplegar |
-| DNS de `observatorio.predes.org.pe` y `obs.predes.org.pe` apuntando al VPS | PREDES | certbot no puede emitir certificados |
+| DNS de los dos dominios (`SITE_DOMAIN` y `API_DOMAIN`) apuntando al VPS | PREDES | certbot no puede emitir certificados |
 | Credenciales SMTP | PREDES | Los avisos del flujo editorial no salen (van a los logs) |
 | API key de Gemini | PREDES o el desarrollador | El resumen automático de PDF queda deshabilitado, con aviso en el admin |
 | Los Excel y GeoJSON de `data/layers/` | PREDES | El seed no tiene qué importar |
 
 Los tres últimos **no bloquean el despliegue**: la plataforma arranca y funciona sin ellos, con
-las funciones correspondientes desactivadas y avisando de por qué.
+las funciones correspondientes desactivadas y avisando de por qué. Sin los Excel y GeoJSON hay que
+sembrar con `seed --solo-catalogos`, y el visor de peligros sale vacío hasta que lleguen.
+
+> Este procedimiento se ejecutó por primera vez contra un servidor y un dominio reales el
+> **04/08/2026**; lo que se hizo y lo que cambia para el pase de PREDES está en
+> [`despliegue-entorno-desarrollo.md`](./despliegue-entorno-desarrollo.md).
 
 ## Dimensionado
 
@@ -33,12 +38,19 @@ generación de tiles de las capas nacionales, no el tráfico.
 
 ## Puesta en marcha
 
+**Ningún dominio está escrito en el repositorio.** Los `server_name`, las rutas del certificado y
+el origen de CORS los genera nginx al arrancar, con `envsubst`, a partir de `SITE_DOMAIN` y
+`API_DOMAIN` del `.env` de la raíz. Desplegar en otro dominio es cambiar esas dos variables y
+recrear el contenedor; no se edita ni un `.conf`.
+
 ```bash
 git clone <repo> observatorio && cd observatorio
 
 # 1. Secretos y configuración
 cp backend/.env.example backend/.env
 cp .env.example .env
+# El bind mount de los datos fuente existe siempre, aunque los Excel aún no estén.
+mkdir -p data/layers
 ```
 
 En **`backend/.env`** hay que poner, como mínimo:
@@ -51,7 +63,7 @@ SITE_URL=https://observatorio.predes.org.pe
 BACKEND_URL=https://obs.predes.org.pe
 CORS_ALLOWED_ORIGINS=https://observatorio.predes.org.pe
 CSRF_TRUSTED_ORIGINS=https://obs.predes.org.pe,https://observatorio.predes.org.pe
-ADMIN_URL=gestion/
+ADMIN_URL=loginseguro/
 POSTGRES_PASSWORD=<contraseña fuerte>
 MEILI_MASTER_KEY=<50+ caracteres aleatorios>
 DJANGO_SUPERUSER_USERNAME= / _EMAIL= / _PASSWORD=
@@ -59,7 +71,7 @@ DJANGO_SUPERUSER_USERNAME= / _EMAIL= / _PASSWORD=
 
 `SECRET_KEY` y `MEILI_MASTER_KEY`: `python -c "import secrets; print(secrets.token_urlsafe(50))"`.
 
-**`ADMIN_URL=gestion/`** y no `admin/`: `/admin/` es lo primero que prueba cualquier escaneo
+**`ADMIN_URL=loginseguro/`** y no `admin/`: `/admin/` es lo primero que prueba cualquier escaneo
 automático. Si lo cambias, ajusta el `location` correspondiente en
 `deploy/nginx/conf.d/observatorio.conf` — tienen que coincidir.
 
@@ -67,20 +79,32 @@ En **`.env` de la raíz** (variables de compose, no de Django):
 
 ```
 SITE_DOMAIN=observatorio.predes.org.pe
+API_DOMAIN=obs.predes.org.pe
 VITE_API_URL=https://obs.predes.org.pe/api
 VITE_SEARCH_URL=https://obs.predes.org.pe/search
 VITE_TILES_URL=https://obs.predes.org.pe/tiles
 VITE_MEILI_SEARCH_KEY=<la imprime meili_setup; se rellena en el paso 4>
 ```
 
+> `SITE_DOMAIN` y `API_DOMAIN` son las que consume nginx. Compose las exige con `:?`, así que un
+> `.env` al que le falte una **aborta antes de crear un solo contenedor**, con el mensaje puesto.
+> `CORS_ALLOWED_ORIGINS` de `backend/.env` tiene que ser `https://` + `SITE_DOMAIN`, exactamente:
+> es el mismo valor que nginx pone en `Access-Control-Allow-Origin` para `/media/` y `/tiles/`, y
+> si discrepan el visor se queda sin capas.
+
 > **Las `VITE_*` se hornean en el bundle durante el build**, no se leen en runtime. Si apuntan a
 > `localhost`, el sitio queda mudo en el servidor **sin un solo error en los logs**. Cada vez que
 > cambien hay que reconstruir la imagen del frontend, no basta con reiniciar.
 
 ```bash
-# 2. Certificados, con nginx todavía parado y certbot abriendo él mismo el puerto 80.
+# 2. Certificado, con nginx todavía parado y certbot abriendo él mismo el puerto 80.
+#    UN SOLO certificado con los dos dominios como SAN. `--cert-name` fija el nombre de la
+#    lineage, que es de donde leen LOS DOS bloques 443. Sin él, certbot la nombra con el primer
+#    -d, y basta reordenar los argumentos para que nginx deje de encontrar el archivo.
+#    Conviene hacerlo antes con `--dry-run`: valida el reto ACME sin gastar cuota.
 docker compose run --rm --entrypoint certbot --publish 80:80 certbot certonly \
-  --standalone -d observatorio.predes.org.pe -d obs.predes.org.pe \
+  --standalone --cert-name observatorio.predes.org.pe \
+  -d observatorio.predes.org.pe -d obs.predes.org.pe \
   --email <correo> --agree-tos --no-eff-email
 
 # 3. Todo arriba
@@ -90,7 +114,8 @@ docker compose up -d --build
 docker compose exec backend python manage.py meili_setup
 #    → copiar VITE_MEILI_SEARCH_KEY al .env de la raíz
 
-# 5. Datos
+# 5. Datos. Sin los Excel y GeoJSON en data/layers/ el seed aborta: para levantar la plataforma
+#    sin ellos, `seed --solo-catalogos` (catálogos, sitio, menú, grupos y superusuario).
 docker compose exec backend python manage.py seed --capas --tiles
 
 # 6. Reconstruir el frontend con la llave ya en su sitio, y publicarlo
@@ -102,7 +127,7 @@ que el paso 4 solo hace falta para **ver** la llave.
 
 ### Por qué el primer certificado va por `--standalone` y no por webroot
 
-Dos razones, las dos comprobadas:
+Tres razones, las tres comprobadas contra un servidor real el 04/08/2026:
 
 1. **nginx no arranca sin los certificados.** Los bloques `443` declaran `ssl_certificate`, y con el
    archivo ausente nginx aborta con `cannot load certificate … No such file or directory`. Así que
@@ -113,29 +138,44 @@ Dos razones, las dos comprobadas:
    argumentos** y se queda girando en el bucle sin emitir nada. El síntoma es un comando que no
    termina y no dice por qué.
 
+3. **Un solo certificado, y hay que decirle cómo se llama.** `certonly -d A -d B` crea **una sola**
+   lineage —un certificado con los dos dominios como SAN— y la nombra con el primer `-d`. Los dos
+   bloques 443 leen de ahí, así que `--cert-name` deja de hacerlo depender del orden de los
+   argumentos. Apuntar el bloque del API a `live/<API_DOMAIN>/` **no funciona**: ese directorio no
+   existe y nginx aborta con `cannot load certificate`.
+
 Las **renovaciones** sí van por webroot y no requieren nada: las hace el propio contenedor `certbot`
 cada 12 h, y el `--webroot` de su bucle prevalece sobre el método guardado en la primera emisión.
+Quien recoge el certificado renovado es nginx, que se recarga cada 6 h desde
+`deploy/nginx/docker-entrypoint.d/40-recarga-periodica.sh`. Sin esa recarga, nginx seguiría
+sirviendo el certificado viejo hasta que caducara.
 
 ## Comprobaciones tras desplegar
 
 ```bash
-curl -sI https://observatorio.predes.org.pe/ | head -1          # 200, la SPA
-curl -s  https://obs.predes.org.pe/api/sitio/ | head -c 80      # JSON de configuración
-curl -sI https://obs.predes.org.pe/gestion/login/ | head -1     # 200, el admin
-curl -sr 0-99 -D - -o /dev/null https://obs.predes.org.pe/tiles/ccpp.pmtiles | grep -i 206
-curl -s https://obs.predes.org.pe/api/peligros/resumen/ | grep -o '"total_ccpp":[0-9]*'
+set -a && . ./.env && set +a          # SITE_DOMAIN, API_DOMAIN y VITE_MEILI_SEARCH_KEY
+
+# Lo primero: que envsubst haya sustituido los dominios. Si algo falla ahí, nginx no arranca
+# —los `include` apuntarían a archivos inexistentes—, pero conviene verlo con los ojos.
+docker compose exec nginx nginx -T | grep -E 'server_name|ssl_certificate |Allow-Origin'
+
+curl -sI https://$SITE_DOMAIN/ | head -1          # 200, la SPA
+curl -s  https://$API_DOMAIN/api/sitio/ | head -c 80      # JSON de configuración
+curl -sI https://$API_DOMAIN/loginseguro/login/ | head -1  # 200, el admin (el de ADMIN_URL)
+curl -sr 0-99 -D - -o /dev/null https://$API_DOMAIN/tiles/ccpp.pmtiles | grep -i 206
+curl -s https://$API_DOMAIN/api/peligros/resumen/ | grep -o '"total_ccpp":[0-9]*'
 
 # Ayuda memoria CON su mapa. Descargar el PDF no basta: sale igual sin mapa —es la degradación
 # prevista— y así estuvo saliendo en producción local sin que nada lo dijera. El mapa es la única
 # imagen rasterizada del documento, así que contarlas es la comprobación: tiene que dar ≥ 1.
-curl -so /tmp/am.pdf https://obs.predes.org.pe/api/distritos/080101/ayuda-memoria.pdf \
+curl -so /tmp/am.pdf https://$API_DOMAIN/api/distritos/080101/ayuda-memoria.pdf \
   && grep -c '/Subtype /Image' /tmp/am.pdf
 
 # Buscador, dos comprobaciones distintas y las dos necesarias:
 # a. Sin llave → 401. Confirma que el proxy manda la ruta y no la raíz (un 405 sería el proxy mal).
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
   -H 'Content-Type: application/json' -d '{"queries":[]}' \
-  https://obs.predes.org.pe/search/multi-search
+  https://$API_DOMAIN/search/multi-search
 
 # b. CON la llave del .env → 200. Confirma que la llave con la que se construyó el bundle sigue
 #    siendo válida. Es la que faltaba, y su ausencia costó un buscador en modo básico.
@@ -143,7 +183,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
   -H "Authorization: Bearer $VITE_MEILI_SEARCH_KEY" \
   -H 'Content-Type: application/json' \
   -d '{"queries":[{"indexUid":"medidas","q":"cusco","limit":1}]}' \
-  https://obs.predes.org.pe/search/multi-search
+  https://$API_DOMAIN/search/multi-search
 ```
 
 El del resumen debe decir `8968`.
@@ -165,7 +205,7 @@ El del resumen debe decir `8968`.
 
 Y en el navegador, `/peligros` tiene que pintar los puntos: es lo que confirma de una vez que el
 API, los tiles, CORS y el bundle están todos bien. La verificación completa es
-`E2E_URL=https://observatorio.predes.org.pe npx playwright test`.
+`E2E_URL=https://$SITE_DOMAIN npx playwright test`.
 
 ## Runbook
 
@@ -180,7 +220,10 @@ API, los tiles, CORS y el bundle están todos bien. La verificación completa es
 | Regenerar los tiles de las capas | `docker compose exec backend python manage.py generar_tiles --rehacer` |
 | Agregar métricas y purgar | `docker compose exec backend python manage.py shell -c "from apps.core.tasks import agregar_metricas; agregar_metricas.func()"` |
 | Recargar nginx | `docker compose exec nginx nginx -s reload` |
-| Renovar certificados a mano | `docker compose run --rm certbot renew && docker compose exec nginx nginx -s reload` |
+| **Cambiar de dominio** | Editar `SITE_DOMAIN`/`API_DOMAIN` en el `.env` de la raíz y `docker compose up -d nginx` — **recrear**, no `restart`: el entorno se congela al crear el contenedor. Y emitir el certificado del dominio nuevo antes |
+| Ver la configuración efectiva de nginx | `docker compose exec nginx nginx -T` |
+| Renovar certificados a mano | `docker compose run --rm --entrypoint certbot certbot renew --webroot -w /var/www/certbot && docker compose exec nginx nginx -s reload` |
+| Comprobar que la renovación funcionará | el mismo comando con `--dry-run` (no gasta cuota) |
 | Logs | `docker compose logs -f backend worker nginx` |
 | Backup manual | `docker compose exec backup /backup.sh` |
 

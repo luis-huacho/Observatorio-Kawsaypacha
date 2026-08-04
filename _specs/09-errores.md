@@ -41,6 +41,9 @@ usa el proyecto. Un solo sitio para lo pendiente, un solo sitio para lo hecho.
 | E-002 | media | El mapa base **OpenTopoMap no tiene licencia apta para producción**: es un servicio voluntario con política de uso restrictiva | `frontend/src/components/MapaPeligros.tsx:162` | — | abierto |
 | E-003 | baja | Las entradas de la bitácora **no están en orden cronológico** | `_specs/README.md` | — | abierto |
 | E-004 | baja | `_docs/propuesta.md` está **desfasado** frente al encargo real | `_docs/propuesta.md` | — | abierto |
+| E-006 | baja | Zona de caché `proxy_cache_path` declarada y **nunca usada**: reserva 10 MB para nada | `deploy/nginx/conf.d/observatorio.conf:13` | — | abierto |
+| E-007 | baja | `seed --solo-catalogos --demo` **ignora `--demo` en silencio**: el `return` del primero corta antes | `backend/apps/core/management/commands/seed.py:103` | pendiente | abierto |
+| E-008 | baja | `ssl_stapling on` ya no hace nada: los certificados de Let's Encrypt no traen URL de OCSP, y nginx avisa en cada arranque y cada recarga | `deploy/nginx/conf.d/ssl-comun.inc` | — | abierto |
 
 ---
 
@@ -106,3 +109,51 @@ que alguien abriría buscando el alcance acordado, y le daría fechas que ya no 
 No se versiona (`.gitignore` ignora `/_docs/*` salvo la documentación técnica), así que el arreglo
 no tiene ningún efecto sobre el repo publicado. Vale con una nota al principio que diga qué documento
 manda.
+
+### E-006 — una zona de caché declarada que nunca se usa
+
+`deploy/nginx/conf.d/observatorio.conf:13` declara
+`proxy_cache_path /var/cache/nginx/tiles … keys_zone=tiles:10m max_size=512m`, con dos líneas de
+comentario explicando por qué merece la pena cachear los tiles en nginx. Pero **no hay un solo
+`proxy_cache tiles;` en el repositorio**, y `/tiles/` se sirve con `alias` desde el volumen `media`,
+no por proxy: no hay nada que cachear. Además `/var/cache/nginx` no tiene volumen montado, así que
+la caché tampoco sobreviviría a una recreación del contenedor.
+
+Reserva 10 MB de memoria compartida para nada. El daño real es el comentario, que describe un
+comportamiento que no ocurre y que alguien podría dar por bueno al diagnosticar la latencia de los
+tiles.
+
+**Arreglo**: borrar la directiva y su comentario. Si algún día se quiere de verdad, el sitio de la
+caché no es este —los tiles no pasan por `proxy_pass`—, sino `expires`/`Cache-Control`, que ya está.
+
+### E-007 — `--solo-catalogos` se come `--demo` sin decirlo
+
+`seed --solo-catalogos --demo` siembra los catálogos y **no carga el contenido de demostración**,
+sin una sola línea que lo advierta. La causa está a la vista en `seed.py`: `--solo-catalogos`
+imprime su nota y hace `return`, y el bloque de `--demo` viene después.
+
+Cada bandera por separado hace lo que dice, así que no es un error de ninguna de las dos: es que
+juntas no componen. Apareció el 04/08/2026 al desplegar sin los Excel, que es justo el escenario
+donde tiene sentido pedir las dos —catálogos sin importar nada, pero con algo que enseñar—. Se
+resolvió llamando a `Command()._demo()` a mano.
+
+**Arreglo**: mover el bloque de `--demo` delante del `return`, o rechazar la combinación con un
+`CommandError` que lo explique. Lo primero es más útil. La prueba va en `backend/tests/test_seed.py`:
+sembrar con las dos banderas y exigir que haya medidas.
+
+### E-008 — `ssl_stapling` ya no aplica
+
+`ssl-comun.inc` activa `ssl_stapling on` y `ssl_stapling_verify on`. Desde que Let's Encrypt dejó
+de incluir la URL del respondedor OCSP en sus certificados, la directiva no puede hacer nada, y
+nginx lo dice en cada arranque y en cada recarga:
+
+```
+nginx: [warn] "ssl_stapling" ignored, no OCSP responder URL in the certificate
+```
+
+No rompe nada —el grapado OCSP es una optimización, no un requisito—, pero **ensucia el log de
+nginx con un aviso permanente**, y un aviso que siempre está es un aviso que nadie lee. Ese es el
+daño real: el día que nginx avise de algo importante, estará al lado de este.
+
+**Arreglo**: quitar las dos directivas y dejar un comentario que explique por qué no están, para
+que nadie las vuelva a añadir «porque faltan».

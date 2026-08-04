@@ -36,7 +36,7 @@ cd frontend && npm install && npm run dev
 
 Con eso: **http://localhost:5173** el sitio, **http://localhost:8000/api/docs/** el API, y el admin
 en **http://localhost:8000/`$ADMIN_URL`** — el prefijo lo fija `ADMIN_URL` en `backend/.env`, y el
-`.env.example` trae `gestion/`, así que copiándolo tal cual el admin está en `/gestion/` y no en
+`.env.example` trae `loginseguro/`, así que copiándolo tal cual el admin está ahí y no en
 `/admin/`. La tabla completa de accesos, con puertos y credenciales, está en el README.
 
 El primer build de la imagen del backend tarda unos minutos porque **compila tippecanoe**. Es una
@@ -151,6 +151,7 @@ npm install && npx playwright install chromium   # una sola vez, en la raíz
 npx playwright test                    # 56 E2E en escritorio y móvil
 ```
 
+
 `pytest` vive **dentro del contenedor**, para correr con las mismas versiones de GDAL, tippecanoe
 y WeasyPrint que producción. Se instala porque `compose.dev.yml` construye la imagen con
 `GRUPOS_UV=--group dev`; si cambias esa opción hace falta
@@ -221,6 +222,6 @@ frontend/         Vite + React + TS. `src/lib/` capa de datos; `src/routes/` una
 prototype/        Prototipo aprobado. CONGELADO: es la referencia visual, no se toca
 _specs/           Especificaciones y ADR. Se leen antes de cambiar algo de fondo
 _docs/            Esta documentación
-deploy/nginx/     `conf.d/` producción, `local/` prueba local sobre HTTP
+deploy/nginx/     `conf.d/` producción · `templates/` fragmentos con dominio · `local/` HTTP
 data/             Excel y GeoJSON canónicos. NO se versionan
 ```

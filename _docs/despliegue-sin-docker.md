@@ -220,7 +220,7 @@ SITE_URL=https://observatorio.predes.org.pe
 BACKEND_URL=https://obs.predes.org.pe
 CORS_ALLOWED_ORIGINS=https://observatorio.predes.org.pe
 CSRF_TRUSTED_ORIGINS=https://obs.predes.org.pe,https://observatorio.predes.org.pe
-ADMIN_URL=gestion/
+ADMIN_URL=loginseguro/
 
 # --- Base de datos GESTIONADA ---
 POSTGRES_DB=observatorio
@@ -418,8 +418,11 @@ server {
     http2 on;
     server_name obs.predes.org.pe;
 
-    ssl_certificate     /etc/letsencrypt/live/obs.predes.org.pe/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/obs.predes.org.pe/privkey.pem;
+    # El MISMO certificado que la SPA, y no uno propio: `certbot -d A -d B` emite UNA sola lineage
+    # —un certificado con los dos dominios como SAN— nombrada con el primer -d. La ruta
+    # /etc/letsencrypt/live/obs.predes.org.pe/ NO existe, y apuntar ahí impide arrancar nginx.
+    ssl_certificate     /etc/letsencrypt/live/observatorio.predes.org.pe/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/observatorio.predes.org.pe/privkey.pem;
 
     client_max_body_size 64M;      # Excel de 5.4 MB, GeoJSON de hasta 57 MB
 
@@ -433,7 +436,7 @@ server {
         proxy_pass http://127.0.0.1:8000;
     }
 
-    location /gestion/ {           # el valor de ADMIN_URL; si lo cambias, cámbialo aquí
+    location /loginseguro/ {       # el valor de ADMIN_URL; si lo cambias, cámbialo aquí
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -494,10 +497,16 @@ sudo certbot --nginx -d observatorio.predes.org.pe -d obs.predes.org.pe \
 # b) Si prefieres pegar la configuración de arriba tal cual: emite primero, con nginx parado,
 #    y añade los bloques 443 después.
 sudo systemctl stop nginx
-sudo certbot certonly --standalone -d observatorio.predes.org.pe -d obs.predes.org.pe \
+sudo certbot certonly --standalone --cert-name observatorio.predes.org.pe \
+  -d observatorio.predes.org.pe -d obs.predes.org.pe \
   --email <correo> --agree-tos --no-eff-email
 sudo systemctl start nginx
 ```
+
+> **Es UN solo certificado con los dos dominios**, no dos. `--cert-name` fija el nombre de la
+> lineage —el directorio de `/etc/letsencrypt/live/`— para que no dependa del orden de los `-d`, y
+> **los dos bloques `443` leen de ahí**. Con la opción (a) da igual, porque el plugin de nginx
+> reescribe las rutas él mismo.
 
 La renovación la deja programada el propio paquete (`systemctl list-timers | grep certbot`). Se
 comprueba con `sudo certbot renew --dry-run`.
@@ -558,7 +567,7 @@ cd /srv/observatorio/backend && sudo -u observatorio .venv/bin/python manage.py 
 
 curl -sI https://observatorio.predes.org.pe/ | head -1          # 200, la SPA
 curl -s  https://obs.predes.org.pe/api/sitio/ | head -c 80      # JSON de configuración
-curl -sI https://obs.predes.org.pe/gestion/login/ | head -1     # 200, el admin
+curl -sI https://obs.predes.org.pe/loginseguro/login/ | head -1 # 200, el admin
 curl -s https://obs.predes.org.pe/api/peligros/resumen/ | grep -o '"total_ccpp":[0-9]*'   # 8968
 
 # Tiles por rangos: 206 y con Content-Range expuesto, o el visor se queda sin capas

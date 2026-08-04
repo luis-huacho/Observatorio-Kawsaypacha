@@ -1,0 +1,10 @@
+# GENERADO al arrancar el contenedor: envsubst renderiza este archivo en
+# /etc/nginx/generado/dominio-spa.inc a partir de SITE_DOMAIN del .env de la raíz. No editarlo
+# dentro del contenedor, que se reescribe en cada arranque.
+#
+# Está aquí, y no en observatorio.conf, para que el repositorio no lleve ningún dominio dentro:
+# el mismo árbol sirve para el entorno de desarrollo y para producción.
+server_name ${SITE_DOMAIN};
+
+ssl_certificate     /etc/letsencrypt/live/${SITE_DOMAIN}/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/${SITE_DOMAIN}/privkey.pem;

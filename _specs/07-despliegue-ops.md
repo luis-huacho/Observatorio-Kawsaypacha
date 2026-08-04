@@ -6,8 +6,10 @@ Docker Compose en servidor propio (VPS) con dominio, HTTPS y backups automático
 
 | Dominio | Sirve |
 |---|---|
-| `observatorio.predes.org.pe` | La SPA estática (`dist/`). Es lo que el público conoce |
-| `obs.predes.org.pe` | `/api/`, el admin (`ADMIN_URL`), `/static/`, `/media/`, `/tiles/` y `/search/` |
+| `SITE_DOMAIN` (producción: `observatorio.predes.org.pe`) | La SPA estática (`dist/`). Es lo que el público conoce |
+| `API_DOMAIN` (producción: `obs.predes.org.pe`) | `/api/`, el admin (`ADMIN_URL`), `/static/`, `/media/`, `/tiles/` y `/search/` |
+
+**Los dominios no están escritos en el repositorio.** Salen de esas dos variables del `.env` de la raíz, y nginx los toma al arrancar con `envsubst`: la imagen renderiza `deploy/nginx/templates/*.template` en `/etc/nginx/generado`, que `observatorio.conf` incluye. Se generan **fragmentos incluidos** y no el archivo entero a propósito — si el directorio de salida no fuera escribible, el script de la imagen deja un ERROR en el log y **sigue adelante**, y con el archivo entero eso dejaría a nginx sirviendo su página de bienvenida sin ningún bloque 443. Con fragmentos, el mismo fallo es un `include` inexistente y nginx no arranca.
 
 Separar el sitio público del backend deja el admin y el API fuera del dominio que se difunde, y permite mover cualquiera de los dos sin tocar el otro. El coste es que **el frontend deja de ser mismo-origen**: se activa `django-cors-headers` con allowlist de los dos dominios, y nginx añade cabeceras CORS en `/media/` y `/tiles/` (las necesitan PMTiles por HTTP Range y la exportación del mapa a PNG desde el canvas).
 
@@ -64,7 +66,7 @@ server {
     client_max_body_size 64M;                            # Excel de 5.4 MB, GeoJSON de 57 MB
 
     location /api/     { proxy_pass http://backend:8000; }
-    location /gestion/ { proxy_pass http://backend:8000; }   # ADMIN_URL del .env
+    location /loginseguro/ { proxy_pass http://backend:8000; }  # ADMIN_URL del .env
     location /static/  { alias /srv/static/; }
 
     # El prefijo se quita con `rewrite`, NO con la barra final de proxy_pass: la configuración
@@ -93,7 +95,7 @@ server {
 }
 ```
 
-Ambos bloques con `listen 443 ssl` y redirección desde `:80`. Los certificados los emite `certbot` por webroot y los renueva su cron; nginx recarga tras cada renovación.
+Ambos bloques con `listen 443 ssl` y redirección desde `:80`. **Un solo certificado con los dos dominios como SAN**, en la lineage `SITE_DOMAIN`, de la que leen los dos bloques: `certbot -d A -d B` emite una sola y la nombra con el primer `-d`, así que apuntar el bloque del API a `live/API_DOMAIN/` impide arrancar nginx. La primera emisión va por `--standalone` con nginx parado (es un círculo: nginx no arranca sin los `.pem` y no puede servir el reto); las renovaciones, por webroot desde el contenedor `certbot`. La recarga que las recoge la hace el propio nginx cada 6 h, desde `deploy/nginx/docker-entrypoint.d/40-recarga-periodica.sh`.
 
 ## Dockerfile backend (multi-stage)
 
@@ -117,7 +119,7 @@ POSTGRES_DB= POSTGRES_USER= POSTGRES_PASSWORD= POSTGRES_HOST=db POSTGRES_PORT=54
 MEILI_URL=http://meilisearch:7700        MEILI_MASTER_KEY=
 GEMINI_API_KEY=
 EMAIL_HOST= EMAIL_PORT= EMAIL_HOST_USER= EMAIL_HOST_PASSWORD= DEFAULT_FROM_EMAIL=
-ADMIN_URL=gestion/     # admin fuera de /admin/ por defecto
+ADMIN_URL=loginseguro/ # admin fuera de /admin/ por defecto
 DJANGO_SUPERUSER_USERNAME= DJANGO_SUPERUSER_EMAIL= DJANGO_SUPERUSER_PASSWORD=   # los usa `manage.py seed`
 ```
 

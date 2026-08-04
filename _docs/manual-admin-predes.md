@@ -9,9 +9,9 @@ puede hacer por sí misma.
 
 ## Entrar
 
-`https://obs.predes.org.pe/gestion/` con el usuario y la contraseña que se entregaron aparte.
+`https://obs.predes.org.pe/loginseguro/` con el usuario y la contraseña que se entregaron aparte.
 
-> Es `/gestion/`, no `/admin/`. Se cambió a propósito: `/admin/` es la primera dirección que
+> Es `/loginseguro/`, no `/admin/`. Se cambió a propósito: `/admin/` es la primera dirección que
 > prueban los robots que buscan sitios para atacar.
 
 Al entrar se ve el **Panel**, que responde de un vistazo las preguntas del día:

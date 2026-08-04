@@ -8,7 +8,9 @@
 # busca, y que los tiles salen por rangos con sus cabeceras CORS.
 #
 # Antes de levantarlo hace falta un .env en la raíz con las VITE_* apuntando a http://localhost
-# (ver .env.example).
+# (ver .env.example). `SITE_DOMAIN` y `API_DOMAIN` también tienen que estar —compose las exige con
+# `:?` en el servicio nginx— aunque aquí no se usen: la configuración local no tiene dominios ni
+# TLS. Los fragmentos que genera envsubst van a un tmpfs que esta configuración no incluye.
 
 services:
   # `BACKEND_URL` es la URL con la que **el navegador** alcanza al backend: el API la usa para

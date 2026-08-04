@@ -37,7 +37,7 @@ Plataforma web pública de PREDES para monitorear la **Gestión del Riesgo de De
 ├── backend/           Django. `apps/` una carpeta por dominio; `config/` settings y urls
 ├── frontend/          Vite + React + TS. `src/lib/` capa de datos; `src/routes/` una por página
 ├── e2e/               Pruebas de extremo a extremo (Playwright)
-├── deploy/nginx/      `conf.d/` producción · `local/` prueba local sobre HTTP
+├── deploy/nginx/      `conf.d/` producción · `templates/` dominios · `local/` prueba HTTP
 ├── _specs/            Especificaciones y ADR — se leen ANTES de cambiar algo de fondo
 ├── _docs/             Documentación técnica y entregables (arquitectura, desarrollo, despliegue)
 ├── prototype/         Prototipo aprobado. CONGELADO: referencia visual, no se toca
@@ -112,8 +112,8 @@ El primer build tarda unos minutos porque **compila tippecanoe**; es una sola ve
 | Worker de tareas | sin puerto | — | `logs -f worker` |
 
 **El prefijo del admin lo fija `ADMIN_URL`** en `backend/.env`, y el `.env.example` trae
-`gestion/`: si lo copiaste sin cambiarlo, el admin está en
-**http://localhost:8000/gestion/**, no en `/admin/`. Se cambia a propósito, porque `/admin/` es lo
+`loginseguro/`: si lo copiaste sin cambiarlo, el admin está en
+**http://localhost:8000/loginseguro/**, no en `/admin/`. Se cambia a propósito, porque `/admin/` es lo
 primero que prueba cualquier escaneo automático. En local puedes dejar `ADMIN_URL=admin/` si te
 resulta más cómodo.
 

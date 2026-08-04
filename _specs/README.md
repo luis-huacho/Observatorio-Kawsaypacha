@@ -11,6 +11,66 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > sabe roto y sigue sin arreglar vive en **[09-errores.md](09-errores.md)**; al cerrarse un error,
 > sale de allí y entra aquí como una entrada nueva.
 
+### Actualización 04/08/2026 — primer despliegue real: seis cosas que solo se ven con un dominio
+
+El Observatorio se desplegó por primera vez contra un servidor y un dominio públicos
+(`observatorio.somosiadigital.com`, entorno de desarrollo en servidor propio; ver
+`_docs/despliegue-entorno-desarrollo.md`). Ejecutar el procedimiento de `_docs/despliegue.md` de
+principio a fin, en vez de leerlo, encontró seis defectos. **Cinco eran invisibles desde local**, y
+los cuatro primeros habrían bloqueado el pase de PREDES exactamente igual.
+
+- **El certificado que se emitía no era el que nginx buscaba.** El paso documentado emitía con
+  `certonly -d observatorio… -d obs…`, que crea **una sola** lineage nombrada con el primer `-d`;
+  pero el bloque del API pedía `/etc/letsencrypt/live/obs…/fullchain.pem`, que con ese comando no
+  existe nunca. nginx habría abortado con `cannot load certificate`. Ahora los dos bloques 443 leen
+  la misma lineage y el comando la fija con `--cert-name`, para que no dependa del orden de los
+  argumentos. El mismo fallo estaba repetido en `despliegue-sin-docker.md`, y también se corrigió.
+
+- **Nada recargaba nginx tras renovar el certificado**, aunque `compose.yaml` lo afirmaba en un
+  comentario y el spec 07 lo daba por hecho. certbot habría renovado sobre el día 60 y nginx habría
+  seguido sirviendo el viejo hasta caducar el 90. Se implementó en
+  `deploy/nginx/docker-entrypoint.d/40-recarga-periodica.sh`. Va ahí y no en un `command:` de
+  compose porque el entrypoint de la imagen solo ejecuta esos scripts —envsubst incluido— si el
+  primer argumento es `nginx`: un `command` con `sh` habría saltado la generación de plantillas.
+
+- **Dos comandos del runbook no hacían nada.** `docker compose run --rm certbot renew` sin
+  `--entrypoint certbot` cae en el bucle de renovación e ignora los argumentos; y `renew` sin
+  `--webroot -w /var/www/certbot` reusa el `standalone` de la primera emisión, que choca con nginx
+  en el puerto 80. Los dos están corregidos y **comprobados con `--dry-run` contra Let's Encrypt**.
+
+- **La sincronización de la búsqueda no funcionaba. Nunca.** `manage.py meili_estado` daba los tres
+  índices editoriales a cero después de sembrar, y la medición en el servidor fue tajante:
+  `post_save.receivers` tenía **una sola entrada, con su referencia débil ya muerta**, y un `save()`
+  no encolaba nada. La causa es que `@receiver` conecta con referencia **débil** por defecto y los
+  manejadores de `apps/core/signals.py` eran funciones locales de `_registrar`: el recolector se los
+  llevaba en cuanto la función retornaba. Peor con `dispatch_uid`, porque la entrada muerta se queda
+  en el registro con su clave y un segundo `conectar()` la ve ocupada y no vuelve a conectar.
+  Arreglado con `weak=False`. El efecto era el que el propio archivo dice evitar, y de la forma más
+  silenciosa posible: **lo publicado se ve en su página y no aparece al buscarlo**.
+
+  No se reproduce bajo pytest —ahí los manejadores siguen vivos—, así que la prueba de
+  `backend/tests/test_señales_meili.py` ataca la causa y no el síntoma: exige que los receptores no
+  se guarden como `weakref`. Falla sobre el código anterior y pasa sobre el nuevo.
+
+- **El dominio de la SPA no enviaba ninguna cabecera de seguridad** (era E-005): ni HSTS, ni
+  `nosniff`, ni `Referrer-Policy`, ni en la portada ni en el JavaScript del bundle. `ssl-comun.inc`
+  las declaraba a nivel `server`, pero **nginx descarta los `add_header` heredados en cuanto una
+  `location` declara uno propio**, y las cinco que declaran su `Cache-Control` o sus cabeceras CORS
+  se las comían. Se sacaron a `seguridad-comun.inc` y se incluyen también en esas cinco. Medido
+  antes y después con `curl -sI`.
+
+Y un cambio de fondo, que es la razón de que este despliegue no ensuciara el repositorio: **los
+dominios ya no están escritos en ninguna parte del código**. `server_name`, las rutas del
+certificado y el origen de CORS se generan al arrancar con envsubst, desde `SITE_DOMAIN` y
+`API_DOMAIN` del `.env` de la raíz —la variable `SITE_DOMAIN`, que hasta hoy no la consumía nadie—.
+Se generan **fragmentos incluidos** y no el archivo entero a propósito: si el directorio de salida
+no fuera escribible, el script de la imagen deja un ERROR en el log y **sigue adelante**, y con el
+archivo completo eso dejaría a nginx sirviendo su página de bienvenida sin un solo bloque 443. Con
+fragmentos, el mismo fallo es un `include` inexistente y nginx no arranca.
+
+Quedan abiertos en [09-errores.md](09-errores.md), anotados y no corregidos: E-006 (caché declarada
+y nunca usada), E-007 (`--solo-catalogos` se come `--demo`) y E-008 (`ssl_stapling` ya no aplica).
+
 ### Actualización 04/08/2026 — la ayuda memoria salía sin mapa en producción
 
 Reportado desde `/peligros` con Kunturkanki. Reproducido y corregido; las reglas quedan en 02:

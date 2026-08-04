@@ -13,7 +13,7 @@ falla. Las decisiones con su razonamiento completo viven en `_specs/00-alcance-d
                     ┌───────────────────────────────────────────────────┐
                     │  nginx  (:80/:443, certbot renueva los certs)     │
                     └───────┬───────────────────┬───────────────┬───────┘
-                       dist/│            /api/  │  /gestion/    │ /tiles/ /media/ /static/
+                       dist/│         /api/ /loginseguro/       │ /tiles/ /media/ /static/
                             │                   │               │
                      ┌──────▼─────┐      ┌──────▼──────┐  ┌─────▼──────────┐
                      │  SPA React │      │  gunicorn   │  │ volumen media  │

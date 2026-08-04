@@ -20,11 +20,22 @@ def _registrar(slug: str, etiqueta_modelo: str):
 
     modelo = django_apps.get_model(etiqueta_modelo)
 
-    @receiver(post_save, sender=modelo, dispatch_uid=f"meili_save_{slug}")
+    # `weak=False` no es opcional, y es el error que este archivo tuvo desde el principio.
+    #
+    # `@receiver` conecta con referencia DÉBIL por defecto, y estos dos manejadores son funciones
+    # locales: en cuanto `_registrar` retorna nadie más los referencia, el recolector se los lleva
+    # y la señal se queda con una referencia muerta. El efecto es exactamente el que este archivo
+    # dice evitar —el índice deja de sincronizarse— y además es invisible: lo publicado se ve en
+    # su página y simplemente no aparece al buscarlo. Medido en el servidor el 04/08/2026, antes
+    # del arreglo: `post_save.receivers` tenía UNA entrada, muerta, y `save()` no encolaba nada.
+    #
+    # Con `dispatch_uid` es peor de lo que parece, porque la entrada muerta se queda en el
+    # registro con su clave: un segundo `conectar()` la ve ocupada y **no vuelve a conectar**.
+    @receiver(post_save, sender=modelo, dispatch_uid=f"meili_save_{slug}", weak=False)
     def _al_guardar(sender, instance, **kwargs):
         _encolar(slug, instance.pk)
 
-    @receiver(post_delete, sender=modelo, dispatch_uid=f"meili_delete_{slug}")
+    @receiver(post_delete, sender=modelo, dispatch_uid=f"meili_delete_{slug}", weak=False)
     def _al_borrar(sender, instance, **kwargs):
         _encolar(slug, instance.pk)
 

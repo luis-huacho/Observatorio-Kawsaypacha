@@ -1,0 +1,10 @@
+# GENERADO al arrancar el contenedor desde SITE_DOMAIN y API_DOMAIN (ver dominio-spa.inc.template).
+server_name ${API_DOMAIN};
+
+# El MISMO certificado que la SPA, y no uno propio: certbot emite UNA sola lineage con los dos
+# dominios como SAN y la nombra con `--cert-name`, que es SITE_DOMAIN. La ruta
+# /etc/letsencrypt/live/${API_DOMAIN}/ NO existe, y apuntar ahí impide arrancar nginx con
+# «cannot load certificate … No such file or directory». Estuvo así hasta el 04/08/2026, cuando el
+# primer despliegue real lo destapó. Ver el paso 2 de _docs/despliegue.md.
+ssl_certificate     /etc/letsencrypt/live/${SITE_DOMAIN}/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/${SITE_DOMAIN}/privkey.pem;

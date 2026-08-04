@@ -6,7 +6,7 @@ Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PRED
 
 - `frontend/` — Vite + React 18 + TS + Tailwind 3 + react-router 6 + MapLibre GL. Consume el API vía `src/lib/api.ts` (`VITE_API_URL`).
 - `backend/` — Django 5.2 LTS + DRF + PostgreSQL 16 (sin PostGIS) + django-tasks (worker por BD, sin Redis) + admin con django-unfold. Apps en `backend/apps/`.
-- `e2e/` — pruebas de extremo a extremo con Playwright; `deploy/nginx/` — configuración de nginx (`conf.d/` producción, `local/` prueba local sobre HTTP).
+- `e2e/` — pruebas de extremo a extremo con Playwright; `deploy/nginx/` — configuración de nginx (`conf.d/` producción, `templates/` los fragmentos con dominio que genera envsubst, `docker-entrypoint.d/` la recarga periódica, `local/` prueba local sobre HTTP).
 - Meilisearch: búsqueda y facetas (llave search-only para el frontend; master key solo en backend).
 - Mapas, **son dos cosas distintas**:
   - Capas de contexto (ríos, lagunas, glaciares): GeoJSON → recorte a Cusco → Tippecanoe → `.pmtiles` estáticos en `media/tiles/`, servidos con HTTP Range.
