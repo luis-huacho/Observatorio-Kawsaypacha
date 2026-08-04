@@ -67,6 +67,17 @@ En dev apuntan a `http://localhost:8000/api` etc. (o proxy de Vite). `.env` no s
 
 - `Layout.tsx` pide `/api/sitio/` una vez (contexto React `SitioContext`); `Header`/`Footer` renderizan menú (`EnlaceMenu`) y textos desde ahí — se eliminan los arrays hardcodeados (`NAV` en `Header.tsx`, fuentes en `Footer.tsx`).
 - Mientras carga: skeleton con los textos por defecto actuales (fallback estático para no parpadear). Ese respaldo **es el menú en modo degradado**, así que lo que se oculte en `EnlaceMenu` hay que quitarlo también de ahí o reaparece en cada carga y cuando el API no responde.
+- **Las cajas de búsqueda pasan por `CajaBusqueda.tsx`**, que es donde vive su comportamiento: la
+  «X» de limpiar aparece solo cuando hay texto, es `type="button"` —dos de las cajas están dentro de
+  un `<form>` y sin eso lo enviarían—, devuelve el foco al campo y `Escape` hace lo mismo. Cubre
+  `/buscar`, el filtro de `/recursos` y las dos cajas de la cabecera; su prop `tono` solo cambia el
+  aspecto. La quinta caja, el buscador de centros poblados del visor, es un control de MapLibre
+  hecho a mano y lleva su equivalente imperativo en `MapaControles.ts`, donde la «X» **no quita el
+  marcador**: vacía el campo para escribir otra cosa.
+  Regla de producto: **en `/buscar` la «X» no toca la URL**. El término vive en `?q=` y los
+  resultados anteriores se quedan en pantalla hasta que se envíe la nueva búsqueda — es «borrar para
+  escribir», no «cancelar la búsqueda». En `/recursos` el filtro es en vivo y por eso ahí sí amplía
+  el listado al instante.
 - **El menú de escritorio va en una sola línea** (desde `lg`). La barra tiene altura fija, así que un enlace que parte su texto en dos se sale por arriba y por abajo: los enlaces llevan `whitespace-nowrap`, logo y `nav` van con `shrink-0`, y el que cede espacio cuando falta es el buscador (`min-w-0` en el `form` y en el `input`, `w-40` hasta `xl` y `w-56` desde ahí). Medido a 1024, 1280 y 1440 px en `e2e/header.spec.ts`.
 - Hero de portada: carrusel/slide único según nº de `HeroSlide` publicados.
 

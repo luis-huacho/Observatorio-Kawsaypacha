@@ -35,6 +35,27 @@ test.describe("Menú superior", () => {
     await expect(page.locator('a[href="/peligros"]:visible').first()).toBeVisible();
   });
 
+  test("la caja de búsqueda de la cabecera se vacía con la «X»", async ({ page }) => {
+    await page.goto("/");
+    // En móvil la caja vive dentro del panel de la hamburguesa.
+    await abrirMenu(page);
+
+    const caja = page.locator('header input[aria-label="Buscar"]:visible').first();
+    const limpiar = page.locator('header button[aria-label="Limpiar búsqueda"]:visible');
+
+    // Con la caja vacía no hay nada que limpiar y el botón no se pinta.
+    await expect(limpiar).toHaveCount(0);
+
+    await caja.fill("heladas");
+    await expect(limpiar).toHaveCount(1);
+    await limpiar.click();
+
+    await expect(caja).toHaveValue("");
+    await expect(caja).toBeFocused();
+    // La caja de la cabecera envía la búsqueda con Enter: la «X» no puede navegar a /buscar.
+    await expect(page).toHaveURL(/\/$/);
+  });
+
   test("el menú de escritorio cabe en una línea", async ({ page, isMobile }) => {
     test.skip(!!isMobile, "en móvil el menú es un panel vertical, por diseño");
 

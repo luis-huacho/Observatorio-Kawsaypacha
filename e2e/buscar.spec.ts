@@ -112,15 +112,67 @@ test.describe("Búsqueda", () => {
     await expect(page.locator("main a").first()).toBeVisible();
   });
 
-  test("el buscador de lugares del visor lleva a un centro poblado", async ({ page }) => {
+  test("la «X» vacía la caja sin cancelar la búsqueda", async ({ page }) => {
+    // Es la decisión de producto: se borra **para escribir otra cosa**, así que los resultados
+    // anteriores siguen en pantalla hasta que se envíe la nueva búsqueda. Sin esta prueba,
+    // «mejorar» el botón limpiando también la URL parece un arreglo y es un cambio de conducta.
+    const busquedas: string[] = [];
+    page.on("request", (r) => {
+      if (/multi-search|\/api\/buscar\//.test(r.url())) busquedas.push(r.url());
+    });
+
+    await page.goto(`/buscar?q=${CONSULTA}`);
+    const caja = page.getByLabel("Términos de búsqueda");
+    await expect(caja).toHaveValue(CONSULTA);
+    const resultados = page.locator("main section h2");
+    await expect(resultados.first()).toBeVisible();
+    const cuantos = await resultados.count();
+
+    const limpiar = page.getByRole("button", { name: "Limpiar búsqueda" });
+    await expect(limpiar).toBeVisible();
+    const antes = busquedas.length;
+    const url = page.url();
+    await limpiar.click();
+
+    await expect(caja).toHaveValue("");
+    // El foco vuelve al campo: sin eso hay que hacer clic otra vez para escribir, que es el trabajo
+    // manual que el botón venía a quitar.
+    await expect(caja).toBeFocused();
+    await expect(limpiar).toHaveCount(0);
+    // Y lo que no debe pasar: ni relanzar la búsqueda (el botón está dentro de un `<form>`, y sin
+    // `type="button"` lo enviaría) ni perder los resultados.
+    expect(page.url(), "la «X» no debe tocar la URL").toBe(url);
+    expect(busquedas.length, "la «X» no debe relanzar la búsqueda").toBe(antes);
+    await expect(resultados).toHaveCount(cuantos);
+  });
+
+  test("el buscador de lugares del visor lleva a un centro poblado y se puede vaciar", async ({
+    page,
+  }) => {
     await page.goto("/peligros");
 
-    const buscador = page.getByPlaceholder(/buscar.*(lugar|centro|poblado)/i).first();
-    if ((await buscador.count()) === 0) {
-      test.skip(true, "el control de búsqueda del mapa no está visible en este ancho");
+    // El control lo añade MapLibre cuando el mapa está listo, así que hay que **esperarlo**: la
+    // primera versión de esta prueba miraba el DOM antes de eso y se saltaba siempre, de modo que
+    // el buscador de lugares no estaba cubierto por nadie.
+    const buscador = page.getByPlaceholder("Buscar centro poblado…");
+    const aparecio = await buscador
+      .waitFor({ state: "visible", timeout: 30_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!aparecio) {
+      test.skip(true, "el control de búsqueda del mapa no llegó a montarse en este entorno");
     }
 
     await buscador.fill("Písac");
-    await expect(page.getByRole("option").or(page.locator("li")).first()).toBeVisible();
+    const sugerencias = page.locator(".maplibregl-ctrl li");
+    await expect(sugerencias.first()).toBeVisible();
+
+    // La «X» del control: vacía la caja y las sugerencias. El marcador del mapa **no** se toca.
+    const limpiar = page.locator('.maplibregl-ctrl button[aria-label="Limpiar búsqueda"]');
+    await expect(limpiar).toBeVisible();
+    await limpiar.click();
+    await expect(buscador).toHaveValue("");
+    await expect(sugerencias).toHaveCount(0);
+    await expect(limpiar).toBeHidden();
   });
 });

@@ -114,16 +114,16 @@ Un módulo por familia. El criterio es el **contrato del spec 02**, no la implem
 
 ## Casos obligatorios — E2E (Playwright)
 
-Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. 50 pruebas, ~1 min.
+Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. 56 pruebas, ~1.4 min.
 
 | Spec | Comprueba |
 |---|---|
 | `peligros.spec.ts` | El mapa **pinta de verdad** (se leen los píxeles del canvas: uno en blanco pasa cualquier `toBeVisible`) · las cifras de distribución salen del resumen del servidor y no de las filas cargadas · la tabla dice cuántos CCPP quedan sin clasificación · filtrar por peligro y nivel reduce la tabla · la ficha del CCPP abre desde la tabla · la ayuda memoria descarga un PDF · el selector de mapa base conmuta sin errores |
 | `home.spec.ts` | Las cifras salen del API y **coinciden** con `/api/peligros/resumen/` · ninguna se queda en el marcador de carga · el cascarón viene de `/api/sitio/` · Prioridades no aparece · el bloque de actualidad enlaza a contenido real · una ruta inventada da el 404 del sitio y no el de nginx (prueba el `try_files`) |
-| `buscar.spec.ts` | Una búsqueda devuelve resultados agrupados · **cuando Meilisearch está disponible se usa Meilisearch** · con él inalcanzable el fallback de DRF responde igual · una consulta sin resultados lo dice y ofrece a dónde ir |
+| `buscar.spec.ts` | Una búsqueda devuelve resultados agrupados · **cuando Meilisearch está disponible se usa Meilisearch** (mirando el status, no la llamada) · con él inalcanzable el fallback de DRF responde igual · una consulta sin resultados lo dice y ofrece a dónde ir · la **«X» vacía la caja sin cancelar la búsqueda**: no toca la URL, no relanza la consulta, no pierde los resultados y devuelve el foco · el buscador de lugares del visor sugiere y se vacía con su «X» |
 | `medidas.spec.ts` | El listado sale del API y cada tarjeta tiene imagen (el default lo resuelve el servidor) · el filtro manda el **slug** al API y recorta · la ficha abre con su contenido · una medida inexistente no deja la página en blanco · los chips de tema llevan al listado recortado |
 | `inversion.spec.ts` | Se muestra el estado vacío «información en preparación», **no un cero ni un gráfico en blanco** · la sección sigue anunciada en el menú (diferida no es oculta) |
-| `header.spec.ts` | «Comparar distritos» no se ofrece en la navegación (ADR-P2), y el resto del menú sí sigue ahí · en escritorio el menú **cabe en una línea** a 1024, 1280 y 1440 px, sin que la página desborde a lo ancho |
+| `header.spec.ts` | «Comparar distritos» no se ofrece en la navegación (ADR-P2), y el resto del menú sí sigue ahí · en escritorio el menú **cabe en una línea** a 1024, 1280 y 1440 px, sin que la página desborde a lo ancho · la «X» vacía la caja de búsqueda de la cabecera sin navegar |
 
 Tres convenciones que la suite impone desde `e2e/apoyo.ts` y `e2e/fixtures.ts`:
 

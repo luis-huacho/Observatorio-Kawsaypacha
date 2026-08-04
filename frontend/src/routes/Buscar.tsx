@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Search } from "lucide-react";
+import { AlertTriangle, ArrowRight } from "lucide-react";
 
 import { formatNumber } from "@/lib/semaforo";
 import { buscarGlobal, type RespuestaBusqueda } from "@/lib/search";
+import CajaBusqueda from "@/components/CajaBusqueda";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 
@@ -63,17 +64,17 @@ export default function Buscar() {
       />
 
       <div className="container-page py-8">
+        {/* La «X» de la caja vacía **solo la caja**, no la búsqueda: el término vive en la URL y
+            los resultados anteriores se quedan en pantalla hasta que se envíe la nueva. Es «borrar
+            para escribir otra cosa», y perder de vista lo encontrado no era lo que se pedía. */}
         <form onSubmit={enviar} className="max-w-xl flex gap-2 mb-8">
-          <div className="flex-1 flex items-center gap-2 control">
-            <Search className="w-4 h-4 text-ink-600 shrink-0" />
-            <input
-              value={texto}
-              onChange={(e) => setTexto(e.target.value)}
-              placeholder="Qochas, heladas, SINAGERD, Ollantaytambo…"
-              className="flex-1 bg-transparent border-0 outline-none text-sm"
-              aria-label="Términos de búsqueda"
-            />
-          </div>
+          <CajaBusqueda
+            value={texto}
+            onChange={setTexto}
+            placeholder="Qochas, heladas, SINAGERD, Ollantaytambo…"
+            etiqueta="Términos de búsqueda"
+            className="flex-1"
+          />
           <button type="submit" className="btn-primary">
             Buscar
           </button>

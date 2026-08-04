@@ -7,6 +7,19 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 - Fase 0 (prototipo estático) **completada y aprobada** por PREDES.
 - Fase actual: construcción de `frontend/` (Vite + React + TS + MapLibre) y `backend/` (Django 5.2 LTS + PostgreSQL + Meilisearch + PMTiles), desplegados con Docker Compose.
 
+### Actualización 03/08/2026 — botón de limpiar en las cajas de búsqueda
+
+Las cinco cajas del sitio ganan una «X» para vaciarlas. Se corrigieron 06 y 08:
+
+- **`CajaBusqueda.tsx`** concentra el comportamiento de las cuatro cajas en React —`/buscar`, el
+  filtro de la biblioteca y las dos de la cabecera—: la «X» solo con texto, `type="button"` (dos
+  viven dentro de un `<form>`), el foco de vuelta al campo y `Escape` como atajo. La del visor es un
+  control de MapLibre a mano y lleva su equivalente imperativo, que **no borra el marcador**.
+- Regla de producto en 06: **en `/buscar` la «X» no toca la URL**. El término vive en `?q=` y los
+  resultados se quedan hasta que se envíe la nueva búsqueda.
+- De paso, la prueba del buscador de lugares del visor **dejó de saltarse siempre**: miraba el DOM
+  antes de que MapLibre añadiera el control, así que ese buscador no estaba cubierto por nadie.
+
 ### Actualización 03/08/2026 — la llave de búsqueda pasa a ser determinista
 
 El buscador apareció en «modo básico» en el sitio compilado. La causa: la llave *search-only* se

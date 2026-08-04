@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Download, ExternalLink, FileText, Search } from "lucide-react";
+import { Download, ExternalLink, FileText } from "lucide-react";
 
 import { useApi, useApiPaginado } from "@/lib/api";
 import { registrarDescargaDocumento } from "@/lib/metricas";
 import type { CategoriaDocumento, Documento } from "@/lib/types";
+import CajaBusqueda from "@/components/CajaBusqueda";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 
@@ -57,16 +58,13 @@ export default function Recursos() {
         </h2>
 
         <div className="grid sm:grid-cols-[1fr_240px] gap-3 mb-5 max-w-2xl">
-          <div className="flex items-center gap-2 control">
-            <Search className="w-4 h-4 text-ink-600 shrink-0" />
-            <input
-              value={buscar}
-              onChange={(e) => setBuscar(e.target.value)}
-              placeholder="Buscar por título, resumen o institución…"
-              className="flex-1 bg-transparent border-0 outline-none text-sm"
-              aria-label="Buscar documentos"
-            />
-          </div>
+          {/* Aquí el filtro es en vivo, así que la «X» amplía el listado al instante. */}
+          <CajaBusqueda
+            value={buscar}
+            onChange={setBuscar}
+            placeholder="Buscar por título, resumen o institución…"
+            etiqueta="Buscar documentos"
+          />
           <select
             value={categoria}
             onChange={(e) => setCategoria(e.target.value)}

@@ -202,7 +202,7 @@ cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
 
 npm install && npx playwright install chromium   # una sola vez, en la raíz
-npx playwright test                    # 50 E2E en escritorio y móvil
+npx playwright test                    # 56 E2E en escritorio y móvil
 ```
 
 `pytest` corre **dentro del contenedor**, con las mismas versiones de GDAL, tippecanoe y WeasyPrint

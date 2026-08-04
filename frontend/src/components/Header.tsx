@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { Search, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 import { registrarBusqueda } from "@/lib/metricas";
 import { useSitio } from "@/lib/sitio";
+import CajaBusqueda from "@/components/CajaBusqueda";
 
 export default function Header() {
   const [open, setOpen] = useState(false);
@@ -85,18 +86,16 @@ export default function Header() {
           </nav>
 
           {/* El buscador es el que cede el espacio: `min-w-0` aquí y en el input —un `<input>` trae
-              ancho mínimo intrínseco y sin eso no bajaría de `w-56`, comprimiendo el menú. */}
-          <form
-            onSubmit={onSubmit}
-            className="hidden md:flex items-center ml-auto min-w-0 bg-white/95 rounded-lg border border-white/30 px-3 py-1.5 focus-within:border-white transition"
-          >
-            <Search className="w-4 h-4 shrink-0 text-ink-600" />
-            <input
+              ancho mínimo intrínseco y sin eso no bajaría de `w-56`, comprimiendo el menú. Las
+              clases visuales de la caja viven en el tono «cabecera» de `CajaBusqueda`; este `form`
+              solo la coloca. */}
+          <form onSubmit={onSubmit} className="hidden md:flex ml-auto min-w-0">
+            <CajaBusqueda
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={setQ}
               placeholder="Buscar distrito, peligro, medida…"
-              className="bg-transparent border-0 outline-none text-sm ml-2 w-40 xl:w-56 min-w-0 text-ink-900"
-              aria-label="Buscar"
+              etiqueta="Buscar"
+              tono="cabecera"
             />
           </form>
 
@@ -127,14 +126,14 @@ export default function Header() {
                 {item.texto}
               </NavLink>
             ))}
-            <form onSubmit={onSubmit} className="flex items-center gap-2 mt-2 pt-2 border-t border-white/20">
-              <Search className="w-4 h-4 text-white/80" />
-              <input
+            <form onSubmit={onSubmit} className="flex mt-2 pt-2 border-t border-white/20">
+              <CajaBusqueda
                 value={q}
-                onChange={(e) => setQ(e.target.value)}
+                onChange={setQ}
                 placeholder="Buscar…"
-                className="flex-1 bg-white/95 rounded-md px-3 py-2 text-sm border border-white/30 text-ink-900"
-                aria-label="Buscar"
+                etiqueta="Buscar"
+                tono="cabecera-movil"
+                className="flex-1"
               />
             </form>
           </div>

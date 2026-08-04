@@ -102,17 +102,37 @@ export class BuscarLugarControl implements IControl {
     div.className = "maplibregl-ctrl maplibregl-ctrl-group";
     div.style.cssText = "background:#fff;overflow:hidden";
 
+    const fila = document.createElement("div");
+    fila.style.cssText = "display:flex;align-items:center";
+
     const input = document.createElement("input");
     input.type = "text";
     input.placeholder = "Buscar centro poblado…";
     input.style.cssText =
-      "border:none;outline:none;padding:7px 9px;width:210px;font:13px system-ui;display:block";
+      "border:none;outline:none;padding:7px 9px;width:186px;font:13px system-ui;display:block";
+
+    // Equivalente de la «X» de `CajaBusqueda`, a mano porque este control es DOM puro. Solo se ve
+    // cuando hay texto, y **no quita el marcador**: vacía la caja para escribir otra cosa, y borrar
+    // de paso el punto al que se acaba de volar sería una sorpresa desagradable.
+    const limpiar = document.createElement("button");
+    limpiar.type = "button";
+    limpiar.textContent = "×";
+    limpiar.title = "Limpiar búsqueda";
+    limpiar.setAttribute("aria-label", "Limpiar búsqueda");
+    limpiar.style.cssText =
+      "display:none;border:none;background:none;cursor:pointer;color:#555;font:18px/1 system-ui;" +
+      "padding:0 8px 2px";
 
     const lista = document.createElement("ul");
     lista.style.cssText =
       "list-style:none;margin:0;padding:0;max-height:220px;overflow:auto;background:#fff";
 
+    const mostrarLimpiar = () => {
+      limpiar.style.display = input.value ? "block" : "none";
+    };
+
     const render = async () => {
+      mostrarLimpiar();
       const term = input.value.trim();
       if (term.length < 2) {
         lista.innerHTML = "";
@@ -149,17 +169,32 @@ export class BuscarLugarControl implements IControl {
           this.marcador.togglePopup();
           lista.innerHTML = "";
           input.value = c.nombre;
+          mostrarLimpiar();
         });
         lista.appendChild(li);
       }
     };
 
     input.addEventListener("input", () => void render());
+    limpiar.addEventListener("click", () => {
+      input.value = "";
+      lista.innerHTML = "";
+      mostrarLimpiar();
+      input.focus();
+    });
     // Sin esto, escribir sobre el mapa dispara los atajos de teclado de MapLibre.
-    div.addEventListener("keydown", (e) => e.stopPropagation());
+    div.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && input.value) {
+        input.value = "";
+        lista.innerHTML = "";
+        mostrarLimpiar();
+      }
+      e.stopPropagation();
+    });
     div.addEventListener("click", (e) => e.stopPropagation());
 
-    div.append(input, lista);
+    fila.append(input, limpiar);
+    div.append(fila, lista);
     this.contenedor = div;
     return div;
   }

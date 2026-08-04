@@ -141,7 +141,7 @@ dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF co
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
 npm install && npx playwright install chromium   # una sola vez, en la raíz
-npx playwright test                    # 50 E2E en escritorio y móvil
+npx playwright test                    # 56 E2E en escritorio y móvil
 ```
 
 `pytest` vive **dentro del contenedor**, para correr con las mismas versiones de GDAL, tippecanoe
