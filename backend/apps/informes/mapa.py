@@ -22,6 +22,14 @@ ANCHO = 1100
 ALTO = 700
 TIMEOUT_MS = 25_000
 
+#: Plazo tras el que la página se da por pintada aunque `idle` no haya llegado.
+#:
+#: El mapa base son teselas de openstreetmap.org: si ese servicio se atasca, `idle` no llega nunca
+#: y la captura se iba al timeout dejando el documento sin mapa. Pasado este plazo se captura lo
+#: que haya —los centros poblados y las capas propias ya están dibujados—, que es mejor que nada.
+#: Holgado respecto a lo que tarda en local (~2 s) y muy por debajo de `TIMEOUT_MS`.
+ESPERA_PINTADO_MS = 8_000
+
 
 def url_visor(distrito, peligro: str = "", nivel_min="") -> str:
     params = {"distrito": distrito.ubigeo, "ancho": ANCHO, "alto": ALTO}
@@ -59,6 +67,13 @@ def capturar_mapa(distrito, peligro: str = "", nivel_min="") -> tuple[str | None
                 )
                 if error := pagina.evaluate("window.__mapaError || null"):
                     return None, str(error)[:200]
+                # Avisos que no abortaron la captura —teselas del mapa base, una capa que no
+                # respondió—. Van al log porque si no, un mapa base caído solo se nota mirando el
+                # PDF y preguntándose por qué tiene el fondo en blanco.
+                if avisos := pagina.evaluate("window.__mapaAvisos || []"):
+                    logger.warning(
+                        "Mapa de %s capturado con avisos: %s", distrito.ubigeo, "; ".join(avisos)
+                    )
                 png = pagina.screenshot(type="png")
             finally:
                 navegador.close()

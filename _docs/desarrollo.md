@@ -143,8 +143,8 @@ hasta que la añadas.
 ## Pruebas
 
 ```bash
-dc exec backend pytest                 # 143 pruebas, ~32 s (sin las lentas)
-dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
+dc exec backend pytest                 # 144 pruebas, ~30 s (sin las lentas)
+dc exec backend pytest -m lento        # 5 más: los Excel completos y el PDF con mapa
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
 npm install && npx playwright install chromium   # una sola vez, en la raíz

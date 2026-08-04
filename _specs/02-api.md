@@ -218,6 +218,12 @@ Notas de contrato heredadas de la maqueta:
 - **El mapa se renderiza en el servidor** (decisión del dueño del proyecto). El worker abre una página headless (Playwright + Chromium) con un visor mínimo que consume `/api/ccpp/geojson/` y las capas de contexto, encuadra el distrito y captura el PNG, que WeasyPrint incrusta. Se prefiere esto a que el cliente envíe el canvas de su vista: así el PDF se puede generar **desde el admin y por lotes**, sin depender de que alguien tenga el visor abierto, y el documento es reproducible a partir de sus parámetros. Coste asumido: Chromium en la imagen del backend (~400 MB) y un punto más de fallo — si la captura falla, el PDF sale **sin mapa** y con el resto del contenido intacto, nunca con un hueco roto.
 - Los textos de firma salen de `ConfiguracionSitio` y `BloqueTexto`, no cableados como en el prototipo.
 
+Y tres reglas de la captura, las tres pagadas con un PDF que salió sin mapa en producción local:
+
+- **Todo lo que pide esa página va por su propio origen.** El navegador headless corre dentro del contenedor y abre el visor por la URL interna (`RENDER_MAPA_BASE_URL`), así que sus `fetch` son **relativos** y las URL de los PMTiles que devuelve `/api/mapas/capas/` se reescriben contra `location.origin`. `BACKEND_URL` es la URL con la que **el visitante** alcanza el backend y no sirve aquí: en producción local es `http://localhost`, el puerto 80 del propio contenedor, donde no escucha nadie. Con eso el documento salía sin mapa, y en desarrollo funcionaba por casualidad porque allí `BACKEND_URL` sí es el puerto de ese contenedor.
+- **Qué es fatal y qué no.** No poder cargar los datos (`/ccpp/geojson/`, `/mapas/capas/`) sí lo es: un mapa sin puntos incrustado como si fuera el mapa engaña. Un error de MapLibre —una tesela del mapa base, una capa que no responde— **no** aborta: se recoge como aviso, va al log del servidor y se captura lo que haya. El mapa base son teselas de openstreetmap.org, y con la regla anterior una sola tesela costaba el mapa entero.
+- **Hay un plazo, además del timeout.** Si algo externo se atasca, `idle` puede no llegar nunca; pasado `ESPERA_PINTADO_MS` (8 s) se captura igual. Comprobado apuntando el mapa base a un host inexistente: el PNG sale con los centros poblados y las capas propias sobre fondo plano.
+
 ## Sitio, mapas y métricas
 
 | Endpoint | Params | Notas |

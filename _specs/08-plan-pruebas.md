@@ -15,7 +15,7 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (143 pruebas, ~32 s)
+$DC exec backend pytest                 # suite backend (144 pruebas, ~30 s)
 $DC exec backend pytest -m lento        # los Excel completos y el PDF con mapa (~35 s más)
 cd frontend && npm run lint && npm run build    # tipos + build
 npx playwright test                             # E2E contra el stack levantado
@@ -86,7 +86,8 @@ Un módulo por familia. El criterio es el **contrato del spec 02**, no la implem
 - El PDF se genera de verdad (`%PDF`), con nombre que identifica el distrito, y **para un distrito sin datos de emergencias también**: si fallara ahí, los distritos con vacíos de información serían los únicos sin ayuda memoria.
 - El PDF lee de **las mismas consultas** que el API, comparando cifra a cifra: es la única forma de garantizar que el papel no contradice a la pantalla.
 - Los filtros del visor llegan al documento y se imprimen en él.
-- Con el mapa (Chromium) también sale, marcado `lento`. Su fallo es una degradación prevista, no un error.
+- **El visor de la captura pide sus datos a su propio origen**: las URL del contexto son relativas y no llevan `BACKEND_URL`, que se pone a un host inalcanzable en la prueba precisamente para que se note. Es la prueba que faltaba: con `BACKEND_URL` ahí, el documento salía **sin mapa** en producción local y en desarrollo funcionaba por casualidad.
+- **Con el mapa (Chromium) el PDF trae el mapa**, marcado `lento`: se cuentan las imágenes rasterizadas del PDF (el mapa es la única; el logotipo es vectorial) y se exige ≥ 1, con su contraparte que comprueba que con `sin_mapa=1` no hay ninguna. La versión anterior de esta prueba solo comprobaba que el PDF se generara y **toleraba que viniera sin mapa**, así que el fallo de arriba le era invisible: la degradación prevista tapaba el defecto. La degradación se sigue probando, pero en su propia prueba.
 
 ### `test_workflow.py`
 

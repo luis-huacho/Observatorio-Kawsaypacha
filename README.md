@@ -189,7 +189,7 @@ el API responde 200 y la cifra que se publica es otra.
 | El buscador está arriba **y al día** | `dm meili_estado` | La tabla con los documentos de cada índice frente a la base. Sale con **código ≠ 0** si el servicio no responde o si algo está desfasado, que no da ningún otro síntoma: lo publicado se ve en su página y no aparece al buscarlo |
 | La búsqueda usa Meilisearch **con la llave del navegador** | `curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:7700/multi-search -H "Authorization: Bearer $VITE_MEILI_SEARCH_KEY" -H 'Content-Type: application/json' -d '{"queries":[{"indexUid":"medidas","q":"cusco","limit":1}]}'` | **200**. Mide otra cosa que la fila anterior: un **403** es la llave del bundle caducada. `/api/buscar/estado/` dice `meili_disponible: true` igualmente, porque el backend consulta con la master key, y `/search/health` responde 200 sin credencial |
 | El admin y el flujo editorial | entrar, crear una noticia, enviarla a revisión y publicarla | credenciales, permisos y avisos por correo (van a `logs -f worker`) |
-| La ayuda memoria | `curl -so /tmp/am.pdf localhost:8000/api/distritos/080101/ayuda-memoria.pdf` | WeasyPrint y la captura del mapa con Chromium |
+| La ayuda memoria, **con su mapa** | `curl -so /tmp/am.pdf localhost:8000/api/distritos/080101/ayuda-memoria.pdf && grep -c '/Subtype /Image' /tmp/am.pdf` | **≥ 1**: WeasyPrint y la captura con Chromium. Descargar el PDF no basta — sale igual sin mapa, y así estuvo saliendo. El mapa es la única imagen rasterizada del documento |
 
 Las cinco comprobaciones **manuales previas a la entrega** —más exigentes que estas— están en
 [`_specs/08-plan-pruebas.md`](./_specs/08-plan-pruebas.md).
@@ -197,7 +197,7 @@ Las cinco comprobaciones **manuales previas a la entrega** —más exigentes que
 ## 6. Probar
 
 ```bash
-dc exec backend pytest                 # 143 pruebas, ~32 s
+dc exec backend pytest                 # 144 pruebas, ~30 s
 dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
 
 cd frontend && npm run lint            # tsc --noEmit

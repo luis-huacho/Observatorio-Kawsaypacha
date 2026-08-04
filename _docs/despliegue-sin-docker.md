@@ -165,6 +165,11 @@ sudo -u observatorio bash -lc 'cd /srv/observatorio/backend && .venv/bin/playwri
 plataforma funciona igual**: la ayuda memoria se genera sin el mapa y el motivo queda en el log del
 worker. Es una degradación prevista, no un error.
 
+> Y por eso **hay que comprobar que el mapa sale**, no solo que el PDF se descargue: el documento se
+> genera igual sin él. La comprobación está en §13. El mapa base son teselas de openstreetmap.org: si
+> este servidor no tiene salida a internet, el mapa sale con los centros poblados y las capas propias
+> sobre fondo plano —y el log lo avisa—, en lugar de no salir.
+
 ## 4. Meilisearch como servicio
 
 ```bash
@@ -558,6 +563,11 @@ curl -s https://obs.predes.org.pe/api/peligros/resumen/ | grep -o '"total_ccpp":
 
 # Tiles por rangos: 206 y con Content-Range expuesto, o el visor se queda sin capas
 curl -sr 0-127 -D - -o /dev/null https://obs.predes.org.pe/tiles/ccpp.pmtiles | grep -iE '206|content-range'
+
+# Ayuda memoria CON su mapa: descargar el PDF no basta, sale igual sin él. El mapa es la única
+# imagen rasterizada del documento, así que esto tiene que dar ≥ 1.
+curl -so /tmp/am.pdf https://obs.predes.org.pe/api/distritos/080101/ayuda-memoria.pdf \
+  && grep -c '/Subtype /Image' /tmp/am.pdf
 
 # Buscador, las dos comprobaciones:
 # a. Sin llave → 401. Confirma que Meilisearch recibe la ruta y no la raíz.

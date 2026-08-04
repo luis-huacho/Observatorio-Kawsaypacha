@@ -111,13 +111,64 @@ def test_los_filtros_del_visor_llegan_al_pdf(api, datos_muestra, sin_throttling)
     assert filtrado["filtros"] != completo["filtros"]
 
 
+def test_el_visor_del_mapa_pide_los_datos_a_su_propio_origen(client, settings):
+    """La prueba que faltaba, y sin la que el PDF salía sin mapa en producción.
+
+    El navegador headless corre **dentro del contenedor** y abre esta página por la URL interna
+    (`RENDER_MAPA_BASE_URL`). Sus `fetch` tienen que ir al mismo origen, así que las URL del
+    contexto son **relativas**. Antes se construían con `BACKEND_URL` —la URL con la que el
+    visitante alcanza el backend— y en producción local eso era `http://localhost`, el puerto 80
+    del propio contenedor, donde no escucha nadie: «Failed to fetch», y el documento salía sin
+    mapa. En desarrollo funcionaba por casualidad, porque allí `BACKEND_URL` sí es el puerto de
+    este contenedor.
+
+    Por eso `BACKEND_URL` se pone aquí a un host inalcanzable: si vuelve a colarse en estas URL,
+    esta prueba falla en vez de fallar el PDF de alguien.
+    """
+    settings.BACKEND_URL = "http://no-existe.invalid:9999"
+
+    respuesta = client.get(
+        "/api/informes/visor-mapa/", {"distrito": "080101", "peligro": "sismo", "nivel_min": "3"}
+    )
+    contexto = respuesta.context_data
+
+    assert respuesta.status_code == 200
+    for clave in ("url_geojson", "url_capas"):
+        assert contexto[clave].startswith("/api/"), contexto[clave]
+        assert "no-existe.invalid" not in contexto[clave]
+    # Y los filtros viajan, o el mapa del documento no coincidiría con la pantalla que lo pidió.
+    assert "distrito=080101" in contexto["url_geojson"]
+    assert "peligro=sismo" in contexto["url_geojson"]
+    assert "nivel_min=3" in contexto["url_geojson"]
+
+
+def _chromium_disponible() -> bool:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return False
+    try:
+        with sync_playwright() as p:
+            p.chromium.launch(args=["--no-sandbox"]).close()
+        return True
+    except Exception:  # noqa: BLE001 — sin navegador la prueba se salta, no falla
+        return False
+
+
 @pytest.mark.lento
 def test_con_el_mapa_tambien_sale(api, datos_muestra, sin_throttling):
-    """La captura con Chromium es la parte frágil, y su fallo **no** puede impedir el documento.
+    """El camino completo: con Chromium disponible, el PDF **tiene que traer el mapa**.
 
-    Si el navegador headless no arranca, el PDF tiene que salir igual sin el mapa: es una
-    degradación prevista, no un error. Aquí se comprueba el camino completo.
+    La primera versión de esta prueba solo comprobaba que el PDF se generara, y toleraba que
+    viniera sin mapa —«degradación prevista»—. Con eso, el documento salió meses sin mapa en
+    producción local sin que la suite dijera nada: el fallo se veía como el camino degradado. Ahora
+    la degradación se comprueba en su propia prueba (`sin_mapa=1`, arriba) y aquí se exige el mapa.
+
+    Si el navegador no está en la imagen, se salta: es una limitación del entorno, no del código.
     """
+    if not _chromium_disponible():
+        pytest.skip("Chromium no está disponible en esta imagen")
+
     respuesta = api.get("/api/distritos/080101/ayuda-memoria.pdf")
     contenido = (
         b"".join(respuesta.streaming_content)
@@ -127,3 +178,14 @@ def test_con_el_mapa_tambien_sale(api, datos_muestra, sin_throttling):
 
     assert respuesta.status_code == 200
     assert contenido.startswith(b"%PDF")
+    # El mapa es la única imagen rasterizada del documento —el logotipo es vectorial—, así que
+    # contarlas es la forma de saber si el mapa llegó.
+    assert contenido.count(b"/Subtype /Image") >= 1, "el PDF salió sin el mapa"
+
+
+@pytest.mark.lento
+def test_sin_mapa_el_pdf_no_lleva_ninguna_imagen(api, datos_muestra, sin_throttling):
+    """La contraparte de la prueba anterior: sin ella, contar imágenes no significaría nada."""
+    _, contenido = _pdf(api, "080101")
+
+    assert contenido.count(b"/Subtype /Image") == 0

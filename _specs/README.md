@@ -7,6 +7,31 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 - Fase 0 (prototipo estático) **completada y aprobada** por PREDES.
 - Fase actual: construcción de `frontend/` (Vite + React + TS + MapLibre) y `backend/` (Django 5.2 LTS + PostgreSQL + Meilisearch + PMTiles), desplegados con Docker Compose.
 
+### Actualización 04/08/2026 — la ayuda memoria salía sin mapa en producción
+
+Reportado desde `/peligros` con Kunturkanki. Reproducido y corregido; las reglas quedan en 02:
+
+- **Causa**: el visor que captura el navegador headless pedía sus datos con URL construidas a partir
+  de `BACKEND_URL`, que es la URL con la que **el visitante** alcanza el backend. Chromium corre
+  dentro del contenedor, así que en producción local (`http://localhost`) pedía al puerto 80 del
+  propio contenedor, donde no escucha nadie: «Failed to fetch» y PDF sin mapa. **En desarrollo
+  funcionaba por casualidad**, porque allí `BACKEND_URL` es el puerto de ese contenedor — y por eso
+  la prueba del PDF con mapa no lo veía. Ahora las URL son relativas.
+- **La misma causa una segunda vez**: `/api/mapas/capas/` devuelve las URL de los PMTiles en absoluto
+  y con `BACKEND_URL`, así que las tres capas fallaban y el mapa no terminaba de pintar nunca. El
+  visor del informe las reescribe contra su propio origen.
+- **Una sola tesela costaba el mapa entero**: cualquier `error` de MapLibre se trataba como fatal, y
+  el mapa base son teselas de openstreetmap.org. Ahora esos errores son avisos que van al log, hay un
+  plazo de 8 s por si `idle` no llega, y el mapa sale con los centros poblados y las capas propias
+  sobre fondo plano. Comprobado apuntando el mapa base a un host inexistente.
+- **Una prueba que pasaba en vacío** (08): `test_con_el_mapa_tambien_sale` solo comprobaba que el PDF
+  se generara y toleraba que viniera sin mapa. Pasa a exigir el mapa cuando Chromium está disponible,
+  con su contraparte que comprueba que sin mapa no hay ninguna imagen.
+- Hallazgo de datos anotado, sin cambio de código por decisión del dueño del proyecto: el Excel de ese
+  distrito sale vacío porque **la fuente no clasificó ninguno de sus 61 centros poblados**, y hay
+  **24 distritos así**, Sicuani incluido (302 centros poblados). La ayuda memoria sí lo explica en su
+  párrafo de presentación; el export no dice nada.
+
 ### Actualización 03/08/2026 — las imágenes del editor, en su carpeta y a tamaño de pantalla
 
 Arreglar el 404 de la subida de imágenes destapó **dos ajustes que no hacían nada**. Los dos se

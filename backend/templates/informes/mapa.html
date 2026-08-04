@@ -36,6 +36,24 @@
 
   maplibregl.addProtocol("pmtiles", new pmtiles.Protocol().tile);
 
+  /**
+   * Cualquier URL, reescrita contra el origen de ESTA página.
+   *
+   * `/api/mapas/capas/` devuelve las URL de los PMTiles en absoluto y con `BACKEND_URL`, que es
+   * la URL con la que **el visitante** alcanza el backend. Este navegador corre dentro del
+   * contenedor, así que en producción local esas URL apuntan a un puerto donde no escucha nadie:
+   * las tres capas fallaban, el mapa no terminaba nunca de pintar y la captura se iba al timeout.
+   * El origen de esta página, en cambio, es alcanzable por definición: acaba de cargarla.
+   */
+  const enEsteOrigen = (u) => {
+    try {
+      const url = new URL(u, location.origin);
+      return location.origin + url.pathname + url.search;
+    } catch (e) {
+      return u;
+    }
+  };
+
   (async () => {
     let puntos = { type: "FeatureCollection", features: [] };
     let capas = [];
@@ -50,6 +68,9 @@
       window.__mapaError = "no se pudieron cargar los datos: " + e;
       return;
     }
+
+    // Avisos que NO abortan la captura. Ver el manejador de `error` de más abajo.
+    window.__mapaAvisos = [];
 
     const mapa = new maplibregl.Map({
       container: "mapa",
@@ -75,7 +96,10 @@
 
     mapa.on("load", () => {
       for (const capa of capas) {
-        mapa.addSource(capa.slug, { type: "vector", url: "pmtiles://" + capa.url });
+        mapa.addSource(capa.slug, {
+          type: "vector",
+          url: "pmtiles://" + enEsteOrigen(capa.url),
+        });
         const e = capa.estilo || {};
         if (capa.tipo_geometria === "linea") {
           mapa.addLayer({
@@ -125,13 +149,32 @@
       // `idle` y no `load`: se emite cuando no queda nada pendiente por cargar ni dibujar, que
       // es la única señal fiable de que la captura no va a salir a medias (spec 05).
       mapa.once("idle", () => { window.__mapaListo = true; });
+
+      // Red de seguridad: si algo externo se queda colgado —el mapa base vive en
+      // openstreetmap.org— `idle` puede no llegar nunca, y entonces la captura se iba al timeout
+      // y el documento salía sin mapa. Pasado este plazo se captura lo que haya: los centros
+      // poblados y las capas ya están dibujados, y un mapa sin fondo es mejor que ninguno.
+      setTimeout(() => { window.__mapaListo = true; }, {{ espera_ms }});
     });
 
-    // El error se señaliza como error. La primera versión de esto ponía `__mapaListo = true`
-    // en el manejador, y el resultado fue una captura en blanco que el PDF incrustaba como si
-    // fuera un mapa: el fallo se veía como éxito.
+    // Los errores de MapLibre **no abortan la captura**, y eso es deliberado: aquí llega una
+    // tesela del mapa base que no responde o una capa PMTiles que falla, y con la versión
+    // anterior —que ponía `__mapaError` con cualquiera de ellos— **una sola tesela costaba el
+    // mapa entero**. El mapa base son teselas de openstreetmap.org, así que en un servidor sin
+    // salida a internet el documento nunca habría traído mapa.
+    //
+    // Lo que sí se captura es un mapa con los centros poblados y las capas sobre fondo plano:
+    // incompleto, pero honesto y utilizable en una reunión. Los avisos se recogen para que el
+    // servidor los deje en el log, y el caso «no llega nunca a pintar» lo cubre el timeout de
+    // `capturar_mapa`.
+    //
+    // Lo que sigue siendo fatal es no tener los datos (arriba): un mapa sin puntos incrustado
+    // como si fuera el mapa es peor que no tener mapa.
     mapa.on("error", (e) => {
-      window.__mapaError = String((e && e.error && e.error.message) || e);
+      const aviso = String((e && e.error && e.error.message) || e);
+      if (window.__mapaAvisos.length < 10 && !window.__mapaAvisos.includes(aviso)) {
+        window.__mapaAvisos.push(aviso);
+      }
     });
   })();
 </script>

@@ -125,6 +125,12 @@ curl -sI https://obs.predes.org.pe/gestion/login/ | head -1     # 200, el admin
 curl -sr 0-99 -D - -o /dev/null https://obs.predes.org.pe/tiles/ccpp.pmtiles | grep -i 206
 curl -s https://obs.predes.org.pe/api/peligros/resumen/ | grep -o '"total_ccpp":[0-9]*'
 
+# Ayuda memoria CON su mapa. Descargar el PDF no basta: sale igual sin mapa —es la degradación
+# prevista— y así estuvo saliendo en producción local sin que nada lo dijera. El mapa es la única
+# imagen rasterizada del documento, así que contarlas es la comprobación: tiene que dar ≥ 1.
+curl -so /tmp/am.pdf https://obs.predes.org.pe/api/distritos/080101/ayuda-memoria.pdf \
+  && grep -c '/Subtype /Image' /tmp/am.pdf
+
 # Buscador, dos comprobaciones distintas y las dos necesarias:
 # a. Sin llave → 401. Confirma que el proxy manda la ruta y no la raíz (un 405 sería el proxy mal).
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
