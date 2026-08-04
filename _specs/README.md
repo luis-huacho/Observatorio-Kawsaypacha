@@ -82,6 +82,21 @@ detecta la distribución, cubre los tres pasos y **termina arrancando el navegad
 fallo de este tipo sale en dos segundos en vez de tras seis minutos de suite y disfrazado de caída
 del sitio.
 
+### Actualización 04/08/2026 — el panel del admin imprimía sus propios comentarios
+
+Encima de la tarjeta «Buscador» salía, como texto visible, el comentario del código que explica
+para qué sirve esa tarjeta. Eran dos, y estaban en `backend/templates/admin/index.html`.
+
+**Causa**: `{# … #}` en Django es un comentario de **una sola línea**. Uno de varias no se ignora:
+se renderiza tal cual. Los de una línea del mismo archivo funcionaban bien, y por eso no cantaba al
+leer el código.
+
+**Corrección**: los dos pasan a `{% comment %} … {% endcomment %}`, que sí es multilínea, con una
+nota en el propio archivo para que nadie los devuelva a la almohadilla. Comprobado contra el sitio
+desplegado: cero ocurrencias del texto y la tarjeta intacta.
+
+Es cosmético, pero estaba en la primera pantalla que ve PREDES al entrar al admin.
+
 ### Actualización 04/08/2026 — la ayuda memoria salía sin mapa en producción
 
 Reportado desde `/peligros` con Kunturkanki. Reproducido y corregido; las reglas quedan en 02:

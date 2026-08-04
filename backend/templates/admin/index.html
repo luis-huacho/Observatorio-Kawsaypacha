@@ -1,6 +1,12 @@
 {% extends "unfold/layouts/base_simple.html" %}
-{# Sustituye la portada del admin. Unfold rellena el contexto con DASHBOARD_CALLBACK; el
-   template a usar se elige overrideando admin/index.html, no desde el callback. #}
+{% comment %}
+Sustituye la portada del admin. Unfold rellena el contexto con DASHBOARD_CALLBACK; el
+template a usar se elige overrideando admin/index.html, no desde el callback.
+
+`{% comment %}` y no `{# … #}`: la sintaxis de almohadilla es de UNA sola línea, así que un
+comentario de varias se pinta tal cual en la página. Estuvo saliendo en el panel, encima de la
+tarjeta del buscador, hasta el 04/08/2026.
+{% endcomment %}
 {% load i18n informes %}
 
 {% block title %}Panel | Observatorio Kallpachakuy{% endblock %}
@@ -102,10 +108,12 @@
   </table>
 </div>
 
-{# --- Estado del buscador ---
-   Lo que responde: si Meilisearch está arriba y si lo indexado cuadra con lo publicado. Un índice
-   desfasado no da ningún síntoma salvo «el buscador no encuentra algo que sí está publicado», así
-   que sin esta tarjeta nadie se enteraría. #}
+{% comment %}
+--- Estado del buscador ---
+Lo que responde: si Meilisearch está arriba y si lo indexado cuadra con lo publicado. Un índice
+desfasado no da ningún síntoma salvo «el buscador no encuentra algo que sí está publicado», así
+que sin esta tarjeta nadie se enteraría.
+{% endcomment %}
 <div class="rounded-lg border border-base-200 dark:border-base-800 overflow-hidden mb-8">
   <div class="px-4 py-3 border-b border-base-200 dark:border-base-800 flex items-center justify-between gap-3">
     <div class="font-semibold text-sm">
