@@ -238,6 +238,50 @@ E2E_URL=https://$SITE_DOMAIN npx playwright test
 | Comprobar que la renovación funcionará | el mismo comando con `--dry-run` (no gasta cuota) |
 | Logs | `docker compose logs -f backend worker nginx` |
 | Backup manual | `docker compose exec backup /backup.sh` |
+| Ver cuánto ocupa Docker | `docker system df` y `sudo du -sh /var/lib/docker` (ver más abajo: no dicen lo mismo) |
+| Limpiar imágenes y caché | `docker builder prune -f --max-used-space 4GB && docker image prune -f` |
+
+### Que Docker no se coma el disco
+
+Cada `docker compose build backend` crea una imagen de ~2.8 GB y **deja la anterior sin tag**. Con
+un despliegue al mes no se nota; con varios seguidos, sí. A eso se suma el caché de construcción de
+BuildKit, que guarda las capas intermedias —compilar tippecanoe, `uv sync`, `playwright install`— y
+**no se limpia solo si no se le dice**.
+
+Dos medidas, y la primera es la que evita tener que acordarse:
+
+**1. Un techo al caché, en `/etc/docker/daemon.json`.** No existe por defecto; hay que crearlo.
+
+```json
+{
+  "builder": { "gc": { "enabled": true, "defaultKeepStorage": "4GB" } }
+}
+```
+
+Luego `sudo systemctl restart docker`. **Corta el servicio unos segundos**: los contenedores con
+`restart: unless-stopped` vuelven solos, pero conviene hacerlo fuera de horario. El archivo vive en
+el servidor y **no se versiona**, así que hay que crearlo en cada máquina.
+
+**2. Una limpieza semanal en el cron del host**, por si el caché crece entre construcciones:
+
+```cron
+0 5 * * 1 docker builder prune -f --max-used-space 4GB >> /var/log/observatorio-limpieza.log 2>&1 && docker image prune -f >> /var/log/observatorio-limpieza.log 2>&1
+```
+
+`image prune` sin `-a` borra **solo las imágenes sin tag**, que son las que deja atrás cada
+reconstrucción. Con `-a` se llevaría también las que no tengan un contenedor arriba, y eso incluye
+la imagen de desarrollo con `pytest`: recuperarla cuesta recompilar tippecanoe.
+
+> **Nunca `docker system prune --volumes`.** Ahí viven `pgdata`, `media`, `meili_data` y
+> `certbot_conf`: la base, los PDF y las imágenes que sube PREDES, los índices de búsqueda y los
+> certificados. `docker system prune` a secas es aceptable —se lleva el contenedor `frontend`
+> parado, que es de un solo disparo y se recrea—, pero con `--volumes` te llevas la plataforma.
+
+> **`docker system df` engaña, y por exceso.** Cuenta bajo «Build Cache» capas que están
+> **compartidas con las imágenes vivas**, así que las suma dos veces: puede anunciar 6.6 GB de
+> caché cuando `/var/lib/docker` entero ocupa 5.1 GB. Lo purgable de verdad es la columna
+> `Private` de `docker buildx du`. Si un `prune` dice «Total reclaimed space: 0B», no está roto:
+> es que lo privado ya estaba por debajo del techo que le pediste.
 
 **Al desplegar, `docker compose run --rm frontend` no es opcional**: es lo que copia el `dist/`
 nuevo al volumen que sirve nginx. Sin ese paso el backend se actualiza y el frontend no.

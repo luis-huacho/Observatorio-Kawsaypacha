@@ -207,6 +207,17 @@ git pull && docker compose build backend frontend && docker compose up -d \
   && docker compose run --rm frontend
 ```
 
+Y la contrapartida de reconstruir tanto: cada `build` del backend deja atrás una imagen de ~2.8 GB
+sin tag, y BuildKit guarda las capas intermedias. Se limpia con
+
+```bash
+docker builder prune -f --max-used-space 4GB && docker image prune -f
+```
+
+**Nunca con `--volumes`**: ahí viven la base, los archivos subidos, los índices y los certificados.
+En el servidor esto se automatiza con un techo en `/etc/docker/daemon.json` y un cron semanal — ver
+[«Que Docker no se coma el disco»](./_docs/despliegue.md) en la guía de despliegue.
+
 ## 5. Revisar que el sistema está bien
 
 Ocho comprobaciones, elegidas porque cada una cubre algo que **falla en silencio**: la página carga,

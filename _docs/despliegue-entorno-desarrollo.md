@@ -145,6 +145,12 @@ En el crontab de `appdevuser`, con sus logs en `/home/appdevuser/`:
 | 03:15 diario | Agregación de métricas y purga de eventos de más de 90 días. Sin ella el panel del admin se queda en blanco |
 | 04:30 diario | `meili_estado`, que sale con código ≠ 0 si el buscador está caído o desfasado |
 | 02:30 domingos | `tar` del volumen `media` a `/home/appdevuser/respaldos` |
+| 05:00 lunes | Purga del caché de BuildKit y de las imágenes sin tag |
+
+Además, `/etc/docker/daemon.json` fija un techo de 4 GB al caché de construcción
+(`builder.gc.defaultKeepStorage`). No existía —el servidor estaba con todo por defecto— y **no se
+versiona**, así que hay que crearlo también en el servidor de PREDES; está documentado en
+[`despliegue.md`](./despliegue.md).
 
 El volcado de la base no va por cron: lo hace el servicio `backup` de compose, diario, con
 retención de 7 diarios, 4 semanales y 6 mensuales.
