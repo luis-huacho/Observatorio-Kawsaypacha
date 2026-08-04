@@ -143,7 +143,7 @@ hasta que la añadas.
 ## Pruebas
 
 ```bash
-dc exec backend pytest                 # 136 pruebas, ~37 s (sin las lentas)
+dc exec backend pytest                 # 143 pruebas, ~32 s (sin las lentas)
 dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación

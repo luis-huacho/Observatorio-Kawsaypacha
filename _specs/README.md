@@ -7,6 +7,20 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 - Fase 0 (prototipo estático) **completada y aprobada** por PREDES.
 - Fase actual: construcción de `frontend/` (Vite + React + TS + MapLibre) y `backend/` (Django 5.2 LTS + PostgreSQL + Meilisearch + PMTiles), desplegados con Docker Compose.
 
+### Actualización 03/08/2026 — las imágenes del editor, en su carpeta y a tamaño de pantalla
+
+Arreglar el 404 de la subida de imágenes destapó **dos ajustes que no hacían nada**. Los dos se
+cierran con un `CKEDITOR_5_FILE_STORAGE` propio (`apps.core.almacenamiento`), documentado en 03:
+
+- **`CKEDITOR_5_UPLOAD_PATH` lo ignora la librería** (`fs.save(f.name, f)`, sin prefijo): las imágenes
+  caían en la raíz de `media/`. Ahora van a `contenido/%Y/%m/`, la convención del resto del proyecto.
+  Trampa por el camino: **`Storage.save` no llama a `generate_filename`** —solo lo hace la ruta de los
+  campos de modelo—, así que el prefijo tiene que aplicarse en `save`.
+- **`CONTENIDO_ANCHO_MAXIMO_PX` no se usaba en ningún sitio** mientras el comentario de al lado
+  prometía que las fotos se reescalan al guardar. No se reescalaban. Medido con una subida real:
+  4.000 px y 4,3 MB → 1.600 px y 513 KB. Con orientación EXIF corregida, sin tocar GIF ni TIFF, sin
+  recomprimir lo que ya cabe y sin fallar nunca por esto.
+
 ### Actualización 03/08/2026 — estado del buscador en el panel, y un 404 escondido bajo el admin
 
 Tres preguntas operativas —¿está caído el buscador?, ¿está indexado al 100%?, ¿cómo se reindexa?— de

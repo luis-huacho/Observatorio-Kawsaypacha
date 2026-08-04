@@ -92,6 +92,15 @@ Página de inicio del admin con: visitas últimos 30 días (ResumenDiario), top 
 
 Además, **tarjeta «Buscador»** (`meili.estado_indices()`): si el servicio responde y, por índice, documentos indexados frente a publicados. Es la única forma que tiene PREDES de enterarse de un índice desfasado, que no da ningún otro síntoma que «lo publicado no aparece al buscarlo» (ver 04). Con un botón **Reindexar la búsqueda** que encola `core.tasks.reindexar_meili` —encolar y no ejecutar: reconstruir `ccpp` son ~16 s y 8.968 documentos—, en `apps/core/vistas_admin.py`, con `staff_member_required` + `require_POST`.
 
+### Imágenes insertadas desde el editor
+
+Van por `apps.core.almacenamiento.AlmacenamientoContenido` (`CKEDITOR_5_FILE_STORAGE`), que hace dos cosas que la librería no hace:
+
+- **Las guarda en `contenido/%Y/%m/`.** `django-ckeditor-5` **ignora `CKEDITOR_5_UPLOAD_PATH`** —guarda con `fs.save(f.name, f)`, sin prefijo—, así que sin el storage caían en la raíz de `media/`. El ajuste lo aplica ahora nuestro storage, y el prefijo se resuelve en cada guardado (fijarlo en `location` lo congelaría al arrancar el proceso: un gunicorn de julio escribiría en `07/` en agosto).
+- **Reduce el ancho a `CONTENIDO_ANCHO_MAXIMO_PX`** (1.600 px) y corrige la orientación EXIF. Ese ajuste existía y **no se usaba en ningún sitio**: una foto de campo de 4.000 px y 4,3 MB se servía tal cual. Medido tras el arreglo: 513 KB y 1.600 px. No toca GIF ni TIFF (Pillow pierde la animación), no recomprime lo que ya cabe (se escribe byte por byte) y si Pillow falla guarda el original — perder la foto de alguien sería peor que servirla grande.
+
+**Solo aplica a las imágenes del editor.** Las de los campos de imagen del formulario (portadas, galería de medidas, hero) se guardan tal cual, cada una con su `upload_to`.
+
 > **Todo lo que se monte bajo `ADMIN_URL` va ANTES de `admin.site.urls`.** `AdminSite` termina sus URLs con un `catch_all_view` que casa con cualquier cosa bajo su prefijo y responde 404, así que una ruta declarada después nunca se alcanza. La subida de imágenes de CKEditor estuvo así y devolvía 404 sin decirlo; hay prueba de regresión en `tests/test_urls_admin.py`.
 
 ## Pantallas de mantenimiento de textos estáticos

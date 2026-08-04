@@ -15,7 +15,7 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (136 pruebas, ~37 s)
+$DC exec backend pytest                 # suite backend (143 pruebas, ~32 s)
 $DC exec backend pytest -m lento        # los Excel completos y el PDF con mapa (~35 s más)
 cd frontend && npm run lint && npm run build    # tipos + build
 npx playwright test                             # E2E contra el stack levantado
@@ -121,6 +121,14 @@ Un módulo por familia. El criterio es el **contrato del spec 02**, no la implem
   resuelve*: un 404 del catch-all y uno legítimo son indistinguibles desde fuera.
 - El botón de reindexar: sin sesión de staff no hace nada, por `GET` responde 405, y por `POST`
   **encola** la tarea (no la ejecuta) y vuelve al panel con su aviso.
+
+### `test_almacenamiento.py`
+
+Las imágenes del editor, y **los dos ajustes que no hacían nada** hasta que se escribieron estas pruebas:
+caen en `contenido/<año>/<mes>/`; una de 3.000 px sale con 1.600 y pesando menos; una que ya cabe se
+escribe **byte por byte** (recomprimir «por si acaso» degrada sin ganar nada); un GIF no se toca
+(Pillow le quita la animación); una foto con `Orientation` sale derecha; un nombre con `../` no escapa
+de la carpeta; y un archivo que no es imagen **no rompe la subida**.
 
 ### `test_tiles.py`
 

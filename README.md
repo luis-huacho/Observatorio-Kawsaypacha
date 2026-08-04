@@ -197,7 +197,7 @@ Las cinco comprobaciones **manuales previas a la entrega** —más exigentes que
 ## 6. Probar
 
 ```bash
-dc exec backend pytest                 # 136 pruebas, ~37 s
+dc exec backend pytest                 # 143 pruebas, ~32 s
 dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
 
 cd frontend && npm run lint            # tsc --noEmit

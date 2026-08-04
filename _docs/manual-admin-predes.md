@@ -97,6 +97,10 @@ que conviene saber:
 
 - **Las imágenes se suben ahí mismo** y quedan guardadas en el servidor. No hace falta subirlas a
   otro sitio ni pegar enlaces externos, que se rompen con el tiempo.
+- **Las fotos grandes se reducen solas.** Se puede subir la foto tal como salió del teléfono o de la
+  cámara: el sistema la deja en 1.600 px de ancho —de sobra para pantalla— y la endereza si venía
+  tumbada. No hace falta recortarla ni comprimirla antes. El límite por archivo son **10 MB**; si se
+  pasa, el editor lo dice y hay que reducirla antes de subirla.
 - **Al pegar desde Word se limpia el formato.** Es intencional: el Word trae estilos que romperían
   el diseño del sitio. Los encabezados y las listas hay que volver a marcarlos con los botones.
 
