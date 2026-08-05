@@ -1,13 +1,21 @@
 # 09 — Ciclo de errores
 
-Lo que se sabe roto y **todavía no está corregido** vive en el tracker, no en este archivo:
+Lo que se sabe roto y **todavía no está corregido** vive en el tracker, no en este archivo. Corre en
+el servidor de desarrollo, publicado solo en `127.0.0.1`, y se alcanza abriendo el túnel:
 
 ```
-docker compose -f compose.tracking.yaml up -d     # Gitea local, solo en 127.0.0.1:3000
-./deploy/gitea/inicializar.sh                     # idempotente; la primera vez crea todo
+ssh -L 3000:localhost:3000 usuario@observatorio.somosiadigital.com
 ```
 
 → **<http://localhost:3000/luishuacho/observatorio/issues>**
+
+Si hay que levantarlo —la primera vez, o en una máquina nueva— son dos comandos desde la raíz del
+repositorio, y el segundo es idempotente:
+
+```
+docker compose -f compose.tracking.yaml up -d
+./deploy/gitea/inicializar.sh
+```
 
 Este documento se queda con lo que el tracker no guarda: **el ciclo**. Qué significa cada etiqueta,
 cuándo nace un error, cuándo se puede cerrar y dónde va a parar cuando se cierra.
@@ -72,9 +80,14 @@ un solo sitio para lo hecho.
 
 ## Qué hace falta para consultarlo
 
-El tracker es **local y de desarrollo**: escucha solo en `127.0.0.1`, no se despliega en el servidor
-de producción y no forma parte del entregable. Quien clone el repositorio y no lo levante no pierde
-nada del producto — pierde la lista de pendientes, que es información de trabajo.
+El tracker es **de desarrollo y no forma parte del entregable**. Corre en el servidor de desarrollo
+—`somosiadigital.com`, no la producción de PREDES—, escucha solo en `127.0.0.1` y se llega a él por
+túnel SSH: sin certificado, sin vhost de nginx y sin un puerto más abierto. **Hay uno solo**, a
+propósito: dos trackers son dos listas de pendientes que divergen, que es el problema del que se
+venía.
+
+Quien clone el repositorio y no abra el túnel no pierde nada del producto — pierde la lista de
+pendientes, que es información de trabajo. Lo ya corregido sí está en el repositorio, en la bitácora.
 
 Los detalles de operación (dónde vive el token, cómo se regenera, cómo se gestiona desde Claude
 Code) están en [`_docs/desarrollo.md`](../_docs/desarrollo.md), y el porqué de la decisión en

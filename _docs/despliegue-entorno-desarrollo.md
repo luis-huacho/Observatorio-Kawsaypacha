@@ -186,6 +186,33 @@ seis corregidas; el detalle está en la bitácora de `_specs/README.md`.
 6. **El dominio de la SPA no enviaba ninguna cabecera de seguridad**, ni HSTS ni `nosniff`.
 
 Tres quedaron abiertos y **no corregidos** por estar fuera del encargo: E-006, E-007 y E-008. Su
-ficha completa está en el tracker (`docker compose -f compose.tracking.yaml up -d` →
-<http://localhost:3000/luishuacho/observatorio/issues>), que es el único sitio donde su estado se
-mantiene al día; el ciclo está en `_specs/09-errores.md`.
+ficha completa está en el tracker, que es el único sitio donde su estado se mantiene al día; el ciclo
+está en `_specs/09-errores.md`.
+
+## Además de la plataforma, este servidor lleva el tracker
+
+Desde el **05/08/2026** aquí corre también el **tracker de errores** (Gitea, `compose.tracking.yaml`)
+y el CLI de Claude Code. No forma parte del entregable ni toca a la plataforma: es herramienta de
+trabajo, y está aquí y no en el portátil para que **haya un solo tracker** —dos listas de pendientes
+divergen—.
+
+| | |
+|---|---|
+| Proyecto Compose | `observatorio-tracking`, **independiente** del de la plataforma |
+| Puerto | `127.0.0.1:3000`; no lo ve internet ni nginx |
+| Acceso | `ssh -L 3000:localhost:3000 …` y <http://localhost:3000> en el navegador |
+| Consumo | ~1,3 MB de datos con ocho issues; la imagen, unos 250 MB |
+
+Tres cosas que conviene tener presentes en **esta** máquina:
+
+- **No está en los backups.** El servicio `backup` de `compose.yaml` solo vuelca PostgreSQL; el
+  volumen `observatorio-tracking_gitea_data` es sqlite y queda fuera. Se copia con el mismo
+  procedimiento que documenta `desarrollo.md` para mudarlo de máquina.
+- **No lo vigila nada.** `vigilar-contenedores.sh` filtra por proyecto Compose, así que el tracker
+  queda fuera de su bucle de reinicio. Es deliberado: que se caiga el tracker no es una incidencia.
+- **2 vCPU y 4 GB no dan para todo a la vez.** Reconstruir la imagen del backend compila tippecanoe
+  desde el código fuente y ya obligó a añadir 2 GB de swap; no lances eso y Claude Code al mismo
+  tiempo.
+
+Cómo se levanta, cómo se muda el volumen y cómo se instala el CLI está en
+[`desarrollo.md`](./desarrollo.md), en la sección del tracker.

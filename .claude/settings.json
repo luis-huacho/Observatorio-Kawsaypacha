@@ -1,4 +1,5 @@
 {
+  "enabledMcpjsonServers": ["gitea"],
   "permissions": {
     "allow": [
       "mcp__gitea__list_issues",

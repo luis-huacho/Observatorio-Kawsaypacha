@@ -197,17 +197,23 @@ encontró, está en `_specs/08-plan-pruebas.md`.
 
 ## El tracker de errores
 
-Lo que se sabe roto y sigue sin arreglar vive en un **Gitea local**, no en un archivo del
-repositorio. Escucha solo en `127.0.0.1:3000`: es una herramienta de desarrollo, no se despliega en
-el servidor y no forma parte de lo que se entrega a PREDES (ADR-A15).
+Lo que se sabe roto y sigue sin arreglar vive en un **Gitea**, no en un archivo del repositorio. Corre
+en el servidor de desarrollo y escucha solo en `127.0.0.1:3000`: no forma parte de lo que se entrega
+a PREDES (ADR-A15). Se llega a él abriendo el túnel y luego el navegador:
+
+```bash
+ssh -L 3000:localhost:3000 usuario@observatorio.somosiadigital.com
+```
+
+→ <http://localhost:3000/luishuacho/observatorio/issues> · usuario y contraseña en
+`deploy/gitea/admin.env`.
+
+Para levantarlo —la primera vez, o en una máquina nueva— son dos comandos desde la raíz:
 
 ```bash
 docker compose -f compose.tracking.yaml up -d     # levantar
 ./deploy/gitea/inicializar.sh                     # idempotente; la primera vez crea todo
 ```
-
-→ <http://localhost:3000/luishuacho/observatorio/issues> · usuario y contraseña en
-`deploy/gitea/admin.env`.
 
 Se levanta **solo**, nunca junto a `compose.yaml`. Es un proyecto Compose aparte
 (`observatorio-tracking`) a propósito: como override, un `down --remove-orphans` sin acordarse del
@@ -270,6 +276,73 @@ este tracker existe justamente porque el estado mantenido a mano se desincroniza
 
 Cerrar sigue siendo cosa tuya, y son **dos** gestos: cerrar el issue en el tracker y escribir la
 entrada `### Actualización DD/MM/AAAA` en la bitácora de `_specs/README.md`.
+
+### El tracker vive en el servidor de desarrollo
+
+**Hay un solo tracker**, en `observatorio.somosiadigital.com`, y se alcanza por túnel SSH. Dos
+trackers —uno local y otro remoto— serían dos listas de pendientes que divergen, que es exactamente
+el problema del que se venía.
+
+Que corra ahí no lo expone: `compose.tracking.yaml` publica en `127.0.0.1:3000` y eso no cambia. El
+túnel trae ese puerto a tu máquina:
+
+```bash
+ssh -L 3000:localhost:3000 usuario@observatorio.somosiadigital.com
+```
+
+Y con el túnel abierto, <http://localhost:3000> en el navegador funciona igual que cuando corría en
+local. Ni certificado, ni vhost de nginx, ni un puerto más abierto a internet. Es también la razón de
+que el `ROOT_URL` del contenedor siga siendo `http://localhost:3000/`: por el túnel, esa **es** la
+URL correcta.
+
+Ojo con una cosa: no es la producción de PREDES, es el servidor de desarrollo (Rocky Linux, 2 vCPU,
+4 GB). Gitea consume poco, pero **no lances una reconstrucción de la imagen del backend y Claude Code
+a la vez**: tippecanoe se compila desde el código fuente y esa máquina ya necesitó 2 GB de swap para
+que le cupiera.
+
+#### Mudar el tracker de una máquina a otra
+
+Los issues **no están en el repositorio**: viven en el volumen `observatorio-tracking_gitea_data`,
+con su base sqlite y los adjuntos. Se mueven copiando el volumen entero, que es la única forma de no
+perder los adjuntos por el camino —un export por el API se los deja—. Pesa poco: ~1,3 MB con ocho
+issues.
+
+En el origen, **con el tracker parado** (sqlite en caliente no se copia entero de forma fiable):
+
+```bash
+docker compose -f compose.tracking.yaml stop
+docker run --rm -v observatorio-tracking_gitea_data:/data:ro -v "$PWD":/salida \
+    alpine tar czf /salida/gitea-data.tgz -C /data .
+scp gitea-data.tgz deploy/gitea/*.env usuario@servidor:~/observatorio/
+```
+
+En el destino, con el repositorio ya clonado:
+
+```bash
+cd ~/observatorio
+docker compose -f compose.tracking.yaml create        # crea el volumen, sin arrancar
+docker run --rm -v observatorio-tracking_gitea_data:/data -v "$PWD":/entrada \
+    alpine tar xzf /entrada/gitea-data.tgz -C /data
+mv gitea-data.tgz /tmp && mv *.env deploy/gitea/
+docker compose -f compose.tracking.yaml up -d
+```
+
+Los dos `.env` viajan aparte porque git los ignora. Si no los copias, `inicializar.sh` se planta con
+un mensaje explícito: encuentra el usuario ya creado en la base y no tiene su contraseña para seguir.
+Con ellos, el script es un no-op — está para eso.
+
+#### Claude Code en el servidor
+
+Hace falta el CLI instalado y autenticado allí; la autenticación es interactiva y la haces tú.
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash
+cd ~/observatorio && claude          # la primera vez pide iniciar sesión
+```
+
+Lo demás ya viaja en el repositorio: `.mcp.json`, `.claude/commands/issue.md` y `.claude/settings.json`
+—que lleva `enabledMcpjsonServers` justamente para que el servidor de Gitea se habilite solo tras el
+`git pull`, sin tener que aprobarlo a mano en cada máquina—.
 
 El ciclo —cuándo nace un error, qué significa cada etiqueta, cuándo se puede cerrar y qué se escribe
 al cerrarlo— está en `_specs/09-errores.md`.

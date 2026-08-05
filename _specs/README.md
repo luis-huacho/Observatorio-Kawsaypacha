@@ -8,10 +8,11 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 - Fase actual: construcción de `frontend/` (Vite + React + TS + MapLibre) y `backend/` (Django 5.2 LTS + PostgreSQL + Meilisearch + PMTiles), desplegados con Docker Compose.
 
 > Las entradas `### Actualización` de más abajo son la bitácora de **lo ya corregido**. Lo que se
-> sabe roto y sigue sin arreglar vive en el **tracker** (Gitea local: `docker compose -f
-> compose.tracking.yaml up -d` → <http://localhost:3000/luishuacho/observatorio/issues>); al cerrarse
-> un error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
-> cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
+> sabe roto y sigue sin arreglar vive en el **tracker**, en el servidor de desarrollo: se abre el
+> túnel (`ssh -L 3000:localhost:3000 …`) y se consulta en
+> <http://localhost:3000/luishuacho/observatorio/issues>. Al cerrarse un error, se cierra allí y entra
+> aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
+> está en **[09-errores.md](09-errores.md)**.
 
 ### Actualización 05/08/2026 — el sitio no se recuperaba solo de un cuelgue
 
@@ -62,6 +63,36 @@ Verificado de punta a punta: `docker compose pause backend` → «unhealthy» en
 vigilante → sitio en 200; `docker compose stop db` → `/api/salud/` responde 200 con
 `"base": "sin respuesta"` y el contenedor **sigue sano**; y al cuarto intento seguido el vigilante
 deja de reiniciar y registra que llegó al tope.
+
+### Actualización 05/08/2026 — el tracker se muda al servidor, y se trabaja por número
+
+El tracker nació en el portátil, y eso fabricaba el problema que venía a resolver: en cuanto se
+consultara desde otra máquina habría **dos listas de pendientes divergiendo**. Ahora hay una sola, en
+el servidor de desarrollo (`somosiadigital.com`, no la producción de PREDES), y se llega por túnel:
+`ssh -L 3000:localhost:3000`. Sigue publicando solo en `127.0.0.1`, así que no hace falta certificado,
+ni vhost de nginx, ni abrir un puerto. Es también la razón de que su `ROOT_URL` siga siendo
+`http://localhost:3000/`: por el túnel, esa es la URL correcta. **ADR-A15 se reescribió**, porque
+decía literalmente que no se desplegaba en el servidor.
+
+Los issues no viajan en el repositorio —viven en el volumen sqlite— y se mudan copiando el volumen
+entero, no exportando por el API: uno de los issues ya tenía una imagen adjunta y el export la habría
+dejado atrás.
+
+Y para trabajar uno, `/issue N`, o `/issue 6 3 1` para varios en un solo plan. Sin etiqueta de cola
+ni asignación, y no por simplificar: **el MCP no lee asignados** —`list_issues` filtra por etiqueta,
+hito, estado y fechas, y `issue_read` ni siquiera devuelve el campo; puede escribirlos, no leerlos—.
+Descartada esa vía, una etiqueta de cola tampoco aporta: es estado que hay que sincronizar a mano, y
+este tracker existe justamente porque el estado sincronizado a mano se desincroniza. El número del
+issue es toda la instrucción necesaria.
+
+Dos bordes que salieron probando contra el servidor, los dos escritos en el propio comando:
+`issue_read` de un número inexistente **no da error, devuelve vacío**, y un issue abierto desde la web
+llega sin etiquetas y sin línea de «Prueba de cierre», así que hay que proponerlas en el plan en vez
+de tratarlo como una ficha rota.
+
+`.claude/settings.json` se versiona junto a `.mcp.json` y lleva `enabledMcpjsonServers`, que es lo que
+permite que el servidor de Gitea se habilite solo tras un `git pull` en una máquina nueva. Estaba en
+`settings.local.json`, que el gitignore global ignora, y por ahí el montaje no era reproducible.
 
 ### Actualización 04/08/2026 — los errores abiertos se mudan a un tracker
 
