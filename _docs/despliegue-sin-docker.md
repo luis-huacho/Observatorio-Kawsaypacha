@@ -392,6 +392,12 @@ diseño: solo permite buscar, y solo en los índices públicos.
 con tres diferencias del *bare metal*: `proxy_pass` a `127.0.0.1:8000` (sin el `resolver` de Docker,
 que ahí resolvía nombres de contenedor), `alias` a rutas reales y `root` al `dist/` copiado.
 
+Y una cuarta diferencia, que es una ausencia: **aquí no está el bloque `/gitea` ni su
+`limit_req_zone`**. El tracker de errores es una herramienta de desarrollo que solo existe como
+contenedor (`compose.tracking.yaml`), así que en un despliegue sin Docker no hay nada a lo que
+apuntar. No copiar ese bloque del otro archivo: su destino es `gitea:3000`, un nombre que solo
+resuelve el DNS embebido de Docker, y sin él nginx no arranca.
+
 ```nginx
 proxy_cache_path /var/cache/nginx/tiles levels=1:2 keys_zone=tiles:10m max_size=512m inactive=7d;
 
