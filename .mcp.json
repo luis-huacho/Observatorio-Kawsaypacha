@@ -1,0 +1,32 @@
+{
+  "$comentario": [
+    "Servidor MCP oficial de Gitea, contra el tracker de errores de compose.tracking.yaml.",
+    "Da acceso a los issues del repositorio luishuacho/observatorio: leer, crear, comentar,",
+    "etiquetar y cerrar. Requiere que el tracker esté en pie:",
+    "  docker compose -f compose.tracking.yaml up -d && ./deploy/gitea/inicializar.sh",
+    "",
+    "El token NO va aquí: viaja en deploy/gitea/token.env (ignorado por git) y entra por",
+    "--env-file, que es lo que permite versionar este archivo. La ruta es relativa a la raíz",
+    "del proyecto, que es el directorio desde el que se lanza el servidor.",
+    "",
+    "--network host y GITEA_HOST=http://localhost:3000 van juntos y no son intercambiables por",
+    "la red de compose: Gitea construye los html_url de su API con la cabecera Host de la",
+    "peticion, asi que entrando por http://gitea:3000 devolveria enlaces que el navegador no",
+    "puede abrir. El puerto solo escucha en loopback, de modo que --network host no expone nada.",
+    "",
+    "El binario se nombra explicitamente porque la imagen no declara ENTRYPOINT: sin el,",
+    "docker toma '-t stdio' como el comando a ejecutar y el contenedor no arranca."
+  ],
+  "mcpServers": {
+    "gitea": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "--network", "host",
+        "--env-file", "deploy/gitea/token.env",
+        "docker.gitea.com/gitea-mcp-server:1.6.0",
+        "/app/gitea-mcp", "-t", "stdio"
+      ]
+    }
+  }
+}

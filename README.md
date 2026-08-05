@@ -509,7 +509,7 @@ producción.
 | Administrar contenido (para PREDES) | [`_docs/manual-admin-predes.md`](./_docs/manual-admin-predes.md) |
 | **Implementar algo** | [`_specs/`](./_specs/) — modelo de datos, contrato de API, ADR |
 | Saber por qué se decidió algo | [`_specs/00-alcance-decisiones.md`](./_specs/00-alcance-decisiones.md) |
-| **Ver qué está roto y pendiente** | [`_specs/09-errores.md`](./_specs/09-errores.md) — errores abiertos; lo ya corregido está en la bitácora de [`_specs/README.md`](./_specs/README.md) |
+| **Ver qué está roto y pendiente** | El tracker: `docker compose -f compose.tracking.yaml up -d` → <http://localhost:3000/luishuacho/observatorio/issues>. El ciclo está en [`_specs/09-errores.md`](./_specs/09-errores.md) y lo ya corregido en la bitácora de [`_specs/README.md`](./_specs/README.md) |
 | Ver el historial del prototipo | [`_specs/archive/`](./_specs/archive/) |
 
 ## Licencia y créditos

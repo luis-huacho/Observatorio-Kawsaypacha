@@ -1,0 +1,74 @@
+# Tracker de errores del proyecto: Gitea local, solo issues.
+#
+# Es un proyecto Compose INDEPENDIENTE, no un override de `compose.yaml`. Tres razones:
+#
+#   1. Como override, un `docker compose -f compose.yaml -f compose.local.yml down --remove-orphans`
+#      —sin acordarse del tercer `-f`— se llevaría por delante el contenedor. El tracker no puede
+#      morir cada vez que se reinicia la aplicación.
+#   2. `deploy/vigilar-contenedores.sh` filtra por `com.docker.compose.project`. Con proyecto propio,
+#      gitea queda fuera del bucle de reinicio automático sin tener que añadirle una guarda.
+#   3. `compose.yaml` aborta si faltan SITE_DOMAIN / API_DOMAIN / VITE_* (declaradas con `:?`). Este
+#      archivo arranca solo, sin el `.env` de la raíz.
+#
+# Se levanta así, y nunca junto a los otros compose:
+#
+#   docker compose -f compose.tracking.yaml up -d
+#   ./deploy/gitea/inicializar.sh        # idempotente: crear admin, token, repo y etiquetas
+#
+# No lleva bloque `networks:` a propósito: cae en la red por defecto del proyecto,
+# `observatorio-tracking_default`, que es la que usa el servidor MCP de `.mcp.json` para alcanzarlo
+# por nombre de servicio (`http://gitea:3000`).
+
+name: observatorio-tracking
+
+services:
+  gitea:
+    image: gitea/gitea:1.27.1
+    restart: unless-stopped
+    environment:
+      # El volumen es de docker y nace root; el entrypoint le hace chown a este uid/gid.
+      USER_UID: "1000"
+      USER_GID: "1000"
+
+      # SQLite basta: un solo usuario, ningún contenedor de base de datos extra que operar.
+      GITEA__database__DB_TYPE: sqlite3
+      GITEA__database__PATH: /data/gitea/gitea.db
+
+      # Sin INSTALL_LOCK el primer arranque abre el asistente web y la configuración deja de estar
+      # en este archivo: se queda dentro del volumen, donde nadie la revisa.
+      GITEA__security__INSTALL_LOCK: "true"
+
+      GITEA__server__DOMAIN: localhost
+      GITEA__server__ROOT_URL: http://localhost:3000/
+      GITEA__server__HTTP_PORT: "3000"
+      # Se empuja por HTTP contra localhost; el servidor SSH sería un puerto abierto sin uso.
+      GITEA__server__DISABLE_SSH: "true"
+
+      GITEA__service__DISABLE_REGISTRATION: "true"
+      GITEA__service__REQUIRE_SIGNIN_VIEW: "true"
+
+      # Nada de CI, registro de paquetes ni correo: esto es un tracker de issues.
+      GITEA__actions__ENABLED: "false"
+      GITEA__packages__ENABLED: "false"
+      GITEA__mailer__ENABLED: "false"
+      GITEA__log__LEVEL: Warn
+
+    volumes:
+      - gitea_data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+
+    # Solo loopback: el tracker no se publica ni se expone en el servidor de producción.
+    ports:
+      - "127.0.0.1:3000:3000"
+
+    healthcheck:
+      # La imagen de gitea no trae curl; el wget de busybox sí está.
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  gitea_data:

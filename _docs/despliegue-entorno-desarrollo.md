@@ -185,6 +185,7 @@ seis corregidas; el detalle está en la bitácora de `_specs/README.md`.
    buscarlo hasta que alguien reindexara a mano. Es el más grave de los seis y el más silencioso.
 6. **El dominio de la SPA no enviaba ninguna cabecera de seguridad**, ni HSTS ni `nosniff`.
 
-Quedan abiertos en `_specs/09-errores.md` y **no corregidos** por estar fuera del encargo: E-006
-(una zona de caché declarada y nunca usada), E-007 (`--solo-catalogos` se come `--demo` en
-silencio) y E-008 (`ssl_stapling` ya no aplica con los certificados de Let's Encrypt).
+Tres quedaron abiertos y **no corregidos** por estar fuera del encargo: E-006, E-007 y E-008. Su
+ficha completa está en el tracker (`docker compose -f compose.tracking.yaml up -d` →
+<http://localhost:3000/luishuacho/observatorio/issues>), que es el único sitio donde su estado se
+mantiene al día; el ciclo está en `_specs/09-errores.md`.

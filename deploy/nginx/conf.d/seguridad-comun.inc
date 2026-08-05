@@ -8,7 +8,7 @@
 # `nosniff` y la portada sin HSTS— aunque `ssl-comun.inc` las pusiera a nivel `server`.
 #
 # Medido el 04/08/2026 contra el sitio ya desplegado: el dominio de la SPA no devolvía ninguna de
-# las tres. Ver E-005 en _specs/09-errores.md.
+# las tres. Era el error E-005, ya cerrado; el detalle está en la bitácora de _specs/README.md.
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 add_header X-Content-Type-Options "nosniff" always;
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;

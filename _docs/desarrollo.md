@@ -195,6 +195,60 @@ configurado —lo que pasaba— es invisible hasta que el sitio se sirve como en
 El plan completo, con los casos obligatorios, de dónde sale cada uno y lo que la suite ya
 encontró, está en `_specs/08-plan-pruebas.md`.
 
+## El tracker de errores
+
+Lo que se sabe roto y sigue sin arreglar vive en un **Gitea local**, no en un archivo del
+repositorio. Escucha solo en `127.0.0.1:3000`: es una herramienta de desarrollo, no se despliega en
+el servidor y no forma parte de lo que se entrega a PREDES (ADR-A15).
+
+```bash
+docker compose -f compose.tracking.yaml up -d     # levantar
+./deploy/gitea/inicializar.sh                     # idempotente; la primera vez crea todo
+```
+
+→ <http://localhost:3000/luishuacho/observatorio/issues> · usuario y contraseña en
+`deploy/gitea/admin.env`.
+
+Se levanta **solo**, nunca junto a `compose.yaml`. Es un proyecto Compose aparte
+(`observatorio-tracking`) a propósito: como override, un `down --remove-orphans` sin acordarse del
+tercer `-f` se llevaría el tracker por delante, y `vigilar-contenedores.sh` —que filtra contenedores
+por proyecto— lo metería en su bucle de reinicio automático. La cabecera de `compose.tracking.yaml`
+lo explica entero.
+
+`inicializar.sh` crea, si no existen, el usuario administrador, un token, el repositorio y las
+etiquetas de severidad y área. Correrlo dos veces seguidas no cambia nada, y si el token guardado ha
+dejado de valer —por ejemplo tras un `down -v`— lo detecta y genera otro.
+
+Deja dos archivos, los dos ignorados por git:
+
+| Archivo | Qué lleva |
+|---|---|
+| `deploy/gitea/admin.env` | usuario y contraseña del admin, para entrar por la web |
+| `deploy/gitea/token.env` | `GITEA_HOST` y `GITEA_ACCESS_TOKEN`, y nada más |
+
+Van separados porque `token.env` se le pasa **entero** al contenedor del servidor MCP con
+`--env-file`, y la contraseña del admin no tiene por qué viajar ahí dentro. Eso es también lo que
+permite versionar `.mcp.json`: el token no está escrito en él.
+
+El token lleva solo `write:repository,write:issue,read:user`. El arranque no lo usa —habla con el
+API por autenticación básica— justamente para no tener que ampliarlo: crear un repositorio por API
+exige `write:user`, un permiso que el MCP no necesita para nada.
+
+**Dos cosas que se ven raras y son deliberadas** en `.mcp.json`:
+
+- El contenedor del MCP corre con `--network host` y `GITEA_HOST=http://localhost:3000`, no en la
+  red de compose. Gitea construye los `html_url` de su API **a partir de la cabecera `Host` de la
+  petición**, así que entrando por `http://gitea:3000` devolvería enlaces que el navegador no puede
+  abrir. El puerto solo escucha en loopback, de modo que `--network host` no expone nada nuevo.
+- El binario se nombra explícitamente (`/app/gitea-mcp -t stdio`) porque la imagen **no declara
+  `ENTRYPOINT`**: sin él, docker toma `-t stdio` como el comando y el contenedor no arranca.
+
+Si Claude Code dice que el servidor `gitea` falla, casi siempre es que el tracker no está en pie.
+Un `.mcp.json` nuevo o modificado **solo se carga al reiniciar la sesión**.
+
+El ciclo —cuándo nace un error, qué significa cada etiqueta, cuándo se puede cerrar y qué se escribe
+al cerrarlo— está en `_specs/09-errores.md`.
+
 ## Trampas que ya nos costaron tiempo
 
 - **`useJsonData` ya no existe.** Todo pasa por `lib/api.ts`, que es el único punto de

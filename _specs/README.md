@@ -8,8 +8,10 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 - Fase actual: construcción de `frontend/` (Vite + React + TS + MapLibre) y `backend/` (Django 5.2 LTS + PostgreSQL + Meilisearch + PMTiles), desplegados con Docker Compose.
 
 > Las entradas `### Actualización` de más abajo son la bitácora de **lo ya corregido**. Lo que se
-> sabe roto y sigue sin arreglar vive en **[09-errores.md](09-errores.md)**; al cerrarse un error,
-> sale de allí y entra aquí como una entrada nueva.
+> sabe roto y sigue sin arreglar vive en el **tracker** (Gitea local: `docker compose -f
+> compose.tracking.yaml up -d` → <http://localhost:3000/luishuacho/observatorio/issues>); al cerrarse
+> un error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
+> cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
 ### Actualización 05/08/2026 — el sitio no se recuperaba solo de un cuelgue
 
@@ -60,6 +62,39 @@ Verificado de punta a punta: `docker compose pause backend` → «unhealthy» en
 vigilante → sitio en 200; `docker compose stop db` → `/api/salud/` responde 200 con
 `"base": "sin respuesta"` y el contenedor **sigue sano**; y al cuarto intento seguido el vigilante
 deja de reiniciar y registra que llegó al tope.
+
+### Actualización 04/08/2026 — los errores abiertos se mudan a un tracker
+
+La tabla de errores abiertos de `09-errores.md` se sostenía en que alguien la mantuviera sincronizada
+a mano en tres documentos —ella misma, este README y `_docs/despliegue-entorno-desarrollo.md`—, y ya
+había dejado un rastro de que eso no funciona: `seguridad-comun.inc` remitía a «E-005 en
+09-errores.md» y E-005 llevaba días cerrado y fuera del archivo. Un puntero a una fila que ya no
+existe es peor que ningún puntero. Y uno de los siete errores abiertos, E-003, era del propio
+registro: la bitácora no está en orden cronológico.
+
+Ahora hay un **Gitea local** en `compose.tracking.yaml` con los siete abiertos migrados íntegros,
+prosa incluida, etiquetados por severidad y área. Tres decisiones que no son obvias:
+
+- **Proyecto Compose independiente**, no un override de `compose.yaml`. Como override, un `down
+  --remove-orphans` sin acordarse del tercer `-f` se llevaría el tracker por delante; y
+  `vigilar-contenedores.sh`, que filtra por proyecto, lo metería en su bucle de reinicio sin querer.
+- **Solo `127.0.0.1`, nunca en el servidor.** Es una herramienta de desarrollo: no se despliega, no
+  entra en el entregable y no añade una pieza más que PREDES tenga que operar y respaldar. Ese es el
+  mismo criterio con el que se descartó Caddy en ADR-A6bis.
+- **El identificador `E-NNN` sobrevive en el título del issue**, porque hay comentarios en el código
+  que citan errores por ese número.
+
+Lo gestiona el servidor MCP oficial de Gitea, declarado en `.mcp.json`. El token no está en ese
+archivo —viaja por `--env-file` desde `deploy/gitea/token.env`, que git ignora—, lo que permite
+versionar la configuración sin filtrar credenciales, y lleva solo tres alcances:
+`write:repository,write:issue,read:user`. El arranque (`deploy/gitea/inicializar.sh`) es idempotente
+y usa autenticación básica precisamente para no tener que ampliarlos: crear un repositorio por API
+exige `write:user`, que el MCP no necesita para nada.
+
+Lo que **no** cambia, y es lo importante: la regla de que un error reproducible nace con una prueba
+que falla y se cierra cuando esa prueba pasa. Cada issue lleva esa prueba escrita al pie. Y al
+cerrarse, sigue entrando aquí como una entrada de bitácora, que es lo que queda en el repositorio
+cuando nadie levante el contenedor. `09-errores.md` se queda con el ciclo y pierde la tabla.
 
 ### Actualización 04/08/2026 — primer despliegue real: seis cosas que solo se ven con un dominio
 
@@ -118,8 +153,9 @@ no fuera escribible, el script de la imagen deja un ERROR en el log y **sigue ad
 archivo completo eso dejaría a nginx sirviendo su página de bienvenida sin un solo bloque 443. Con
 fragmentos, el mismo fallo es un `include` inexistente y nginx no arranca.
 
-Quedan abiertos en [09-errores.md](09-errores.md), anotados y no corregidos: E-006 (caché declarada
-y nunca usada), E-007 (`--solo-catalogos` se come `--demo`) y E-008 (`ssl_stapling` ya no aplica).
+Quedan abiertos, anotados y no corregidos: E-006 (caché declarada y nunca usada), E-007
+(`--solo-catalogos` se come `--demo`) y E-008 (`ssl_stapling` ya no aplica). Los tres viven ahora en
+el tracker, con su ficha completa; el ciclo está en [09-errores.md](09-errores.md).
 
 Y un séptimo hallazgo, del mismo día y de la misma naturaleza —documentación que describe algo que
 no basta—: **correr las E2E en el servidor exigía un paso que la guía no mencionaba.** `README.md` y
@@ -345,7 +381,7 @@ comprobar nada.
 | [06-frontend.md](06-frontend.md) | Migración prototype→frontend, rutas nuevas, lib/api.ts, estados vacíos |
 | [07-despliegue-ops.md](07-despliegue-ops.md) | compose.yaml, nginx + gunicorn, los dos dominios, .env, HTTPS, backups, runbook, capacitación |
 | [08-plan-pruebas.md](08-plan-pruebas.md) | Qué se prueba y con qué; casos obligatorios derivados de la auditoría de datos; criterio de entrega |
-| [09-errores.md](09-errores.md) | **Errores abiertos**: lo que se sabe roto y todavía no está corregido, con su prueba en rojo |
+| [09-errores.md](09-errores.md) | **Ciclo de errores**: severidades, la regla de «nace con una prueba que falla», y dónde está el tracker que guarda los abiertos |
 
 ## Archivo histórico
 

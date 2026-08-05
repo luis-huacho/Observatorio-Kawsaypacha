@@ -24,6 +24,10 @@ prototype/vite.config.d.ts
 .env.local
 .env.*.local
 
+# Credenciales del tracker de errores (Gitea), generadas por deploy/gitea/inicializar.sh.
+# El .mcp.json de la raíz sí se versiona: el token no está dentro, entra por --env-file.
+/deploy/gitea/*.env
+
 # Vercel
 .vercel
 
