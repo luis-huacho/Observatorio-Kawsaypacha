@@ -290,7 +290,7 @@ E2E_URL=https://$SITE_DOMAIN npx playwright test
 
 | Operación | Comando |
 |---|---|
-| Desplegar una actualización | `git pull && docker compose build backend frontend && docker compose up -d && docker compose run --rm frontend` |
+| Desplegar una actualización | `git pull && docker compose build backend frontend && docker compose up -d && docker compose run --rm frontend && docker compose exec nginx nginx -s reload` |
 | Migraciones (normalmente automáticas) | `docker compose exec backend python manage.py migrate` |
 | Sembrar o resembrar datos | `docker compose exec backend python manage.py seed` |
 | **Comprobar el buscador** (servicio + índices al día) | `docker compose exec backend python manage.py meili_estado` |
@@ -367,6 +367,11 @@ la imagen de desarrollo con `pytest`: recuperarla cuesta recompilar tippecanoe.
 
 **Al desplegar, `docker compose run --rm frontend` no es opcional**: es lo que copia el `dist/`
 nuevo al volumen que sirve nginx. Sin ese paso el backend se actualiza y el frontend no.
+
+**Y `nginx -s reload` tampoco**, si el `git pull` tocó `deploy/nginx/conf.d/`. `up -d` solo recrea lo
+que cambió en compose, y la definición de nginx casi nunca cambia: el archivo nuevo está montado, pero
+el proceso sigue con el que cargó al arrancar. **El síntoma es un 404**, no un error. Pasó el
+05/08/2026 con el bloque `/gitea`, y `nginx -T` no lo delata porque relee del disco.
 
 ### Tarea nocturna de métricas
 

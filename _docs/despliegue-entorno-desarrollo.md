@@ -199,12 +199,29 @@ divergen—.
 | | |
 |---|---|
 | Proyecto Compose | `observatorio-tracking`, **independiente** del de la plataforma |
-| Puerto | `127.0.0.1:3000`; no lo ve internet ni nginx |
-| Acceso | `ssh -L 3000:localhost:3000 …` y <http://localhost:3000> en el navegador |
-| Consumo | ~1,3 MB de datos con ocho issues; la imagen, unos 250 MB |
+| Modo | **Publicado** desde el 05/08/2026 (`compose.tracking-publicado.yml`) |
+| Acceso | <https://obs.somosiadigital.com/gitea/>, sin túnel |
+| Vía de rescate | `ssh -L 3000:localhost:3000 …`; el puerto sigue publicado en loopback y es por donde entran `inicializar.sh` y el MCP |
+| `RED_APP` en esta máquina | `observatorio-kallpachakuy_default` — el directorio del clon es `observatorio-kallpachakuy`, no `observatorio` |
+| Consumo | 2,4 MB de datos; la imagen, unos 250 MB |
 
-Tres cosas que conviene tener presentes en **esta** máquina:
+Publicarlo no exigió tocar nginx: la `location` de `/gitea` ya está en `conf.d/observatorio.conf`,
+dentro del bloque del dominio del API, y es una subruta de un dominio que ya tenía DNS y certificado.
+Sí exigió **recargar nginx**, porque el bloque llegó en un `git pull` posterior al arranque del
+contenedor — ver la bitácora de `_specs/README.md`.
 
+Cinco cosas que conviene tener presentes en **esta** máquina:
+
+- **Su login está en internet**, con el `limit_req` de 30/min, el registro deshabilitado,
+  `REQUIRE_SIGNIN_VIEW` y la versión oculta. La contraseña del admin es la del patrón que genera
+  `inicializar.sh` y el `allow`/`deny` por IP sigue comentado: es un servidor de QA temporal y el
+  endurecimiento se decide si esto se replica en el de PREDES.
+- **El tracker de aquí está vacío.** El volumen `observatorio-tracking_gitea_data` nació el
+  05/08/2026 con el usuario, el repositorio y las etiquetas, pero **sin issues**: los que se
+  anotaron durante el despliegue —E-006, E-007 y E-008— siguen en el tracker de la máquina donde se
+  abrieron. Se traen copiando el volumen entero, con el procedimiento de
+  [`desarrollo.md`](./desarrollo.md); ojo, eso trae también su `admin.env`, así que las credenciales
+  pasan a ser las de la máquina de origen.
 - **No está en los backups.** El servicio `backup` de `compose.yaml` solo vuelca PostgreSQL; el
   volumen `observatorio-tracking_gitea_data` es sqlite y queda fuera. Se copia con el mismo
   procedimiento que documenta `desarrollo.md` para mudarlo de máquina.

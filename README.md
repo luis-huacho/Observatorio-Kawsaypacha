@@ -202,10 +202,19 @@ un `.py` no hace nada. En **desarrollo** es al revés: `compose.dev.yml` monta `
 despliegue**. Sin él, el backend se actualiza y el sitio se queda con el bundle anterior, sin un
 solo error. `restart frontend` tampoco sirve: ese contenedor ya terminó su trabajo.
 
+**Y el segundo que más se olvida: `nginx -s reload`.** `up -d` solo recrea los contenedores cuya
+configuración de compose cambió, y la de nginx casi nunca cambia: si el `git pull` trae un cambio en
+`deploy/nginx/conf.d/`, el archivo está en su sitio —el volumen es un *bind mount*— pero el proceso
+sigue con la configuración que cargó al arrancar. **El síntoma no es un error, es un 404** que parece
+«esa ruta no existe». Pasó el 05/08/2026 con el bloque `/gitea`. Y cuidado al diagnosticarlo:
+`nginx -T` **relee los archivos del disco**, así que enseña la configuración nueva y da la impresión
+de que está cargada.
+
 ```bash
 # Desplegar una actualización, entera y en orden
 git pull && docker compose build backend frontend && docker compose up -d \
-  && docker compose run --rm frontend
+  && docker compose run --rm frontend \
+  && docker compose exec nginx nginx -s reload
 ```
 
 Y la contrapartida de reconstruir tanto: cada `build` del backend deja atrás una imagen de ~2.8 GB
@@ -519,11 +528,15 @@ docker compose -f compose.tracking.yaml -f compose.tracking-publicado.yml up -d
 **3.** Comprobar `https://obs.predes.org.pe/gitea/`. Para retirarlo, se levanta otra vez **sin** el
 segundo `-f` y vuelve a quedar solo tras el túnel.
 
-**No hace falta tocar nginx, ni el DNS, ni el certificado.** La `location` de `/gitea` ya está en
+**No hace falta editar nginx, ni el DNS, ni el certificado.** La `location` de `/gitea` ya está en
 `deploy/nginx/conf.d/observatorio.conf`, dentro del bloque del dominio del API, y por ser una subruta
 del dominio que ya existe no necesita un registro ni un `-d` más en certbot. Con el tracker apagado,
 `/gitea` responde 502 y **el resto del sitio sigue funcionando**: nginx resuelve su destino en cada
 petición, así que la plataforma nunca depende del tracker.
+
+Sí puede hacer falta **recargarlo**: si el bloque llegó en un `git pull` posterior al arranque del
+contenedor, nginx aún no lo tiene y `/gitea` da **404** en vez de 502. `docker compose exec nginx
+nginx -s reload` (§4).
 
 ### Las cuentas
 

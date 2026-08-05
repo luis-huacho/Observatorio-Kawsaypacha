@@ -198,15 +198,20 @@ encontró, está en `_specs/08-plan-pruebas.md`.
 ## El tracker de errores
 
 Lo que se sabe roto y sigue sin arreglar vive en un **Gitea**, no en un archivo del repositorio. Corre
-en el servidor de desarrollo y escucha solo en `127.0.0.1:3000`: no forma parte de lo que se entrega
-a PREDES (ADR-A15). Se llega a él abriendo el túnel y luego el navegador:
+en el servidor de desarrollo y no forma parte de lo que se entrega a PREDES (ADR-A15). Desde el
+05/08/2026 está **publicado** como subruta del dominio del API, así que se llega con el navegador y
+nada más:
+
+→ <https://obs.somosiadigital.com/gitea/> · `/<admin>/observatorio/issues` · **usuario y contraseña en
+`deploy/gitea/admin.env`**, que git ignora.
+
+El túnel sigue valiendo y es la vía de rescate si nginx o el certificado fallan —el puerto se publica
+en loopback igual que antes—, pero ojo: publicado, `ROOT_URL` lleva el prefijo `/gitea/`, y por el
+túnel las páginas cargan con los enlaces apuntando ahí.
 
 ```bash
-ssh -L 3000:localhost:3000 usuario@observatorio.somosiadigital.com
+ssh -L 3000:localhost:3000 usuario@observatorio.somosiadigital.com   # solo si el dominio falla
 ```
-
-→ `http://localhost:3000/<admin>/observatorio/issues` · **usuario y contraseña en
-`deploy/gitea/admin.env`**, que git ignora.
 
 `<admin>` no está escrito en el repositorio: lo genera `inicializar.sh` con el patrón `admin<NNN>` y
 una contraseña `PREDES.<NNN>.<año>`, así que **no es el mismo en dos instalaciones**. El comando
@@ -283,21 +288,22 @@ entrada `### Actualización DD/MM/AAAA` en la bitácora de `_specs/README.md`.
 
 ### El tracker vive en el servidor de desarrollo
 
-**Hay un solo tracker**, en `observatorio.somosiadigital.com`, y se alcanza por túnel SSH. Dos
-trackers —uno local y otro remoto— serían dos listas de pendientes que divergen, que es exactamente
-el problema del que se venía.
+**Hay un solo tracker**, en `observatorio.somosiadigital.com`. Dos trackers —uno local y otro
+remoto— serían dos listas de pendientes que divergen, que es exactamente el problema del que se
+venía.
 
-Que corra ahí no lo expone: `compose.tracking.yaml` publica en `127.0.0.1:3000` y eso no cambia. El
-túnel trae ese puerto a tu máquina:
+Ahí está **publicado** en `https://obs.somosiadigital.com/gitea/` (ver más abajo). El modo por
+defecto del repositorio sigue siendo el aislado: `compose.tracking.yaml` publica en `127.0.0.1:3000`
+y el túnel trae ese puerto a tu máquina, que es lo que hay que usar en una instalación nueva y lo
+que queda como rescate en el servidor:
 
 ```bash
 ssh -L 3000:localhost:3000 usuario@observatorio.somosiadigital.com
 ```
 
-Y con el túnel abierto, <http://localhost:3000> en el navegador funciona igual que cuando corría en
-local. Ni certificado, ni vhost de nginx, ni un puerto más abierto a internet. Es también la razón de
-que el `ROOT_URL` del contenedor siga siendo `http://localhost:3000/`: por el túnel, esa **es** la
-URL correcta.
+Con el túnel abierto y **sin publicar**, <http://localhost:3000> funciona igual que cuando corría en
+local: ni certificado, ni vhost de nginx, ni un puerto más abierto a internet. Es la razón de que el
+`ROOT_URL` por defecto sea `http://localhost:3000/` — por el túnel, esa **es** la URL correcta.
 
 Ojo con una cosa: no es la producción de PREDES, es el servidor de desarrollo (Rocky Linux, 2 vCPU,
 4 GB). Gitea consume poco, pero **no lances una reconstrucción de la imagen del backend y Claude Code
@@ -339,14 +345,26 @@ Con ellos, el script es un no-op — está para eso.
 
 El túnel es el modo por defecto y no requiere nada. Si se quiere llegar al tracker desde un navegador
 cualquiera —sin clave SSH, desde el móvil—, se publica como subruta del dominio del API detrás del
-nginx que ya está:
+nginx que ya está. **Es lo que está hecho en el servidor de desarrollo desde el 05/08/2026.**
 
 ```bash
 docker compose -f compose.tracking.yaml -f compose.tracking-publicado.yml up -d
 ```
 
 Y para retirarlo, se vuelve a levantar sin el segundo `-f`. Es un solo comando en cada sentido, y no
-hay que tocar nginx: la `location` está siempre puesta.
+hay que **editar** nginx: la `location` está siempre puesta.
+
+Pero sí puede hacer falta **recargarlo**. Si el bloque `/gitea` llegó a la máquina en un `git pull`
+posterior al arranque del contenedor, nginx sigue con la configuración que cargó y la `location` no
+existe para él:
+
+```bash
+docker compose exec nginx nginx -s reload
+```
+
+Se distingue por el código: con la `location` cargada y el tracker apagado, `/gitea` da **502**; sin
+ella, da **404**. Y no vale comprobarlo con `nginx -T`, que **relee los archivos del disco** y por
+tanto enseña la configuración nueva aunque el proceso corra con la vieja.
 
 Hacen falta dos variables en el `.env` de la raíz, `RED_APP` y `TRACKER_URL`, documentadas en
 `.env.example`. La primera es la trampa: **el nombre de la red del proyecto de la aplicación no es

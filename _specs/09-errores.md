@@ -5,8 +5,11 @@ el servidor y admite dos modos, según cómo se haya levantado:
 
 | Modo | Cómo se llega |
 |---|---|
-| **Aislado** (por defecto) | `ssh -L 3000:localhost:3000 …` → `http://localhost:3000/<admin>/observatorio/issues` |
+| **Aislado** (por defecto del repositorio) | `ssh -L 3000:localhost:3000 …` → `http://localhost:3000/<admin>/observatorio/issues` |
 | **Publicado** (`compose.tracking-publicado.yml`) | `https://<API_DOMAIN>/gitea/<admin>/observatorio/issues`, sin túnel |
+
+En el servidor de desarrollo está **publicado** desde el 05/08/2026. El túnel queda como vía de
+rescate; el detalle, en `_docs/despliegue-entorno-desarrollo.md`.
 
 `<admin>` es la cuenta que genera el inicializador con el patrón `admin<NNN>`; el nombre real está en
 `deploy/gitea/admin.env`, que git ignora. No está escrito en el repositorio a propósito.

@@ -8,11 +8,44 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 - Fase actual: construcción de `frontend/` (Vite + React + TS + MapLibre) y `backend/` (Django 5.2 LTS + PostgreSQL + Meilisearch + PMTiles), desplegados con Docker Compose.
 
 > Las entradas `### Actualización` de más abajo son la bitácora de **lo ya corregido**. Lo que se
-> sabe roto y sigue sin arreglar vive en el **tracker**, en el servidor de desarrollo: se abre el
-> túnel (`ssh -L 3000:localhost:3000 …`) y se consulta en
-> `http://localhost:3000/<admin>/observatorio/issues`. Al cerrarse un error, se cierra allí y entra
-> aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
-> está en **[09-errores.md](09-errores.md)**.
+> sabe roto y sigue sin arreglar vive en el **tracker**, en el servidor de desarrollo, publicado en
+> `https://<API_DOMAIN>/gitea/<admin>/observatorio/issues` (y por túnel como rescate). Al cerrarse un
+> error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
+> cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
+
+### Actualización 05/08/2026 — el tracker publicado en `/gitea`, y el nginx que no se enteró
+
+El tracker pasó a modo **publicado** en el servidor de desarrollo: se levanta con
+`compose.tracking.yaml` + `compose.tracking-publicado.yml`, con `RED_APP` y `TRACKER_URL` en el `.env`
+de la raíz, y se llega por el dominio del API sin túnel. No hizo falta tocar el DNS, ni el
+certificado —la subruta cuelga de un dominio que ya existía—, ni editar nginx.
+
+Lo que sí destapó es un **fallo de la documentación de despliegue**, y es el motivo de esta entrada:
+
+**El comando de «desplegar una actualización» no recargaba nginx.** El one-liner documentado en el
+README y en el runbook de `_docs/despliegue.md` era
+`git pull && build && up -d && run --rm frontend`. Ninguno de esos cuatro pasos recarga nginx: `up -d`
+solo recrea los contenedores cuya definición de compose cambió, y la de nginx casi nunca cambia. Así
+que un `git pull` que toque `deploy/nginx/conf.d/` deja el archivo nuevo montado —es un *bind
+mount*— y el proceso corriendo con el que cargó al arrancar. La tabla «¿Reconstruir, recrear o
+reiniciar?» del README ya lo decía bien; lo que fallaba era el comando que uno copia.
+
+Tres cosas lo hacen difícil de ver, y por eso queda escrito:
+
+- **El síntoma es un 404, no un error.** Con la `location` cargada y el tracker apagado, `/gitea`
+  responde 502 —ese es el diseño, el sitio no depende del tracker—. Sin la `location`, la petición cae
+  al manejador estático del `server` y devuelve **404**, que se lee como «esa ruta no existe» y manda
+  a buscar el problema en el compose del tracker, que es donde no está.
+- **`nginx -T` no sirve para comprobarlo**: relee los archivos del disco, así que enseña la
+  configuración nueva y da la impresión de que está cargada. Lo que sí distingue es el comportamiento
+  —el `limit_req` de la `location` no dispara— y el log de error, que delataba el archivo estático que
+  nginx estaba buscando.
+- **Se arregla solo, tarde y sin avisar.** `40-recarga-periodica.sh` recarga cada 6 h, de modo que el
+  cambio acaba aplicándose; entre medias, el sitio sirve una configuración que no es la del
+  repositorio y nadie lo sabe.
+
+Corregido añadiendo `docker compose exec nginx nginx -s reload` al final del comando en los dos
+sitios, con la explicación al lado. Sin issue en el tracker: se encontró y se cerró en el acto.
 
 ### Actualización 05/08/2026 — el sitio no se recuperaba solo de un cuelgue
 
