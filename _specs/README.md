@@ -64,6 +64,39 @@ vigilante → sitio en 200; `docker compose stop db` → `/api/salud/` responde 
 `"base": "sin respuesta"` y el contenedor **sigue sano**; y al cuarto intento seguido el vigilante
 deja de reiniciar y registra que llegó al tope.
 
+### Actualización 05/08/2026 — el tracker se puede publicar en `/gitea`, sin túnel
+
+Al túnel SSH se le añade un segundo modo: `compose.tracking-publicado.yml` engancha el tracker al
+nginx del sitio y lo sirve en `/gitea` del dominio del API. Un solo comando en cada sentido, sin DNS
+ni certificado nuevos, y la `location` está siempre puesta.
+
+**La decisión que importa es la dirección del acoplamiento.** Es el tracker el que se engancha a la
+red de la aplicación, y nunca al revés: si fuera nginx quien se uniera a una red del tracker declarada
+`external`, el sitio entero dejaría de arrancar el día que esa red faltara. Y como el destino va en
+una variable con el resolver de Docker, nginx lo resuelve en cada petición. Comprobado con el tracker
+apagado: `/gitea` da 502 y `/`, `/api/salud/` y `/search/health` siguen en 200. El sitio no depende
+del tracker, y eso no es una promesa sino una prueba.
+
+La subruta se eligió sobre un subdominio propio por no pedir DNS ni reemitir el certificado,
+**sabiendo que la documentación de Gitea la desaconseja** —«not widely used and may have some issues
+in rare cases»—. Por eso la `location` copia su bloque literal, con el doble `rewrite` que devuelve el
+URI sin decodificar para no romper los `%2F`, y con `proxy_pass …$uri` porque con una variable en el
+destino nginx deja de sustituir el prefijo. Es el mismo motivo por el que `/search/` necesitó su
+`rewrite` en su día. Tampoco vale `proxy-comun.inc` aquí: fija `Connection ""` y con eso Gitea pierde
+el upgrade a websocket.
+
+Verificado en local contra `compose.local.yml`, no solo configurado: login por la subruta, listado de
+issues, los assets sirviendo desde `/gitea/assets/` sin chocar con los de la SPA, los dos adjuntos de
+un issue descargando enteros, y el `limit_req` cortando a la novena petición seguida al login sin
+afectar al resto del sitio. Queda sin probar el caso de las URIs con `%2F`: el repositorio de Gitea
+está vacío y no hay ramas que lo ejerciten.
+
+**ADR-A15 se reescribe por tercera vez**, y ahora recoge el riesgo aceptado: publicado en
+`predes.org.pe` esto es un login expuesto a internet en el dominio del entregable, para un sistema que
+PREDES no sabe que existe. Se advirtió, se decidió publicarlo igual, y se hace endurecido: límite de
+30 peticiones por minuto, sin registro, sin anunciar la versión, y con un `allow`/`deny` por IP
+preparado y comentado por si más adelante se quiere recortar la exposición.
+
 ### Actualización 05/08/2026 — el tracker se muda al servidor, y se trabaja por número
 
 El tracker nació en el portátil, y eso fabricaba el problema que venía a resolver: en cuanto se

@@ -1,13 +1,12 @@
 # 09 — Ciclo de errores
 
 Lo que se sabe roto y **todavía no está corregido** vive en el tracker, no en este archivo. Corre en
-el servidor de desarrollo, publicado solo en `127.0.0.1`, y se alcanza abriendo el túnel:
+el servidor y admite dos modos, según cómo se haya levantado:
 
-```
-ssh -L 3000:localhost:3000 usuario@observatorio.somosiadigital.com
-```
-
-→ **<http://localhost:3000/luishuacho/observatorio/issues>**
+| Modo | Cómo se llega |
+|---|---|
+| **Aislado** (por defecto) | `ssh -L 3000:localhost:3000 …` → <http://localhost:3000/luishuacho/observatorio/issues> |
+| **Publicado** (`compose.tracking-publicado.yml`) | `https://<API_DOMAIN>/gitea/luishuacho/observatorio/issues`, sin túnel |
 
 Si hay que levantarlo —la primera vez, o en una máquina nueva— son dos comandos desde la raíz del
 repositorio, y el segundo es idempotente:
@@ -80,13 +79,16 @@ un solo sitio para lo hecho.
 
 ## Qué hace falta para consultarlo
 
-El tracker es **de desarrollo y no forma parte del entregable**. Corre en el servidor de desarrollo
-—`somosiadigital.com`, no la producción de PREDES—, escucha solo en `127.0.0.1` y se llega a él por
-túnel SSH: sin certificado, sin vhost de nginx y sin un puerto más abierto. **Hay uno solo**, a
-propósito: dos trackers son dos listas de pendientes que divergen, que es el problema del que se
-venía.
+El tracker es **de desarrollo y no forma parte del entregable**, aunque comparta servidor con la
+plataforma. **Hay uno solo**, a propósito: dos trackers son dos listas de pendientes que divergen,
+que es el problema del que se venía.
 
-Quien clone el repositorio y no abra el túnel no pierde nada del producto — pierde la lista de
+Aislado no expone nada —escucha en `127.0.0.1` y se llega por túnel—. Publicado en `/gitea` gana
+acceso desde cualquier navegador y, a cambio, deja un login en internet; el porqué de la decisión y
+lo que la mitiga están en **ADR-A15**. En ninguno de los dos modos el sitio depende de él: si el
+tracker cae, `/gitea` da 502 y el resto responde con normalidad.
+
+Quien clone el repositorio y no lo levante no pierde nada del producto — pierde la lista de
 pendientes, que es información de trabajo. Lo ya corregido sí está en el repositorio, en la bitácora.
 
 Los detalles de operación (dónde vive el token, cómo se regenera, cómo se gestiona desde Claude

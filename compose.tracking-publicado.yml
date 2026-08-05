@@ -1,0 +1,49 @@
+# Publica el tracker en `/gitea` del dominio del API, detrás del nginx del sitio.
+#
+#   docker compose -f compose.tracking.yaml -f compose.tracking-publicado.yml up -d
+#
+# Sin este override el tracker sigue aislado y solo se alcanza por túnel SSH, que es el modo por
+# defecto y el que conviene en la máquina de desarrollo. Publicarlo es una decisión explícita: son
+# dos archivos en la línea de comandos, no una casilla escondida.
+#
+# POR QUÉ EL ACOPLAMIENTO VA EN ESTE SENTIDO. Es el **tracker** el que se engancha a la red de la
+# aplicación, y nunca al revés. El tracker es la pieza prescindible: si no arranca, el sitio no se
+# entera. Si lo hubiéramos hecho al revés —nginx uniéndose a una red del tracker declarada
+# `external`—, el sitio entero dejaría de arrancar el día que esa red no existiera.
+#
+# Y nginx tampoco depende de que Gitea esté: su destino va en una variable con el resolver de
+# Docker, así que se resuelve **en cada petición**. Con el tracker apagado, `/gitea` devuelve 502 y
+# el resto del sitio responde con normalidad. `nginx -t` ni se entera, porque no resuelve variables.
+#
+# DOS VARIABLES en el .env de la RAÍZ (ver .env.example):
+#
+#   RED_APP      nombre de la red del proyecto de la aplicación. **No es igual en todas las
+#                máquinas**: compose lo deriva del nombre del directorio, así que aquí es
+#                `predes-observatorio_default` (directorio «PREDES - observatorio») y en un servidor
+#                que clonó en ~/observatorio será `observatorio_default`. Se comprueba con
+#                `docker network ls`.
+#   TRACKER_URL  la URL pública con la subruta, **con la barra final**. Es requisito de la subruta:
+#                Gitea genera todos sus enlaces a partir de ROOT_URL, y sin el prefijo la navegación
+#                se rompe en cuanto se pincha algo. El valor por defecto sirve para probarlo en
+#                local con compose.local.yml.
+
+services:
+  gitea:
+    networks:
+      - default        # hay que nombrarla: en cuanto un servicio declara `networks`, deja de
+      - app            # unirse a la de por defecto de forma implícita
+    environment:
+      GITEA__server__ROOT_URL: ${TRACKER_URL:-http://localhost/gitea/}
+
+      # Endurecido, porque a partir de aquí el login está en internet. El registro ya viene
+      # deshabilitado y REQUIRE_SIGNIN_VIEW activo desde compose.tracking.yaml.
+      GITEA__api__ENABLE_SWAGGER: "false"
+      GITEA__other__SHOW_FOOTER_VERSION: "false"   # no anunciar la versión a quien busca CVEs
+      GITEA__security__LOGIN_REMEMBER_DAYS: "7"
+      # OJO: no deshabilitar la autenticación básica. `deploy/gitea/inicializar.sh` la necesita
+      # para crear el token sin tener que darle al MCP el alcance `write:user`.
+
+networks:
+  app:
+    name: ${RED_APP:-predes-observatorio_default}
+    external: true

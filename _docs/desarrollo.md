@@ -331,6 +331,42 @@ Los dos `.env` viajan aparte porque git los ignora. Si no los copias, `inicializ
 un mensaje explícito: encuentra el usuario ya creado en la base y no tiene su contraseña para seguir.
 Con ellos, el script es un no-op — está para eso.
 
+#### Publicarlo en `/gitea`, sin túnel
+
+El túnel es el modo por defecto y no requiere nada. Si se quiere llegar al tracker desde un navegador
+cualquiera —sin clave SSH, desde el móvil—, se publica como subruta del dominio del API detrás del
+nginx que ya está:
+
+```bash
+docker compose -f compose.tracking.yaml -f compose.tracking-publicado.yml up -d
+```
+
+Y para retirarlo, se vuelve a levantar sin el segundo `-f`. Es un solo comando en cada sentido, y no
+hay que tocar nginx: la `location` está siempre puesta.
+
+Hacen falta dos variables en el `.env` de la raíz, `RED_APP` y `TRACKER_URL`, documentadas en
+`.env.example`. La primera es la trampa: **el nombre de la red del proyecto de la aplicación no es
+igual en todas las máquinas** —compose lo deriva del nombre del directorio—, así que se comprueba con
+`docker network ls` antes de escribirlo.
+
+Cuatro cosas que conviene entender antes de usarlo:
+
+- **El sitio nunca depende del tracker.** Es el tracker el que se engancha a la red de la aplicación,
+  y nunca al revés; y nginx resuelve su destino por variable, en cada petición. Con el tracker
+  apagado, `/gitea` da 502 y todo lo demás responde 200. Está comprobado, y es la razón de que el
+  acoplamiento vaya en ese sentido y no en el otro.
+- **`ROOT_URL` tiene que llevar la subruta.** Gitea genera todos sus enlaces a partir de ella; sin el
+  prefijo, la navegación se rompe al primer clic. Por eso `TRACKER_URL` acaba en `/gitea/`, con barra.
+  El efecto secundario es que, publicado, el acceso directo por `localhost:3000` sirve páginas cuyos
+  enlaces apuntan a `/gitea` y ahí no resuelven. Publicado se usa la URL pública; el túnel queda como
+  vía de rescate si nginx o el certificado fallan.
+- **La subruta es la variante frágil, y Gitea lo dice**: «not widely used and may have some issues in
+  rare cases». La `location` copia su bloque literal —con el doble `rewrite` que devuelve el URI sin
+  decodificar— en vez de improvisar uno. Si algo raro falla, empezar por ahí.
+- **El login queda en internet.** Tiene `limit_req` a 30/min, el registro deshabilitado, la versión
+  oculta y `REQUIRE_SIGNIN_VIEW`. En `conf.d/observatorio.conf` hay además un `allow`/`deny` por IP
+  preparado y comentado, para recortar la exposición sin renunciar al acceso web.
+
 #### Claude Code en el servidor
 
 Hace falta el CLI instalado y autenticado allí; la autenticación es interactiva y la haces tú.

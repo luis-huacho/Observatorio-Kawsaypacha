@@ -298,6 +298,17 @@ E2E_URL=https://$SITE_DOMAIN npx playwright test
 | Ver la salud de los contenedores | `docker compose ps` — la columna `Status` dice `healthy` / `unhealthy` |
 | Comprobar el sitio desde fuera | `./deploy/comprobar-sitio.sh $SITE_DOMAIN $API_DOMAIN "$VITE_MEILI_SEARCH_KEY"` |
 | Por qué se reinició algo solo | `cat ~/observatorio-registros/vigilancia.log` |
+| **Publicar el tracker** en `/gitea` | `docker compose -f compose.tracking.yaml -f compose.tracking-publicado.yml up -d` |
+| **Retirarlo** de `/gitea` (vuelve a solo túnel) | `docker compose -f compose.tracking.yaml up -d` |
+
+> El tracker de errores es una herramienta de desarrollo, no parte de la plataforma. Corre como
+> proyecto Compose **aparte** (`observatorio-tracking`), así que ni `docker compose up -d` ni
+> `docker compose down` de la tabla de arriba lo tocan, y `vigilar-contenedores.sh` no lo vigila.
+> **Su volumen `gitea_data` no entra en los backups**, que solo vuelcan PostgreSQL: si se pierde, se
+> pierde el historial de issues. Publicado, `/gitea` queda accesible desde internet detrás de un
+> login con límite de peticiones — ver la sección del tracker en
+> [`desarrollo.md`](./desarrollo.md), incluido el `allow`/`deny` por IP que está preparado y
+> comentado en `deploy/nginx/conf.d/observatorio.conf`.
 | Reindexar la búsqueda | `docker compose exec backend python manage.py meili_rebuild` — o el botón de la tarjeta «Buscador» del panel del admin, que hace lo mismo en segundo plano |
 | Regenerar los tiles de CCPP | `docker compose exec backend python manage.py generar_tiles_ccpp` |
 | Regenerar los tiles de las capas | `docker compose exec backend python manage.py generar_tiles --rehacer` |
