@@ -487,6 +487,76 @@ systemd y la configuración de nginx listas para copiar, las comprobaciones post
 diagnóstico— está en
 [`_docs/despliegue-sin-docker.md`](./_docs/despliegue-sin-docker.md).
 
+## El tracker de errores, en `/gitea`
+
+Un Gitea que **no forma parte de la plataforma**: es donde se anota todo lo que se encuentra probando
+el sitio desplegado, para que no acabe repartido entre correos y mensajes. Corre como proyecto Compose
+aparte, así que ni `docker compose up -d` ni `down` de la plataforma lo tocan.
+
+Por defecto solo escucha en `127.0.0.1` y se llega por túnel (`ssh -L 3000:localhost:3000 …`).
+Publicarlo bajo el dominio del API es opcional y explícito.
+
+### Publicarlo en el servidor
+
+**1.** Dos variables en el `.env` de la raíz:
+
+```bash
+# El nombre de la red del proyecto de la APLICACIÓN. No es igual en todas las máquinas: compose lo
+# deriva del nombre del directorio. Comprobarlo antes con `docker network ls`.
+RED_APP=observatorio_default
+# La URL pública, CON la barra final. Gitea genera todos sus enlaces a partir de ella.
+TRACKER_URL=https://obs.predes.org.pe/gitea/
+```
+
+**2.** Levantarlo con los dos archivos —el segundo es el que lo engancha al nginx del sitio— y
+ejecutar el inicializador, que es idempotente:
+
+```bash
+docker compose -f compose.tracking.yaml -f compose.tracking-publicado.yml up -d
+./deploy/gitea/inicializar.sh
+```
+
+**3.** Comprobar `https://obs.predes.org.pe/gitea/`. Para retirarlo, se levanta otra vez **sin** el
+segundo `-f` y vuelve a quedar solo tras el túnel.
+
+**No hace falta tocar nginx, ni el DNS, ni el certificado.** La `location` de `/gitea` ya está en
+`deploy/nginx/conf.d/observatorio.conf`, dentro del bloque del dominio del API, y por ser una subruta
+del dominio que ya existe no necesita un registro ni un `-d` más en certbot. Con el tracker apagado,
+`/gitea` responde 502 y **el resto del sitio sigue funcionando**: nginx resuelve su destino en cada
+petición, así que la plataforma nunca depende del tracker.
+
+### Las cuentas
+
+`./deploy/gitea/inicializar.sh` **genera** el administrador la primera vez, con el patrón
+`admin<NNN>` y contraseña `PREDES.<NNN>.<año>`, y lo escribe en **`deploy/gitea/admin.env`**, que git
+ignora. Los valores reales no están en el repositorio ni en este README a propósito: se entregan
+aparte, igual que las cuentas de Django (ver `_docs/despliegue-entorno-desarrollo.md`).
+
+QA puede usar esa misma cuenta, o una propia creada a mano desde la web (*Administración → Usuarios*);
+el registro abierto está deshabilitado.
+
+> **Si se publica en internet, cambiar la contraseña generada por una de verdad.** El patrón es
+> público y solo varían tres dígitos: son 900 combinaciones, y lo único que hay delante es el límite
+> de 30 peticiones por minuto de nginx. En `deploy/nginx/conf.d/observatorio.conf` hay además un
+> `allow`/`deny` por IP preparado y comentado. El volumen del tracker **tampoco entra en los
+> backups**, que solo vuelcan PostgreSQL.
+
+### Cómo se trabaja lo anotado
+
+En el servidor, desde Claude Code en la raíz del repositorio:
+
+```
+/issue 6            un issue
+/issue 6 3 1        varios; sale un solo plan que los cubre todos
+/issue              lista los abiertos y se detiene, para elegir
+```
+
+Lee la ficha, plantea un plan, espera aprobación, escribe la prueba que falla, la hace pasar y
+comenta en el issue qué lo demuestra. No commitea ni cierra: eso se revisa. Cerrar son **dos** gestos
+—cerrar el issue y escribir la entrada `### Actualización DD/MM/AAAA` en la bitácora de
+[`_specs/README.md`](./_specs/README.md)—, y esa entrada es lo que queda en el repositorio cuando
+nadie levante el contenedor.
+
 ## Lo que depende de PREDES
 
 Se implementó todo con valores por defecto seguros, y estas piezas quedan pendientes del cliente:
@@ -509,7 +579,7 @@ producción.
 | Administrar contenido (para PREDES) | [`_docs/manual-admin-predes.md`](./_docs/manual-admin-predes.md) |
 | **Implementar algo** | [`_specs/`](./_specs/) — modelo de datos, contrato de API, ADR |
 | Saber por qué se decidió algo | [`_specs/00-alcance-decisiones.md`](./_specs/00-alcance-decisiones.md) |
-| **Ver qué está roto y pendiente** | El tracker, en el servidor de desarrollo: `ssh -L 3000:localhost:3000 …` → <http://localhost:3000/luishuacho/observatorio/issues>. El ciclo está en [`_specs/09-errores.md`](./_specs/09-errores.md) y lo ya corregido en la bitácora de [`_specs/README.md`](./_specs/README.md) |
+| **Ver qué está roto y pendiente** | El tracker — ver [El tracker de errores, en `/gitea`](#el-tracker-de-errores-en-gitea). El ciclo está en [`_specs/09-errores.md`](./_specs/09-errores.md) y lo ya corregido en la bitácora de [`_specs/README.md`](./_specs/README.md) |
 | Ver el historial del prototipo | [`_specs/archive/`](./_specs/archive/) |
 
 ## Licencia y créditos

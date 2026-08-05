@@ -10,7 +10,7 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > Las entradas `### Actualización` de más abajo son la bitácora de **lo ya corregido**. Lo que se
 > sabe roto y sigue sin arreglar vive en el **tracker**, en el servidor de desarrollo: se abre el
 > túnel (`ssh -L 3000:localhost:3000 …`) y se consulta en
-> <http://localhost:3000/luishuacho/observatorio/issues>. Al cerrarse un error, se cierra allí y entra
+> `http://localhost:3000/<admin>/observatorio/issues`. Al cerrarse un error, se cierra allí y entra
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 

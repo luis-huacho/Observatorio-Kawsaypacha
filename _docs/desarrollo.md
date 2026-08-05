@@ -205,8 +205,12 @@ a PREDES (ADR-A15). Se llega a él abriendo el túnel y luego el navegador:
 ssh -L 3000:localhost:3000 usuario@observatorio.somosiadigital.com
 ```
 
-→ <http://localhost:3000/luishuacho/observatorio/issues> · usuario y contraseña en
-`deploy/gitea/admin.env`.
+→ `http://localhost:3000/<admin>/observatorio/issues` · **usuario y contraseña en
+`deploy/gitea/admin.env`**, que git ignora.
+
+`<admin>` no está escrito en el repositorio: lo genera `inicializar.sh` con el patrón `admin<NNN>` y
+una contraseña `PREDES.<NNN>.<año>`, así que **no es el mismo en dos instalaciones**. El comando
+`/issue` lo resuelve solo con `get_me` del MCP, sin que haya que decírselo.
 
 Para levantarlo —la primera vez, o en una máquina nueva— son dos comandos desde la raíz:
 

@@ -10,6 +10,11 @@
 # sale 0. Esa es la razón de que exista — el asistente web del primer arranque hace lo mismo, pero
 # a mano y sin dejar rastro en el repositorio, así que nadie puede reproducir la instalación.
 #
+# Las credenciales del administrador **las genera él** (`admin<NNN>` / `PREDES.<NNN>.<año>`) y no
+# están escritas en ningún archivo versionado. Si encuentra un administrador con un nombre que no
+# encaja en ese patrón, lo renombra: los issues conservan su autoría y el token del MCP sigue
+# valiendo, porque van atados al usuario y no a su nombre.
+#
 # Escribe dos archivos, los dos ignorados por git:
 #
 #   deploy/gitea/admin.env   usuario y contraseña del admin (para entrar por la web)
@@ -31,9 +36,9 @@ DIR="$RAIZ/deploy/gitea"
 COMPOSE=(docker compose -f "$RAIZ/compose.tracking.yaml")
 
 URL_LOCAL="http://localhost:3000"       # puerto publicado en loopback; ver la nota de la cabecera
-USUARIO="${GITEA_ADMIN_USER:-luishuacho}"
-CORREO="${GITEA_ADMIN_EMAIL:-l.huacho@gmail.com}"
+CORREO="${GITEA_ADMIN_EMAIL:-observatorio@predes.org.pe}"
 REPO="${GITEA_REPO:-observatorio}"
+PATRON_USUARIO='^admin[0-9]{3}$'
 NOMBRE_TOKEN="claude-mcp"
 ALCANCES="write:repository,write:issue,read:user"
 
@@ -64,33 +69,75 @@ curl -fsS --max-time 3 "$URL_LOCAL/api/healthz" >/dev/null 2>&1 \
 
 gitea_cli() { "${COMPOSE[@]}" exec -T -u git gitea gitea "$@"; }
 
-if gitea_cli admin user list 2>/dev/null | awk 'NR>1 {print $2}' | grep -qx "$USUARIO"; then
-    igual "El usuario '$USUARIO' ya existe"
-    [[ -f "$DIR/admin.env" ]] || morir \
-        "El usuario '$USUARIO' existe pero falta deploy/gitea/admin.env con su contraseña.
-   Sin ella este script no puede seguir. Opciones: exportar GITEA_ADMIN_PASSWORD, o empezar de
-   cero con 'docker compose -f compose.tracking.yaml down -v'."
-else
-    # 24 bytes en base64: suficiente para una contraseña que nadie va a teclear de memoria.
-    CLAVE="$(openssl rand -base64 24)"
-    gitea_cli admin user create \
-        --username "$USUARIO" \
-        --email "$CORREO" \
-        --password "$CLAVE" \
-        --admin \
-        --must-change-password=false >/dev/null
+# Las credenciales se GENERAN, no vienen escritas en ninguna parte: así no acaban en el historial de
+# git, y cada instalación tiene las suyas. El patrón es el acordado con el dueño del proyecto.
+#
+# Los dos números son independientes a propósito. Con el mismo, conocer el usuario regalaría la
+# mitad de la contraseña, y esto puede acabar tras un login expuesto a internet.
+#
+# OJO CON LA FUERZA DEL SECRETO: el patrón es público y solo varían tres dígitos, o sea **900
+# combinaciones**. Eso NO aguanta un ataque por fuerza bruta sostenido; lo único que hay delante es
+# el `limit_req` de nginx. Si el tracker se publica en `/gitea`, cambiar la contraseña por una de
+# verdad desde la web —o restringir por IP— deja de ser opcional. Está dicho en el README.
+tres_digitos() { printf '%d' $(( $(od -An -N2 -tu2 < /dev/urandom) % 900 + 100 )); }
+nuevo_usuario() { printf 'admin%s' "$(tres_digitos)"; }
+nueva_clave()   { printf 'PREDES.%s.%s' "$(tres_digitos)" "$(date +%Y)"; }
+
+escribir_admin_env() {
     umask 077
     cat > "$DIR/admin.env" <<EOF
 # Credenciales del admin de Gitea, generadas por deploy/gitea/inicializar.sh.
-# Sirven para entrar por la web en $URL_LOCAL. No se versionan.
+# Sirven para entrar por la web. No se versionan: git ignora deploy/gitea/*.env.
 GITEA_ADMIN_USER=$USUARIO
 GITEA_ADMIN_PASSWORD=$CLAVE
 EOF
-    hecho "Usuario '$USUARIO' creado — credenciales en deploy/gitea/admin.env"
-fi
+}
 
-CLAVE="${GITEA_ADMIN_PASSWORD:-$(sed -n 's/^GITEA_ADMIN_PASSWORD=//p' "$DIR/admin.env")}"
-[[ -n "$CLAVE" ]] || morir "deploy/gitea/admin.env no trae GITEA_ADMIN_PASSWORD"
+# El archivo manda; el entorno puede forzarlo para reproducir una instalación concreta.
+USUARIO="${GITEA_ADMIN_USER:-$(sed -n 's/^GITEA_ADMIN_USER=//p' "$DIR/admin.env" 2>/dev/null)}"
+CLAVE="${GITEA_ADMIN_PASSWORD:-$(sed -n 's/^GITEA_ADMIN_PASSWORD=//p' "$DIR/admin.env" 2>/dev/null)}"
+EN_GITEA="$(gitea_cli admin user list 2>/dev/null | awk 'NR>1 {print $2}')"
+
+if [[ -z "$USUARIO" ]]; then
+    # Instalación nueva. Si ya hubiera usuarios, no sabríamos su contraseña y no podríamos seguir.
+    [[ -z "$EN_GITEA" ]] || morir \
+        "Gitea ya tiene usuarios ($(tr '\n' ' ' <<< "$EN_GITEA")) y falta deploy/gitea/admin.env con
+   la contraseña de alguno. Opciones: exportar GITEA_ADMIN_USER y GITEA_ADMIN_PASSWORD, o empezar
+   de cero con 'docker compose -f compose.tracking.yaml down -v' (se pierden los issues)."
+    USUARIO="$(nuevo_usuario)"; CLAVE="$(nueva_clave)"
+    gitea_cli admin user create --username "$USUARIO" --email "$CORREO" --password "$CLAVE" \
+        --admin --must-change-password=false >/dev/null
+    escribir_admin_env
+    hecho "Usuario '$USUARIO' creado — credenciales en deploy/gitea/admin.env"
+
+elif ! grep -qx "$USUARIO" <<< "$EN_GITEA"; then
+    # Está en admin.env pero no en Gitea: el volumen se recreó por debajo.
+    [[ -n "$CLAVE" ]] || morir "deploy/gitea/admin.env no trae GITEA_ADMIN_PASSWORD"
+    gitea_cli admin user create --username "$USUARIO" --email "$CORREO" --password "$CLAVE" \
+        --admin --must-change-password=false >/dev/null
+    hecho "Usuario '$USUARIO' recreado con las credenciales guardadas"
+
+elif [[ ! "$USUARIO" =~ $PATRON_USUARIO ]]; then
+    # El administrador tiene un nombre que no encaja con el patrón —una cuenta personal de antes de
+    # que esto se generase—. Se renombra en vez de crear otro: `rename` conserva la autoría de los
+    # issues y el token del MCP, que van atados al usuario y no a su nombre.
+    [[ -n "$CLAVE" ]] || morir "deploy/gitea/admin.env no trae GITEA_ADMIN_PASSWORD"
+    VIEJO="$USUARIO"
+    USUARIO="$(nuevo_usuario)"
+    curl -fsS -X POST -u "$VIEJO:$CLAVE" -H "Content-Type: application/json" \
+        -d "$(jq -nc --arg n "$USUARIO" '{new_username: $n}')" \
+        "$URL_LOCAL/api/v1/admin/users/$VIEJO/rename" >/dev/null
+    CLAVE="$(nueva_clave)"
+    gitea_cli admin user change-password --username "$USUARIO" --password "$CLAVE" \
+        --must-change-password=false >/dev/null
+    escribir_admin_env
+    hecho "Administrador '$VIEJO' renombrado a '$USUARIO', con contraseña nueva"
+    igual "Los issues conservan su autoría y el token del MCP sigue valiendo"
+
+else
+    igual "El administrador '$USUARIO' ya está como debe"
+    [[ -n "$CLAVE" ]] || morir "deploy/gitea/admin.env no trae GITEA_ADMIN_PASSWORD"
+fi
 
 # ---------------------------------------------------------------- 3. token de acceso
 #

@@ -1,7 +1,7 @@
 {
   "$comentario": [
     "Servidor MCP oficial de Gitea, contra el tracker de errores de compose.tracking.yaml.",
-    "Da acceso a los issues del repositorio luishuacho/observatorio: leer, crear, comentar,",
+    "Da acceso a los issues del repositorio <admin>/observatorio: leer, crear, comentar,",
     "etiquetar y cerrar. Requiere que el tracker esté en pie:",
     "  docker compose -f compose.tracking.yaml up -d && ./deploy/gitea/inicializar.sh",
     "",

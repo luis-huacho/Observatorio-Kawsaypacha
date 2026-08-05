@@ -3,8 +3,12 @@ description: Trabajar uno o varios issues del tracker de errores por número
 argument-hint: "[número...] — p.ej. 6, o 6 3 1"
 ---
 
-Trabaja los issues del tracker de errores del proyecto: **`luishuacho/observatorio`**, en el Gitea
-local. Ese `owner`/`repo` es el mismo en todas las llamadas al MCP.
+Trabaja los issues del tracker de errores del proyecto, en el Gitea del servidor.
+
+El repositorio se llama siempre **`observatorio`**. El `owner` **no está escrito en ninguna parte y
+no hay que adivinarlo**: es el dueño del token, y se obtiene con la herramienta `get_me` del MCP
+(campo `login`). Lo genera el inicializador con el patrón `admin<NNN>`, así que **no es el mismo en
+dos instalaciones**. Resuélvelo una vez al principio y reutilízalo en todas las llamadas.
 
 Números pedidos: **$ARGUMENTS**
 
