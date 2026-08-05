@@ -146,6 +146,16 @@ En el crontab de `appdevuser`, con sus logs en `/home/appdevuser/`:
 | 04:30 diario | `meili_estado`, que sale con código ≠ 0 si el buscador está caído o desfasado |
 | 02:30 domingos | `tar` del volumen `media` a `/home/appdevuser/respaldos` |
 | 05:00 lunes | Purga del caché de BuildKit y de las imágenes sin tag |
+| **cada 2 min** | `deploy/vigilar-contenedores.sh`: reinicia backend o nginx si el healthcheck los marca enfermos, con tope de 3/hora |
+| 04:35 diario | `cola_estado`, que avisa si el worker dejó de avanzar. **No reinicia**: una importación interrumpida hay que repetirla |
+
+Los registros y el contador de reinicios viven en **`~/observatorio-registros/`**, no en
+`/var/log`, para que respaldar el servidor sean dos carpetas: esa y `~/respaldos/`.
+`vigilancia.log` está vacío mientras todo va bien.
+
+Y una pieza que **no** está en este servidor a propósito: `deploy/comprobar-sitio.sh`, la
+comprobación externa. Solo necesita `curl`, y hay que colgarla del cron de **otra máquina** — si el
+servidor entero cae, el vigilante local cae con él.
 
 Además, `/etc/docker/daemon.json` fija un techo de 4 GB al caché de construcción
 (`builder.gc.defaultKeepStorage`). No existía —el servidor estaba con todo por defecto— y **no se

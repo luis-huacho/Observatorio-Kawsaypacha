@@ -16,6 +16,7 @@ from .editorial import (
     VideoViewSet,
 )
 from .incidencia import AyudaMemoriaView, ComparadorView
+from .salud import SaludView
 from .peligros import (
     CentroPobladoExportView,
     CentroPobladoGeoJSONView,
@@ -54,6 +55,7 @@ __all__ = [
     "NoticiaViewSet",
     "ProvinciaViewSet",
     "ResumenPeligrosView",
+    "SaludView",
     "SitioView",
     "TipoPeligroViewSet",
     "VideoViewSet",

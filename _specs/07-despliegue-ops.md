@@ -149,6 +149,27 @@ DJANGO_SUPERUSER_USERNAME= DJANGO_SUPERUSER_EMAIL= DJANGO_SUPERUSER_PASSWORD=   
 
 Seguridad: `DEBUG=0`, admin en `ADMIN_URL` no-default, throttling DRF, `SECURE_*` headers de Django, contenedores sin puertos publicados salvo nginx, actualizaciones de imágenes mensuales.
 
+## Vigilancia y recuperación
+
+`restart: unless-stopped` cubre que un proceso **muera**. No cubre que se **cuelgue**: gunicorn con sus workers bloqueados sigue `Up` y el sitio devuelve timeouts. Y Compose **no reinicia un contenedor «unhealthy»** — los healthchecks solo informan—, así que hace falta alguien que mire y decida.
+
+| Pieza | Qué cubre | Dónde |
+|---|---|---|
+| `healthcheck` de `backend` y `nginx` | Que el proceso atienda de verdad | `compose.yaml` |
+| `deploy/vigilar-contenedores.sh` (cron */2 min) | Reinicia lo «unhealthy», máx. 3/hora por servicio | anfitrión |
+| `manage.py cola_estado` (cron diario) | Avisa si la cola no avanza. **No reinicia** | anfitrión |
+| `deploy/comprobar-sitio.sh` | Lo que el anfitrión no puede ver: servidor caído, DNS, certificado | **otra máquina** |
+
+**`GET /api/salud/` mide liveness, no dependencias** (spec 02). Responde `200` aunque PostgreSQL o Meilisearch estén caídos, y lo declara en el cuerpo. Si fallara por ellos, una caída de la base marcaría el backend «unhealthy» y el vigilante lo reiniciaría en bucle: reiniciar el backend no levanta la base, y el bucle borra el rastro. Por lo mismo va exenta de throttling — con `interval: 10s` son 360 peticiones/hora contra un techo anónimo de 1000, y un 429 provocaría reinicios sin que pasara nada.
+
+**El worker se reinicia a mano, nunca solo.** Si se atasca a mitad de una importación de 10,978 filas, matarlo puede dejar el dato peor que parado. Es la misma doctrina que `meili_estado` —comprobar y arreglar se piden por separado—, y la razón de que ahí sí valga automatizar el reinicio de `backend` y `nginx`: reiniciar un servidor web colgado no destruye nada y la alternativa es un sitio caído.
+
+**El vigilante corre en el anfitrión, no como contenedor.** `willfarrell/autoheal` y equivalentes exigen montar `/var/run/docker.sock`, que es la API de Docker sin autenticación: root del servidor cedido a un contenedor, en una máquina pública. Y añade una pieza que PREDES tendría que saber operar, que es justo lo que ADR-A6bis evitó al descartar Caddy.
+
+**`nginx` mantiene `depends_on` sin `condition: service_healthy`**, a propósito: esperar a un backend sano dejaría el sitio entero caído en vez de degradado, y el `resolver 127.0.0.11` con destino en variable ya está puesto para que nginx sobreviva a un backend que aún no responde.
+
+El estado de todo esto vive bajo `$HOME` (`~/observatorio-registros/`), no en `/var/log`, para que respaldar el servidor sean dos carpetas.
+
 ## Checklist de capacitación a PREDES (Fase III del TDR)
 
 Sesión grabada (registro audiovisual = anexo del informe final). El guion desarrollado está en `_docs/manual-admin-predes.md`:

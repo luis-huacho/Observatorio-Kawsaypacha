@@ -11,6 +11,56 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > sabe roto y sigue sin arreglar vive en **[09-errores.md](09-errores.md)**; al cerrarse un error,
 > sale de allí y entra aquí como una entrada nueva.
 
+### Actualización 05/08/2026 — el sitio no se recuperaba solo de un cuelgue
+
+`restart: unless-stopped` cubría que un proceso muriera, y nada más. El fallo contrario —gunicorn
+con sus workers bloqueados, vivo y sin atender— dejaba el contenedor en `Up`, el sitio devolviendo
+timeouts y a nadie haciendo nada, porque **Compose no reinicia un contenedor «unhealthy»**: los
+healthchecks solo informan. Y `backend`, `worker` y `nginx` —la ruta que ve el visitante— no tenían
+healthcheck ninguno.
+
+Se cubre con cuatro piezas, y lo que las hace correctas es lo que **no** hacen:
+
+- **`GET /api/salud/`** (spec 02) mide *liveness*, no dependencias: responde 200 aunque PostgreSQL o
+  Meilisearch estén caídos, y lo declara en el cuerpo. Si fallara por ellos, una caída de la base
+  marcaría el backend «unhealthy» y el vigilante lo reiniciaría en bucle, sin arreglar nada
+  —reiniciar el backend no levanta la base— y borrando el rastro. Va exenta de throttling porque con
+  `interval: 10s` son 360 peticiones/hora contra un techo de 1000, y un 429 provocaría reinicios sin
+  que pasara nada. Es también por lo que no se reutilizó `/api/docs/` ni `/api/schema/`.
+- **Healthchecks** de `backend` y `nginx`. El del backend lleva `start_period: 90s` porque el
+  entrypoint corre `migrate` y `meili_setup` antes de gunicorn; sin margen, cada despliegue nacería
+  «unhealthy» y acabaría reiniciado a media migración.
+- **`deploy/vigilar-contenedores.sh`** en el cron del anfitrión, con **tope de 3 reinicios por hora
+  y servicio**: un reinicio que no arregla el problema no puede volverse un bucle que impida
+  diagnosticarlo. Corre fuera de Docker y no como contenedor `autoheal` porque esa imagen exige
+  `/var/run/docker.sock`, que es root del anfitrión cedido a un contenedor en una máquina pública.
+- **`deploy/comprobar-sitio.sh`**, para otra máquina: solo `curl`, sin Docker ni SSH ni
+  credenciales. Cubre el punto ciego insalvable del vigilante local —si el servidor cae, cae con
+  él— y lo que solo se ve desde fuera: DNS, firewall y los días que le quedan al certificado.
+
+**El worker queda fuera del reinicio automático**, y esto no contradice la doctrina de
+`meili_estado` sino que la aplica: reindexar por tu cuenta de madrugada destruye información;
+reiniciar un servidor web colgado no destruye nada. Pero matar un worker a mitad de una importación
+de 10,978 filas sí puede dejar el dato peor que parado, así que ahí hay aviso —`manage.py
+cola_estado`— y no remedio.
+
+Dos cosas encontradas al construirlo, las dos comprobadas contra el servidor:
+
+- **`_docs/despliegue.md` documentaba `ALLOWED_HOSTS` sin `localhost`.** La sonda pide
+  `http://localhost:8000/` desde dentro del contenedor y Django responde **400** a cualquier `Host`
+  que no esté en la lista: con la configuración documentada, el healthcheck habría fallado siempre
+  y el vigilante habría reiniciado el backend en bucle. En el servidor de PREDES, no en este.
+- **django-tasks-db no usa `NULL` para «sin retraso»**, usa el centinela `9999-01-01`
+  (`get_date_max()`). Un filtro propio con `run_after__isnull=True` no casa con ninguna fila y deja
+  el vigilante de la cola ciego **sin dar ningún error**. Lo destapó una prueba que falló; se
+  corrigió reutilizando el `.ready()` de la propia librería, que es la definición que aplica el
+  worker.
+
+Verificado de punta a punta: `docker compose pause backend` → «unhealthy» en 5 s → reiniciado por el
+vigilante → sitio en 200; `docker compose stop db` → `/api/salud/` responde 200 con
+`"base": "sin respuesta"` y el contenedor **sigue sano**; y al cuarto intento seguido el vigilante
+deja de reiniciar y registra que llegó al tope.
+
 ### Actualización 04/08/2026 — primer despliegue real: seis cosas que solo se ven con un dominio
 
 El Observatorio se desplegó por primera vez contra un servidor y un dominio públicos

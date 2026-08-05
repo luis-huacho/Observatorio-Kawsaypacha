@@ -170,6 +170,7 @@ Comandos propios del proyecto:
 | `meili_setup` | Crear índices e imprimir la llave de solo búsqueda |
 | `meili_estado` | ¿Está arriba el buscador y al día? Sale con código ≠ 0 si no |
 | `meili_rebuild [indice]` | Reconstruir la búsqueda desde la base |
+| `cola_estado` | ¿Sigue avanzando el worker? Sale con código ≠ 0 si la cola está atascada |
 | `generar_tiles_ccpp` | Regenerar los PMTiles de centros poblados |
 | `generar_tiles [--rehacer]` | Regenerar los PMTiles de las capas de contexto |
 

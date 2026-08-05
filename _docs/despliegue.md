@@ -58,7 +58,7 @@ En **`backend/.env`** hay que poner, como mínimo:
 ```
 SECRET_KEY=<50+ caracteres aleatorios>
 DEBUG=0
-ALLOWED_HOSTS=obs.predes.org.pe,observatorio.predes.org.pe
+ALLOWED_HOSTS=obs.predes.org.pe,observatorio.predes.org.pe,localhost,127.0.0.1
 SITE_URL=https://observatorio.predes.org.pe
 BACKEND_URL=https://obs.predes.org.pe
 CORS_ALLOWED_ORIGINS=https://observatorio.predes.org.pe
@@ -74,6 +74,12 @@ DJANGO_SUPERUSER_USERNAME= / _EMAIL= / _PASSWORD=
 **`ADMIN_URL=loginseguro/`** y no `admin/`: `/admin/` es lo primero que prueba cualquier escaneo
 automático. Si lo cambias, ajusta el `location` correspondiente en
 `deploy/nginx/conf.d/observatorio.conf` — tienen que coincidir.
+
+> **`localhost` en `ALLOWED_HOSTS` no es un resto de desarrollo: hace falta en producción.** El
+> healthcheck del contenedor pide `http://localhost:8000/api/salud/` desde dentro, y Django
+> responde **400** a cualquier `Host` que no esté en la lista. Sin `localhost`, la sonda falla
+> siempre, el contenedor queda «unhealthy» y `deploy/vigilar-contenedores.sh` lo reinicia en
+> bucle. Este documento lo omitía hasta el 05/08/2026; `backend/.env.example` sí lo traía.
 
 En **`.env` de la raíz** (variables de compose, no de Django):
 
@@ -227,6 +233,10 @@ E2E_URL=https://$SITE_DOMAIN npx playwright test
 | Migraciones (normalmente automáticas) | `docker compose exec backend python manage.py migrate` |
 | Sembrar o resembrar datos | `docker compose exec backend python manage.py seed` |
 | **Comprobar el buscador** (servicio + índices al día) | `docker compose exec backend python manage.py meili_estado` |
+| **Comprobar la cola** (¿avanza el worker?) | `docker compose exec backend python manage.py cola_estado` |
+| Ver la salud de los contenedores | `docker compose ps` — la columna `Status` dice `healthy` / `unhealthy` |
+| Comprobar el sitio desde fuera | `./deploy/comprobar-sitio.sh $SITE_DOMAIN $API_DOMAIN "$VITE_MEILI_SEARCH_KEY"` |
+| Por qué se reinició algo solo | `cat ~/observatorio-registros/vigilancia.log` |
 | Reindexar la búsqueda | `docker compose exec backend python manage.py meili_rebuild` — o el botón de la tarjeta «Buscador» del panel del admin, que hace lo mismo en segundo plano |
 | Regenerar los tiles de CCPP | `docker compose exec backend python manage.py generar_tiles_ccpp` |
 | Regenerar los tiles de las capas | `docker compose exec backend python manage.py generar_tiles --rehacer` |
@@ -265,7 +275,7 @@ el servidor y **no se versiona**, así que hay que crearlo en cada máquina.
 **2. Una limpieza semanal en el cron del host**, por si el caché crece entre construcciones:
 
 ```cron
-0 5 * * 1 docker builder prune -f --max-used-space 4GB >> /var/log/observatorio-limpieza.log 2>&1 && docker image prune -f >> /var/log/observatorio-limpieza.log 2>&1
+0 5 * * 1 docker builder prune -f --max-used-space 4GB >> ~/observatorio-registros/limpieza.log 2>&1 && docker image prune -f >> ~/observatorio-registros/limpieza.log 2>&1
 ```
 
 `image prune` sin `-a` borra **solo las imágenes sin tag**, que son las que deja atrás cada
@@ -292,7 +302,7 @@ La agregación diaria y la purga de eventos de más de 90 días no se ejecutan s
 del host:
 
 ```cron
-15 3 * * * cd /ruta/al/observatorio && docker compose exec -T backend python manage.py shell -c "from apps.core.tasks import agregar_metricas; agregar_metricas.func()" >> /var/log/observatorio-metricas.log 2>&1
+15 3 * * * cd /ruta/al/observatorio && docker compose exec -T backend python manage.py shell -c "from apps.core.tasks import agregar_metricas; agregar_metricas.func()" >> ~/observatorio-registros/metricas.log 2>&1
 ```
 
 Sin esto el panel del admin se queda en blanco (lee del agregado, no de los eventos crudos) y la
@@ -315,6 +325,77 @@ Por qué hace falta vigilarlo: el índice se sincroniza por señales hacia el wo
 worker estuvo caído, si Meilisearch no respondía al guardar, o si alguien escribió en la base fuera
 de la aplicación, **el índice se queda atrás sin ningún síntoma**. Lo publicado se ve en su página y
 simplemente no aparece al buscarlo.
+
+## Cuando la app se cuelga sin morirse
+
+`restart: unless-stopped` cubre que el **proceso muera**. No cubre lo contrario: gunicorn con sus
+tres workers bloqueados, vivo y sin atender. El contenedor figura `Up`, el sitio devuelve timeouts
+y nadie hace nada — porque **Docker Compose no reinicia un contenedor «unhealthy»**: los
+healthchecks solo pintan estado.
+
+Se cubre con tres piezas, y cada una tapa lo que la anterior no ve.
+
+**1. Los healthchecks**, en `compose.yaml`. `backend` pide `/api/salud/` y `nginx` su propio `:80`.
+
+`/api/salud/` mide **una sola cosa: que el proceso atienda**. Devuelve `200` aunque la base o el
+buscador estén caídos, y lo dice en el cuerpo:
+
+```json
+{"servicio": "ok", "base": "sin respuesta", "buscador": "ok"}
+```
+
+Eso no es dejadez: si la sonda fallara por sus dependencias, una caída de PostgreSQL marcaría el
+backend «unhealthy» y el vigilante lo reiniciaría en bucle, sin arreglar nada y borrando el rastro.
+Reiniciar el backend no levanta la base.
+
+**2. `deploy/vigilar-contenedores.sh`**, en el cron del anfitrión cada 2 minutos. Reinicia lo que
+esté «unhealthy», **con tope de 3 por servicio y hora**: un reinicio que no arregla el problema no
+puede convertirse en un bucle que impida diagnosticarlo. Al llegar al tope deja de actuar y lo
+registra.
+
+```cron
+*/2 * * * * cd /ruta/al/observatorio && ./deploy/vigilar-contenedores.sh >> ~/observatorio-registros/vigilancia.log 2>&1
+```
+
+Corre en el anfitrión y no como contenedor `autoheal` **a propósito**: esa imagen exige montar
+`/var/run/docker.sock`, que es la API de Docker sin autenticación —root del servidor cedido a un
+contenedor, en una máquina pública—. Desde fuera se hace lo mismo sin ceder nada.
+
+> **El worker queda fuera del reinicio automático.** Si se atasca a mitad de una importación de
+> 10,978 filas, matarlo puede dejar el dato peor que parado. Para él hay aviso y no remedio:
+> `manage.py cola_estado` sale con código ≠ 0 si la cola no avanza —tareas esperando más de 15
+> minutos, o una en curso desde hace más de 30— y dice qué mirar. Mismo criterio que
+> `meili_estado`.
+>
+> ```cron
+> 35 4 * * * cd /ruta/al/observatorio && docker compose exec -T backend python manage.py cola_estado || mail -s "Observatorio: la cola no avanza" alguien@predes.org.pe
+> ```
+
+**3. `deploy/comprobar-sitio.sh`, desde OTRA máquina.** El vigilante local tiene un punto ciego
+insalvable: si el servidor entero cae, cae con él. Este script no necesita nada del servidor —ni
+Docker, ni SSH, ni credenciales, ni el repositorio: solo `curl`— y comprueba lo que solo se ve
+desde fuera.
+
+```bash
+./deploy/comprobar-sitio.sh observatorio.predes.org.pe obs.predes.org.pe "$VITE_MEILI_SEARCH_KEY"
+```
+
+Mira SPA, redirección a HTTPS, `/api/salud/`, admin, buscador con llave y **los días que le quedan
+al certificado** — por debajo de 21 avisa, porque certbot renueva a los 30 y si se bajó de ahí es
+que la renovación no está funcionando. Sale con código ≠ 0, para colgarlo de un `|| mail`.
+
+### Los registros, todos bajo `$HOME`
+
+Las tareas de cron escriben en **`~/observatorio-registros/`**, no en `/var/log`, para que
+respaldar el servidor sean dos carpetas: esa y `~/respaldos/`.
+
+```
+~/observatorio-registros/
+  vigilancia.log  vigilancia.estado   metricas.log
+  buscador.log    cola.log            respaldo.log   limpieza.log
+```
+
+`vigilancia.log` **está vacío mientras todo va bien**, a propósito: si tiene líneas, algo pasó.
 
 ## Backups
 

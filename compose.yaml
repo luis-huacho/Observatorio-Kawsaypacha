@@ -26,6 +26,19 @@ services:
   backend:
     build: ./backend
     env_file: backend/.env
+    # Prueba de vida, no de dependencias: `/api/salud/` responde 200 aunque la base o el buscador
+    # estén caídos (ver apps/api/views/salud.py). Si fallara por ellos, una caída de PostgreSQL
+    # marcaría esto «unhealthy» y `deploy/vigilar-contenedores.sh` reiniciaría en bucle sin
+    # arreglar nada. Va contra localhost, así que **ALLOWED_HOSTS tiene que incluir localhost**.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8000/api/salud/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # `docker-entrypoint.sh` corre migrate y meili_setup ANTES de gunicorn. Sin margen, el
+      # contenedor nacería «unhealthy» en cada despliegue y el vigilante lo reiniciaría a media
+      # migración.
+      start_period: 90s
     volumes:
       - media:/app/media
       - static:/app/staticfiles
@@ -100,6 +113,13 @@ services:
     # /docker-entrypoint.d/20-envsubst-on-templates.sh, que comprueba `-w` antes de crear nada.
     tmpfs:
       - /etc/nginx/generado
+    # El :80 responde 301 a cualquier host, y `curl -f` da por bueno un 3xx: prueba de vida sin
+    # depender de certificados ni de SNI. Basta con que el maestro esté atendiendo.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "80:80"
       - "443:443"

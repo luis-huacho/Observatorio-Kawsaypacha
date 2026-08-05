@@ -229,6 +229,27 @@ Y tres reglas de la captura, las tres pagadas con un PDF que salió sin mapa en 
 | Endpoint | Params | Notas |
 |---|---|---|
 | `GET /api/sitio/` | — | payload único cacheable (`Cache-Control: max-age=300`): ConfiguracionSitio + BloqueTexto + EnlaceMenu visibles + HeroSlides publicados. El frontend lo pide una vez al montar `Layout` |
+| `GET /api/salud/` | — | Prueba de vida. **Siempre 200 si el proceso atiende**, incluso con la base o el buscador caídos; ver abajo |
+
+### `/api/salud/` — liveness, no dependencias
+
+No lo consume el frontend: lo consumen el `healthcheck` de `backend` en `compose.yaml` y
+`deploy/comprobar-sitio.sh` desde otra máquina (spec 07).
+
+```json
+{"servicio": "ok", "base": "sin respuesta", "buscador": "ok"}
+```
+
+**Devuelve 200 aunque falten sus dependencias, y lo declara en el cuerpo.** Es la decisión que
+define el endpoint: si respondiera 5xx cuando PostgreSQL no contesta, el healthcheck marcaría el
+contenedor «unhealthy», el vigilante lo reiniciaría en bucle, y ni arreglaría nada —reiniciar el
+backend no levanta la base— ni dejaría rastro que mirar.
+
+Va **exenta de throttling** por la misma razón: con `interval: 10s` son 360 peticiones/hora contra
+el techo anónimo de 1000/hora, y un 429 provocaría reinicios sin que pasara nada en el sitio. Es
+también el motivo de no reutilizar `/api/docs/` ni `/api/schema/`, que sí están sujetas.
+
+El cuerpo es escueto a propósito —sin versiones, sin nombres de host, sin rutas—: es público.
 | `GET /api/mapas/capas/` | — | capas con `estado_tiles=ok` y `visible_por_defecto`/orden: `[{ slug, nombre, url: "/tiles/rios.pmtiles", tipo_geometria, estilo, min_zoom, max_zoom, atribucion }]` |
 | `POST /api/metricas/evento/` | body `form-encoded` `tipo=busqueda&ruta=/buscar&detalle=heladas` | beacon (`navigator.sendBeacon`); throttle **600/min por IP**; respuesta 204 |
 

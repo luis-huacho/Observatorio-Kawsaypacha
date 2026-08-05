@@ -57,6 +57,11 @@ urlpatterns = [
     path("buscar/", views.BusquedaView.as_view(), name="buscar"),
     path("buscar/estado/", views.EstadoBusquedaView.as_view(), name="buscar-estado"),
     # --- Sitio, mapas, métricas e inversión ---------------------------------
+    # --- Salud --------------------------------------------------------------
+    # Prueba de vida para el healthcheck del contenedor y para la vigilancia externa.
+    # Exenta de throttling y sin dependencias duras: ver apps/api/views/salud.py.
+    path("salud/", views.SaludView.as_view(), name="salud"),
+
     path("sitio/", views.SitioView.as_view(), name="sitio"),
     path("mapas/capas/", views.CapasMapaView.as_view(), name="mapas-capas"),
     path("inversion/", views.InversionView.as_view(), name="inversion"),
