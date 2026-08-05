@@ -58,6 +58,12 @@ Los que no son defectos de código —licencias, documentación, decisiones del 
 etiqueta **`sin-prueba`**: para esos el cierre es la revisión a ojo, y la línea del pie explica qué
 hay que mirar.
 
+**Trabajar uno.** Se mira la lista en la web y se lanza `/issue N` en Claude Code —o `/issue 6 3 1`
+para varios, que salen en un solo plan—. El comando lee la ficha, plantea el plan, y solo con el plan
+aprobado escribe la prueba que falla, la hace pasar y comenta en el issue qué lo demuestra. No
+commitea ni cierra: eso se revisa. Está en `.claude/commands/issue.md` y el detalle en
+[`_docs/desarrollo.md`](../_docs/desarrollo.md).
+
 **Al cerrar**, el issue se cierra en el tracker **y** entra en la bitácora de
 [`README.md`](README.md) como una entrada `### Actualización DD/MM/AAAA` con su causa y su
 corrección, que es el formato que ya usa el proyecto. Esa entrada es la que se lee sin levantar

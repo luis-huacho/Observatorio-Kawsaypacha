@@ -246,6 +246,31 @@ exige `write:user`, un permiso que el MCP no necesita para nada.
 Si Claude Code dice que el servidor `gitea` falla, casi siempre es que el tracker no está en pie.
 Un `.mcp.json` nuevo o modificado **solo se carga al reiniciar la sesión**.
 
+### Pasarle un issue a Claude
+
+Se mira la lista en la web —ahí están las fichas completas, las etiquetas y el historial— y se lanza
+el comando con los números:
+
+```
+/issue 6            un issue
+/issue 6 3 1        varios; sale un solo plan que los cubre todos
+/issue              sin argumentos: lista los abiertos y se detiene, para elegir
+```
+
+El comando está en `.claude/commands/issue.md` y hace el flujo del proyecto: lee la ficha, lee el
+código, **plantea un plan y espera aprobación**, y solo entonces escribe la prueba que falla, la hace
+pasar y comenta en el issue qué hizo y qué prueba lo demuestra. **No commitea y no cierra el issue**
+a propósito: una corrección que nadie ha visto no se da por buena.
+
+No hay cola, ni etiqueta «para Claude», ni asignación. Por dos razones. La primera es que **el MCP no
+lee asignados**: `list_issues` filtra por etiqueta, hito, estado y fechas, pero no por asignado, y
+`issue_read` ni siquiera devuelve el campo —puede escribirlos, no leerlos; es una asimetría de
+`gitea-mcp` 1.6.0—. La segunda es que una cola es estado que hay que mantener sincronizado a mano, y
+este tracker existe justamente porque el estado mantenido a mano se desincroniza.
+
+Cerrar sigue siendo cosa tuya, y son **dos** gestos: cerrar el issue en el tracker y escribir la
+entrada `### Actualización DD/MM/AAAA` en la bitácora de `_specs/README.md`.
+
 El ciclo —cuándo nace un error, qué significa cada etiqueta, cuándo se puede cerrar y qué se escribe
 al cerrarlo— está en `_specs/09-errores.md`.
 
