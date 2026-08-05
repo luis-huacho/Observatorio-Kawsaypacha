@@ -425,9 +425,12 @@ git clone <repo> observatorio && cd observatorio
 cp backend/.env.example backend/.env     # dominios reales, secretos, ADMIN_URL
 cp .env.example .env                     # VITE_* con https://obs.predes.org.pe
 
-# 1. Certificados, ANTES de levantar nginx (ver la nota de abajo)
+# 1. Certificado, ANTES de levantar nginx (ver la nota de abajo). UNO SOLO con los dos dominios
+#    como SAN: `--cert-name` fija el nombre de la lineage, que es de donde leen los DOS bloques
+#    443. Sin él lo nombra el primer -d, y reordenar los argumentos rompe nginx.
 docker compose run --rm --entrypoint certbot --publish 80:80 certbot certonly \
-  --standalone -d observatorio.predes.org.pe -d obs.predes.org.pe \
+  --standalone --cert-name observatorio.predes.org.pe \
+  -d observatorio.predes.org.pe -d obs.predes.org.pe \
   --email <correo> --agree-tos --no-eff-email
 
 # 2. Todo arriba
@@ -439,6 +442,11 @@ docker compose exec backend python manage.py seed --capas --tiles
 
 # 4. Reconstruir el frontend con la llave ya en el .env de la raíz, y publicarlo
 docker compose build frontend && docker compose run --rm frontend
+
+# 5. Lo del ANFITRIÓN, que no está en el repositorio y sin lo cual el sitio sirve pero no se
+#    vigila, no se limpia y no agrega métricas: el techo del caché de Docker en
+#    /etc/docker/daemon.json, la carpeta ~/observatorio-registros/ y seis tareas de cron.
+#    Está entero, listo para pegar, en el paso 7 de _docs/despliegue.md.
 ```
 
 > **El primer certificado se emite con `--standalone` y con nginx parado**, no por webroot. La

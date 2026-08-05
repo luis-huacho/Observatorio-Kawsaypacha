@@ -539,6 +539,9 @@ comprueba con `sudo certbot renew --dry-run`.
 # desfasado, y eso pasa **sin ningún síntoma**: lo publicado se ve en su página y no aparece al
 # buscarlo. Comprueba y avisa; reindexar es una decisión de una persona (botón en el panel del admin).
 30 4 * * * cd /srv/observatorio/backend && sudo -u observatorio .venv/bin/python manage.py meili_estado || mail -s "Observatorio: revisar el buscador" alguien@predes.org.pe
+# ¿Sigue avanzando el worker? Un worker atascado no da ningún síntoma: el sitio sirve y el admin
+# guarda, y lo que falla es lo que nadie está mirando (un Excel que no entra, un correo que no sale).
+35 4 * * * cd /srv/observatorio/backend && sudo -u observatorio .venv/bin/python manage.py cola_estado || mail -s "Observatorio: la cola no avanza" alguien@predes.org.pe
 
 # Volcado diario de la base gestionada, con 14 días de retención.
 30 2 * * * PGPASSWORD=<contraseña> pg_dump -h <host> -U <usuario> -d observatorio --clean --if-exists | gzip > /var/backups/observatorio/db-$(date +\%F).sql.gz && find /var/backups/observatorio -name 'db-*.sql.gz' -mtime +14 -delete
@@ -640,6 +643,8 @@ CORS y el bundle.
 | Desplegar una actualización | `git pull`, `uv sync --no-dev`, `migrate`, `collectstatic`, `systemctl restart observatorio-backend observatorio-worker`, y rehacer el build del frontend |
 | Sembrar o resembrar datos | `manage.py seed` |
 | **Comprobar el buscador** (servicio + índices al día) | `manage.py meili_estado` |
+| **Comprobar la cola** (¿avanza el worker?) | `manage.py cola_estado` |
+| Comprobar el sitio desde fuera | `./deploy/comprobar-sitio.sh <spa> <api> "$VITE_MEILI_SEARCH_KEY"` — desde OTRA máquina, solo necesita curl |
 | Reindexar la búsqueda | `manage.py meili_rebuild` — o el botón de la tarjeta «Buscador» del panel del admin |
 | Regenerar tiles | `manage.py generar_tiles_ccpp` · `manage.py generar_tiles --rehacer` |
 | Logs | `journalctl -u observatorio-backend -u observatorio-worker -f` |

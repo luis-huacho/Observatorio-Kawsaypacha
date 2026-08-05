@@ -131,6 +131,67 @@ docker compose build frontend && docker compose run --rm frontend
 `migrate` y `meili_setup` corren solos en cada arranque del contenedor (son idempotentes), así
 que el paso 4 solo hace falta para **ver** la llave.
 
+### 7. Lo que va en el anfitrión, no en el repositorio
+
+Con el paso 6 el sitio ya sirve, pero **no se vigila, no se limpia y no agrega métricas**. Esa
+parte no puede vivir en el repositorio —es configuración de la máquina— así que hay que instalarla
+a mano, y por eso está aquí entera en vez de repartida por el documento. Todo lo de abajo es
+idempotente: se puede repetir.
+
+```bash
+# a. Un techo al caché de construcción de Docker. El archivo no existe por defecto.
+#    Aplicarlo reinicia el demonio: corta el servicio unos segundos.
+sudo tee /etc/docker/daemon.json >/dev/null <<'JSON'
+{ "builder": { "gc": { "enabled": true, "defaultKeepStorage": "4GB" } } }
+JSON
+sudo systemctl restart docker
+
+# b. La carpeta donde vive TODO el estado del anfitrión (ver más abajo).
+mkdir -p ~/observatorio-registros ~/respaldos
+
+# c. Las tareas periódicas. Sustituir la RUTA por la del repositorio clonado.
+crontab -e
+```
+
+```cron
+# --- Observatorio Kallpachakuy ------------------------------------------------
+# Vigilancia: reinicia backend o nginx si el healthcheck los marca enfermos (máx. 3/hora).
+*/2 * * * * cd RUTA && ./deploy/vigilar-contenedores.sh >> ~/observatorio-registros/vigilancia.log 2>&1
+
+# Agregación nocturna de métricas: sin ella el panel del admin se queda en blanco.
+15 3 * * * cd RUTA && docker compose exec -T backend python manage.py shell -c "from apps.core.tasks import agregar_metricas; agregar_metricas.func()" >> ~/observatorio-registros/metricas.log 2>&1
+
+# Avisos. Salen con código != 0 y solo comprueban: no arreglan nada por su cuenta.
+30 4 * * * cd RUTA && docker compose exec -T backend python manage.py meili_estado >> ~/observatorio-registros/buscador.log 2>&1
+35 4 * * * cd RUTA && docker compose exec -T backend python manage.py cola_estado >> ~/observatorio-registros/cola.log 2>&1
+
+# Respaldo semanal del volumen media (el de la base lo hace el servicio `backup`).
+30 2 * * 0 docker run --rm -v PROYECTO_media:/m -v ~/respaldos:/out alpine tar czf /out/media-$(date +\%F).tar.gz -C /m . >> ~/observatorio-registros/respaldo.log 2>&1
+
+# Purga del caché de BuildKit y de las imágenes sin tag.
+0 5 * * 1 docker builder prune -f --max-used-space 4GB >> ~/observatorio-registros/limpieza.log 2>&1 && docker image prune -f >> ~/observatorio-registros/limpieza.log 2>&1
+```
+
+`PROYECTO_media` es el nombre real del volumen: sale de `docker volume ls | grep media` y es el
+nombre de la carpeta del repositorio más `_media`.
+
+> **Cuidado con el `%` en un crontab: cron lo convierte en un salto de línea** salvo que vaya
+> escapado como `\%`. Es la causa clásica de un cron que «está puesto» y nunca corre. Por eso el
+> respaldo lleva `+\%F`, y por eso la comprobación de abajo evita el `%` por completo usando
+> `date -Iseconds`. **Después de editar el crontab, ejecuta la línea a mano** —copiada tal cual,
+> con `sh -c` y no con tu shell— antes de darla por buena.
+
+**Y la comprobación externa**, que es la única que ve que el servidor entero se cayó. Va en el cron
+de **otra máquina**: solo necesita `curl` y el script, ni Docker ni SSH ni credenciales.
+
+```cron
+*/10 * * * * /ruta/comprobar-sitio.sh observatorio.predes.org.pe obs.predes.org.pe LLAVE || mail -s "Observatorio caído" alguien@predes.org.pe
+```
+
+Si todavía no hay otra máquina, se puede poner en el propio servidor como provisional —detecta el
+certificado caducado, el DNS, el proxy del buscador y el backend degradado—, sabiendo que **no
+puede avisar de una caída total**, porque se cae con él.
+
 ### Por qué el primer certificado va por `--standalone` y no por webroot
 
 Tres razones, las tres comprobadas contra un servidor real el 04/08/2026:
