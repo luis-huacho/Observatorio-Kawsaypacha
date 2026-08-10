@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
-"""Carga un volcado de gastos del MEF en una base SQLite para poder consultarlo con SQL.
+"""Carga un CSV de gastos en una base SQLite para poder consultarlo con SQL.
 
-El CSV recortado por `get_data_cusco.py` es fiel al original, pero no es explorable: cada
-pregunta obliga a barrer cientos de MB de texto. Esta base es una herramienta de trabajo
+Los CSV que produce este proyecto son fieles a su origen, pero no son explorables: cada
+pregunta obliga a barrer el archivo entero. Esta base es una herramienta de trabajo
 —desechable, se regenera desde el CSV— y no sustituye a `DatasetUpload`, que sigue siendo
 la única vía de importación real de la aplicación.
 
-Las 35 columnas de importes (7 métricas × 5 ejercicios) se guardan como REAL para poder
-sumarlas y ordenarlas directamente. El resto va TEXT: los códigos del MEF llevan ceros a la
-izquierda (`08`, `0068`, `00003`) que como número se perderían.
+**El tipo de cada columna se declara, nunca se deduce del contenido.** Los códigos del MEF
+llevan ceros a la izquierda (`08`, `0068`, `006`) que como número se perderían, y parsean
+como número igual de bien que un importe. Por defecto solo van a REAL las columnas que
+llevan el ejercicio en el nombre (`PIM_2024`); para las demás están `--reales` y `--enteros`.
 
-Ejemplo:
+Ejemplos:
 
+    # volcado del MEF: las 35 columnas de importe se detectan solas
     python3 scripts/csv_a_sqlite.py \\
-        data/inversion/comparativo_cusco_gastos_2022_2026.csv \\
+        data/inversion/comparativo_cusco_gastos_2022_2025.csv \\
         inversion_cusco.sqlite3
+
+    # consolidado en formato largo: las métricas no llevan año, hay que declararlas
+    python3 scripts/csv_a_sqlite.py \\
+        data/inversion/pp0068_cusco_2022_2026_largo.csv pp0068_cusco.sqlite3 \\
+        --tabla pp0068 --reales PIA PIM DEVENGADO --enteros EJERCICIO EN_BASE_2026 \\
+        --indices EJERCICIO ENTIDAD_CODIGO PROVINCIA DISTRITO PRODUCTO_PROYECTO TIPO
 """
 
 from __future__ import annotations
@@ -30,7 +38,8 @@ import sys
 # de las dimensiones; ninguna columna de dimensión termina en _<4 dígitos>.
 MONETARIA = re.compile(r"^(PIA|PIM|CERTIFICADO|COMPROMETIDO_ANUAL|COMPROMETIDO|DEVENGADO|GIRADO)_\d{4}$")
 
-# Columnas por las que se filtra o se agrupa al revisar. Se indexan después de la carga.
+# Índices por defecto, pensados para el volcado del MEF: las columnas por las que se filtra o
+# se agrupa al revisarlo. Se crean después de la carga y se sustituyen con --indices.
 INDICES = (
     "NIVEL_GOBIERNO",
     "DEPARTAMENTO_EJECUTORA_NOMBRE",
@@ -62,6 +71,33 @@ def analizar_argumentos() -> argparse.Namespace:
     parser.add_argument("salida", help="Archivo .sqlite3 a crear.")
     parser.add_argument("--tabla", default="gastos", help="Nombre de la tabla (por defecto: gastos).")
     parser.add_argument(
+        "--reales",
+        nargs="+",
+        default=[],
+        metavar="COLUMNA",
+        help=(
+            "Columnas a guardar como REAL, además de las que llevan el ejercicio en el nombre "
+            "(PIM_2024). Hace falta cuando las métricas no lo llevan, como en el consolidado."
+        ),
+    )
+    parser.add_argument(
+        "--enteros",
+        nargs="+",
+        default=[],
+        metavar="COLUMNA",
+        help=(
+            "Columnas a guardar como INTEGER. Importa para las banderas: si EN_BASE_2026 queda "
+            "como texto, `WHERE EN_BASE_2026 = 1` no devuelve nada y no avisa."
+        ),
+    )
+    parser.add_argument(
+        "--indices",
+        nargs="+",
+        default=list(INDICES),
+        metavar="COLUMNA",
+        help="Columnas a indexar. Por defecto, las del volcado del MEF.",
+    )
+    parser.add_argument(
         "--rehacer",
         action="store_true",
         help="Borrar la base si ya existe. Sin esta bandera el script aborta antes de pisarla.",
@@ -74,6 +110,34 @@ def analizar_argumentos() -> argparse.Namespace:
         help="Filas por executemany (por defecto: 50000).",
     )
     return parser.parse_args()
+
+
+def resolver_tipos(columnas: list[str], reales: list[str], enteros: list[str]) -> list[str]:
+    """Tipo SQLite de cada columna: TEXT salvo lo que se declare numérico.
+
+    Nunca se deduce del contenido. `ENTIDAD_CODIGO` vale `006` y `PRODUCTO_PROYECTO` vale
+    `3000001`: los dos parsean como número y perderían el cero a la izquierda o dejarían de
+    casar con los catálogos del MEF.
+    """
+    for nombre in [*reales, *enteros]:
+        if nombre not in columnas:
+            raise SystemExit(
+                f"La columna {nombre!r} no está en la cabecera.\n"
+                "Columnas disponibles: " + ", ".join(columnas)
+            )
+    repetidas = set(reales) & set(enteros)
+    if repetidas:
+        raise SystemExit("Columnas declaradas a la vez REAL e INTEGER: " + ", ".join(sorted(repetidas)))
+
+    tipos = []
+    for nombre in columnas:
+        if nombre in enteros:
+            tipos.append("INTEGER")
+        elif nombre in reales or MONETARIA.match(nombre):
+            tipos.append("REAL")
+        else:
+            tipos.append("TEXT")
+    return tipos
 
 
 def preparar_salida(ruta: str, rehacer: bool) -> None:
@@ -98,11 +162,14 @@ def main() -> None:
         except StopIteration:
             raise SystemExit("El archivo de entrada está vacío.")
 
-        es_real = [bool(MONETARIA.match(nombre)) for nombre in columnas]
+        tipos = resolver_tipos(columnas, args.reales, args.enteros)
         n_columnas = len(columnas)
         print(
-            f"{n_columnas} columnas: {sum(es_real)} REAL (importes), "
-            f"{n_columnas - sum(es_real)} TEXT (dimensiones).",
+            f"{n_columnas} columnas: "
+            + ", ".join(
+                f"{tipos.count(t)} {t}" for t in ("REAL", "INTEGER", "TEXT") if tipos.count(t)
+            )
+            + ".",
             file=sys.stderr,
         )
 
@@ -115,15 +182,18 @@ def main() -> None:
         conexion.execute("PRAGMA cache_size = -200000")
 
         definicion = ", ".join(
-            f"{citar(nombre)} {'REAL' if real else 'TEXT'}"
-            for nombre, real in zip(columnas, es_real)
+            f"{citar(nombre)} {tipo}" for nombre, tipo in zip(columnas, tipos)
         )
         conexion.execute(f"CREATE TABLE {citar(args.tabla)} ({definicion})")
 
         insercion = (
             f"INSERT INTO {citar(args.tabla)} VALUES ({', '.join('?' * n_columnas)})"
         )
-        indices_reales = [i for i, real in enumerate(es_real) if real]
+        conversiones = [
+            (i, float if tipo == "REAL" else int)
+            for i, tipo in enumerate(tipos)
+            if tipo != "TEXT"
+        ]
 
         filas = 0
         lote: list[list] = []
@@ -134,13 +204,13 @@ def main() -> None:
                 raise SystemExit(
                     f"Fila {filas + 1}: {len(cruda)} campos en vez de {n_columnas}."
                 )
-            for i in indices_reales:
+            for i, convertir in conversiones:
                 try:
-                    cruda[i] = float(cruda[i])
+                    cruda[i] = convertir(cruda[i])
                 except ValueError:
                     raise SystemExit(
                         f"Fila {filas + 1}, columna {columnas[i]}: "
-                        f"{cruda[i]!r} no es un número."
+                        f"{cruda[i]!r} no es un {tipos[i]}."
                     )
             lote.append(cruda)
 
@@ -155,7 +225,7 @@ def main() -> None:
         conexion.commit()
 
     print(f"{filas:,} filas cargadas. Creando índices…", file=sys.stderr)
-    for columna in INDICES:
+    for columna in args.indices:
         if columna not in columnas:
             print(f"  (aviso) sin índice: {columna} no está en el CSV", file=sys.stderr)
             continue
