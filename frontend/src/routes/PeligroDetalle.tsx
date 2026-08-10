@@ -6,6 +6,7 @@ import type { CentroPobladoDetalle } from "@/lib/types";
 import SemaforoChip from "@/components/SemaforoChip";
 import SourceLink from "@/components/SourceLink";
 import EmptyState from "@/components/EmptyState";
+import KPI from "@/components/KPI";
 import { formatNumber } from "@/lib/semaforo";
 
 export default function PeligroDetalle() {
@@ -48,9 +49,9 @@ export default function PeligroDetalle() {
       />
       <div className="container-page py-8">
       <section className="grid sm:grid-cols-3 gap-4">
-        <Card label="Población" value={cp.poblacion != null ? formatNumber(cp.poblacion) : "s/d"} sub="habitantes" />
-        <Card label="Altitud" value={cp.altitud != null ? formatNumber(cp.altitud) : "s/d"} sub="msnm" />
-        <Card
+        <KPI label="Población" value={cp.poblacion != null ? formatNumber(cp.poblacion) : "s/d"} sub="habitantes" />
+        <KPI label="Altitud" value={cp.altitud != null ? formatNumber(cp.altitud) : "s/d"} sub="msnm" />
+        <KPI
           label="Coordenadas"
           value={cp.lat != null && cp.lon != null ? `${cp.lat.toFixed(4)}, ${cp.lon.toFixed(4)}` : "s/d"}
           sub="lat, lon"
@@ -98,17 +99,5 @@ export default function PeligroDetalle() {
       </section>
       </div>
     </>
-  );
-}
-
-function Card({ label, value, sub, mono = false }: { label: string; value: string; sub: string; mono?: boolean }) {
-  return (
-    <div className="card p-5">
-      <div className="text-xs text-ink-600">{label}</div>
-      <div className={`mt-1 font-display font-extrabold text-2xl text-mountain-900 ${mono ? "font-mono text-base" : ""}`}>
-        {value}
-      </div>
-      <div className="text-xs text-ink-600">{sub}</div>
-    </div>
   );
 }
