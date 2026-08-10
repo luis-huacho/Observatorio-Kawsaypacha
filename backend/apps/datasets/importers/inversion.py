@@ -318,9 +318,18 @@ def _sincronizar_catalogo(filas, advertencias) -> dict[str, object]:
         descubiertos.setdefault(codigo, {"nombre": nombre, "proyecto": es_proyecto(producto)})
 
     existentes = {c.codigo: c for c in ClasificacionActividad.objects.select_related("proceso")}
-    nuevos = 0
+    nuevos = renombrados = 0
     for codigo, datos in descubiertos.items():
-        if codigo in existentes:
+        if (existente := existentes.get(codigo)) is not None:
+            # La semilla crea las 30 actividades conocidas con el código como nombre, porque el
+            # nombre real solo lo trae el archivo. Rellenarlo aquí es lo que evita que la ficha
+            # de una municipalidad muestre «5005564» donde debería decir «Mantenimiento de
+            # cauces…». Solo se toca el nombre cuando sigue siendo el marcador: `proceso` y
+            # `automatico` son de PREDES y no se rozan.
+            if existente.nombre == codigo and datos["nombre"]:
+                existente.nombre = datos["nombre"]
+                existente.save(update_fields=["nombre"])
+                renombrados += 1
             continue
         proceso_slug = (
             PROCESO_POR_DEFECTO_PROYECTOS if datos["proyecto"] else ACTIVIDAD_A_PROCESO.get(codigo)
@@ -339,6 +348,11 @@ def _sincronizar_catalogo(filas, advertencias) -> dict[str, object]:
         nuevos += 1
 
     sin_proceso = [c for c in existentes.values() if c.proceso_id is None]
+    if renombrados:
+        advertencias.append(
+            f"{renombrados} clasificación(es) del catálogo tenían el código como nombre y se "
+            f"han completado con el nombre del archivo."
+        )
     if nuevos:
         advertencias.append(
             f"{nuevos} código(s) nuevos añadidos al catálogo de procesos de la GRD con la "

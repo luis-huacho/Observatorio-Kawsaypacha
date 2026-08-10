@@ -9,8 +9,17 @@ Ningún derivado se guarda. Todos salen de `PresupuestoEntidad` (totales) y `Pre
 """
 from decimal import Decimal
 
-from django.db.models import DecimalField, F, Q, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models import (
+    DecimalField,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+    Value,
+)
+from django.db.models.functions import Coalesce, NullIf
 
 from apps.inversion.models import (
     Ejercicio,
@@ -71,6 +80,83 @@ def entidades(ambito: str = AMBITO_POR_DEFECTO, provincia: str = ""):
     return queryset
 
 
+#: Claves de ordenación de la tabla de municipalidades. Los tres primeros son los rankings que
+#: pide la hoja «Campos» del cliente; `variacion` solo tiene sentido comparando dos ejercicios.
+#:
+#: El orden se resuelve en SQL y no en Python porque la tabla se pagina: ordenar la página ya
+#: recibida daría un «ranking» que solo ordena lo que se ha cargado.
+ORDENES = {
+    "pim": "pim",
+    "ejecucion": "pct_ejecucion",
+    "saldo": "saldo",
+    "institucional": "pct_institucional",
+    "variacion": "delta_pim",
+}
+ORDEN_POR_DEFECTO = "pim"
+
+#: Denominador seguro: `NULLIF(x, 0)` deja la división en NULL en vez de reventar, y así los
+#: «no se puede calcular» viajan como nulos y acaban al final del orden.
+_DECIMAL = DecimalField(max_digits=20, decimal_places=10)
+
+
+def anotar_derivados(queryset, ejercicio_comparado=None):
+    """Anota en SQL los derivados por los que se puede ordenar.
+
+    Se anotan aunque no se vayan a ordenar por ellos: son baratos y dejan la consulta lista
+    para cualquier `ordenar` sin ramificar el queryset.
+    """
+    queryset = queryset.annotate(
+        saldo=ExpressionWrapper(F("pim") - F("devengado"), output_field=_DECIMAL),
+        pct_ejecucion=ExpressionWrapper(
+            F("devengado") / NullIf(F("pim"), Value(CERO)), output_field=_DECIMAL
+        ),
+        pct_institucional=ExpressionWrapper(
+            F("pim") / NullIf(F("pim_institucional"), Value(CERO)), output_field=_DECIMAL
+        ),
+    )
+    if ejercicio_comparado is None:
+        # Sin comparación no hay delta. Se anota como NULL para que `ordenar=variacion` no
+        # rompa la consulta: simplemente deja todas las filas empatadas y desempata el código.
+        return queryset.annotate(delta_pim=Value(None, output_field=_DECIMAL))
+
+    pim_comparado = Subquery(
+        PresupuestoEntidad.objects.filter(
+            entidad=OuterRef("entidad"), ejercicio=ejercicio_comparado
+        ).values("pim")[:1],
+        output_field=_DECIMAL,
+    )
+    return queryset.annotate(
+        pim_comparado=pim_comparado,
+        delta_pim=ExpressionWrapper(F("pim") - pim_comparado, output_field=_DECIMAL),
+    )
+
+
+def ordenar_listado(queryset, ordenar: str = ORDEN_POR_DEFECTO):
+    """Aplica el orden pedido **con desempate estable por código de entidad**.
+
+    El desempate no es cosmético: sin un orden total, dos filas empatadas pueden salir en
+    distinto orden en dos consultas y la paginación repite unas y se salta otras. Es el mismo
+    motivo por el que el listado de centros poblados desempata por nombre.
+    """
+    campo = ORDENES.get(ordenar, ORDENES[ORDEN_POR_DEFECTO])
+    return queryset.order_by(F(campo).desc(nulls_last=True), "entidad__codigo")
+
+
+def listado(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="", ordenar=ORDEN_POR_DEFECTO,
+            buscar="", ejercicio_comparado=None):
+    """Queryset de `PresupuestoEntidad` listo para paginar, filtrar y exportar.
+
+    Lo comparten el listado paginado y el Excel, para que el archivo salga exactamente de la
+    misma consulta que la pantalla —mismo criterio que `CentroPobladoExportView`—.
+    """
+    queryset = PresupuestoEntidad.objects.filter(
+        ejercicio=ejercicio, entidad__in=entidades(ambito, provincia)
+    ).select_related("entidad__distrito", "entidad__provincia", "ejercicio")
+    if texto := (buscar or "").strip():
+        queryset = queryset.filter(entidad__nombre__icontains=texto)
+    return ordenar_listado(anotar_derivados(queryset, ejercicio_comparado), ordenar)
+
+
 def _o_nulo(valor):
     """`float` o `None`. Nunca convierte un dato ausente en un cero."""
     return float(valor) if valor is not None else None
@@ -123,6 +209,87 @@ def fila_entidad(presupuesto: PresupuestoEntidad, reparto: dict | None = None) -
     }
 
 
+def son_comparables(a: Ejercicio, b: Ejercicio) -> bool:
+    """Dos ejercicios comparan sus porcentajes de ejecución solo si tienen el mismo tipo de corte.
+
+    Un 47.7 % a junio contra un 83 % de año cerrado no es una caída de ejecución: son dos
+    medidas distintas. La comparación **se muestra igual, marcada** (ver el ADR), y este campo
+    es lo que permite marcarla en todas partes —pantalla y Excel— sin que cada cliente tenga
+    que redescubrir la regla.
+    """
+    return a.es_parcial == b.es_parcial
+
+
+def comparacion_fila(presupuesto: PresupuestoEntidad, otro: PresupuestoEntidad | None,
+                     ejercicio_comparado: Ejercicio) -> dict:
+    """Bloque de comparación de una municipalidad contra otro ejercicio.
+
+    `otro` es `None` cuando la municipalidad no tenía presupuesto del 0068 ese año: sus deltas
+    son `None`, no cero. Aparecer de la nada no es lo mismo que no haber cambiado.
+    """
+    comparable = son_comparables(presupuesto.ejercicio, ejercicio_comparado)
+    if otro is None:
+        return {
+            "anio": ejercicio_comparado.anio,
+            "corte": ejercicio_comparado.corte,
+            "es_parcial": ejercicio_comparado.es_parcial,
+            "comparable": comparable,
+            "sin_presupuesto": True,
+            "pia": None, "pim": None, "devengado": None, "pct_ejecucion": None,
+            "delta_pim": None, "pct_delta_pim": None,
+            "delta_devengado": None, "delta_pct_ejecucion": None,
+        }
+
+    pct_actual = _porcentaje(presupuesto.devengado, presupuesto.pim)
+    pct_otro = _porcentaje(otro.devengado, otro.pim)
+    return {
+        "anio": ejercicio_comparado.anio,
+        "corte": ejercicio_comparado.corte,
+        "es_parcial": ejercicio_comparado.es_parcial,
+        "comparable": comparable,
+        "sin_presupuesto": False,
+        "pia": float(otro.pia),
+        "pim": float(otro.pim),
+        "devengado": float(otro.devengado),
+        "pct_ejecucion": pct_otro,
+        "delta_pim": float(presupuesto.pim - otro.pim),
+        "pct_delta_pim": _porcentaje(presupuesto.pim - otro.pim, otro.pim),
+        "delta_devengado": float(presupuesto.devengado - otro.devengado),
+        # Se calcula aunque no sea comparable: la decisión fue mostrarlo marcado, no ocultarlo.
+        # Quien lo pinte tiene `comparable` al lado para decir que no es una caída real.
+        "delta_pct_ejecucion": (
+            None if pct_actual is None or pct_otro is None else pct_actual - pct_otro
+        ),
+    }
+
+
+def comparacion_agregada(ejercicio, ejercicio_comparado, ambito=AMBITO_POR_DEFECTO,
+                         provincia="") -> dict:
+    """Los agregados del ejercicio comparado y sus deltas, para la cabecera de la comparación."""
+    otros = agregados(ejercicio_comparado, ambito, provincia)
+    actuales = agregados(ejercicio, ambito, provincia)
+    return {
+        "anio": ejercicio_comparado.anio,
+        "corte": ejercicio_comparado.corte,
+        "es_parcial": ejercicio_comparado.es_parcial,
+        "comparable": son_comparables(ejercicio, ejercicio_comparado),
+        "agregados": otros,
+        "deltas": {
+            "pia": actuales["pia"] - otros["pia"],
+            "pim": actuales["pim"] - otros["pim"],
+            "devengado": actuales["devengado"] - otros["devengado"],
+            "pct_pim": _porcentaje(
+                Decimal(str(actuales["pim"] - otros["pim"])), Decimal(str(otros["pim"]))
+            ),
+            "pct_ejecucion": (
+                None
+                if actuales["pct_ejecucion"] is None or otros["pct_ejecucion"] is None
+                else actuales["pct_ejecucion"] - otros["pct_ejecucion"]
+            ),
+        },
+    }
+
+
 def _reparto_por_origen(ejercicio, queryset_entidades) -> dict[str, dict[str, Decimal]]:
     """PIM por entidad y origen (proyecto / actividad), para el % de proyectos vs actividades."""
     filas = (
@@ -136,16 +303,40 @@ def _reparto_por_origen(ejercicio, queryset_entidades) -> dict[str, dict[str, De
     return reparto
 
 
-def por_entidad(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="") -> list[dict]:
-    """Una fila por entidad con presupuesto del 0068 en el ejercicio, ya con sus derivados."""
-    queryset_entidades = entidades(ambito, provincia)
-    reparto = _reparto_por_origen(ejercicio, queryset_entidades)
-    presupuestos = (
-        PresupuestoEntidad.objects.filter(ejercicio=ejercicio, entidad__in=queryset_entidades)
-        .select_related("entidad__distrito", "entidad__provincia")
-        .order_by("-pim")
-    )
-    return [fila_entidad(p, reparto.get(p.entidad.codigo)) for p in presupuestos]
+def por_entidad(presupuestos, ejercicio_comparado=None) -> list[dict]:
+    """Convierte una **página** de `PresupuestoEntidad` en filas de la tabla.
+
+    Recibe ya la lista paginada y resuelve de una sola consulta lo que cada fila necesita
+    —el reparto proyectos/actividades y, si se compara, el presupuesto del otro ejercicio—,
+    acotado a los códigos de la página. Hacerlo fila a fila sería una consulta por
+    municipalidad.
+    """
+    presupuestos = list(presupuestos)
+    if not presupuestos:
+        return []
+
+    codigos = [p.entidad.codigo for p in presupuestos]
+    ejercicio = presupuestos[0].ejercicio
+    reparto = _reparto_por_origen(ejercicio, EntidadEjecutora.objects.filter(codigo__in=codigos))
+
+    comparados: dict[str, PresupuestoEntidad] = {}
+    if ejercicio_comparado is not None:
+        comparados = {
+            p.entidad.codigo: p
+            for p in PresupuestoEntidad.objects.filter(
+                ejercicio=ejercicio_comparado, entidad__codigo__in=codigos
+            ).select_related("entidad")
+        }
+
+    filas = []
+    for presupuesto in presupuestos:
+        fila = fila_entidad(presupuesto, reparto.get(presupuesto.entidad.codigo))
+        if ejercicio_comparado is not None:
+            fila["comparacion"] = comparacion_fila(
+                presupuesto, comparados.get(presupuesto.entidad.codigo), ejercicio_comparado
+            )
+        filas.append(fila)
+    return filas
 
 
 def agregados(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="") -> dict:
@@ -201,16 +392,18 @@ def agregados(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="") -> dict:
     }
 
 
-def procesos(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="") -> dict:
+def procesos(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="", entidad=None) -> dict:
     """Reparto del 0068 entre procesos de la GRD, más lo que el catálogo aún no clasifica.
 
     Sale del catálogo vigente en este mismo instante: si PREDES corrige una actividad en el
     admin, el siguiente request ya lo refleja.
+
+    Con `entidad` se acota a una sola municipalidad: es lo que pinta su ficha, con el mismo
+    cálculo que el gráfico del tablero para que las dos pantallas no se separen.
     """
+    ambitos = [entidad] if entidad is not None else entidades(ambito, provincia)
     filas = (
-        PresupuestoActividad.objects.filter(
-            ejercicio=ejercicio, entidad__in=entidades(ambito, provincia)
-        )
+        PresupuestoActividad.objects.filter(ejercicio=ejercicio, entidad__in=ambitos)
         .values("clasificacion__proceso__slug")
         .annotate(pim=_suma("pim"), devengado=_suma("devengado"))
     )
@@ -271,6 +464,70 @@ def tendencia(ambito=AMBITO_POR_DEFECTO, provincia="") -> list[dict]:
             "devengado": float(fila.get("devengado", CERO)),
         })
     return serie
+
+
+def serie_entidad(entidad: EntidadEjecutora) -> list[dict]:
+    """La historia presupuestal de una municipalidad, un punto por ejercicio publicado.
+
+    Es la comparación entre años **a nivel de municipalidad**: donde la vista de comparación
+    enfrenta dos ejercicios de toda la región, esto enseña los cinco de una sola entidad.
+    Los ejercicios en los que no tuvo presupuesto del 0068 **no se rellenan con ceros**: se
+    omiten, porque «no participó del programa» no es «participó con cero soles».
+    """
+    presupuestos = {
+        p.ejercicio_id: p
+        for p in PresupuestoEntidad.objects.filter(
+            entidad=entidad, ejercicio__visible=True
+        ).select_related("ejercicio")
+    }
+    serie = []
+    for ejercicio in Ejercicio.objects.filter(visible=True).order_by("anio"):
+        presupuesto = presupuestos.get(ejercicio.pk)
+        if presupuesto is None:
+            continue
+        serie.append({
+            "anio": ejercicio.anio,
+            "corte": ejercicio.corte,
+            "es_parcial": ejercicio.es_parcial,
+            "fuente": ejercicio.get_fuente_display(),
+            **{
+                clave: fila_entidad(presupuesto)[clave]
+                for clave in (
+                    "pia", "pim", "devengado", "pct_ejecucion", "saldo", "variacion_pia_pim",
+                    "pct_variacion_pia_pim", "pia_institucional", "pim_institucional",
+                    "devengado_institucional", "pct_0068_institucional",
+                )
+            },
+        })
+    return serie
+
+
+def actividades_entidad(entidad: EntidadEjecutora, ejercicio: Ejercicio) -> list[dict]:
+    """Actividades y proyectos del 0068 de una municipalidad en un ejercicio.
+
+    **No se pagina**: son 3 de media por entidad y ejercicio, con 50 en el máximo real. Es el
+    mismo criterio con el que no se paginan los 112 distritos ni los 9 peligros — lo que crece
+    es la tabla de municipalidades, y esa sí se pagina.
+    """
+    filas = (
+        PresupuestoActividad.objects.filter(entidad=entidad, ejercicio=ejercicio)
+        .select_related("clasificacion__proceso")
+        .order_by("-pim", "clasificacion__codigo")
+    )
+    return [
+        {
+            "codigo": f.clasificacion.codigo,
+            "nombre": f.clasificacion.nombre,
+            "origen": f.clasificacion.origen,
+            "proceso": f.clasificacion.proceso.nombre if f.clasificacion.proceso_id else None,
+            "proceso_slug": f.clasificacion.proceso.slug if f.clasificacion.proceso_id else None,
+            "pia": float(f.pia),
+            "pim": float(f.pim),
+            "devengado": float(f.devengado),
+            "pct_ejecucion": _porcentaje(f.devengado, f.pim),
+        }
+        for f in filas
+    ]
 
 
 def sin_clasificar_pendiente() -> dict:

@@ -16,7 +16,12 @@ from .editorial import (
     VideoViewSet,
 )
 from .incidencia import AyudaMemoriaView, ComparadorView
-from .inversion import InversionExportView, InversionView
+from .inversion import (
+    InversionEntidadDetalleView,
+    InversionEntidadesView,
+    InversionExportView,
+    InversionView,
+)
 from .salud import SaludView
 from .peligros import (
     CentroPobladoExportView,
@@ -48,6 +53,8 @@ __all__ = [
     "FrecuenciaDetalleView",
     "FrecuenciaExportView",
     "FrecuenciaListaView",
+    "InversionEntidadDetalleView",
+    "InversionEntidadesView",
     "InversionExportView",
     "InversionView",
     "MedidaViewSet",

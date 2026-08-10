@@ -105,8 +105,37 @@ CABECERAS_INVERSION = [
 ANCHOS_INVERSION = [10, 10, 26, 12, 42, 14, 18, 18, 14, 15, 15, 15, 12, 17, 17, 17, 17, 21, 20,
                     15, 15, 13]
 
+#: Columnas que se añaden al comparar con otro ejercicio.
+CABECERAS_COMPARACION = [
+    "PIM comparado", "Devengado comparado", "% ejecución comparado",
+    "Δ PIM", "Δ PIM (%)", "Δ devengado", "Δ % ejecución", "Comparabilidad",
+]
+ANCHOS_COMPARACION = [16, 20, 21, 15, 13, 16, 16, 46]
 
-def filas_inversion(filas, ejercicio):
+#: Texto de la columna «Comparabilidad». Es la mitigación de una decisión consciente: el Δ de
+#: % de ejecución se muestra aunque uno de los dos ejercicios sea un corte parcial, y en
+#: pantalla la leyenda está al lado — pero el Excel viaja solo por correo, así que la
+#: advertencia tiene que ir **en la propia fila**.
+AVISO_NO_COMPARABLE = (
+    "Cortes distintos: el Δ de % de ejecución no es comparable (uno de los dos es parcial)"
+)
+AVISO_COMPARABLE = "Ejercicios del mismo tipo de corte"
+
+
+def cabeceras_inversion(ejercicio_comparado=None) -> list[str]:
+    if ejercicio_comparado is None:
+        return list(CABECERAS_INVERSION)
+    anio = ejercicio_comparado.anio
+    return CABECERAS_INVERSION + [
+        f"{c} ({anio})" if "comparado" in c else c for c in CABECERAS_COMPARACION
+    ]
+
+
+def anchos_inversion(ejercicio_comparado=None) -> list[int]:
+    return ANCHOS_INVERSION + (ANCHOS_COMPARACION if ejercicio_comparado is not None else [])
+
+
+def filas_inversion(filas, ejercicio, ejercicio_comparado=None):
     """Una fila por entidad, con los derivados ya calculados por `inversion.consultas`.
 
     Se exportan los mismos números que la pantalla —no los recalcula el export— y cada fila
@@ -114,7 +143,7 @@ def filas_inversion(filas, ejercicio):
     puede saber que un 47 % de ejecución es de medio año.
     """
     for f in filas:
-        yield [
+        fila = [
             ejercicio.anio,
             ejercicio.corte,
             ejercicio.get_fuente_display(),
@@ -138,3 +167,16 @@ def filas_inversion(filas, ejercicio):
             f["pim_actividades"],
             f["pct_proyectos"],
         ]
+        if ejercicio_comparado is not None:
+            c = f.get("comparacion") or {}
+            fila += [
+                c.get("pim"),
+                c.get("devengado"),
+                c.get("pct_ejecucion"),
+                c.get("delta_pim"),
+                c.get("pct_delta_pim"),
+                c.get("delta_devengado"),
+                c.get("delta_pct_ejecucion"),
+                AVISO_COMPARABLE if c.get("comparable") else AVISO_NO_COMPARABLE,
+            ]
+        yield fila

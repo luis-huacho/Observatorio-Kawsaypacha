@@ -38,7 +38,13 @@ def test_sin_ejercicio_visible_responde_el_contrato_de_sin_datos(api, inversion_
 
     assert cuerpo["disponible"] is False
     assert cuerpo["motivo"]
-    assert "por_entidad" not in cuerpo
+    assert "agregados" not in cuerpo
+
+    # El listado sirve el mismo estado vacío como una página sin resultados: el cliente no
+    # necesita un caso especial para «hay datos pero todavía sin publicar».
+    listado = api.get("/api/inversion/entidades/").json()
+    assert listado["count"] == 0
+    assert listado["results"] == []
 
 
 def test_un_anio_oculto_no_cae_al_ultimo_visible(api, inversion_cargada):
@@ -84,8 +90,8 @@ def test_declara_el_corte_parcial_y_la_fuente(api, inversion_cargada):
 
 def test_los_derivados_de_una_entidad_cuadran_a_mano(api, inversion_cargada):
     """Cusco 2026: PIA 100 000, PIM 220 000, devengado 65 000, institucional 2 200 000."""
-    cuerpo = api.get("/api/inversion/?anio=2026").json()
-    cusco = next(f for f in cuerpo["por_entidad"] if f["codigo"] == "300684")
+    filas = api.get("/api/inversion/entidades/?anio=2026").json()["results"]
+    cusco = next(f for f in filas if f["codigo"] == "300684")
 
     assert cusco["pia"] == 100_000
     assert cusco["pim"] == 220_000
@@ -108,8 +114,8 @@ def test_sin_total_institucional_el_porcentaje_es_nulo_y_no_cero(api, inversion_
 
     Poroy no trae fila institucional de 2026 en la muestra: su porcentaje no se puede calcular.
     """
-    cuerpo = api.get("/api/inversion/?anio=2026").json()
-    poroy = next(f for f in cuerpo["por_entidad"] if f["codigo"] == "300686")
+    filas = api.get("/api/inversion/entidades/?anio=2026").json()["results"]
+    poroy = next(f for f in filas if f["codigo"] == "300686")
 
     assert poroy["pia_institucional"] is None
     assert poroy["pim_institucional"] is None
@@ -154,13 +160,13 @@ def test_sin_ninguna_entidad_con_institucional_el_total_es_nulo(api, inversion_c
 def test_el_ambito_municipal_deja_fuera_al_gobierno_regional(api, inversion_cargada):
     """El GORE tiene 900 000 en la muestra: colarlo en el ranking municipal lo dominaría."""
     municipal = api.get("/api/inversion/?anio=2026").json()
-    codigos = {f["codigo"] for f in municipal["por_entidad"]}
+    codigos = {f["codigo"] for f in api.get("/api/inversion/entidades/?anio=2026").json()["results"]}
 
     assert "446" not in codigos
     assert municipal["agregados"]["pim"] == 535_000  # 220 000 + 310 000 + 5 000
 
-    regional = api.get("/api/inversion/?anio=2026&ambito=regional").json()
-    assert {f["codigo"] for f in regional["por_entidad"]} == {"446"}
+    regional = api.get("/api/inversion/entidades/?anio=2026&ambito=regional").json()
+    assert {f["codigo"] for f in regional["results"]} == {"446"}
 
 
 def test_el_reparto_por_procesos_sale_del_catalogo_vigente(api, inversion_cargada):
@@ -191,10 +197,10 @@ def test_lo_que_el_catalogo_no_clasifica_se_declara_aparte(api, inversion_cargad
 
 
 def test_filtra_por_provincia(api, inversion_cargada):
-    cuerpo = api.get("/api/inversion/?anio=2026&provincia=CUSCO").json()
+    filas = api.get("/api/inversion/entidades/?anio=2026&provincia=CUSCO").json()["results"]
 
-    assert {f["provincia"] for f in cuerpo["por_entidad"]} == {"CUSCO"}
-    assert api.get("/api/inversion/?anio=2026&provincia=9999").json()["por_entidad"] == []
+    assert {f["provincia"] for f in filas} == {"CUSCO"}
+    assert api.get("/api/inversion/entidades/?anio=2026&provincia=9999").json()["results"] == []
 
 
 def test_el_export_lleva_el_corte_en_cada_fila(api, inversion_cargada, sin_throttling):
@@ -233,3 +239,168 @@ def test_el_export_sin_datos_explica_por_que(api, inversion_cargada, sin_throttl
     hoja = openpyxl.load_workbook(io.BytesIO(respuesta.content)).active
     assert [c.value for c in hoja[1]] == ["Motivo"]
     assert "PREDES" in hoja.cell(row=2, column=1).value
+
+
+# --- Listado paginado y ranking --------------------------------------------
+
+
+def test_paginacion_por_defecto_y_techo(api, inversion_cargada):
+    respuesta = api.get("/api/inversion/entidades/?anio=2026&page_size=100000").json()
+
+    assert set(respuesta) == {"count", "next", "previous", "results"}
+    assert len(respuesta["results"]) <= 200
+
+
+def test_el_orden_es_estable_entre_paginas(api, inversion_cargada):
+    """Recorrer todas las páginas tiene que dar cada municipalidad una vez, ni más ni menos.
+
+    Sin un orden total, dos filas empatadas pueden salir en distinto orden en dos consultas y
+    la paginación repite unas y se salta otras. No se ve a simple vista y por eso se prueba:
+    el desempate por código existe exactamente para esto.
+    """
+    codigos, pagina = [], 1
+    while True:
+        cuerpo = api.get(f"/api/inversion/entidades/?anio=2026&page_size=1&page={pagina}").json()
+        codigos += [f["codigo"] for f in cuerpo["results"]]
+        if not cuerpo["next"]:
+            break
+        pagina += 1
+
+    assert len(codigos) == cuerpo["count"]
+    assert len(set(codigos)) == len(codigos), "la paginación repitió alguna municipalidad"
+
+
+@pytest.mark.parametrize(
+    "clave, campo",
+    [("pim", "pim"), ("saldo", "saldo"), ("ejecucion", "pct_ejecucion")],
+)
+def test_cada_ranking_ordena_de_verdad(api, inversion_cargada, clave, campo):
+    """El orden lo resuelve el servidor: ordenar en el cliente ordenaría solo la página cargada."""
+    filas = api.get(
+        f"/api/inversion/entidades/?anio=2026&ambito=todos&ordenar={clave}&page_size=200"
+    ).json()["results"]
+    valores = [f[campo] for f in filas]
+
+    # Los nulos van al final y no se comparan: «no se puede calcular» no es un valor pequeño.
+    # La muestra incluye a Ccorca con PIM 0 justo para que este caso no pase de vacío.
+    conocidos = [v for v in valores if v is not None]
+    assert valores[: len(conocidos)] == conocidos, "los nulos tienen que quedar al final"
+    assert conocidos == sorted(conocidos, reverse=True)
+
+
+def test_el_listado_busca_por_nombre(api, inversion_cargada):
+    filas = api.get("/api/inversion/entidades/?anio=2026&buscar=poroy").json()["results"]
+
+    assert [f["codigo"] for f in filas] == ["300686"]
+
+
+# --- Comparación entre ejercicios ------------------------------------------
+
+
+def test_la_comparacion_marca_los_cortes_distintos(api, inversion_cargada):
+    """2026 es un corte a junio y 2025 un año cerrado: el Δ de % de ejecución no es comparable.
+
+    La decisión fue **mostrarlo marcado**, no ocultarlo, así que lo que se prueba es que la
+    marca viaja en el dato: sin `comparable` en el payload, cada cliente tendría que
+    redescubrir la regla y el Excel saldría sin advertencia.
+    """
+    filas = api.get(
+        "/api/inversion/entidades/?anio=2026&comparar_con=2025&ambito=todos"
+    ).json()["results"]
+    cusco = next(f for f in filas if f["codigo"] == "300684")
+
+    assert cusco["comparacion"]["comparable"] is False
+    assert cusco["comparacion"]["anio"] == 2025
+    # Cusco 2026: PIM 220 000; 2025: 170 000 (120 000 + 50 000).
+    assert cusco["comparacion"]["pim"] == 170_000
+    assert cusco["comparacion"]["delta_pim"] == 50_000
+    assert cusco["comparacion"]["pct_delta_pim"] == pytest.approx(50_000 / 170_000)
+    assert cusco["comparacion"]["delta_pct_ejecucion"] is not None
+
+
+def test_una_entidad_sin_presupuesto_el_otro_ano_no_delta_a_cero(api, inversion_cargada):
+    """Aparecer de la nada no es lo mismo que no haber cambiado: los deltas son null.
+
+    El gobierno regional solo tiene presupuesto en 2026 en la muestra.
+    """
+    filas = api.get(
+        "/api/inversion/entidades/?anio=2026&comparar_con=2025&ambito=regional"
+    ).json()["results"]
+    gore = next(f for f in filas if f["codigo"] == "446")
+
+    assert gore["comparacion"]["sin_presupuesto"] is True
+    assert gore["comparacion"]["delta_pim"] is None
+
+
+def test_comparar_con_el_mismo_ejercicio_se_ignora(api, inversion_cargada):
+    """Compararse consigo mismo daría una columna de ceros que parece un dato."""
+    filas = api.get("/api/inversion/entidades/?anio=2026&comparar_con=2026").json()["results"]
+
+    assert "comparacion" not in filas[0]
+
+
+def test_la_cabecera_de_comparacion_trae_los_agregados_del_otro_ejercicio(api, inversion_cargada):
+    cuerpo = api.get("/api/inversion/?anio=2026&comparar_con=2025&ambito=todos").json()
+
+    assert cuerpo["comparacion"]["anio"] == 2025
+    assert cuerpo["comparacion"]["comparable"] is False
+    assert cuerpo["comparacion"]["agregados"]["pim"] == 570_000  # 120k + 50k + 400k
+    assert cuerpo["comparacion"]["deltas"]["pim"] == cuerpo["agregados"]["pim"] - 570_000
+
+
+# --- Ficha de una municipalidad --------------------------------------------
+
+
+def test_la_ficha_trae_la_serie_y_sus_actividades(api, inversion_cargada):
+    cuerpo = api.get("/api/inversion/entidades/300684/?anio=2026").json()
+
+    assert cuerpo["entidad"]["nombre"] == "MUNICIPALIDAD PROVINCIAL DEL CUZCO"
+    assert cuerpo["entidad"]["ambito"] == "provincial"
+    assert [p["anio"] for p in cuerpo["serie"]] == [2025, 2026]
+    assert cuerpo["serie"][-1]["es_parcial"] is True
+    # Las actividades de la ficha suman exactamente el PIM de la municipalidad: si no, la
+    # pantalla estaría enseñando un desglose que no cuadra con su propio total.
+    assert sum(a["pim"] for a in cuerpo["actividades"]) == 220_000
+    assert {a["codigo"] for a in cuerpo["actividades"]} == {"5005561", "5005571"}
+
+
+def test_la_serie_omite_los_ejercicios_sin_presupuesto(api, inversion_cargada):
+    """No participar del programa un año no es participar con cero soles."""
+    cuerpo = api.get("/api/inversion/entidades/446/?anio=2026").json()
+
+    assert [p["anio"] for p in cuerpo["serie"]] == [2026]
+
+
+def test_la_ficha_de_una_entidad_sin_territorio_se_sirve_igual(api, inversion_cargada):
+    """Cuenta en los totales, así que su ficha existe; lo que hace es declarar el hueco."""
+    cuerpo = api.get("/api/inversion/entidades/309999/?anio=2026").json()
+
+    assert cuerpo["entidad"]["sin_territorio"] is True
+    assert cuerpo["entidad"]["ubigeo_distrito"] is None
+
+
+def test_una_municipalidad_que_no_existe_responde_404(api, inversion_cargada):
+    assert api.get("/api/inversion/entidades/000000/").status_code == 404
+
+
+def test_el_export_comparado_lleva_la_advertencia_en_cada_fila(
+    api, inversion_cargada, sin_throttling
+):
+    """En pantalla la leyenda está al lado; el Excel viaja solo por correo.
+
+    Es la mitigación de haber elegido mostrar el Δ marcado en vez de suprimirlo: sin esta
+    columna, la cifra circula sin su advertencia en cuanto alguien reenvía el archivo.
+    """
+    import io
+
+    import openpyxl
+
+    respuesta = api.get("/api/inversion/export.xlsx?anio=2026&comparar_con=2025")
+
+    hoja = openpyxl.load_workbook(io.BytesIO(respuesta.content)).active
+    filas = list(hoja.iter_rows(values_only=True))
+    cabeceras = list(filas[0])
+    assert "Comparabilidad" in cabeceras
+    assert "Δ PIM" in cabeceras
+    columna = cabeceras.index("Comparabilidad")
+    assert all("no es comparable" in f[columna] for f in filas[1:])
