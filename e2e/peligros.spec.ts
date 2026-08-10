@@ -165,6 +165,89 @@ test.describe("Visor de exposición a peligros", () => {
     await expect(page.getByRole("checkbox", { name: "Sismo" })).not.toBeChecked();
   });
 
+  test("la tabla lista todos los peligros de cada centro poblado", async ({ page }) => {
+    // El nivel máximo es un resumen: con 3.4 peligros de media por lugar, «Muy alto» no dice a
+    // qué está expuesto, que es lo que decide qué medida le toca.
+    await page.goto("/peligros");
+    const filas = (await (await esperarApi(page, "/api/ccpp/?")).json()).results;
+    const conVarios = filas.findIndex((f: { peligros: unknown[] }) => f.peligros.length > 1);
+    expect(conVarios, "el API no devolvió ninguno con varios peligros").toBeGreaterThanOrEqual(0);
+
+    const tabla = page.locator("table").last();
+    await expect(tabla.getByRole("columnheader", { name: "Distrito" })).toBeVisible();
+    await expect(tabla.getByRole("columnheader", { name: "Peligros" })).toBeVisible();
+
+    // Tantos íconos como peligros trae esa fila del API: si el mapa y la tabla discreparan,
+    // sería justo aquí.
+    const fila = tabla.locator("tbody tr").nth(conVarios);
+    await expect(fila.locator("li")).toHaveCount(filas[conVarios].peligros.length);
+  });
+
+  test("la tabla pagina de 20 en 20 y no repite centros poblados", async ({ page }) => {
+    // Dos fallos se juntaban aquí: el orden del API era parcial —770 nombres se repiten en el
+    // padrón— así que `LIMIT/OFFSET` repetía filas y se saltaba otras; y el cliente archivaba
+    // la respuesta de una página bajo el número de la siguiente. Se veían filas duplicadas; lo
+    // que no se veía, los centros poblados perdidos.
+    const errores = vigilarConsola(page);
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/ccpp/?");
+
+    const filas = page.locator("table").last().locator("tbody tr");
+    await expect(filas).toHaveCount(20);
+
+    const enlaces = () => page.locator("table").last().locator("tbody tr td:nth-child(2) a");
+    for (let i = 0; i < 2; i++) {
+      await page.getByRole("button", { name: /Ver más/ }).click();
+      await esperarApi(page, `page=${i + 2}`);
+    }
+    await expect(filas).toHaveCount(60);
+
+    const codigos = await enlaces().evaluateAll((as) => as.map((a) => a.getAttribute("href")));
+    expect(new Set(codigos).size, `hay repetidos:\n${codigos.join("\n")}`).toBe(codigos.length);
+    expect(errores, `errores en consola:\n${errores.join("\n")}`).toEqual([]);
+  });
+
+  test("«Reiniciar» devuelve los filtros a su estado inicial", async ({ page }) => {
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/peligros/resumen/");
+
+    await soloPeligro(page, "Sismo");
+    await esperarApi(page, "peligros=sismo");
+    await expect(page.getByRole("checkbox", { name: "Heladas" })).not.toBeChecked();
+
+    await page.getByRole("button", { name: "Reiniciar" }).click();
+
+    await expect(page.getByRole("checkbox", { name: "Heladas" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Sismo" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Bajo" })).toBeChecked();
+  });
+
+  test("el mapa recibe una ranura por peligro, no solo el peor", async ({ page }) => {
+    // Antes se dibujaba únicamente el de mayor nivel y el resto quedaba escondido en el popup,
+    // que es lo que motivó la corona. Cada ranura la pinta una capa distinta, así que lo que se
+    // comprueba es que el payload las traiga y que **la consola quede limpia**: una expresión
+    // de estilo inválida tumba la capa entera, y un `icon-image` sin su imagen registrada
+    // escupe un error por punto. Los dos fallos son mudos en la pantalla.
+    const errores = vigilarConsola(page);
+    await page.goto("/peligros");
+    const geojson = await (await esperarApi(page, "/api/ccpp/geojson/")).json();
+    await esperarMapaPintado(page);
+
+    type Props = Record<string, unknown>;
+    const conVarios = geojson.features
+      .map((f: { properties: Props }) => f.properties)
+      .filter((p: Props) => Number(p.clasificaciones) > 1);
+    expect(conVarios.length, "ningún punto con varios peligros").toBeGreaterThan(0);
+
+    for (const p of conVarios.slice(0, 20)) {
+      for (let k = 0; k < Number(p.clasificaciones); k++) {
+        expect(p[`s${k}`], `falta la ranura ${k}`).toBeTruthy();
+        expect(p[`n_${k}`]).toBeGreaterThanOrEqual(1);
+      }
+    }
+    expect(errores, `errores en consola:\n${errores.join("\n")}`).toEqual([]);
+  });
+
   test("desmarcar todos los peligros no muestra todo, sino nada", async ({ page }) => {
     // Un checklist vacío significa «ninguno». Interpretarlo como «todos» sorprendería a quien
     // acaba de desmarcarlo: pediría nada y se le devolvería la región entera.

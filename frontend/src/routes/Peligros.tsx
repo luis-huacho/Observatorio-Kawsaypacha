@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, Suspense, lazy } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, Download, FileText, Filter } from "lucide-react";
+import { ChevronRight, Download, FileText, Filter, RotateCcw } from "lucide-react";
 import { urlApi, useApi, useApiPaginado } from "@/lib/api";
 import { registrarAyudaMemoria, registrarExport } from "@/lib/metricas";
 import type {
@@ -17,13 +17,21 @@ import { NIVEL_BG, NIVEL_COLOR, NIVEL_LABEL, formatNumber } from "@/lib/semaforo
 import GeoSelector from "@/components/GeoSelector";
 import ChecklistFiltro from "@/components/ChecklistFiltro";
 import ResultadosExposicion from "@/components/ResultadosExposicion";
+import ListaPeligrosCcpp from "@/components/ListaPeligrosCcpp";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 import type { MapaPeligrosHandle } from "@/components/MapaPeligros";
 
 const MapaPeligros = lazy(() => import("@/components/MapaPeligros"));
 
-const POR_PAGINA = 50;
+/**
+ * Filas por página de la tabla.
+ *
+ * **Se manda al API.** Antes era un literal decorativo que solo salía en el texto del botón
+ * mientras el servidor paginaba por su `PAGE_SIZE` de 50: cambiarlo aquí no cambiaba nada.
+ * `apps/api/paginacion.py` acepta `page_size` por querystring, con tope 200.
+ */
+const POR_PAGINA = 20;
 /** De más grave a menos: es el orden en que se lee un semáforo de riesgo. */
 const NIVELES: Nivel[] = [4, 3, 2, 1];
 
@@ -114,6 +122,7 @@ export default function Peligros() {
   const tabla = useApiPaginado<CentroPoblado>(vacio ? null : "/ccpp/", {
     ...filtros,
     clasificados: 1,
+    page_size: POR_PAGINA,
   });
   // Puntos del visor: FeatureCollection ya filtrado (ADR-A13). El mapa hereda exactamente los
   // mismos filtros que la tabla porque los dos salen de `filtros`.
@@ -199,9 +208,25 @@ export default function Peligros() {
         <div className="grid lg:grid-cols-[280px_1fr] gap-6">
           {/* Filtros: ubicación, tipo, nivel. Y nada más — los resultados viven al lado. */}
           <aside className="card p-5 h-fit lg:sticky lg:top-20">
-            <div className="flex items-center gap-2 mb-4">
-              <Filter className="w-4 h-4 text-mountain-700" />
-              <span className="font-display font-semibold text-mountain-900">Filtros</span>
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <span className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-mountain-700" />
+                <span className="font-display font-semibold text-mountain-900">Filtros</span>
+              </span>
+              {/* Recarga la página en vez de reponer el estado a mano. Aquí los filtros viven
+                  en `useState` y no en la URL, así que recargar **es** el reset completo:
+                  ubicación, peligros, niveles y el encuadre del mapa. Reponerlos uno a uno
+                  sería la misma lista escrita dos veces, y la segunda copia se olvidaría el
+                  día que se añada un filtro. */}
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                title="Vuelve a todas las provincias, todos los peligros y todos los niveles"
+                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-ink-300/40 text-ink-600 hover:bg-mountain-100"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reiniciar
+              </button>
             </div>
 
             <div className="space-y-5">
@@ -306,7 +331,7 @@ export default function Peligros() {
 
                 {/* Relación de centros poblados */}
                 <div ref={tablaRef} className="card mt-4 p-5 scroll-mt-24">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
                     <h2 className="font-display font-semibold text-mountain-900">
                       Centros poblados con clasificación de peligro
                     </h2>
@@ -314,6 +339,23 @@ export default function Peligros() {
                       {formatNumber(tabla.total)} CCPP
                     </span>
                   </div>
+
+                  {/* Leyenda del color. La tabla ya no tiene columna «Nivel» —el nivel viaja
+                      en el color de cada ícono—, así que sin esto el código de color solo se
+                      podría descifrar buscándolo en la leyenda del mapa. */}
+                  <p className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs text-ink-600">
+                    <span>Color del ícono = nivel:</span>
+                    {NIVELES.map((n) => (
+                      <span key={n} className="inline-flex items-center gap-1">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: NIVEL_COLOR[n] }}
+                          aria-hidden
+                        />
+                        {NIVEL_LABEL[n]}
+                      </span>
+                    ))}
+                  </p>
                   {tabla.resultados.length === 0 ? (
                     <EmptyState
                       title="Sin clasificaciones registradas"
@@ -325,19 +367,20 @@ export default function Peligros() {
                         <table className="w-full text-sm">
                           <thead className="text-xs text-ink-600 uppercase tracking-wide">
                             <tr>
+                              <th className="text-left px-2 py-2">Distrito</th>
                               <th className="text-left px-2 py-2">Centro poblado</th>
-                              <th className="text-left px-2 py-2 hidden sm:table-cell">
-                                Distrito
-                              </th>
-                              <th className="text-center px-2 py-2">Nivel</th>
+                              <th className="text-left px-2 py-2">Peligros</th>
                             </tr>
                           </thead>
                           <tbody>
                             {tabla.resultados.map((c) => (
                               <tr
                                 key={c.codigo}
-                                className="border-t border-ink-300/20 hover:bg-mountain-100/40"
+                                className="border-t border-ink-300/20 hover:bg-mountain-100/40 align-top"
                               >
+                                <td className="px-2 py-2 text-ink-600 whitespace-nowrap">
+                                  {c.distrito}
+                                </td>
                                 <td className="px-2 py-2">
                                   <Link
                                     className="text-mountain-900 hover:text-mountain-700 no-underline"
@@ -345,17 +388,18 @@ export default function Peligros() {
                                   >
                                     {c.nombre}
                                   </Link>
-                                  <div className="text-xs text-ink-600">{c.categoria}</div>
+                                  {/* La categoría cede el sitio en móvil: es el detalle menos
+                                      decisivo de la fila, y el distrito ya no puede ocultarse
+                                      porque encabeza la tabla. */}
+                                  <div className="text-xs text-ink-600 hidden sm:block">
+                                    {c.categoria}
+                                  </div>
                                 </td>
-                                <td className="px-2 py-2 hidden sm:table-cell text-ink-600">
-                                  {c.distrito}
-                                </td>
-                                <td className="px-2 py-2 text-center">
-                                  <span
-                                    className={`chip border ${NIVEL_BG[(c.nivel ?? 1) as Nivel]}`}
-                                  >
-                                    {NIVEL_LABEL[(c.nivel ?? 1) as Nivel]}
-                                  </span>
+                                <td className="px-2 py-2">
+                                  <ListaPeligrosCcpp
+                                    peligros={c.peligros ?? []}
+                                    tipos={peligros}
+                                  />
                                 </td>
                               </tr>
                             ))}
@@ -377,7 +421,7 @@ export default function Peligros() {
                             disabled={tabla.cargando}
                             className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded border border-ink-300/40 text-ink-600 hover:bg-mountain-100 disabled:opacity-40 disabled:hover:bg-transparent"
                           >
-                            {tabla.cargando ? "Cargando…" : `Ver ${POR_PAGINA} más`}
+                            {tabla.cargando ? "Cargando…" : "Ver más"}
                             <ChevronRight className="w-3.5 h-3.5" />
                           </button>
                         )}

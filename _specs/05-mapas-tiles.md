@@ -78,12 +78,19 @@ Disparo: guardar `CapaCartografica` con archivo nuevo, o acción "(Re)generar ti
 
 ### Los canales del símbolo (ADR-A17)
 
-**Un punto suelto codifica dos variables: la FORMA dice el tipo de peligro y el COLOR dice el
-nivel.** Ni el tamaño ni la población entran ya en la ecuación.
+**Un punto suelto muestra TODOS sus peligros**: un ícono por cada uno, repartidos en corona
+sobre la ubicación, donde la FORMA dice el tipo y el COLOR dice el nivel. Ni el tamaño ni la
+población entran ya en la ecuación.
+
+Se dibujaban todos porque dibujar solo el peor escondía la mayor parte de lo evaluado: **2,372
+de los 3,238 centros poblados clasificados tienen tres o más peligros**, y el máximo es siete.
+Como los sueltos solo aparecen por encima del zoom de agrupación, hay sitio para desplegarlos.
 
 | canal | qué dice | cómo |
 |---|---|---|
-| ícono | tipo de peligro que gana: mayor nivel, y a igualdad el primero por `TipoPeligro.orden` | `icon-image` = `["concat","peligro-",["get","peligro"],"-",["to-string",["get","nivel"]]]`. El ganador **lo decide el servidor** y viaja en `peligro`; recalcularlo en el cliente separaría el símbolo del popup |
+| ícono | **un ícono por peligro**, repartidos en corona sobre la ubicación | Una capa `symbol` por ranura (`ccpp-peligro-0`…`ccpp-peligro-8`), cada una leyendo `s<k>` / `n_<k>`. MapLibre dibuja un símbolo por capa y feature, así que mostrar N peligros exige N capas: no hay forma de que una sola itere sobre una lista |
+| posición | la ranura `k` dentro de una corona de `total` peligros | `icon-offset` con un `match` sobre `clasificaciones`. **No** se puede calcular: MapLibre no sabe construir un array de dos números a partir de dos expresiones, y los pares del `match` van envueltos en `["literal", …]` o rechaza la capa entera |
+| ancla | dónde está el lugar de verdad | Capa `circle` de 2 px (`ccpp-ancla`) cuando hay más de un peligro: con la corona el centro queda vacío y, entre centros poblados vecinos, no se distingue de quién es cada ícono |
 | color | nivel 1-4 | horneado en la imagen: 36 bitmaps (9 tipos × 4 niveles) |
 | gris liso | sin clasificación | capa `circle` aparte (`ccpp-sin-dato`), sin ícono: darle uno lo haría parecer evaluado |
 

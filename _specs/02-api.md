@@ -10,7 +10,7 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 |---|---|---|
 | `GET /api/territorio/provincias/` | — | sin paginar (13) |
 | `GET /api/territorio/distritos/` | `provincia=<ubigeo4>` | sin paginar (112) |
-| `GET /api/ccpp/` | `provincia`, `distrito` (ubigeo6), `peligros` (slugs CSV), `niveles` (1-4 CSV), `buscar`, `clasificados`, `page` | Padrón con `nivel` anotado (máximo tras los filtros; `null` = sin dato). **`clasificados=1`** deja solo los que tienen clasificación: es lo que usa la tabla del visor, porque el padrón completo la convertiría en una lista de «sin dato» (5,730 de 8,968 en la región). Ordena por nivel descendente con los «sin dato» al final |
+| `GET /api/ccpp/` | `provincia`, `distrito` (ubigeo6), `peligros` (slugs CSV), `niveles` (1-4 CSV), `buscar`, `clasificados`, `page` | Padrón con `nivel` anotado (máximo tras los filtros; `null` = sin dato). **`clasificados=1`** deja solo los que tienen clasificación: es lo que usa la tabla del visor, porque el padrón completo la convertiría en una lista de «sin dato» (5,730 de 8,968 en la región). Cada fila trae **`peligros`**: todos los del centro poblado que pasan los filtros, con `{slug, nombre, nivel}`, no solo el máximo. Ordena por nivel descendente, luego nombre y **`codigo`** — el nombre no es único (770 se repiten, «PUCARA» 21 veces) y sin ese desempate `LIMIT`/`OFFSET` repetía filas entre páginas y se saltaba otras |
 | `GET /api/ccpp/{codigo}/` | — | ficha con clasificaciones anidadas |
 | `GET /api/ccpp/export.xlsx` | mismos filtros que la lista | openpyxl, streaming |
 | `GET /api/ccpp/geojson/` | mismos filtros que la lista, **sin paginar** | Puntos del visor (ver 05 / ADR-A13). `FeatureCollection` de `Point`; ver el ejemplo y la nota de tamaño más abajo |
@@ -67,6 +67,10 @@ MapLibre solo agrupa fuentes `geojson` (ADR-A13), así que la capa de centros po
         // igualdad el primero del catálogo. `n<k>` y `p_<slug>` son el desglose que suma
         // `clusterProperties`, y **solo vienen las claves distintas de cero**.
         "peligro": "sismo", "n4": 1, "p_sismo": 1,
+        // Ranuras de la corona: un peligro por ranura, en orden de nivel descendente. El
+        // visor dibuja **un ícono por cada una**. El nivel va como `n_0` y no `n0` porque
+        // `n1`…`n4` ya son el desglose que suman los grupos.
+        "s0": "sismo", "n_0": 4, "s1": "heladas", "n_1": 3,
         // Máximo de los peligros que sobrevivieron a los filtros. 0 = sin dato.
         "nivel": 4,
         // Cuántas clasificaciones sobrevivieron a los filtros. 0 en los que no cumplen,

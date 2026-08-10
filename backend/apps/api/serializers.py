@@ -43,6 +43,7 @@ class CentroPobladoSerializer(serializers.ModelSerializer):
     # Máximo de las clasificaciones que pasan los filtros; null = sin dato con esos filtros.
     # La anotación la pone `filters.anotar_nivel`.
     nivel = serializers.IntegerField(read_only=True, allow_null=True, required=False)
+    peligros = serializers.SerializerMethodField()
 
     class Meta:
         model = CentroPoblado
@@ -52,7 +53,27 @@ class CentroPobladoSerializer(serializers.ModelSerializer):
         # del lugar y no una magnitud que se compare con nada.
         fields = [
             "codigo", "nombre", "categoria", "departamento", "provincia",
-            "distrito", "ubigeo_distrito", "lat", "lon", "altitud", "nivel",
+            "distrito", "ubigeo_distrito", "lat", "lon", "altitud", "nivel", "peligros",
+        ]
+
+    def get_peligros(self, obj) -> list[dict]:
+        """Todos los peligros del centro poblado **que pasan los filtros**, no solo el máximo.
+
+        Sale del `Prefetch` con `to_attr="clasificaciones_filtradas"` que arma el viewset, que
+        es quien conoce los filtros de la petición y ya los aplica con la misma condición y el
+        mismo orden que el geojson. Sin prefetch se devuelve vacío en vez de disparar una
+        consulta por fila: el N+1 sería silencioso y solo se notaría en producción.
+        """
+        clasificaciones = getattr(obj, "clasificaciones_filtradas", None)
+        if clasificaciones is None:
+            return []
+        return [
+            {
+                "slug": c.tipo_peligro.slug,
+                "nombre": c.tipo_peligro.nombre,
+                "nivel": c.nivel,
+            }
+            for c in clasificaciones
         ]
 
     def get_departamento(self, obj) -> str:
@@ -85,7 +106,14 @@ class CentroPobladoDetalleSerializer(CentroPobladoSerializer):
     class Meta(CentroPobladoSerializer.Meta):
         # La ficha sí publica la población: ahí es un dato del centro poblado, no una escala
         # con la que se le compare contra los otros 8,967.
-        fields = CentroPobladoSerializer.Meta.fields + ["poblacion", "clasificaciones"]
+        #
+        # Y **sin `peligros`**: aquí está `clasificaciones`, que es lo mismo con fuente y
+        # respaldo documental. Heredarlo devolvería una lista vacía —el prefetch de la ficha
+        # es otro— y un campo que siempre viene vacío se lee como «este lugar no tiene».
+        fields = [c for c in CentroPobladoSerializer.Meta.fields if c != "peligros"] + [
+            "poblacion",
+            "clasificaciones",
+        ]
 
 
 class TipoPeligroSerializer(serializers.ModelSerializer):

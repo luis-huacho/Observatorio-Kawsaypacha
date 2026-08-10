@@ -117,6 +117,66 @@ const FILTRO_SIMBOLOS: maplibregl.ExpressionSpecification = [
   [">", ["coalesce", ["get", "clasificaciones"], 0], 0],
 ];
 
+/**
+ * Ranuras de la corona: un ícono por peligro del centro poblado.
+ *
+ * Nueve, el catálogo entero, igual que en el backend. Antes se dibujaba **solo el de mayor
+ * nivel** y los demás quedaban escondidos en el popup — con 3.4 peligros de media por lugar,
+ * el mapa ocultaba la mayor parte de lo evaluado.
+ */
+const RANURAS = 9;
+
+/** Diámetro visual del símbolo a `icon-size: 1`, que es lo que separa dos íconos vecinos. */
+const DIAMETRO_ICONO = 40;
+
+/**
+ * Posiciones de los `total` íconos de un punto, en píxeles respecto de su ubicación.
+ *
+ * Uno solo va centrado; a partir de dos se reparten en un anillo cuyo radio crece con el
+ * número de peligros, de modo que la separación entre vecinos sea siempre la misma y no se
+ * solapen ni con dos ni con nueve. El primero va arriba, que es el de mayor nivel.
+ *
+ * `icon-offset` se multiplica por `icon-size`, así que la corona encoge y crece con el
+ * símbolo sin necesidad de recalcular nada por zoom.
+ */
+function corona(total: number): [number, number][] {
+  if (total <= 1) return [[0, 0]];
+  const radio = DIAMETRO_ICONO / (2 * Math.sin(Math.PI / total));
+  const redondear = (n: number) => Math.round(n * 10) / 10;
+  return Array.from({ length: total }, (_, k) => {
+    const angulo = -Math.PI / 2 + (2 * Math.PI * k) / total;
+    return [redondear(radio * Math.cos(angulo)), redondear(radio * Math.sin(angulo))];
+  });
+}
+
+/**
+ * `icon-offset` de la ranura `k`, según cuántos peligros tenga el punto.
+ *
+ * Es un `match` sobre el total y no una cuenta con `["get","dx"]` porque **MapLibre no sabe
+ * construir un array de dos números a partir de dos expresiones**: no hay forma de expresar
+ * un par (x, y) calculado. `match`, en cambio, sí devuelve arrays literales, y el total ya
+ * viaja en el feature.
+ */
+function desplazamientoRanura(k: number): maplibregl.ExpressionSpecification {
+  // Los pares van envueltos en `["literal", …]`: un array suelto dentro de una expresión se
+  // interpreta como llamada a función y MapLibre rechaza la capa entera —«Expression name
+  // must be a string, but found number»— sin dibujar un solo símbolo.
+  const literal = (par: [number, number]) => ["literal", par];
+  const casos: unknown[] = [];
+  for (let total = k + 1; total <= RANURAS; total++) {
+    casos.push(total, literal(corona(total)[k]));
+  }
+  return [
+    "match",
+    ["coalesce", ["get", "clasificaciones"], 1],
+    ...casos,
+    literal([0, 0]),
+  ] as unknown as maplibregl.ExpressionSpecification;
+}
+
+/** Ids de las capas de símbolo, una por ranura. */
+const CAPAS_PELIGRO = Array.from({ length: RANURAS }, (_, k) => `ccpp-peligro-${k}`);
+
 function filtroClusters(mostrarSinDato: boolean): maplibregl.ExpressionSpecification {
   const grupo: maplibregl.ExpressionSpecification = ["has", "point_count"];
   if (mostrarSinDato) return grupo;
@@ -529,7 +589,11 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
 
     // Popup con la ficha del centro poblado. El enlace al detalle no puede ser un <a> normal:
     // recargaría la SPA entera, así que se delega al router.
-    map.on("click", "ccpp-puntos", (e) => {
+    // Sobre **todas** las ranuras: pinchar cualquiera de los íconos de la corona abre la ficha
+    // del centro poblado, que es lo esperable cuando todos representan al mismo lugar.
+    // Registrar el manejador antes de que las capas existan es correcto: MapLibre resuelve la
+    // capa en el momento del evento, y estas se añaden tras rasterizar los íconos.
+    map.on("click", CAPAS_PELIGRO, (e) => {
       const f = e.features?.[0];
       if (!f) return;
       const p = f.properties as Record<string, unknown>;
@@ -582,7 +646,7 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
       });
     });
 
-    for (const capa of ["ccpp-puntos", "ccpp-clusters"]) {
+    for (const capa of [...CAPAS_PELIGRO, "ccpp-clusters"]) {
       map.on("mouseenter", capa, () => (map.getCanvas().style.cursor = "pointer"));
       map.on("mouseleave", capa, () => (map.getCanvas().style.cursor = ""));
     }
@@ -626,39 +690,66 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
     registrarIconos(map, tipos, svgPorSlug).then(() => {
       if (cancelado || !mapa.current) return;
       cuandoListo(map, () => {
-        if (map.getLayer("ccpp-puntos")) return;
+        if (map.getLayer(CAPAS_PELIGRO[0])) return;
+        // Ancla de la corona: cuando los íconos rodean la ubicación en vez de ocuparla, el
+        // centro queda vacío y, con centros poblados vecinos, deja de verse de qué corona es
+        // cada ícono. Un punto diminuto marca dónde está el lugar de verdad.
         map.addLayer(
           {
-            id: "ccpp-puntos",
-            type: "symbol",
+            id: "ccpp-ancla",
+            type: "circle",
             source: "ccpp",
-            filter: FILTRO_SIMBOLOS,
-            layout: {
-              "icon-image": [
-                "concat",
-                "peligro-",
-                ["get", "peligro"],
-                "-",
-                ["to-string", ["coalesce", ["get", "nivel"], 0]],
-              ],
-              // Sin esto MapLibre descarta por colisión la mayoría de los símbolos y el visor
-              // se ve medio vacío **sin emitir ningún error**: con 3,238 puntos en Cusco, el
-              // motor de etiquetado deja pasar apenas unos cientos.
-              "icon-allow-overlap": true,
-              "icon-ignore-placement": true,
-              "icon-size": [
-                "interpolate", ["linear"], ["zoom"],
-                6, 0.42,
-                12, 0.75,
-                16, 1,
-              ],
-              // Los más graves por encima: donde se solapan, gana el que hay que ver.
-              "symbol-sort-key": ["-", 4, ["coalesce", ["get", "nivel"], 0]],
+            filter: ["all", FILTRO_SIMBOLOS, [">", ["get", "clasificaciones"], 1]],
+            paint: {
+              "circle-radius": 2,
+              "circle-color": "#1A1A1A",
+              "circle-opacity": 0.55,
+              "circle-stroke-width": 1,
+              "circle-stroke-color": "#ffffff",
             },
           },
-          // Debajo de los grupos, que resumen más información.
           map.getLayer("ccpp-clusters") ? "ccpp-clusters" : undefined
         );
+        // Una capa por ranura. MapLibre dibuja **un símbolo por capa y feature**, así que
+        // mostrar los N peligros de un punto exige N capas leyendo N pares de propiedades;
+        // no hay forma de que una sola capa itere sobre una lista.
+        CAPAS_PELIGRO.forEach((id, k) => {
+          map.addLayer(
+            {
+              id,
+              type: "symbol",
+              source: "ccpp",
+              filter: ["all", FILTRO_SIMBOLOS, ["has", `s${k}`]],
+              layout: {
+                "icon-image": [
+                  "concat",
+                  "peligro-",
+                  ["get", `s${k}`],
+                  "-",
+                  ["to-string", ["coalesce", ["get", `n_${k}`], 0]],
+                ],
+                "icon-offset": desplazamientoRanura(k),
+                // Sin esto MapLibre descarta por colisión la mayoría de los símbolos y el
+                // visor se ve medio vacío **sin emitir ningún error**: con 3,238 puntos en
+                // Cusco, el motor de etiquetado deja pasar apenas unos cientos. Y con la
+                // corona el problema se multiplica, porque los íconos de un mismo punto se
+                // rozan por diseño.
+                "icon-allow-overlap": true,
+                "icon-ignore-placement": true,
+                "icon-size": [
+                  "interpolate", ["linear"], ["zoom"],
+                  6, 0.42,
+                  12, 0.75,
+                  16, 1,
+                ],
+                // Los más graves por encima: donde se solapan, gana el que hay que ver.
+                "symbol-sort-key": ["-", 4, ["coalesce", ["get", `n_${k}`], 0]],
+              },
+            },
+            // Debajo de los grupos, que resumen más información.
+            map.getLayer("ccpp-clusters") ? "ccpp-clusters" : undefined
+          );
+        });
       });
     });
 

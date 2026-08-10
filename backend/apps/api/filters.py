@@ -135,9 +135,15 @@ class CentroPobladoFilter(django_filters.FilterSet):
         # El orden se aplica **aquí** y no en `get_queryset()` del viewset: `nivel` es una
         # anotación que todavía no existe cuando DRF construye el queryset base.
         # `nulls_last` deja los "sin dato" al final, que es donde los espera quien lee una
-        # tabla ordenada por gravedad; `nombre` desempata para que la paginación no repita ni
-        # se salte filas entre páginas.
-        return queryset.order_by(F("nivel").desc(nulls_last=True), "nombre")
+        # tabla ordenada por gravedad.
+        #
+        # `codigo` cierra el orden, y no es decorativo: **el nombre no es único** —770 se
+        # repiten en el padrón, «PUCARA» 21 veces—, así que ordenar solo por (nivel, nombre)
+        # dejaba un orden parcial. Con `LIMIT`/`OFFSET` sobre un orden parcial PostgreSQL no
+        # garantiza nada entre consultas: una misma fila podía salir en dos páginas y otra no
+        # salir en ninguna. Se veía como filas repetidas al pulsar «Ver más», y lo que no se
+        # veía —los centros poblados que se perdían— era lo grave.
+        return queryset.order_by(F("nivel").desc(nulls_last=True), "nombre", "codigo")
 
 
 def condicion_clasificacion(peligros=(), niveles=()) -> Q:

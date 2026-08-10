@@ -15,7 +15,15 @@ export type CentroPoblado = {
    * comparten la tabla, la grilla de resultados y el color de los símbolos del mapa.
    */
   nivel?: Nivel | null;
+  /**
+   * **Todos** los peligros del centro poblado que pasan los filtros, no solo el máximo, y en
+   * el mismo orden con el que el mapa elige el ícono. Es lo que lista la tabla: el nivel
+   * máximo es un resumen, y con 3.4 peligros de media por lugar escondía lo que se consulta.
+   */
+  peligros?: PeligroDeCcpp[];
 };
+
+export type PeligroDeCcpp = { slug: string; nombre: string; nivel: Nivel };
 
 /** Ficha completa: `/api/ccpp/{codigo}/`. */
 export type CentroPobladoDetalle = CentroPoblado & {
@@ -598,9 +606,13 @@ export type PuntoCcpp = {
   peligros: string;
 } & {
   /**
-   * Desglose por nivel (`n1`…`n4`) y presencia por tipo (`p_<slug>`), que es lo único que
-   * `clusterProperties` sabe acumular. **Solo vienen las claves distintas de cero**, para no
-   * inflar con ceros un payload que ronda los 2 MB.
+   * Tres familias de claves numeradas, todas escalares porque una fuente agrupada no admite
+   * otra cosa, y **solo se emiten las ocupadas** para no inflar un payload de 2 MB:
+   *
+   * - `n1`…`n4` — cuántas clasificaciones de ese nivel tiene el punto. Lo suman los grupos.
+   * - `p_<slug>` — presencia de ese tipo (0/1). También lo suman los grupos.
+   * - `s0`…`s8` y `n_0`…`n_8` — **las ranuras de la corona**: un peligro por ranura, en orden
+   *   de nivel descendente. El nivel lleva guion bajo justo para no chocar con `n1`…`n4`.
    */
   [clave: string]: string | number | null;
 };

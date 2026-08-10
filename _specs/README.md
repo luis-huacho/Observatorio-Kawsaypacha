@@ -14,6 +14,41 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 10/08/2026 — el visor mostraba un peligro de cada siete
+
+Ajustes al rediseño anterior, pedidos al recorrerlo ya en funcionamiento. El de fondo: **el
+mapa dibujaba un solo ícono por centro poblado**, el del peligro de mayor nivel, y los demás
+quedaban escondidos en el popup. No era un problema de orden de pintado —solo se dibujaba uno—
+y escondía casi todo: 2,372 de los 3,238 centros poblados clasificados tienen tres o más
+peligros, y el máximo es siete.
+
+Ahora cada punto los muestra **todos**, en corona sobre su ubicación, cada ícono con el color
+de su propio nivel. Son nueve capas `symbol`, una por ranura: MapLibre dibuja un símbolo por
+capa y feature, así que no hay manera de que una sola itere sobre una lista. La posición sale
+de un `match` sobre el número de peligros, porque tampoco sabe construir un par (x, y) a partir
+de dos expresiones. Un punto de 2 px marca el centro, que con la corona queda vacío y entre
+centros poblados vecinos dejaba de verse de quién era cada ícono.
+
+La tabla pasa a `Distrito · Centro poblado · Peligros`, con todos los peligros listados y una
+leyenda de color encima; paginada de 20 en 20 con «Ver más». Y hay un botón «Reiniciar» que
+recarga la ruta limpia.
+
+**Dos fallos de paginación que salieron al bajar a 20 filas** —el segundo llevaba ahí desde el
+principio, y ninguno de los dos avisaba:
+
+- **El orden del API era parcial.** Ordenaba por `(nivel, nombre)`, y el nombre **no es único**:
+  770 se repiten en el padrón, «PUCARA» 21 veces. Con `LIMIT`/`OFFSET` sobre un orden parcial
+  PostgreSQL no garantiza nada entre consultas, así que una fila podía salir en dos páginas y
+  otra en ninguna. Lo visible era la tabla repitiendo centros poblados; lo grave, los que se
+  perdían. Se cierra el orden con `codigo`.
+- **El cliente archivaba cada respuesta bajo el número de página equivocado.** Al avanzar hay al
+  menos un render en que `pagina` ya es la nueva y el estado todavía trae la anterior —si la URL
+  está en caché ni siquiera se pasa por `loading`—, de modo que las filas de una página se
+  guardaban como si fueran de la siguiente. Además la acumulación concatenaba, que no es
+  idempotente. `useApi` pasa a decir **de qué URL** salieron sus datos y `useApiPaginado` guarda
+  por página, comprobando que la respuesta sea la que pidió. Afectaba a las siete rutas
+  paginadas del sitio, no solo a /peligros.
+
 ### Actualización 10/08/2026 — /peligros vuelve a responder una sola pregunta
 
 La revisión partió de una sospecha del cliente: que la data de `/peligros` estaba mal procesada.

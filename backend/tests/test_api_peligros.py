@@ -345,6 +345,121 @@ def test_los_que_no_pasan_el_filtro_siguen_en_el_mapa_con_cero(api, datos_muestr
     assert any(p["clasificaciones"] == 0 for p in por_codigo.values())
 
 
+def test_la_paginacion_no_repite_ni_se_salta_centros_poblados(api, datos_muestra):
+    """Recorrer todas las páginas tiene que devolver cada centro poblado **una vez**.
+
+    El orden era `(nivel, nombre)` y el nombre **no es único**: 770 se repiten en el padrón,
+    «PUCARA» 21 veces. Con `LIMIT`/`OFFSET` sobre un orden parcial, PostgreSQL no garantiza
+    nada entre consultas, así que una fila podía salir en dos páginas y otra en ninguna. Lo
+    visible era la tabla repitiendo filas al pulsar «Ver más»; lo grave, los que se perdían.
+    """
+    vistos: list[str] = []
+    pagina = 1
+    while True:
+        datos = api.get(f"/api/ccpp/?clasificados=1&page_size=7&page={pagina}").json()
+        vistos.extend(r["codigo"] for r in datos["results"])
+        if not datos["next"]:
+            break
+        pagina += 1
+
+    assert len(vistos) == len(set(vistos)), "la paginación repitió centros poblados"
+    assert len(vistos) == datos["count"], "la paginación se saltó centros poblados"
+
+
+def test_el_listado_trae_todos_los_peligros_de_cada_centro_poblado(api, datos_muestra):
+    """La tabla lista a QUÉ está expuesto cada lugar, no solo su nivel máximo.
+
+    El nivel máximo es un resumen, y con un promedio de 3.4 peligros por centro poblado
+    escondía justo lo que se consulta. El orden es el mismo con el que el mapa elige el ícono
+    —nivel descendente, y a igualdad el orden del catálogo—, así que las dos vistas nombran
+    primero el mismo peligro.
+    """
+    from apps.peligros.models import ClasificacionPeligro, TipoPeligro
+
+    orden = {t.slug: t.orden for t in TipoPeligro.objects.all()}
+    filas = api.get("/api/ccpp/?clasificados=1&page_size=50").json()["results"]
+    assert filas
+
+    revisadas = 0
+    for fila in filas:
+        suyas = list(
+            ClasificacionPeligro.objects.filter(
+                centro_poblado__codigo=fila["codigo"]
+            ).select_related("tipo_peligro")
+        )
+        esperado = [
+            {"slug": c.tipo_peligro.slug, "nombre": c.tipo_peligro.nombre, "nivel": c.nivel}
+            for c in sorted(suyas, key=lambda c: (-c.nivel, orden[c.tipo_peligro.slug]))
+        ]
+        assert fila["peligros"] == esperado
+        assert fila["nivel"] == max(c.nivel for c in suyas)
+        revisadas += 1
+
+    assert revisadas > 0
+    assert any(len(f["peligros"]) > 1 for f in filas), "la muestra no tiene ninguno con varios"
+
+
+def test_el_desglose_del_listado_respeta_los_filtros(api, datos_muestra):
+    """Filtrar por un peligro no puede dejar asomar los demás de ese centro poblado.
+
+    Es la prueba que evita que el prefetch se escriba sin condición: la fila seguiría
+    listando heladas con «sismo» marcado, y la tabla contradiría al mapa y a la grilla, que sí
+    recortan.
+    """
+    filas = api.get("/api/ccpp/?clasificados=1&peligros=sismo&page_size=50").json()["results"]
+    assert filas
+
+    for fila in filas:
+        assert [p["slug"] for p in fila["peligros"]] == ["sismo"]
+
+    # Y con dos niveles sueltos, ninguna fila puede traer uno intermedio.
+    filas = api.get("/api/ccpp/?clasificados=1&niveles=1,4&page_size=50").json()["results"]
+    assert filas
+    for fila in filas:
+        assert all(p["nivel"] in (1, 4) for p in fila["peligros"])
+
+
+def test_la_ficha_no_repite_el_desglose_del_listado(api, datos_muestra):
+    """El detalle trae `clasificaciones` —con fuente y respaldo— y no `peligros`.
+
+    Heredarlo del serializer de lista lo dejaría siempre vacío, porque la ficha usa otro
+    prefetch, y un campo que siempre viene vacío se lee como «este lugar no tiene ninguno».
+    """
+    ficha = api.get("/api/ccpp/0801010001/").json()
+
+    assert "peligros" not in ficha
+    assert ficha["clasificaciones"]
+
+
+def test_el_punto_declara_sus_ranuras_para_la_corona(api, datos_muestra):
+    """El visor dibuja **un ícono por peligro**, así que el punto trae uno por ranura.
+
+    Van numeradas (`s0`, `n_0`, `s1`, `n_1`…) y no como lista porque las propiedades de una
+    fuente agrupada tienen que ser escalares y `icon-image` no sabe indexar un array. El nivel
+    lleva guion bajo para no chocar con `n1`…`n4`, que son el desglose que suman los grupos.
+    """
+    import json
+
+    datos = api.get("/api/ccpp/geojson/").json()
+    con_varios = 0
+
+    for feature in datos["features"]:
+        props = feature["properties"]
+        desglose = json.loads(props["peligros"])
+
+        for indice, entrada in enumerate(desglose):
+            assert props[f"s{indice}"] == entrada["s"]
+            assert props[f"n_{indice}"] == entrada["n"]
+        # Solo las ocupadas: una ranura de más dibujaría un ícono que nadie clasificó.
+        assert f"s{len(desglose)}" not in props
+        if desglose:
+            assert props["s0"] == props["peligro"], "la ranura 0 y el ícono deben coincidir"
+        if len(desglose) > 1:
+            con_varios += 1
+
+    assert con_varios > 0, "la muestra no tiene ningún centro poblado con varios peligros"
+
+
 def test_el_punto_declara_el_peligro_que_pinta_su_icono(api, datos_muestra):
     """El símbolo codifica el **tipo** en la forma, así que el punto tiene que decir cuál.
 

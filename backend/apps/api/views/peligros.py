@@ -2,7 +2,7 @@
 import hashlib
 import json
 
-from django.db.models import Max
+from django.db.models import Max, Prefetch
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils.text import slugify
@@ -25,6 +25,18 @@ from ..filters import (
     por_ubigeo_o_nombre,
 )
 from ..throttling import DescargaThrottle
+
+#: Ranuras de la corona de íconos del visor: una por peligro del centro poblado.
+#:
+#: Nueve, que es el catálogo entero. Hoy ningún punto pasa de 7 peligros evaluados, pero
+#: recortar a 7 dejaría de dibujar en silencio justo lo que se pidió arreglar el día que la
+#: fuente clasifique uno más. Solo se emiten las ranuras ocupadas, así que el coste real lo
+#: marca el promedio (3.4), no este tope.
+#:
+#: El nivel va como `n_0`, con guion bajo, y no como `n0`: `n1`…`n4` ya están ocupadas por el
+#: desglose que suman los grupos («cuántas clasificaciones de nivel k»), y las dos familias
+#: viven en el mismo diccionario de propiedades.
+MAX_RANURAS = 9
 
 PARAMS_CCPP = [
     OpenApiParameter("provincia", description="Ubigeo de 4 dígitos o nombre."),
@@ -94,9 +106,26 @@ class CentroPobladoViewSet(viewsets.ReadOnlyModelViewSet):
         qs = super().get_queryset()
         if self.action == "retrieve":
             return qs.prefetch_related("clasificaciones__tipo_peligro", "clasificaciones__fuente")
-        # El orden por nivel lo pone `CentroPobladoFilter.filter_queryset`, que es donde ya
-        # existe la anotación.
-        return qs
+        # La tabla lista **todos** los peligros de cada centro poblado, no solo su nivel
+        # máximo: con un promedio de 3.4 por lugar, el resumen escondía justo lo que se
+        # consulta. Se traen con los **mismos filtros** que la fila —si no, una búsqueda de
+        # «sismo» mostraría también las heladas de ese punto y la tabla contradiría al mapa— y
+        # en el **mismo orden** con el que el geojson elige el ícono, para que las dos vistas
+        # nombren primero el mismo peligro.
+        from apps.peligros.models import ClasificacionPeligro
+
+        peligros, niveles = parametros_exposicion(self.request.query_params)
+        return qs.prefetch_related(
+            Prefetch(
+                "clasificaciones",
+                queryset=ClasificacionPeligro.objects.filter(
+                    condicion_clasificacion_local(peligros, niveles)
+                )
+                .select_related("tipo_peligro")
+                .order_by("-nivel", "tipo_peligro__orden"),
+                to_attr="clasificaciones_filtradas",
+            )
+        )
 
 
 class CentroPobladoExportView(APIView):
@@ -195,6 +224,16 @@ class CentroPobladoGeoJSONView(APIView):
                 clave = f"n{entrada['n']}"
                 propiedades[clave] = propiedades.get(clave, 0) + 1
                 propiedades[f"p_{entrada['s']}"] = 1
+
+            # Ranuras de la corona: el visor dibuja **un ícono por peligro** repartidos en
+            # anillo, y cada capa de MapLibre lee una ranura fija. Van numeradas y no como
+            # lista porque las propiedades de una fuente agrupada tienen que ser escalares, y
+            # porque `icon-image` no sabe indexar un array. El orden es el del desglose —nivel
+            # descendente, y a igualdad el orden del catálogo—, así que `s0` es el mismo
+            # peligro que anuncia `peligro`.
+            for indice, entrada in enumerate(desglose[:MAX_RANURAS]):
+                propiedades[f"s{indice}"] = entrada["s"]
+                propiedades[f"n_{indice}"] = entrada["n"]
             features.append({
                 "type": "Feature",
                 "geometry": {"type": "Point", "coordinates": [c.lon, c.lat]},
