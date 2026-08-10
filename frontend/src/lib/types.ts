@@ -134,7 +134,10 @@ export type InversionEntidad = {
   saldo: number;
   variacion_pia_pim: number;
   pct_variacion_pia_pim: number | null;
+  /** Presupuesto de la entidad entera. null = no se puede calcular, nunca 0. */
+  pia_institucional: number | null;
   pim_institucional: number | null;
+  devengado_institucional: number | null;
   pct_0068_institucional: number | null;
   pim_proyectos: number;
   pim_actividades: number;
@@ -177,6 +180,10 @@ export type Inversion = {
     variacion_pia_pim: number;
     entidades_con_presupuesto: number;
     entidades_en_ambito: number;
+    /** Los tres suman solo las entidades con dato, las mismas que el porcentaje de abajo. */
+    pia_institucional: number | null;
+    pim_institucional: number | null;
+    devengado_institucional: number | null;
     pct_0068_institucional: number | null;
     entidades_con_institucional: number;
     pim_proyectos: number;

@@ -206,6 +206,8 @@ Con datos:
   "agregados": { "pia": 16754644, "pim": 54591255, "devengado": 26064745,
                  "pct_ejecucion": 0.4775, "saldo": 28526510, "variacion_pia_pim": 37836611,
                  "entidades_con_presupuesto": 115, "entidades_en_ambito": 116,
+                 "pia_institucional": null, "pim_institucional": 4305815597,
+                 "devengado_institucional": null,
                  "pct_0068_institucional": 0.0127, "entidades_con_institucional": 114,
                  "pim_proyectos": 22217511, "pim_actividades": 32373744, "pct_proyectos": 0.407 },
   "procesos": [ { "slug": "prevencion_reduccion", "nombre": "Prevención y reducción",
@@ -218,7 +220,8 @@ Con datos:
                      "distrito": "CUSCO", "provincia": "CUSCO",
                      "pia": 0, "pim": 0, "devengado": 0, "pct_ejecucion": 0.0,
                      "saldo": 0, "variacion_pia_pim": 0, "pct_variacion_pia_pim": 0.0,
-                     "pim_institucional": 270220526, "pct_0068_institucional": 0.0,
+                     "pia_institucional": 176788063, "pim_institucional": 270220526,
+                     "devengado_institucional": 128401242, "pct_0068_institucional": 0.0,
                      "pim_proyectos": 0, "pim_actividades": 0, "pct_proyectos": 0.0 } ],
   "ejercicios": [ { "anio": 2026, "corte": "2026-06", "es_parcial": true } ]
 }
@@ -228,7 +231,7 @@ Tres reglas del payload que la interfaz no puede reinventar:
 
 - **`es_parcial` y `corte` viajan con el dato**, en la raíz y en cada punto de `tendencia`. Un % de ejecución de medio año se calcula contra un PIM anual: cualquier cliente que lo dibuje tiene que poder advertirlo.
 - **Un porcentaje que no se puede calcular es `null`, no `0`.** Una municipalidad sin total institucional no tiene un 0 % de su presupuesto en el 0068.
-- **`pct_0068_institucional` de `agregados` solo suma entidades comparables.** Con el numerador de las 116 y el denominador de las 114 que tienen total, el porcentaje saldría inflado sin que nada lo dijera; por eso viaja `entidades_con_institucional`.
+- **Los importes institucionales de `agregados` y su porcentaje salen del mismo universo**: solo las entidades que tienen ese dato. Con el numerador de las 116 y el denominador de las 114 que tienen total, el porcentaje saldría inflado sin que nada lo dijera, y publicar un total institucional que no cuadre con el porcentaje de al lado es el mismo problema por otra vía. Por eso `entidades_con_institucional` viaja junto a las tres cifras: es su rótulo. Sin ninguna entidad con dato, los tres son `null` y no cero.
 
 ## Productos de incidencia
 

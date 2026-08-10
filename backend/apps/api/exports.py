@@ -98,10 +98,12 @@ ANCHOS_CCPP = [13, 30, 14, 18, 18, 14, 11, 11, 12, 12, 7, 20]
 CABECERAS_INVERSION = [
     "Ejercicio", "Corte", "Fuente", "Código MEF", "Entidad", "Ámbito", "Provincia", "Distrito",
     "Ubigeo distrito", "PIA (0068)", "PIM (0068)", "Devengado (0068)", "% ejecución",
-    "Saldo por ejecutar", "Variación PIA-PIM", "PIM institucional", "% del 0068 sobre el total",
+    "Saldo por ejecutar", "Variación PIA-PIM", "PIA institucional", "PIM institucional",
+    "Devengado institucional", "% del 0068 sobre el total",
     "PIM proyectos", "PIM actividades", "% en proyectos",
 ]
-ANCHOS_INVERSION = [10, 10, 26, 12, 42, 14, 18, 18, 14, 15, 15, 15, 12, 17, 17, 17, 20, 15, 15, 13]
+ANCHOS_INVERSION = [10, 10, 26, 12, 42, 14, 18, 18, 14, 15, 15, 15, 12, 17, 17, 17, 17, 21, 20,
+                    15, 15, 13]
 
 
 def filas_inversion(filas, ejercicio):
@@ -128,7 +130,9 @@ def filas_inversion(filas, ejercicio):
             f["pct_ejecucion"],
             f["saldo"],
             f["variacion_pia_pim"],
+            f["pia_institucional"],
             f["pim_institucional"],
+            f["devengado_institucional"],
             f["pct_0068_institucional"],
             f["pim_proyectos"],
             f["pim_actividades"],

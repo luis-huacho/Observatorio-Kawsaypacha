@@ -55,6 +55,14 @@ no casan con el padrón de distritos porque se crearon después.
 El mapa coroplético del diseño original queda fuera: no hay geometrías distritales en el proyecto.
 Toca `_specs/00`, `01`, `02`, `03`, `06` y `08`.
 
+**Ampliación del mismo día.** Auditada la ventana contra la lista de «Campos o indicadores
+requeridos» de la hoja 2 del Excel del cliente, faltaba exponer uno de los once: el *presupuesto
+total institucional*. El PIA y el devengado institucionales se importaban y se guardaban desde el
+principio, pero nunca salían —ni en el payload, ni en el Excel, ni en pantalla—, y del PIM solo se
+publicaba el ratio. Ahora los tres viajan por entidad y agregados, con la regla de que **el total
+y su porcentaje suman las mismas entidades**: publicar un total institucional que no cuadre con el
+porcentaje de al lado es el mismo error que inflar el porcentaje mezclando universos.
+
 ### Actualización 10/08/2026 — el número de los grupos del visor no se movía con los filtros
 
 Salió de una pregunta del dueño del proyecto: «los círculos con número, ¿qué cuentan?». Contaban

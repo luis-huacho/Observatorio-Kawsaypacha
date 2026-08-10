@@ -94,6 +94,11 @@ def test_los_derivados_de_una_entidad_cuadran_a_mano(api, inversion_cargada):
     assert cusco["saldo"] == 155_000
     assert cusco["variacion_pia_pim"] == 120_000
     assert cusco["pct_0068_institucional"] == pytest.approx(220_000 / 2_200_000)
+    # El presupuesto de la entidad entera, que es lo que pone el 0068 en contexto. Los tres
+    # importes salen tal cual del archivo, no solo el PIM del que cuelga el porcentaje.
+    assert cusco["pia_institucional"] == 1_500_000
+    assert cusco["pim_institucional"] == 2_200_000
+    assert cusco["devengado_institucional"] == 900_000
     # Cusco solo tiene actividades en 2026; Poroy es quien aporta el proyecto.
     assert cusco["pct_proyectos"] == 0
 
@@ -106,20 +111,44 @@ def test_sin_total_institucional_el_porcentaje_es_nulo_y_no_cero(api, inversion_
     cuerpo = api.get("/api/inversion/?anio=2026").json()
     poroy = next(f for f in cuerpo["por_entidad"] if f["codigo"] == "300686")
 
+    assert poroy["pia_institucional"] is None
     assert poroy["pim_institucional"] is None
+    assert poroy["devengado_institucional"] is None
     assert poroy["pct_0068_institucional"] is None
 
 
-def test_el_porcentaje_agregado_solo_usa_entidades_comparables(api, inversion_cargada):
-    """El % del 0068 sobre el institucional no puede mezclar numerador y denominador.
+def test_el_total_institucional_y_su_porcentaje_salen_del_mismo_universo(api, inversion_cargada):
+    """El total institucional del ámbito y el % sobre él suman las **mismas** entidades.
 
-    Si el numerador sumara las dos municipalidades y el denominador solo la que tiene total,
-    saldría inflado sin que nada lo dijera. Solo entra Cusco: 220 000 / 2 200 000.
+    Si el numerador sumara las dos municipalidades y el denominador solo la que tiene total, el
+    porcentaje saldría inflado sin que nada lo dijera; y publicar un total institucional que no
+    cuadre con el porcentaje de al lado es el mismo problema por otra vía. Solo entra Cusco.
     """
     agregados = api.get("/api/inversion/?anio=2026").json()["agregados"]
 
     assert agregados["entidades_con_institucional"] == 1
+    assert agregados["pia_institucional"] == 1_500_000
+    assert agregados["pim_institucional"] == 2_200_000
+    assert agregados["devengado_institucional"] == 900_000
     assert agregados["pct_0068_institucional"] == pytest.approx(220_000 / 2_200_000)
+
+
+def test_sin_ninguna_entidad_con_institucional_el_total_es_nulo(api, inversion_cargada):
+    """La suma de un conjunto vacío se leería como «estas municipalidades no tienen presupuesto»."""
+    from apps.inversion.models import PresupuestoEntidad
+
+    PresupuestoEntidad.objects.filter(ejercicio__anio=2026).update(
+        pia_institucional=None, pim_institucional=None, devengado_institucional=None
+    )
+
+    agregados = api.get("/api/inversion/?anio=2026").json()["agregados"]
+
+    assert agregados["entidades_con_institucional"] == 0
+    assert agregados["pia_institucional"] is None
+    assert agregados["pim_institucional"] is None
+    assert agregados["pct_0068_institucional"] is None
+    # El presupuesto del propio programa no se ve afectado.
+    assert agregados["pim"] == 535_000
 
 
 def test_el_ambito_municipal_deja_fuera_al_gobierno_regional(api, inversion_cargada):
@@ -181,6 +210,13 @@ def test_el_export_lleva_el_corte_en_cada_fila(api, inversion_cargada, sin_throt
     filas = list(hoja.iter_rows(values_only=True))
     assert filas[0][:3] == ("Ejercicio", "Corte", "Fuente")
     assert all(f[1] == "2026-06" for f in filas[1:])
+
+    # Los tres importes institucionales viajan en el archivo: es el contexto sin el cual una
+    # cifra del 0068 suelta no dice si la municipalidad prioriza la gestión del riesgo.
+    cabeceras = list(filas[0])
+    assert {"PIA institucional", "PIM institucional", "Devengado institucional"} <= set(cabeceras)
+    cusco = next(f for f in filas[1:] if f[3] == "300684")
+    assert cusco[cabeceras.index("PIA institucional")] == 1_500_000
 
 
 def test_el_export_sin_datos_explica_por_que(api, inversion_cargada, sin_throttling):

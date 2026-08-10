@@ -181,10 +181,17 @@ export default function InversionView() {
             value={formatSoles(a.saldo)}
             sub="presupuesto aprobado y aún no gastado"
           />
+          {/* La cifra es el presupuesto institucional y el porcentaje su lectura: la lista de
+              indicadores del cliente pide el total, no solo el ratio derivado. Ambos suman las
+              mismas entidades, y el subtítulo dice cuántas son. */}
           <KPI
-            label="Peso dentro del presupuesto municipal"
-            value={a.pct_0068_institucional === null ? "Sin dato" : formatPct(a.pct_0068_institucional)}
-            sub={`sobre ${a.entidades_con_institucional} municipalidad(es) con total institucional`}
+            label="Presupuesto institucional total"
+            value={a.pim_institucional === null ? "Sin dato" : formatSoles(a.pim_institucional)}
+            sub={
+              a.pct_0068_institucional === null
+                ? "ninguna municipalidad con total institucional"
+                : `el PP 0068 es el ${formatPct(a.pct_0068_institucional)}, sobre ${a.entidades_con_institucional} municipalidad(es)`
+            }
           />
         </section>
 
@@ -303,6 +310,7 @@ export default function InversionView() {
                   <th className="text-right px-4 py-3">Devengado</th>
                   <th className="text-right px-4 py-3">% Ejec.</th>
                   <th className="text-right px-4 py-3">Saldo</th>
+                  <th className="text-right px-4 py-3 hidden xl:table-cell">PIM institucional</th>
                   <th className="text-right px-4 py-3 hidden lg:table-cell">% del total</th>
                 </tr>
               </thead>
@@ -318,6 +326,9 @@ export default function InversionView() {
                       {f.pct_ejecucion === null ? "—" : formatPct(f.pct_ejecucion)}
                     </td>
                     <td className="px-4 py-3 text-right font-mono">{formatSoles(f.saldo)}</td>
+                    <td className="px-4 py-3 text-right font-mono hidden xl:table-cell">
+                      {f.pim_institucional === null ? "—" : formatSoles(f.pim_institucional)}
+                    </td>
                     <td className="px-4 py-3 text-right font-mono hidden lg:table-cell">
                       {/* «—» y no «0 %»: sin total institucional el porcentaje no se puede
                           calcular, que es distinto de que el 0068 no pese nada. */}

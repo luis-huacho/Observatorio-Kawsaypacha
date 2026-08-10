@@ -71,6 +71,11 @@ def entidades(ambito: str = AMBITO_POR_DEFECTO, provincia: str = ""):
     return queryset
 
 
+def _o_nulo(valor):
+    """`float` o `None`. Nunca convierte un dato ausente en un cero."""
+    return float(valor) if valor is not None else None
+
+
 def _porcentaje(parte, total):
     """Fracción 0-1, o None cuando no hay denominador.
 
@@ -105,11 +110,12 @@ def fila_entidad(presupuesto: PresupuestoEntidad, reparto: dict | None = None) -
         # primera mitad de «¿se está ejecutando lo proyectado?».
         "variacion_pia_pim": float(pim - pia),
         "pct_variacion_pia_pim": _porcentaje(pim - pia, pia),
-        "pim_institucional": (
-            float(presupuesto.pim_institucional)
-            if presupuesto.pim_institucional is not None
-            else None
-        ),
+        # El presupuesto de la entidad entera, que es el contexto del 0068. Los tres van
+        # nulables: solo existen para las entidades que ejecutan desde el departamento, y una
+        # municipalidad sin este dato no tiene un presupuesto institucional de cero.
+        "pia_institucional": _o_nulo(presupuesto.pia_institucional),
+        "pim_institucional": _o_nulo(presupuesto.pim_institucional),
+        "devengado_institucional": _o_nulo(presupuesto.devengado_institucional),
         "pct_0068_institucional": _porcentaje(pim, presupuesto.pim_institucional),
         "pim_proyectos": float(reparto.get("proyecto", CERO)),
         "pim_actividades": float(reparto.get("actividad", CERO)),
@@ -147,12 +153,7 @@ def agregados(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="") -> dict:
     queryset_entidades = entidades(ambito, provincia)
     base = PresupuestoEntidad.objects.filter(ejercicio=ejercicio, entidad__in=queryset_entidades)
 
-    totales = base.aggregate(
-        pia=_suma("pia"),
-        pim=_suma("pim"),
-        devengado=_suma("devengado"),
-        pim_institucional=_suma("pim_institucional"),
-    )
+    totales = base.aggregate(pia=_suma("pia"), pim=_suma("pim"), devengado=_suma("devengado"))
     reparto = (
         PresupuestoActividad.objects.filter(ejercicio=ejercicio, entidad__in=queryset_entidades)
         .values("clasificacion__origen")
@@ -160,12 +161,19 @@ def agregados(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="") -> dict:
     )
     pim_por_origen = {f["clasificacion__origen"]: f["pim"] for f in reparto}
 
-    # El denominador del % sobre el institucional solo suma las entidades que **tienen** ese
-    # dato; si no, el porcentaje mezclaría un numerador de 116 municipalidades con un
-    # denominador de 114 y saldría inflado sin que nada lo dijera.
+    # El total institucional y el % sobre él salen del **mismo universo**: solo las entidades
+    # que tienen ese dato. Mezclar un numerador de 116 municipalidades con un denominador de
+    # 114 inflaría el porcentaje sin que nada lo dijera, y publicar un total institucional que
+    # no cuadre con el porcentaje que hay al lado es el mismo problema por otra vía. Por eso
+    # `entidades_con_institucional` viaja al lado de las tres cifras: es su rótulo.
     con_institucional = base.filter(pim_institucional__isnull=False)
-    comparables = con_institucional.aggregate(pim=_suma("pim"), institucional=_suma(
-        "pim_institucional"))
+    comparables = con_institucional.aggregate(
+        pim=_suma("pim"),
+        pia_institucional=_suma("pia_institucional"),
+        pim_institucional=_suma("pim_institucional"),
+        devengado_institucional=_suma("devengado_institucional"),
+    )
+    hay_institucional = con_institucional.exists()
 
     return {
         "pia": float(totales["pia"]),
@@ -176,7 +184,16 @@ def agregados(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="") -> dict:
         "variacion_pia_pim": float(totales["pim"] - totales["pia"]),
         "entidades_con_presupuesto": base.filter(pim__gt=0).count(),
         "entidades_en_ambito": queryset_entidades.count(),
-        "pct_0068_institucional": _porcentaje(comparables["pim"], comparables["institucional"]),
+        # Sin ninguna entidad con dato, los tres son `None` y no cero: la suma de un conjunto
+        # vacío se leería como «estas municipalidades no tienen presupuesto».
+        "pia_institucional": float(comparables["pia_institucional"]) if hay_institucional else None,
+        "pim_institucional": float(comparables["pim_institucional"]) if hay_institucional else None,
+        "devengado_institucional": (
+            float(comparables["devengado_institucional"]) if hay_institucional else None
+        ),
+        "pct_0068_institucional": _porcentaje(
+            comparables["pim"], comparables["pim_institucional"]
+        ),
         "entidades_con_institucional": con_institucional.count(),
         "pim_proyectos": float(pim_por_origen.get("proyecto", CERO)),
         "pim_actividades": float(pim_por_origen.get("actividad", CERO)),
