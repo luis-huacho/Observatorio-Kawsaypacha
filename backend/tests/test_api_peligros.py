@@ -173,6 +173,80 @@ def test_geojson_devuelve_una_feature_por_centro_poblado_con_coordenadas(api, da
     assert "codigo" in primera["properties"]
 
 
+def test_cada_punto_declara_cuantas_clasificaciones_aporta(api, datos_muestra):
+    """`clasificaciones` es el número que el visor pinta dentro del círculo agrupado.
+
+    Cuenta **filas de clasificación**, no centros poblados: un centro poblado con tres peligros
+    evaluados aporta 3. Es la otra unidad del resumen, y por eso el conteo del mapa no puede
+    compararse con el de la tabla sin decirlo.
+    """
+    from apps.peligros.models import ClasificacionPeligro
+
+    datos = api.get("/api/ccpp/geojson/").json()
+    por_codigo = {f["properties"]["codigo"]: f["properties"] for f in datos["features"]}
+
+    for clasificacion in ClasificacionPeligro.objects.select_related("centro_poblado")[:50]:
+        codigo = clasificacion.centro_poblado.codigo
+        if codigo not in por_codigo:  # sin coordenadas: no llega al mapa
+            continue
+        assert por_codigo[codigo]["clasificaciones"] == ClasificacionPeligro.objects.filter(
+            centro_poblado=clasificacion.centro_poblado
+        ).count()
+
+
+def test_los_que_no_pasan_el_filtro_siguen_en_el_mapa_con_cero(api, datos_muestra):
+    """El filtro recorta el conteo, no el padrón.
+
+    Los centros poblados que no cumplen se quedan en el `FeatureCollection` para pintarse en
+    gris —ausencia de dato no es ausencia de riesgo—, pero aportan 0 al número del grupo. Si
+    desaparecieran, el mapa diría que ahí no hay nada que evaluar.
+    """
+    from apps.peligros.models import ClasificacionPeligro
+
+    sin_filtro = api.get("/api/ccpp/geojson/").json()
+    filtrado = api.get("/api/ccpp/geojson/?peligro=sismo&nivel_min=4").json()
+
+    assert len(filtrado["features"]) == len(sin_filtro["features"])
+
+    por_codigo = {f["properties"]["codigo"]: f["properties"] for f in filtrado["features"]}
+    cumplen = {
+        c.centro_poblado.codigo
+        for c in ClasificacionPeligro.objects.filter(
+            tipo_peligro__slug="sismo", nivel__gte=4
+        ).select_related("centro_poblado")
+    }
+    assert cumplen, "la muestra no tiene ningún sismo en nivel 4"
+    assert all(por_codigo[c]["clasificaciones"] == 1 for c in cumplen if c in por_codigo)
+    assert any(p["clasificaciones"] == 0 for p in por_codigo.values())
+
+
+def test_el_conteo_del_mapa_cuadra_con_el_del_resumen(api, datos_muestra):
+    """Sumar los círculos del visor tiene que dar el total que anuncia la pantalla.
+
+    Las dos cifras salen de consultas distintas —una recorre features, la otra agrega en la
+    base— y la pantalla las muestra juntas, así que solo una prueba las mantiene alineadas. La
+    resta de los sin coordenadas es la única diferencia legítima: el geojson los excluye
+    (no se pueden dibujar) y el resumen no.
+    """
+    from django.db.models import Q
+
+    from apps.peligros.models import ClasificacionPeligro
+
+    geojson = api.get("/api/ccpp/geojson/?peligro=sismo&nivel_min=2").json()
+    resumen = api.get("/api/peligros/resumen/?peligro=sismo&nivel_min=2").json()
+
+    del_mapa = sum(f["properties"]["clasificaciones"] for f in geojson["features"])
+    del_resumen = sum(sum(p["niveles"].values()) for p in resumen["por_peligro"])
+    sin_coordenadas = (
+        ClasificacionPeligro.objects.filter(tipo_peligro__slug="sismo", nivel__gte=2)
+        .filter(Q(centro_poblado__lat=None) | Q(centro_poblado__lon=None))
+        .count()
+    )
+
+    assert del_mapa > 0
+    assert del_mapa == del_resumen - sin_coordenadas
+
+
 # --- Frecuencia de emergencias ---------------------------------------------
 
 

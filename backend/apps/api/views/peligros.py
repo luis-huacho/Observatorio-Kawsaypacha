@@ -162,6 +162,12 @@ class CentroPobladoGeoJSONView(APIView):
                     # 0 = sin dato. Mantenerlo como categoría propia, y no como nivel bajo, es
                     # lo que impide que un vacío de información se lea como ausencia de riesgo.
                     "nivel": c.nivel or 0,
+                    # Cuántas clasificaciones aporta este punto con los filtros puestos. Es el
+                    # número que el visor suma dentro de cada círculo agrupado: la unidad de
+                    # 10,978, no la de 3,238. Vale 0 para los que no cumplen, que siguen en la
+                    # respuesta para pintarse en gris — y así el conteo del mapa sí reacciona a
+                    # los filtros, cosa que `point_count` de MapLibre no podía hacer.
+                    "clasificaciones": len(desglose),
                     # Serializado: las propiedades de un feature agrupado tienen que ser
                     # escalares (spec 05), así que el desglose viaja como texto y el popup lo
                     # parsea.

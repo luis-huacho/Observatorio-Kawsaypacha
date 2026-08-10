@@ -409,6 +409,11 @@ export type PuntoCcpp = {
   altitud: number | null;
   /** 0 = sin dato. Categoría propia, no "nivel bajo". */
   nivel: number;
+  /**
+   * Clasificaciones que este punto aporta con los filtros puestos; 0 si no cumple ninguno.
+   * Es lo que el visor suma para rotular cada grupo — la unidad de las 10,978, no la de 3,238.
+   */
+  clasificaciones: number;
   /** Desglose serializado: las propiedades de un feature agrupado deben ser escalares. */
   peligros: string;
 };

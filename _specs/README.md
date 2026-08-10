@@ -14,6 +14,47 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 10/08/2026 — el número de los grupos del visor no se movía con los filtros
+
+Salió de una pregunta del dueño del proyecto: «los círculos con número, ¿qué cuentan?». Contaban
+centros poblados —`point_count` de MapLibre— y ahí había dos problemas encadenados.
+
+El de fondo es que **el filtro nunca llegaba al mapa**. `anotar_nivel` solo *anota* el nivel;
+únicamente descarta filas cuando recibe `clasificados=1`, y ese parámetro lo manda la tabla pero no
+`/ccpp/geojson/`. Es deliberado —el visor conserva los que no cumplen para pintarlos en gris, porque
+ausencia de dato no es ausencia de riesgo— pero significaba que con «Heladas · nivel 4» puesto el
+grupo seguía diciendo exactamente lo mismo que sin filtros, mientras la tabla de al lado ya había
+encogido. Dos cifras contradictorias en la misma pantalla, y ninguna prueba lo veía porque las de
+API comprobaban el recorte de la tabla y las E2E comprobaban que el mapa pintara.
+
+El segundo es de lectura: un «3» sobre un mapa de peligros se entiende como «aquí hay 3 peligros»,
+no como «3 pueblos». Con lo cual el número más visible del visor decía una cosa y se leía otra.
+
+Se resolvió moviendo el número a la otra unidad (ADR-A16). El endpoint expone ahora
+`clasificaciones` por punto —cuántas sobreviven a los filtros, que la vista ya calculaba para el
+desglose del popup, así que no hay consulta nueva— y el cluster las suma. El tamaño pasa a sumar la
+población **de los que aportan alguna**, para que número y diámetro hablen del mismo conjunto, con
+repliegue a la población total cuando el grupo no aporta ninguna: encogerlo a nada lo escondería
+justo donde falta información. El color se queda como estaba, en el peor nivel del grupo. Un grupo
+sin ninguna clasificación se dibuja sin número, porque un «0» se leería como «evaluado, y sin
+peligro».
+
+El coste es que las dos unidades ahora conviven en la misma vista, así que la cabecera de la tabla
+las muestra juntas y rotuladas: `N CCPP · M peligros clasificados · K sin clasificación`. `M` sale
+de `por_peligro` del resumen y es exactamente lo que da sumar los círculos, de modo que el número
+del mapa cuadra con algo escrito. Hay una prueba que fija esa igualdad, con la única diferencia
+legítima descontada: el geojson excluye los centros poblados sin coordenadas y el resumen no.
+
+Se añadió también un conmutador «Mostrar sin clasificación» en el control de capas, porque con el
+filtro puesto los grises son mayoría y tapan lo que se busca. Va por `setFilter` y no por `setData`
+a propósito: los agregados del grupo ya dejan fuera a los sin dato, así que esconderlos no cambia
+ningún número. Ojo con el gotcha, que queda escrito en 05 y en el código —ocultarlos **no**
+reagrupa: un grupo con 3 sin dato y 2 clasificados sigue siendo un círculo en el mismo sitio,
+rotulado 2—.
+
+Verificado con `pytest tests/test_api_peligros.py` (24 en verde, tres pruebas nuevas), `npm run
+lint` y la suite E2E de `/peligros`.
+
 ### Actualización 10/08/2026 — el spec mandaba al modo lento para el día a día
 
 El spec 07 describía **dos** modos de compose cuando ya había tres, y para «probar producción en

@@ -115,6 +115,20 @@ export default function Peligros() {
   const totalAmbito = cifras?.total_ccpp ?? 0;
   const totalClasificados = tabla.total;
   const sinClasificar = cifras?.por_ccpp.sin_clasificar ?? 0;
+  /**
+   * Clasificaciones que pasan los filtros — la unidad de las 10,978, y la que el visor rotula
+   * dentro de cada grupo. Se muestra junto al conteo de centros poblados porque el mapa y la
+   * tabla cuentan cosas distintas: sin esta cifra no hay forma de cuadrar los círculos con
+   * nada de lo que hay en pantalla.
+   */
+  const totalClasificaciones = useMemo(
+    () =>
+      (cifras?.por_peligro ?? []).reduce(
+        (total, p) => total + Object.values(p.niveles).reduce((a, b) => a + b, 0),
+        0
+      ),
+    [cifras]
+  );
   const nombrePeligro = useMemo(
     () => PELIGROS.find((p) => p.slug === slug)?.nombre ?? "",
     [slug]
@@ -336,6 +350,17 @@ export default function Peligros() {
               </h2>
               <span className="text-sm text-ink-600">
                 {formatNumber(totalClasificados)} CCPP
+                {/* La segunda unidad. El mapa rotula sus grupos con esta, así que sumar los
+                    círculos tiene que dar aquí; sin la cifra, el visor no cuadra con nada.
+                    Difiere del conteo de CCPP porque cada centro poblado aporta una fila por
+                    peligro evaluado. */}
+                <span
+                  className="text-ink-300"
+                  title="Un centro poblado aporta una clasificación por cada peligro evaluado; es la cifra que el mapa muestra dentro de cada grupo."
+                >
+                  {" · "}
+                  {formatNumber(totalClasificaciones)} peligros clasificados
+                </span>
                 {/* Decirlo evita que la tabla se lea como el padrón completo: no tener
                     clasificación no es lo mismo que no tener riesgo. */}
                 {sinClasificar > 0 && (

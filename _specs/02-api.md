@@ -51,6 +51,10 @@ MapLibre solo agrupa fuentes `geojson` (ADR-A13), así que la capa de centros po
         "distrito": "CUSCO", "provincia": "CUSCO", "poblacion": 111930, "altitud": 3439,
         // Máximo de los peligros que sobrevivieron a los filtros. 0 = sin dato.
         "nivel": 4,
+        // Cuántas clasificaciones sobrevivieron a los filtros. 0 en los que no cumplen,
+        // que siguen en la respuesta para pintarse en gris. Es lo que el visor suma para
+        // rotular cada grupo (ADR-A16): la unidad de las 10,978, no la de las 3,238.
+        "clasificaciones": 1,
         // Desglose para el popup, SERIALIZADO: las propiedades de un feature agrupado
         // tienen que ser escalares (ver 05).
         "peligros": "[{\"p\":\"Sismo\",\"n\":4}]"

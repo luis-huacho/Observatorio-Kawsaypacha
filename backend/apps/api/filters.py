@@ -98,9 +98,11 @@ def condicion_clasificacion(peligro: str = "", nivel_min="") -> Q:
 def anotar_nivel(queryset, peligro: str = "", nivel_min="", solo_clasificados: bool = False):
     """Añade `nivel` = máximo de las clasificaciones que sobreviven a los filtros.
 
-    Es la unidad que usan la tabla, el panel de distribución y el mapa: **centros poblados
-    contados una vez, en su nivel más alto**. Agregar sobre las clasificaciones daría 10,978
-    donde la tabla lista 3,238 (los 75 CCPP de Acomayo tienen 3 peligros cada uno).
+    Es la unidad que usan la tabla, el panel de distribución y el **color** de los símbolos del
+    mapa: **centros poblados contados una vez, en su nivel más alto**. Agregar sobre las
+    clasificaciones daría 10,978 donde la tabla lista 3,238 (los 75 CCPP de Acomayo tienen 3
+    peligros cada uno). El **número** de los grupos del visor sí cuenta en esa otra unidad, y
+    para eso el geojson expone `clasificaciones` por punto (ADR-A16).
     """
     condicion = condicion_clasificacion(peligro, nivel_min)
     queryset = queryset.annotate(

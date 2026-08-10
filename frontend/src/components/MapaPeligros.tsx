@@ -69,16 +69,64 @@ function escalaPorPoblacion(campo: maplibregl.ExpressionSpecification) {
 /**
  * Los clusters usan la misma lógica sobre la población agregada del grupo, desplazada hacia
  * arriba: un cluster siempre pesa más que cualquiera de sus puntos y debe leerse como tal.
+ *
+ * La población que cuenta es la de los centros poblados que **aportan clasificaciones** con los
+ * filtros puestos, para que el tamaño y el número hablen del mismo conjunto. Un grupo entero sin
+ * clasificar conserva su población total: sigue viviendo gente ahí, y encogerlo a nada lo haría
+ * invisible justo donde falta información.
  */
 const RADIO_CLUSTER: maplibregl.ExpressionSpecification = [
   "step",
-  ["get", "pob"],
+  ["case", [">", ["get", "clasif"], 0], ["get", "pobClasif"], ["get", "pob"]],
   8,
   200, 11,
   1000, 14,
   10000, 18,
   100000, 24,
 ];
+
+/**
+ * El número del círculo son **clasificaciones**, no centros poblados: uno con tres peligros
+ * evaluados aporta 3. Es la unidad que se lee sin explicación —«aquí hay 3 peligros»— y la
+ * única que reacciona a los filtros; `point_count` no lo hacía, porque los que no cumplen
+ * siguen en la fuente para pintarse en gris.
+ *
+ * Un grupo sin ninguna clasificación se queda sin número: el gris ya dice «sin dato», y un «0»
+ * se leería como «evaluado, y sin peligro».
+ */
+const NUMERO_CLUSTER: maplibregl.ExpressionSpecification = [
+  "case",
+  ["==", ["get", "clasif"], 0], "",
+  ["<", ["get", "clasif"], 1000], ["to-string", ["get", "clasif"]],
+  // Un decimal hasta 10 mil: redondeando al millar, a zoom regional media docena de grupos
+  // distintos se leían todos "1k". Es lo que hacía `point_count_abbreviated`, y los glifos
+  // auto-hospedados (0-255) cubren el punto decimal y la "k".
+  ["<", ["get", "clasif"], 10000],
+  ["concat", ["to-string", ["/", ["round", ["/", ["get", "clasif"], 100]], 10]], "k"],
+  ["concat", ["to-string", ["round", ["/", ["get", "clasif"], 1000]]], "k"],
+];
+
+/**
+ * Filtros de las tres capas de centros poblados.
+ *
+ * El conmutador de «sin clasificación» se aplica **aquí** y no reemplazando los datos: los
+ * agregados del grupo ya dejan fuera a los sin dato, así que esto solo decide qué se dibuja.
+ *
+ * Ojo: ocultarlos no reagrupa. Un grupo con 3 sin dato y 2 clasificados sigue siendo un solo
+ * círculo en el mismo sitio, rotulado 2 — supercluster agrupa la fuente entera antes de que la
+ * capa filtre.
+ */
+function filtroPuntos(mostrarSinDato: boolean): maplibregl.ExpressionSpecification {
+  const suelto: maplibregl.ExpressionSpecification = ["!", ["has", "point_count"]];
+  if (mostrarSinDato) return suelto;
+  return ["all", suelto, [">", ["coalesce", ["get", "clasificaciones"], 0], 0]];
+}
+
+function filtroClusters(mostrarSinDato: boolean): maplibregl.ExpressionSpecification {
+  const grupo: maplibregl.ExpressionSpecification = ["has", "point_count"];
+  if (mostrarSinDato) return grupo;
+  return ["all", grupo, [">", ["get", "clasif"], 0]];
+}
 
 // El protocolo pmtiles:// se registra una sola vez por sesión, no por instancia de mapa.
 let protocoloRegistrado = false;
@@ -287,6 +335,10 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
     });
   }, [capas]);
   const [abierto, setAbierto] = useState(false);
+  // Los centros poblados que no cumplen los filtros se pintan en gris por defecto: la ausencia
+  // de dato es información, y esconderla haría leer «sin evaluar» como «sin peligro». Aun así se
+  // puede apagar, porque con el filtro puesto son mayoría y tapan lo que se está buscando.
+  const [mostrarSinDato, setMostrarSinDato] = useState(true);
 
   useImperativeHandle(
     ref,
@@ -359,6 +411,20 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
             clusterProperties: {
               // El tamaño del grupo lo da la población que concentra, no cuántos puntos son.
               pob: ["+", ["coalesce", ["get", "poblacion"], 0]],
+              // El número: clasificaciones que pasan los filtros. La página no puede recortar la
+              // fuente —los que no cumplen se pintan en gris—, así que el recorte se hace aquí,
+              // sumando lo que cada punto declara aportar.
+              clasif: ["+", ["coalesce", ["get", "clasificaciones"], 0]],
+              // Población de los que aportan alguna, que es la que el radio lee cuando las hay.
+              pobClasif: [
+                "+",
+                [
+                  "case",
+                  [">", ["coalesce", ["get", "clasificaciones"], 0], 0],
+                  ["coalesce", ["get", "poblacion"], 0],
+                  0,
+                ],
+              ],
               // Y el color, el peor nivel del grupo: un cluster no puede verse más benigno que
               // el centro poblado más expuesto que contiene.
               nivelMax: ["max", ["coalesce", ["get", "nivel"], 0]],
@@ -384,7 +450,7 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
           // que resume más información, debe quedar por encima.
           {
             id: "ccpp-puntos", type: "circle", source: "ccpp",
-            filter: ["!", ["has", "point_count"]],
+            filter: filtroPuntos(true),
             paint: {
               "circle-radius": escalaPorPoblacion(["coalesce", ["get", "poblacion"], 0]),
               "circle-color": SIN_DATO,
@@ -395,7 +461,7 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
           },
           {
             id: "ccpp-clusters", type: "circle", source: "ccpp",
-            filter: ["has", "point_count"],
+            filter: filtroClusters(true),
             paint: {
               "circle-radius": RADIO_CLUSTER,
               "circle-color": SIN_DATO,
@@ -406,12 +472,12 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
           },
           {
             id: "ccpp-clusters-num", type: "symbol", source: "ccpp",
-            filter: ["has", "point_count"],
+            filter: filtroClusters(true),
             layout: {
-              "text-field": ["get", "point_count_abbreviated"],
+              "text-field": NUMERO_CLUSTER,
               "text-font": ["Noto Sans Bold"],
               // Acompaña al radio para que el número no desborde los grupos pequeños.
-              "text-size": ["step", ["get", "point_count"], 10, 100, 11, 1000, 12],
+              "text-size": ["step", ["get", "clasif"], 10, 100, 11, 1000, 12],
               "text-allow-overlap": true,
             },
             paint: {
@@ -591,6 +657,18 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
     });
   }, [listo, base]);
 
+  // --- Conmutador de los centros poblados sin clasificación ----------------------------------
+  useEffect(() => {
+    const map = mapa.current;
+    if (!map || !listo) return;
+    cuandoListo(map, () => {
+      map.setFilter("ccpp-puntos", filtroPuntos(mostrarSinDato));
+      for (const capa of ["ccpp-clusters", "ccpp-clusters-num"]) {
+        map.setFilter(capa, filtroClusters(mostrarSinDato));
+      }
+    });
+  }, [listo, mostrarSinDato]);
+
   // --- Conmutador de capas de contexto -------------------------------------------------------
   useEffect(() => {
     const map = mapa.current;
@@ -610,7 +688,10 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
 
       {/* Mapa base y capas de contexto, con la misma disposición que el LayersControl de
           Leaflet: bases arriba (radios), superposiciones abajo (casillas). */}
-      <div className="absolute top-2 right-2 z-10" style={{ marginTop: 78 }}>
+      {/* z-20: al abrirse, el panel llega hasta donde empieza la leyenda —que está en la misma
+          esquina y va después en el DOM—, y esta le robaba los clics de la última casilla. Un
+          desplegable que el usuario acaba de abrir manda sobre lo que hay debajo. */}
+      <div className="absolute top-2 right-2 z-20" style={{ marginTop: 78 }}>
         <button
           type="button"
           onClick={() => setAbierto((v) => !v)}
@@ -652,6 +733,18 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
                 </label>
               ))}
             </div>
+
+            <div className="text-[10px] uppercase tracking-wide text-ink-600 mt-3 mb-1 pt-2 border-t border-ink-300/40">
+              Centros poblados
+            </div>
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={mostrarSinDato}
+                onChange={(e) => setMostrarSinDato(e.target.checked)}
+              />
+              Mostrar sin clasificación
+            </label>
           </div>
         )}
       </div>
@@ -679,6 +772,15 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
           </div>
         </div>
 
+        {/* Cada canal del símbolo codifica una variable distinta y las tres necesitan clave.
+            El número es la que más se malinterpreta: se lee como "cuántos pueblos hay". */}
+        <div className="text-[11px] font-semibold text-ink-900 mt-2 pt-2 border-t border-ink-300/40">
+          Número
+        </div>
+        <div className="text-[10px] text-ink-600 mt-0.5 max-w-[9rem] leading-tight">
+          Peligros clasificados del grupo. Un centro poblado aporta uno por cada peligro evaluado.
+        </div>
+
         {/* El tamaño codifica una segunda variable, así que necesita su propia clave: sin ella
             un círculo grande se lee como "más peligroso" en vez de "más gente expuesta". */}
         <div className="text-[11px] font-semibold text-ink-900 mt-2 pt-2 border-t border-ink-300/40">
@@ -698,7 +800,7 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
           ))}
         </div>
         <div className="text-[10px] text-ink-300 mt-1 max-w-[9rem] leading-tight">
-          Los grupos suman la población de los centros poblados que contienen.
+          Los grupos suman la población de los centros poblados clasificados que contienen.
         </div>
       </div>
     </div>

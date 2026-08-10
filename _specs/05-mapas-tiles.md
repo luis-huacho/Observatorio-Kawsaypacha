@@ -52,8 +52,12 @@ Disparo: guardar `CapaCartografica` con archivo nuevo, o acción "(Re)generar ti
 > Consecuencias que arrastra la decisión, verificadas en el prototipo:
 >
 > - **El filtrado no puede ir por `setFilter`.** Supercluster agrupa la fuente entera *antes* de
->   que la capa aplique su filtro, así que un cluster seguiría contando puntos ya descartados y su
->   conteo mentiría. Se filtra reemplazando los datos con `setData`.
+>   que la capa aplique su filtro, así que los grupos siguen dibujándose donde y como los dictan
+>   los puntos descartados. Se filtra reemplazando los datos con `setData`.
+>   *Matiz (ADR-A16)*: lo que un grupo **dice** ya no depende de `point_count` sino de agregados
+>   calculados por punto, y esos sí distinguen quién cumple. Por eso el conmutador de «sin
+>   clasificación» sí puede ir por `setFilter` —solo esconde, no recuenta—, mientras que los
+>   filtros de la página siguen yendo por `setData`.
 > - **Las propiedades de un feature agrupado deben ser escalares.** Lo que no lo sea (el desglose
 >   de peligros del popup) viaja serializado con `JSON.stringify`.
 > - **El formato ancho `nivel_<slug>` deja de hacer falta en el cliente**, porque la fuente se
@@ -86,25 +90,53 @@ Cusco—, así que una escala lineal deja el 90% de los puntos indistinguibles y
 | 1,000 – 9,999 | 77 | 12 |
 | ≥ 10,000 | 13 | 17 |
 
-Los clusters usan la misma escala sobre la población **agregada** del grupo, desplazada un peldaño
-arriba, y se colorean con el **peor** nivel que contienen — un grupo no puede verse más benigno que
-el centro poblado más expuesto que agrupa. Ambas se declaran con `clusterProperties`:
+**El círculo agrupado codifica tres variables y ninguna es «cuántos puntos hay»** (ADR-A16):
+
+| canal | qué dice | `clusterProperties` |
+|---|---|---|
+| número | clasificaciones que pasan los filtros | `clasif` = `["+", ["coalesce", ["get","clasificaciones"], 0]]` |
+| tamaño | población de los CCPP que aportan alguna | `pobClasif` = suma de `poblacion` con `clasificaciones > 0`; repliegue a `pob` (total) cuando el grupo no aporta ninguna |
+| color | el **peor** nivel que contiene | `nivelMax` = `["max", ["coalesce", ["get","nivel"], 0]]` |
 
 ```js
 cluster: true, clusterRadius: 50, clusterMaxZoom: 12,
 clusterProperties: {
-  pob:      ["+",   ["coalesce", ["get", "poblacion"], 0]],
-  nivelMax: ["max", ["coalesce", ["get", "nivel"],     0]],
+  pob:       ["+",   ["coalesce", ["get", "poblacion"], 0]],
+  clasif:    ["+",   ["coalesce", ["get", "clasificaciones"], 0]],
+  pobClasif: ["+",   ["case", [">", ["coalesce", ["get","clasificaciones"], 0], 0],
+                              ["coalesce", ["get", "poblacion"], 0], 0]],
+  nivelMax:  ["max", ["coalesce", ["get", "nivel"],     0]],
 }
 ```
 
-Tres capas sobre la misma fuente: `ccpp-puntos` (`["!", ["has","point_count"]]`), `ccpp-clusters`
-(`["has","point_count"]`) y `ccpp-clusters-num` (symbol con `point_count_abbreviated`). El punto
-suelto va **debajo** del cluster: a zoom intermedio conviven y el grupo resume más información.
-Clic en cluster → `getClusterExpansionZoom` + `easeTo`.
+El tamaño sigue la escala de la tabla de arriba, desplazada un peldaño; el color no puede verse
+más benigno que el centro poblado más expuesto que agrupa.
 
-**El tamaño necesita su propia clave en la leyenda.** Codifica una segunda variable, y sin
-rotularla un círculo grande se lee como "más peligroso" en vez de "más gente expuesta".
+**Por qué el número no es `point_count`.** Cuenta lo que hay en la fuente, y la fuente no se
+recorta con los filtros: los que no cumplen se quedan para pintarse en gris (`clasificados=1` es
+cosa de la tabla, no del visor). Con «Heladas · nivel 4» puesto, el grupo seguía diciendo lo mismo
+que sin filtros mientras la tabla ya había encogido. Sumando `clasificaciones` —que el API calcula
+**ya filtrada**— el número sí reacciona. Efecto secundario: el mapa cuenta en la unidad de las
+10,978 y la tabla en la de las 3,238, así que la pantalla muestra las dos rotuladas (ver 06).
+
+Un grupo sin ninguna clasificación se dibuja **sin número**: el gris ya dice «sin dato», y un «0»
+se leería como «evaluado, y sin peligro».
+
+Tres capas sobre la misma fuente: `ccpp-puntos` (`["!", ["has","point_count"]]`), `ccpp-clusters`
+y `ccpp-clusters-num` (`["has","point_count"]`). El punto suelto va **debajo** del cluster: a zoom
+intermedio conviven y el grupo resume más información. Clic en cluster →
+`getClusterExpansionZoom` + `easeTo`.
+
+**El conmutador «Mostrar sin clasificación» va por `setFilter`, no por `setData`.** Los agregados
+del grupo ya dejan fuera a los sin dato, así que el conmutador solo decide qué se dibuja: se le
+añade `[">", ["get","clasif"], 0]` a las capas de grupo y el equivalente sobre `clasificaciones` a
+la de puntos sueltos. Ojo, **ocultarlos no reagrupa**: un grupo con 3 sin dato y 2 clasificados
+sigue siendo un solo círculo en el mismo sitio, rotulado 2. Es correcto —supercluster agrupa antes
+de que la capa filtre— y es la razón de no tocar los datos: con `setData` el número cambiaría al
+ocultar, y el usuario leería dos cifras distintas para lo mismo.
+
+**Cada canal necesita su clave en la leyenda.** Sin rotularlos, un círculo grande se lee como «más
+peligroso» en vez de «más gente expuesta», y el número como «cuántos pueblos hay».
 
 ### Pipeline de tiles CCPP (se mantiene, pero ya no alimenta el visor)
 

@@ -70,6 +70,52 @@ test.describe("Visor de exposición a peligros", () => {
       .toBeLessThan(antes);
   });
 
+  test("filtrar reduce también el conteo de peligros clasificados, que es el del mapa", async ({
+    page,
+  }) => {
+    // El número que el visor pinta dentro de cada grupo son clasificaciones, no centros
+    // poblados. Antes salía de `point_count` de MapLibre y era inmune a los filtros: el visor
+    // conserva los que no cumplen para pintarlos en gris, así que el grupo seguía contándolos
+    // mientras la tabla de al lado ya había encogido.
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/peligros/resumen/");
+
+    const contador = page.getByText(/peligros clasificados/);
+    await expect(contador).toBeVisible();
+    const antes = aNumero(await contador.textContent());
+    expect(antes).toBeGreaterThan(0);
+
+    await page.getByLabel("Tipo de peligro").selectOption("heladas");
+    await esperarApi(page, "peligro=heladas");
+    await page.getByRole("button", { name: "Nivel mínimo 4" }).click();
+    await esperarApi(page, "nivel_min=4");
+
+    await expect
+      .poll(async () => aNumero(await contador.textContent()), {
+        message: "el filtro no redujo el conteo de clasificaciones",
+      })
+      .toBeLessThan(antes);
+  });
+
+  test("los centros poblados sin clasificación se pueden ocultar", async ({ page }) => {
+    const errores = vigilarConsola(page);
+
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/ccpp/geojson/");
+    await esperarMapaPintado(page);
+
+    await page.getByRole("button", { name: /Capas/ }).click();
+    const casilla = page.getByLabel("Mostrar sin clasificación");
+    await expect(casilla).toBeChecked();
+
+    // Se apaga con `setFilter`, no reemplazando los datos: si alguien lo cambiara a `setData`,
+    // el mapa volvería a agrupar y el número de los grupos cambiaría al ocultarlos.
+    await casilla.uncheck();
+    await esperarMapaPintado(page);
+
+    expect(errores, `errores en consola:\n${errores.join("\n")}`).toEqual([]);
+  });
+
   test("elegir provincia acota el ámbito y habilita la ayuda memoria por distrito", async ({
     page,
   }) => {
