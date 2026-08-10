@@ -92,9 +92,12 @@ de incidencia, y colapsarla con «bajo riesgo» sería falsear el dato.
 | `informes` | Ayuda memoria PDF y el visor que se captura para su mapa |
 | `api` | Serializers, filtros y vistas. Sin modelos |
 
-**No hay app `inversion`** (ADR-D3): la ventana está diferida porque el cliente aún no tiene
-claridad sobre la data. `/api/inversion/` responde `{"disponible": false}` y el frontend muestra
-su estado vacío con toda la maqueta lista detrás.
+La app **`inversion`** (ADR-D4) modela el PP 0068 **por entidad ejecutora**, no por distrito: quien
+tiene PIA, PIM y devengado es la municipalidad. Guarda el detalle por actividad y calcula el
+reparto por procesos de la GRD al vuelo, contra un catálogo editable en el admin, de modo que
+corregir una clasificación se ve en la web sin reimportar ni recalcular nada. Mientras ningún
+ejercicio esté marcado `visible`, `/api/inversion/` responde `{"disponible": false}` y el frontend
+muestra su estado vacío.
 
 ## Búsqueda
 

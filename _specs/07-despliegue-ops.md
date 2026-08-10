@@ -214,4 +214,4 @@ Sesión grabada (registro audiovisual = anexo del informe final). El guion desar
 8. Leer el dashboard de métricas.
 9. Dónde están los backups y a quién llamar si algo falla.
 
-Pendientes de PREDES para producción: DNS de los dos dominios, credenciales SMTP, API key de Gemini (o se entrega una), servidor (acceso SSH), data de inversión, capas SIG oficiales, textos definitivos.
+Pendientes de PREDES para producción: DNS de los dos dominios, credenciales SMTP, API key de Gemini (o se entrega una), servidor (acceso SSH), capas SIG oficiales, textos definitivos, y **publicar el ejercicio de inversión** (Inversión → Ejercicios → `visible`), que la importación deja oculto a propósito.

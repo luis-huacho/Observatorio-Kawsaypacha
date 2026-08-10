@@ -24,7 +24,7 @@
 |---|---|---|
 | Exposición a peligros naturales | Activa | Excel `Base_Nivel Peligro_CCPP_Cusco.xlsx` (10,978 clasificaciones sobre 8,968 CCPP) + `Base_Frecuencia_Peligro_Cusco.xlsx` (111 distritos) — ver 01 |
 | Medidas (buenas prácticas) | Activa | Contenido editorial (admin) |
-| Inversión (PPR 0068) | **Diferida** (ADR-D3) | **Pendiente: el cliente aún no tiene claridad sobre la data.** Solo se entrega la ruta con estado vacío; sin modelos ni importador |
+| Inversión (PP 0068) | Activa (ADR-D4, supera a ADR-D3) | `Base_Prespuesto_PP0068_cusco_final.xlsx` (corte 2026-06, 119 pliegos) + serie 2022-2025 del comparativo del MEF, consolidadas por `scripts/consolidar_pp0068.py` y `scripts/totales_institucionales.py` — ver 01 |
 | Normativa | Activa | Contenido editorial (admin) |
 | Prioridades | **Desactivada** | — |
 
@@ -66,20 +66,30 @@ Complementan a las ventanas: portada (hero administrable), buscador global, noti
 | A16 | Visor: el número del círculo agrupado cuenta **clasificaciones** (`clasificaciones` del feature, sumada en `clusterProperties`), y su tamaño la población de los centros poblados que aportan alguna | `point_count` de MapLibre (centros poblados del grupo) | `point_count` cuenta lo que hay en la fuente, y la fuente **no se recorta con los filtros**: los que no cumplen siguen en ella para pintarse en gris (A13). El grupo seguía diciendo lo mismo con «Heladas · nivel 4» puesto que sin filtros, mientras la tabla de al lado ya había encogido — dos cifras contradictorias en la misma pantalla. Además la lectura espontánea de un «3» sobre el mapa es «aquí hay 3 peligros», no «3 pueblos». Coste asumido: el mapa queda en la unidad de las 10,978 y la tabla en la de las 3,238, así que **la pantalla muestra las dos rotuladas** y la cabecera de la tabla las reconcilia. Los sin clasificación siguen visibles en gris, con conmutador para ocultarlos |
 | A14 | **Dos dominios**: `observatorio.predes.org.pe` (SPA) y `obs.predes.org.pe` (API, admin, media, tiles, search) | dominio único con `/api` en el mismo origen | Deja el admin y el API fuera del dominio que se difunde, y permite mover cualquiera de los dos por separado. Coste asumido: CORS entre ambos, incluidas cabeceras en `/tiles` y `/media`. Decisión del dueño del proyecto |
 
-> **ADR-D3 — La ventana Inversión no se implementa en esta fase.** El TDR la incluye y sigue siendo parte del producto, pero **el cliente aún no tiene claridad sobre la data**: ni el formato del Excel ni el alcance del PPR 0068 están definidos, y modelar contra un formato imaginado se tira a la basura en cuanto llegue el real. No se crean la app `inversion` ni sus modelos; `GET /api/inversion/` responde `{"disponible": false}` de forma fija y `/inversion` muestra el estado vacío del spec 06. El enlace de menú existe con `EnlaceMenu.visible` editable, así que PREDES puede ocultarlo. Cuando llegue la data se añade la app sin tocar el frontend. Decisión del dueño del proyecto.
+> **ADR-D3 — La ventana Inversión no se implementa en esta fase.** ~~El TDR la incluye y sigue siendo parte del producto, pero **el cliente aún no tiene claridad sobre la data**: ni el formato del Excel ni el alcance del PPR 0068 están definidos, y modelar contra un formato imaginado se tira a la basura en cuanto llegue el real. No se crean la app `inversion` ni sus modelos; `GET /api/inversion/` responde `{"disponible": false}` de forma fija y `/inversion` muestra el estado vacío del spec 06.~~ **Superado por ADR-D4** (10/08/2026): llegó la data. Lo que sí sobrevive: el enlace de menú existe con `EnlaceMenu.visible` editable, y el contrato `{"disponible": false, "motivo"}` se conserva como modo normal —es lo que sirve la ventana mientras PREDES revisa un ejercicio recién importado—. Decisión del dueño del proyecto.
+
+> **ADR-D4 — La unidad de Inversión es la municipalidad, no el distrito.** Supera a ADR-D3, que difería la ventana por falta de data. El cliente entregó `Base_Prespuesto_PP0068_cusco_final.xlsx` (corte 2026-06) y la serie 2022-2025 se reconstruyó desde el comparativo del MEF, así que la ventana se implementa. Al hacerlo cambia la unidad que el spec 01 daba por buena: `InversionDistrito` era herencia del prototipo, pero **quien tiene PIA, PIM y devengado es la entidad ejecutora**, y una municipalidad provincial gestiona presupuesto de toda su provincia — repartirlo entre sus distritos para encajar en el modelo anterior habría inventado cifras distritales que ninguna fuente respalda. Consecuencias que no son opcionales:
+>
+> - Los modelos son `EntidadEjecutora`, `Ejercicio`, `PresupuestoEntidad` y `PresupuestoActividad`; `EjercicioPresupuestal` e `InversionDistrito` del spec 01 quedan sustituidos (ver 01).
+> - **El reparto por procesos de la GRD se clasifica por actividad, no por producto.** A nivel de producto, «3000001 Acciones comunes» (34.6 % del PIM municipal de 2026) y los proyectos de inversión (40.7 %) dejarían tres cuartas partes del dinero en dos cajones que no dicen nada. Las 30 actividades del programa sí nombran el proceso; los proyectos se clasifican por el proyecto, porque sus acciones de obra («expediente técnico», «supervisión y liquidación») son genéricas y se repiten en obras de procesos distintos.
+> - **Seis procesos y no los cinco de la hoja «Campos» del cliente.** Sin un sexto transversal, las tres actividades de acciones comunes —monitoreo del programa, instrumentos estratégicos, asistencia técnica, el 15.8 % del PIM municipal— habría que empujarlas a un proceso que no son.
+> - El mapa coroplético por distrito del diseño original **queda fuera**: no hay geometrías distritales en el proyecto, solo el polígono regional. Ver 06.
+> - **El ejercicio nace oculto.** Importar no publica: `Ejercicio.visible` es una decisión editorial de PREDES, y mientras no la tome la ruta sigue en su estado vacío.
+>
+> Decisión del dueño del proyecto, sobre alcance pedido en reunión: «saber por municipalidad local cómo es el avance de ejecución del presupuesto, en el marco del 0068».
 
 ## Fuera de alcance (esta fase)
 
 - Ventana Prioridades (ADR-P1).
-- Ventana Inversión: modelos, importador y endpoint con datos (ADR-D3). La ruta y su estado vacío sí se entregan.
-- Scraping automático de Consulta Amigable MEF (la inversión se carga por Excel).
+- Mapa coroplético por distrito en Inversión: no hay geometrías distritales en el proyecto (ADR-D4).
+- Scraping automático de Consulta Amigable MEF: la inversión se carga por archivo, vía `DatasetUpload`.
 - i18n quechua, series temporales, 7 procesos GRD, directorio de actores (roadmap futuro, ver `archive/05-roadmap.md`).
 
 ## Dependencias del cliente (riesgos)
 
 | Dependencia | Impacto si no llega | Mitigación |
 |---|---|---|
-| Data de Inversión (Excel) | Ventana vacía | Estado "información en preparación" u ocultar desde admin (ADR-D3) |
+| Data de Inversión (Excel) | ~~Ventana vacía~~ **Entregada** el 09/08/2026 (`Base_Prespuesto_PP0068_cusco_final.xlsx`). Pendiente: el archivo trae dos filas de presupuesto institucional para Pillpinto y ninguna para Yaurisque, así que esas dos municipalidades quedan sin denominador | Cargas siguientes por `DatasetUpload`; mientras no haya ejercicio visible, la ruta muestra "información en preparación" (ADR-D4) |
 | Capas SIG oficiales (especialista SIG) | Capas referenciales | Publicar capas nacionales recortadas a Cusco con atribución |
 | **Polígono oficial de Cusco** (`cusco_region.geojson`) | Ninguno hoy: **resuelto de forma provisional** con geoBoundaries ADM1 (CC BY 4.0), versionado en `backend/apps/mapas/datos/`. Se sustituye por el del INEI cuando llegue | Ver 05 |
 | **Fila de frecuencia de ACOMAYO** (080201) | Un distrito sin historial de emergencias | Estado vacío explícito; pedir la fila al cliente |

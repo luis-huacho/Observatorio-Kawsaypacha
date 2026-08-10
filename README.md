@@ -12,7 +12,7 @@ Plataforma web pública de PREDES para monitorear la **Gestión del Riesgo de De
 | --- | --- |
 | `/peligros`, `/peligros/:codigo` | Visor de exposición: 8.968 centros poblados sobre MapLibre, agrupados y dimensionados por población, con su nivel de peligro. Ficha por centro poblado y ayuda memoria imprimible |
 | `/medidas`, `/medidas/:slug` | Medidas de adaptación con facetas |
-| `/inversion` | Inversión PPR 0068 (a la espera del dato del cliente; la ruta tolera el estado vacío) |
+| `/inversion` | Ejecución del presupuesto del PP 0068 **por municipalidad** (la ruta tolera el estado vacío mientras no haya ejercicio publicado) |
 | `/normativa`, `/normativa/:slug` | Normativa GRD/ACC con enlace a la publicación oficial y export Excel |
 | `/recursos` | Biblioteca documental |
 | `/noticias`, `/eventos`, `/videos` | Actualidad |
@@ -561,9 +561,9 @@ nadie levante el contenedor.
 
 Se implementó todo con valores por defecto seguros, y estas piezas quedan pendientes del cliente:
 DNS de los dos dominios, credenciales SMTP (mientras tanto los correos van al log),
-`GEMINI_API_KEY` (sin ella el resumen con IA se deshabilita con aviso), los datos de Inversión, la
-fila de Acomayo, y sustituir OpenTopoMap por una fuente de mapa base con licencia apta para
-producción.
+`GEMINI_API_KEY` (sin ella el resumen con IA se deshabilita con aviso), publicar el ejercicio de
+Inversión —la importación lo deja oculto a propósito—, la fila de Acomayo, y sustituir OpenTopoMap
+por una fuente de mapa base con licencia apta para producción.
 
 ---
 

@@ -210,15 +210,31 @@ día para otro.
 
 ## Inversión
 
-**`GET /api/inversion/`** responde:
+**`GET /api/inversion/`** — el tablero del PP 0068 **por municipalidad**. Acepta `anio`, `ambito`
+(`municipal` por defecto, `distrital`, `provincial`, `regional`, `todos`) y `provincia` (ubigeo o
+nombre). **`GET /api/inversion/export.xlsx`** devuelve la misma tabla en Excel, con los mismos
+filtros.
+
+Mientras PREDES no publique ningún ejercicio, responde:
 
 ```json
-{"disponible": false, "motivo": "PREDES está consolidando los datos de inversión del PPR 0068."}
+{"disponible": false, "motivo": "PREDES está consolidando los datos de inversión del PP 0068."}
 ```
 
-La sección está diferida porque aún no hay claridad sobre la fuente de datos (ADR-D3). El endpoint
-existe para que el frontend muestre su estado vacío sin casos especiales, y para que el día que
-llegue la data se implemente detrás sin tocar el cliente.
+No es un residuo de cuando la sección estaba diferida: es el estado normal entre una importación y
+su revisión, y ahorra al cliente un caso especial. Un `anio` que no esté publicado devuelve lo
+mismo en vez de caer al último visible, que se vería bien con las cifras de otro año.
+
+Con datos, el payload trae `agregados`, `procesos` (más `sin_clasificar`), `tendencia`,
+`por_entidad` y la lista de `ejercicios` publicados. Tres detalles que conviene no perder al
+consumirlo:
+
+- **`es_parcial` y `corte`** viajan en la raíz y en cada punto de la tendencia. El ejercicio en
+  curso llega a mitad de año y su % de ejecución se calcula contra un PIM anual.
+- **Un porcentaje que no se puede calcular es `null`, no `0`** (`pct_ejecucion`,
+  `pct_0068_institucional`, `pct_proyectos`).
+- **`pct_0068_institucional` de `agregados` solo suma entidades comparables**; por eso viene
+  acompañado de `entidades_con_institucional`.
 
 ## Los tiles
 

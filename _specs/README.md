@@ -14,6 +14,47 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 10/08/2026 — Inversión deja de estar diferida, y su unidad es la municipalidad
+
+Llegó la data que ADR-D3 estaba esperando: `Base_Prespuesto_PP0068_cusco_final.xlsx` (corte
+2026-06, 119 pliegos) y la serie 2022-2025 reconstruida desde el comparativo del MEF. **ADR-D4**
+la implementa y, al hacerlo, corrige la unidad que el spec 01 daba por buena.
+
+**La unidad es la entidad ejecutora, no el distrito.** `InversionDistrito` era herencia del
+prototipo. Quien tiene PIA, PIM y devengado es la municipalidad, y una provincial gestiona
+presupuesto de toda su provincia: repartirlo entre sus distritos para encajar en el modelo
+anterior habría inventado cifras distritales que ninguna fuente respalda.
+
+**El reparto por procesos de la GRD se clasifica por actividad, no por producto.** Fue una
+medición, no una preferencia: a nivel de producto, «3000001 Acciones comunes» concentra el 34.6 %
+del PIM municipal de 2026 y los proyectos de inversión el 40.7 %, así que tres cuartas partes del
+dinero acababan en dos cajones que no dicen nada. Las 30 actividades del programa sí nombran el
+proceso. Los proyectos se clasifican por el proyecto y no por su acción de obra, porque
+«expediente técnico» o «supervisión y liquidación» se repiten en obras de procesos distintos.
+Con las 30 sembradas, «sin clasificar» sale en **cero** sobre los datos reales.
+
+Se añade un sexto proceso, `gestion_transversal`, sobre los cinco que pide la hoja «Campos» del
+cliente: sin él, las tres actividades de acciones comunes —monitoreo del programa, instrumentos
+estratégicos, asistencia técnica, el 15.8 % del PIM— habría que empujarlas a un proceso que no son.
+
+Tres cosas que la implementación dejó escritas en el dato y no en un comentario:
+
+- **`es_parcial` viaja en el payload.** El 47.7 % de ejecución de 2026 es de medio año contra un
+  PIM anual, y la advertencia no puede depender de que la interfaz se acuerde.
+- **Un porcentaje que no se puede calcular es `null`, no `0`.** Una municipalidad sin total
+  institucional no tiene un 0 % de su presupuesto en el 0068; en pantalla se pinta «—».
+- **Importar no publica.** El ejercicio nace oculto y el aviso dice dónde se enciende, así que el
+  estado vacío de la ventana pasa de ser el de una sección diferida al de un ejercicio en revisión.
+
+Dos hallazgos que hay que devolver al cliente: el Excel trae **dos filas de presupuesto
+institucional para Pillpinto y ninguna para Yaurisque** —la segunda cuadra en magnitud con
+Yaurisque, pero repararlo por posición sería adivinar sobre datos ajenos, así que se descartan las
+dos y esas municipalidades quedan sin denominador—, y **cuatro municipalidades de La Convención**
+no casan con el padrón de distritos porque se crearon después.
+
+El mapa coroplético del diseño original queda fuera: no hay geometrías distritales en el proyecto.
+Toca `_specs/00`, `01`, `02`, `03`, `06` y `08`.
+
 ### Actualización 10/08/2026 — el número de los grupos del visor no se movía con los filtros
 
 Salió de una pregunta del dueño del proyecto: «los círculos con número, ¿qué cuentan?». Contaban
@@ -479,7 +520,7 @@ El pipeline del spec 05 se validó de punta a punta en el prototipo (`prototype/
 
 - **ADR-A6bis**: nginx + certbot en contenedor sustituyen a Caddy.
 - **ADR-A14**: dos dominios — `observatorio.predes.org.pe` (SPA) y `obs.predes.org.pe` (API, admin, media, tiles, search), con CORS entre ambos. 07 reescrito en consecuencia. (A13 ya estaba tomado por la capa CCPP agrupada.)
-- **ADR-D3**: la ventana Inversión se difiere; solo se entrega la ruta con su estado vacío.
+- **ADR-D3**: la ventana Inversión se difiere; solo se entrega la ruta con su estado vacío. *(Superado por ADR-D4 el 10/08/2026.)*
 - Se cierran los dos pendientes que los specs arrastraban: **`GET /api/ccpp/geojson/`** queda definido en 02 (FeatureCollection completo con los mismos filtros que la tabla), y el **mapa de la ayuda memoria se renderiza en servidor** con navegador headless.
 - Nuevo **08-plan-pruebas.md**. Se evaluó añadir `data-model.md`, `infra.md`, `prod.md`, `tech.md` y `ui.md`: los cinco ya están cubiertos por 01, 07, 00 y 06, y duplicarlos solo garantiza que se desincronicen.
 - `frontend/` se recreó desde `prototype/`: la copia anterior era previa a la migración a MapLibre.

@@ -72,6 +72,41 @@ dm createsuperuser
 dm check
 ```
 
+### Serie de inversión (PP 0068)
+
+Preparación de los archivos que después se suben por **Datos → Cargas de datos**. Son de un solo
+uso: el día a día es subir el Excel del periodo tal como llega. El volcado nacional del MEF pesa
+~9 GB y **sus columnas de 2026 son copia literal de las de 2025**, por eso el recorte se pide
+`--hasta-ejercicio 2025`.
+
+```bash
+# 1. Recortar el volcado nacional al departamento, descartando el ejercicio falso
+python3 scripts/get_data_cusco.py \
+    data/inversion/comparativo_gastos_2022_2026.csv \
+    data/inversion/comparativo_cusco_gastos_2022_2025.csv \
+    --hasta-ejercicio 2025
+
+# 2. Serie del programa: MEF (2022-2025) + base del cliente (2026)
+python3 scripts/consolidar_pp0068.py \
+    data/inversion/comparativo_cusco_gastos_2022_2025.csv \
+    data/inversion/Base_Prespuesto_PP0068_cusco_final.xlsx \
+    data/inversion/pp0068_cusco_2022_2026_largo.csv
+
+# 3. Denominador: presupuesto institucional por entidad y ejercicio
+python3 scripts/totales_institucionales.py \
+    data/inversion/comparativo_cusco_gastos_2022_2025.csv \
+    data/inversion/Base_Prespuesto_PP0068_cusco_final.xlsx \
+    data/inversion/pp0068_cusco_institucional_2022_2026.csv
+
+# Explorar el volcado con SQL (base desechable, no sustituye a DatasetUpload)
+python3 scripts/csv_a_sqlite.py data/inversion/comparativo_cusco_gastos_2022_2025.csv \
+    inversion_cusco.sqlite3 --rehacer
+python3 scripts/crear_vista_larga.py inversion_cusco.sqlite3 --programa 0068
+```
+
+Tras importar, el ejercicio queda **oculto**: se publica marcando `visible` en
+**Inversión → Ejercicios presupuestales**.
+
 ## Búsqueda
 
 ```bash

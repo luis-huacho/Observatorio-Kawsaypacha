@@ -181,30 +181,54 @@ Notas del contrato:
 } ] }
 ```
 
-## Inversión (data pendiente del cliente)
+## Inversión (PP 0068)
 
 | Endpoint | Params |
 |---|---|
-| `GET /api/inversion/` | `anio` (default: último ejercicio visible) |
-| `GET /api/inversion/export.xlsx` | `anio` |
+| `GET /api/inversion/` | `anio` (default: el más reciente visible), `ambito` (`municipal` por defecto \| distrital \| provincial \| regional \| todos), `provincia` (ubigeo o nombre) |
+| `GET /api/inversion/export.xlsx` | los mismos |
 
-Sin datos cargados (o ejercicio `visible=False`):
+Sin ningún ejercicio `visible`:
 ```json
-{ "disponible": false }
+{ "disponible": false, "motivo": "PREDES está consolidando los datos de inversión del PP 0068." }
 ```
-Con datos — misma forma que `inversion.mock.json`:
+
+Es el **mismo contrato** que servía la ventana cuando estaba diferida, y se conserva a propósito: el cliente no necesita un caso especial para «hay datos pero todavía sin publicar», que es el estado normal entre una importación y la revisión de PREDES.
+
+Un `anio` que no existe o que no está visible **no cae al último**: devuelve `disponible: false`. Servir otro ejercicio se vería perfecto y todas las cifras serían del año equivocado.
+
+Con datos:
 ```jsonc
 {
-  "disponible": true, "anio": 2025,
-  "agregados": { "pim_total": 145000000, "ejecutado": 78000000,
-                 "porcentaje_ejecucion": 0.538, "municipios_con_ppr_0068": 87 },
-  "comparacion_prevencion_respuesta": { "prevencion_total": 52000000, "respuesta_total": 26000000 },
-  "por_distrito": [ { "ubigeo": "080101", "distrito": "Cusco", "provincia": "Cusco",
-                      "pia": 5800000, "pim": 6700000, "devengado": 4200000,
-                      "pct_prevencion": 0.55, "pct_respuesta": 0.45 } ],
-  "tendencia": [ { "anio": 2021, "pim": 98000000, "devengado": 62000000 } ]
+  "disponible": true, "anio": 2026, "corte": "2026-06", "es_parcial": true,
+  "fuente": "Base PP 0068 entregada por PREDES",
+  "ambito": "municipal", "unidad": "municipalidad (entidad ejecutora), no distrito",
+  "agregados": { "pia": 16754644, "pim": 54591255, "devengado": 26064745,
+                 "pct_ejecucion": 0.4775, "saldo": 28526510, "variacion_pia_pim": 37836611,
+                 "entidades_con_presupuesto": 115, "entidades_en_ambito": 116,
+                 "pct_0068_institucional": 0.0127, "entidades_con_institucional": 114,
+                 "pim_proyectos": 22217511, "pim_actividades": 32373744, "pct_proyectos": 0.407 },
+  "procesos": [ { "slug": "prevencion_reduccion", "nombre": "Prevención y reducción",
+                  "color": "#009257", "pim": 28909461, "devengado": 0, "pct": 0.53 } ],
+  "sin_clasificar": { "pim": 0, "devengado": 0, "pct": 0 },
+  "tendencia": [ { "anio": 2022, "corte": "anual", "es_parcial": false, "fuente": "…",
+                   "pia": 18060834, "pim": 48813109, "devengado": 37260987 } ],
+  "por_entidad": [ { "codigo": "300684", "entidad": "MUNICIPALIDAD PROVINCIAL DEL CUZCO",
+                     "ambito": "provincial", "ubigeo_distrito": "080101",
+                     "distrito": "CUSCO", "provincia": "CUSCO",
+                     "pia": 0, "pim": 0, "devengado": 0, "pct_ejecucion": 0.0,
+                     "saldo": 0, "variacion_pia_pim": 0, "pct_variacion_pia_pim": 0.0,
+                     "pim_institucional": 270220526, "pct_0068_institucional": 0.0,
+                     "pim_proyectos": 0, "pim_actividades": 0, "pct_proyectos": 0.0 } ],
+  "ejercicios": [ { "anio": 2026, "corte": "2026-06", "es_parcial": true } ]
 }
 ```
+
+Tres reglas del payload que la interfaz no puede reinventar:
+
+- **`es_parcial` y `corte` viajan con el dato**, en la raíz y en cada punto de `tendencia`. Un % de ejecución de medio año se calcula contra un PIM anual: cualquier cliente que lo dibuje tiene que poder advertirlo.
+- **Un porcentaje que no se puede calcular es `null`, no `0`.** Una municipalidad sin total institucional no tiene un 0 % de su presupuesto en el 0068.
+- **`pct_0068_institucional` de `agregados` solo suma entidades comparables.** Con el numerador de las 116 y el denominador de las 114 que tienen total, el porcentaje saldría inflado sin que nada lo dijera; por eso viaja `entidades_con_institucional`.
 
 ## Productos de incidencia
 
