@@ -9,11 +9,10 @@ export type CentroPoblado = {
   lat: number | null;
   lon: number | null;
   altitud: number | null;
-  poblacion: number | null;
   /**
    * Máximo de los peligros que sobreviven a los filtros de la petición; `null` = sin dato con
    * esos filtros. Lo anota el API (`/api/ccpp/`), no se calcula en el cliente: es la unidad que
-   * comparten la tabla, el panel de distribución y el mapa.
+   * comparten la tabla, la grilla de resultados y el color de los símbolos del mapa.
    */
   nivel?: Nivel | null;
 };
@@ -21,6 +20,11 @@ export type CentroPoblado = {
 /** Ficha completa: `/api/ccpp/{codigo}/`. */
 export type CentroPobladoDetalle = CentroPoblado & {
   clasificaciones: ClasificacionPeligro[];
+  /**
+   * La ficha sí publica la población, aunque el listado y el mapa ya no (ADR-A17): aquí es un
+   * atributo del centro poblado, no una escala con la que compararlo contra los otros 8,967.
+   */
+  poblacion: number | null;
 };
 
 export type Nivel = 1 | 2 | 3 | 4;
@@ -142,6 +146,33 @@ export type InversionEntidad = {
   pim_proyectos: number;
   pim_actividades: number;
   pct_proyectos: number | null;
+  /** Solo con `comparar_con`. Ver `InversionComparacionFila`. */
+  comparacion?: InversionComparacionFila;
+};
+
+/**
+ * Comparación de una municipalidad contra otro ejercicio.
+ *
+ * `comparable` es falso cuando los dos ejercicios tienen cortes distintos: un 47.7 % a junio
+ * contra un 83 % de año cerrado no es una caída de ejecución. El Δ se muestra igual —así se
+ * decidió— pero **siempre marcado**, y la marca viaja aquí para que ningún cliente tenga que
+ * redescubrir la regla.
+ */
+export type InversionComparacionFila = {
+  anio: number;
+  corte: string;
+  es_parcial: boolean;
+  comparable: boolean;
+  /** La municipalidad no tenía presupuesto del 0068 ese año: los deltas son null, no cero. */
+  sin_presupuesto: boolean;
+  pia: number | null;
+  pim: number | null;
+  devengado: number | null;
+  pct_ejecucion: number | null;
+  delta_pim: number | null;
+  pct_delta_pim: number | null;
+  delta_devengado: number | null;
+  delta_pct_ejecucion: number | null;
 };
 
 export type InversionProceso = {
@@ -194,9 +225,86 @@ export type Inversion = {
   /** Lo que el catálogo aún no imputa a ningún proceso. No se reparte ni se esconde. */
   sin_clasificar: { pim: number; devengado: number; pct: number | null };
   tendencia: InversionPuntoTendencia[];
-  por_entidad: InversionEntidad[];
-  ejercicios: Array<{ anio: number; corte: string; es_parcial: boolean }>;
+  ejercicios: InversionEjercicio[];
+  /** Solo con `comparar_con`: los agregados del otro ejercicio y sus deltas. */
+  comparacion?: InversionComparacionAgregada;
 };
+
+export type InversionEjercicio = { anio: number; corte: string; es_parcial: boolean };
+
+export type InversionComparacionAgregada = {
+  anio: number;
+  corte: string;
+  es_parcial: boolean;
+  comparable: boolean;
+  agregados: Inversion["agregados"];
+  deltas: {
+    pia: number;
+    pim: number;
+    devengado: number;
+    pct_pim: number | null;
+    pct_ejecucion: number | null;
+  };
+};
+
+/** Un año de la historia de una municipalidad: `/api/inversion/entidades/{codigo}/`. */
+export type InversionSerieAnio = {
+  anio: number;
+  corte: string;
+  es_parcial: boolean;
+  fuente: string;
+  pia: number;
+  pim: number;
+  devengado: number;
+  pct_ejecucion: number | null;
+  saldo: number;
+  variacion_pia_pim: number;
+  pct_variacion_pia_pim: number | null;
+  pia_institucional: number | null;
+  pim_institucional: number | null;
+  devengado_institucional: number | null;
+  pct_0068_institucional: number | null;
+};
+
+export type InversionActividad = {
+  codigo: string;
+  nombre: string;
+  origen: "actividad" | "proyecto";
+  /** null = el catálogo aún no la imputa a ningún proceso. */
+  proceso: string | null;
+  proceso_slug: string | null;
+  pia: number;
+  pim: number;
+  devengado: number;
+  pct_ejecucion: number | null;
+};
+
+export type InversionEntidadDetalle = {
+  entidad: {
+    codigo: string;
+    nombre: string;
+    ambito: InversionEntidad["ambito"];
+    ambito_nombre: string;
+    ubigeo_distrito: string | null;
+    distrito: string | null;
+    provincia: string | null;
+    /** No casa con el padrón de distritos: cuenta en los totales, pero no se cruza con él. */
+    sin_territorio: boolean;
+  };
+  anio: number;
+  corte: string;
+  es_parcial: boolean;
+  fuente: string;
+  serie: InversionSerieAnio[];
+  procesos: InversionProceso[];
+  sin_clasificar: { pim: number; devengado: number; pct: number | null };
+  actividades: InversionActividad[];
+  ejercicios: InversionEjercicio[];
+};
+
+export type InversionDetalleResponse =
+  | { disponible: false; motivo: string }
+  | ({ disponible: true } & InversionEntidadDetalle);
 
 export type PrioridadDistrito = {
   ubigeo: string;
@@ -323,6 +431,7 @@ export type Distrito = {
  */
 export type ResumenPeligros = {
   total_ccpp: number;
+  /** No lo usa /peligros —la población salió del visor (ADR-A17)—; sí el comparador de distritos. */
   poblacion_total: number;
   por_ccpp: {
     niveles: Record<"1" | "2" | "3" | "4", number>;
@@ -332,6 +441,14 @@ export type ResumenPeligros = {
     peligro: string;
     slug: string;
     niveles: Record<"1" | "2" | "3" | "4", number>;
+    /**
+     * Centros poblados con ESTE peligro tras los filtros. Coincide con la suma de `niveles`
+     * y no por casualidad: la base impide dos clasificaciones del mismo peligro en un mismo
+     * centro poblado, así que **dentro de una fila las dos unidades son la misma**. Por eso la
+     * grilla de resultados puede rotular «centros poblados» sin ambigüedad; la de 3.4× solo
+     * aparece al sumar la columna entre tipos.
+     */
+    centros_poblados: number;
     sin_dato: number;
   }>;
   unidades: { por_ccpp: string; por_peligro: string };
@@ -463,10 +580,15 @@ export type PuntoCcpp = {
   distrito: string;
   provincia: string;
   ubigeo_distrito: string;
-  poblacion: number;
   altitud: number | null;
   /** 0 = sin dato. Categoría propia, no "nivel bajo". */
   nivel: number;
+  /**
+   * Slug del peligro que gana (mayor nivel; a igualdad, el primero del catálogo). Es la FORMA
+   * del ícono en el mapa. Lo decide el servidor para que el símbolo y el popup no discrepen.
+   * `""` = sin dato.
+   */
+  peligro: string;
   /**
    * Clasificaciones que este punto aporta con los filtros puestos; 0 si no cumple ninguno.
    * Es lo que el visor suma para rotular cada grupo — la unidad de las 10,978, no la de 3,238.
@@ -474,6 +596,13 @@ export type PuntoCcpp = {
   clasificaciones: number;
   /** Desglose serializado: las propiedades de un feature agrupado deben ser escalares. */
   peligros: string;
+} & {
+  /**
+   * Desglose por nivel (`n1`…`n4`) y presencia por tipo (`p_<slug>`), que es lo único que
+   * `clusterProperties` sabe acumular. **Solo vienen las claves distintas de cero**, para no
+   * inflar con ceros un payload que ronda los 2 MB.
+   */
+  [clave: string]: string | number | null;
 };
 
 /** Catálogo de peligros tal como lo devuelve `/api/peligros/tipos/`. */

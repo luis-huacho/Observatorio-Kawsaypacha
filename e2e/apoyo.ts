@@ -43,8 +43,18 @@ export function vigilarConsola(page: Page): string[] {
 
 /** El API responde JSON y no un HTML de error: distingue «vacío» de «roto». */
 export async function esperarApi(page: Page, ruta: string | RegExp): Promise<Response> {
+  // Se compara contra la URL **decodificada**: `URLSearchParams` codifica la coma de los filtros
+  // de lista (`niveles=1,4` → `niveles=1%2C4`), y obligar a cada prueba a escribir `%2C` las
+  // vuelve ilegibles y frágiles sin ganar nada.
+  const legible = (r: Response) => {
+    try {
+      return decodeURIComponent(r.url());
+    } catch {
+      return r.url();
+    }
+  };
   const respuesta = await page.waitForResponse(
-    (r) => (typeof ruta === "string" ? r.url().includes(ruta) : ruta.test(r.url())),
+    (r) => (typeof ruta === "string" ? legible(r).includes(ruta) : ruta.test(legible(r))),
     { timeout: 30_000 },
   );
   expect(respuesta.status(), `${respuesta.url()} respondió ${respuesta.status()}`).toBeLessThan(400);

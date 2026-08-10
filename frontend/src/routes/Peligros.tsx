@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy } from "react";
+import { useMemo, useRef, useState, Suspense, lazy } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight, Download, FileText, Filter } from "lucide-react";
 import { urlApi, useApi, useApiPaginado } from "@/lib/api";
@@ -7,34 +7,44 @@ import type {
   CapaMapa,
   CentroPoblado,
   Distrito,
-  FrecuenciaDistrito,
   Nivel,
   Provincia,
   ResumenPeligros,
+  TipoPeligroApi,
 } from "@/lib/types";
-import { PELIGROS } from "@/lib/types";
-import { NIVEL_BG, NIVEL_LABEL, formatNumber } from "@/lib/semaforo";
+import { iconoDe } from "@/lib/iconosPeligro";
+import { NIVEL_BG, NIVEL_COLOR, NIVEL_LABEL, formatNumber } from "@/lib/semaforo";
 import GeoSelector from "@/components/GeoSelector";
-import SemaforoChip from "@/components/SemaforoChip";
+import ChecklistFiltro from "@/components/ChecklistFiltro";
+import ResultadosExposicion from "@/components/ResultadosExposicion";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
-import FrecuenciaEmergencias from "@/components/FrecuenciaEmergencias";
-import ReporteImpresion from "@/components/ReporteImpresion";
 import type { MapaPeligrosHandle } from "@/components/MapaPeligros";
 
 const MapaPeligros = lazy(() => import("@/components/MapaPeligros"));
 
 const POR_PAGINA = 50;
+/** De más grave a menos: es el orden en que se lee un semáforo de riesgo. */
+const NIVELES: Nivel[] = [4, 3, 2, 1];
 
-/** Datos congelados en el momento de pulsar "ayuda memoria". */
-type Reporte = { mapaPng: string | null; mapaBase: string; generadoEn: Date };
-
+/**
+ * Exposición a peligros: qué centros poblados están expuestos, a qué y en qué nivel.
+ *
+ * La página responde **una sola pregunta**. La frecuencia histórica de emergencias —el otro eje
+ * de la fuente, que cuenta lo que ya ocurrió, por distrito y con otra taxonomía— se retiró de
+ * aquí: mezclarlas hacía que los filtros de esta pantalla no afectaran a aquel panel y la
+ * pantalla pareciera mal calculada. Sus modelos, endpoints y el PDF siguen intactos, a la
+ * espera de dónde reubicarla.
+ */
 export default function Peligros() {
   const [provincia, setProvincia] = useState("");
   const [distrito, setDistrito] = useState("");
-  // El selector guarda el slug del catálogo, que es también lo que filtra el API.
-  const [slug, setSlug] = useState("");
-  const [nivelMin, setNivelMin] = useState(0);
+  // Selección múltiple. `null` = "aún no se ha tocado", que se resuelve a "todos" en cuanto
+  // llega el catálogo: sin esto el primer render filtraría por una lista vacía.
+  const [tipos, setTipos] = useState<string[] | null>(null);
+  const [niveles, setNiveles] = useState<Nivel[]>(NIVELES);
+
+  const tablaRef = useRef<HTMLDivElement>(null);
 
   // Catálogo territorial para el GeoSelector: 13 + 112 filas, sin paginar. Va ANTES de
   // `filtros`: ese memo traduce nombre → ubigeo leyendo estas listas, y declararlas después
@@ -42,6 +52,15 @@ export default function Peligros() {
   // porque sin nombre la traducción cortocircuitaba antes de tocarla.
   const provincias = useApi<Provincia[]>("/territorio/provincias/");
   const distritos = useApi<Distrito[]>("/territorio/distritos/");
+
+  // Catálogo de peligros: nombre, orden, color e **ícono**. Sustituye a la constante `PELIGROS`
+  // del cliente para que añadir un peligro en el admin no exija desplegar el frontend.
+  const catalogo = useApi<TipoPeligroApi[]>("/peligros/tipos/");
+  const peligros = useMemo(
+    () => (catalogo.status === "ok" ? catalogo.data : []),
+    [catalogo.status, catalogo.status === "ok" ? catalogo.data : null]
+  );
+  const seleccionTipos = tipos ?? peligros.map((p) => p.slug);
 
   const nombreAUbigeoProvincia = useMemo(() => {
     const mapa = new Map<string, string>();
@@ -58,118 +77,81 @@ export default function Peligros() {
    * hay colisiones, pero la suposición era implícita y basta una fusión de distritos para que
    * deje de cumplirse.
    */
-  const ubigeoDeDistrito = useMemo(() => {
+  const ubigeoDistrito = useMemo(() => {
     if (distritos.status !== "ok" || !distrito) return "";
     const candidatos = distritos.data.filter((d) => d.nombre === distrito);
     if (candidatos.length === 1) return candidatos[0].ubigeo;
     return candidatos.find((d) => d.provincia === provincia)?.ubigeo ?? "";
   }, [distritos.status, distritos.status === "ok" ? distritos.data : null, distrito, provincia]);
 
-  // Filtros tal como los espera el API. `clasificados` solo aplica a la tabla.
+  /**
+   * Desmarcar todo es un estado real y significa «nada», no «todo».
+   *
+   * Mandar la lista completa o no mandarla es equivalente para el API, así que cuando están
+   * todas marcadas se omite el parámetro: así la vista sin filtros comparte entrada de caché
+   * con la de arranque en vez de duplicarla.
+   */
+  const vacio = seleccionTipos.length === 0 || niveles.length === 0;
+
   const filtros = useMemo(
     () => ({
       provincia: nombreAUbigeoProvincia.get(provincia) ?? "",
-      distrito: ubigeoDeDistrito,
-      peligro: slug,
-      nivel_min: nivelMin || undefined,
+      distrito: ubigeoDistrito,
+      peligros:
+        seleccionTipos.length && seleccionTipos.length < peligros.length
+          ? [...seleccionTipos].sort().join(",")
+          : undefined,
+      niveles:
+        niveles.length && niveles.length < 4 ? [...niveles].sort().join(",") : undefined,
     }),
-    [nombreAUbigeoProvincia, provincia, ubigeoDeDistrito, slug, nivelMin]
+    [nombreAUbigeoProvincia, provincia, ubigeoDistrito, seleccionTipos, niveles, peligros.length]
   );
 
-  // Cifras del panel de distribución. Vienen agregadas: contar en el cliente exigiría
+  // Cifras de la grilla de resultados. Vienen agregadas: contarlas en el cliente exigiría
   // descargar las 10,978 clasificaciones (spec 06).
-  const resumen = useApi<ResumenPeligros>("/peligros/resumen/", filtros);
-
+  const resumen = useApi<ResumenPeligros>(vacio ? null : "/peligros/resumen/", filtros);
   // Tabla: solo los clasificados, paginados de 50 en 50 por el servidor.
-  const tabla = useApiPaginado<CentroPoblado>("/ccpp/", { ...filtros, clasificados: 1 });
-
-  // Puntos del visor: FeatureCollection ya filtrado, con `nivel` y el desglose serializado
-  // (ADR-A13). El mapa hereda exactamente los mismos filtros que la tabla porque los dos
-  // salen de `filtros`.
-  const puntos = useApi<GeoJSON.FeatureCollection<GeoJSON.Point>>("/ccpp/geojson/", filtros);
-
+  const tabla = useApiPaginado<CentroPoblado>(vacio ? null : "/ccpp/", {
+    ...filtros,
+    clasificados: 1,
+  });
+  // Puntos del visor: FeatureCollection ya filtrado (ADR-A13). El mapa hereda exactamente los
+  // mismos filtros que la tabla porque los dos salen de `filtros`.
+  const puntos = useApi<GeoJSON.FeatureCollection<GeoJSON.Point>>(
+    vacio ? null : "/ccpp/geojson/",
+    filtros
+  );
   // Capas de contexto del catálogo del admin: solo las que tienen tiles listos. Reemplazar una
   // capa o cambiarle el color es editarla ahí, sin desplegar (requisito 1 del TDR).
   const capas = useApi<CapaMapa[]>("/mapas/capas/");
 
-  // Emergencias del distrito. Sin distrito no se pide nada: el periodo de observación es por
-  // distrito y un agregado regional no podría anunciar ninguno (spec 02).
-  const ubigeoDistrito = ubigeoDeDistrito;
-  const frecuencia = useApi<FrecuenciaDistrito>(
-    ubigeoDistrito ? `/peligros/frecuencia/${ubigeoDistrito}/` : null
-  );
-
   const cifras = resumen.status === "ok" ? resumen.data : null;
-  // Distribución por centro poblado (nivel máximo), que es la unidad de la tabla y del mapa.
-  const stats: Record<Nivel, number> = useMemo(() => {
-    const vacio = { 1: 0, 2: 0, 3: 0, 4: 0 } as Record<Nivel, number>;
-    if (!cifras) return vacio;
-    return {
-      1: cifras.por_ccpp.niveles["1"],
-      2: cifras.por_ccpp.niveles["2"],
-      3: cifras.por_ccpp.niveles["3"],
-      4: cifras.por_ccpp.niveles["4"],
-    };
-  }, [cifras]);
-
-  const totalAmbito = cifras?.total_ccpp ?? 0;
-  const totalClasificados = tabla.total;
-  const sinClasificar = cifras?.por_ccpp.sin_clasificar ?? 0;
-  /**
-   * Clasificaciones que pasan los filtros — la unidad de las 10,978, y la que el visor rotula
-   * dentro de cada grupo. Se muestra junto al conteo de centros poblados porque el mapa y la
-   * tabla cuentan cosas distintas: sin esta cifra no hay forma de cuadrar los círculos con
-   * nada de lo que hay en pantalla.
-   */
-  const totalClasificaciones = useMemo(
-    () =>
-      (cifras?.por_peligro ?? []).reduce(
-        (total, p) => total + Object.values(p.niveles).reduce((a, b) => a + b, 0),
-        0
-      ),
-    [cifras]
-  );
-  const nombrePeligro = useMemo(
-    () => PELIGROS.find((p) => p.slug === slug)?.nombre ?? "",
-    [slug]
-  );
-
-  const filasTabla = useMemo(
-    () =>
-      tabla.resultados.map((c) => ({ ccpp: c, nivel: (c.nivel ?? 0) as Nivel })),
-    [tabla.resultados]
-  );
 
   const puntosMapa = useMemo<GeoJSON.FeatureCollection<GeoJSON.Point>>(
     () =>
-      puntos.status === "ok"
-        ? puntos.data
-        : { type: "FeatureCollection", features: [] },
+      puntos.status === "ok" ? puntos.data : { type: "FeatureCollection", features: [] },
     [puntos.status, puntos.status === "ok" ? puntos.data : null]
   );
 
-  // La tabla ya llega paginada del servidor; `POR_PAGINA` es el tamaño que pide el API.
-  const visibles = filasTabla;
-  const cargando = tabla.cargando || resumen.status === "loading";
+  const verRelacion = (slug: string) => {
+    setTipos([slug]);
+    tablaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
-  // --- Ayuda memoria y export ----------------------------------------------------------------
+  // --- Descargas -----------------------------------------------------------------------------
   const mapaRef = useRef<MapaPeligrosHandle>(null);
 
   /**
    * La ayuda memoria la genera el **servidor** (spec 02): el mapa se renderiza allí con un
    * navegador headless, así que el documento es reproducible a partir de sus parámetros y se
    * puede pedir desde el admin o por lotes, sin depender de que alguien tenga el visor abierto.
-   *
-   * En el prototipo esto era `window.print()` sobre `ReporteImpresion`. Ese componente se
-   * conserva porque es la maqueta de la que salió la plantilla del backend, pero ya no se usa.
    */
   const urlAyudaMemoria = ubigeoDistrito
     ? urlApi(`/distritos/${ubigeoDistrito}/ayuda-memoria.pdf`, {
-        peligro: slug,
-        nivel_min: nivelMin || undefined,
+        peligros: filtros.peligros,
+        niveles: filtros.niveles,
       })
     : "";
-
   const urlExport = urlApi("/ccpp/export.xlsx", { ...filtros, clasificados: 1 });
 
   return (
@@ -214,236 +196,199 @@ export default function Peligros() {
       />
 
       <div className="container-page py-8 no-imprimir">
-      <div className="grid lg:grid-cols-[280px_1fr] gap-6">
-        {/* Filtros */}
-        <aside className="card p-5 h-fit lg:sticky lg:top-20">
-          <div className="flex items-center gap-2 mb-4">
-            <Filter className="w-4 h-4 text-mountain-700" />
-            <span className="font-display font-semibold text-mountain-900">Filtros</span>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-ink-600 mb-1">Ubicación</label>
-              <GeoSelector
-                provincias={provincias.status === "ok" ? provincias.data : []}
-                distritos={distritos.status === "ok" ? distritos.data : []}
-                provincia={provincia}
-                distrito={distrito}
-                onChange={(p, d) => {
-                  setProvincia(p);
-                  setDistrito(d);
-                }}
-              />
+        <div className="grid lg:grid-cols-[280px_1fr] gap-6">
+          {/* Filtros: ubicación, tipo, nivel. Y nada más — los resultados viven al lado. */}
+          <aside className="card p-5 h-fit lg:sticky lg:top-20">
+            <div className="flex items-center gap-2 mb-4">
+              <Filter className="w-4 h-4 text-mountain-700" />
+              <span className="font-display font-semibold text-mountain-900">Filtros</span>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-ink-600 mb-1">Tipo de peligro</label>
-              <select
-                aria-label="Tipo de peligro"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                className="control w-full"
-              >
-                <option value="">Todos (nivel máximo)</option>
-                {PELIGROS.map((p) => (
-                  <option key={p.slug} value={p.slug}>{p.nombre}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-ink-600 mb-1">
-                Nivel mínimo
-              </label>
-              <div
-                role="group"
-                aria-label="Nivel mínimo"
-                className="flex gap-1 bg-mountain-100/60 rounded-full p-1"
-              >
-                {[0, 1, 2, 3, 4].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setNivelMin(n)}
-                    aria-pressed={nivelMin === n}
-                    aria-label={n === 0 ? "Todos los niveles" : `Nivel mínimo ${n}`}
-                    className={`flex-1 py-1.5 text-sm rounded-full transition ${
-                      nivelMin === n
-                        ? "bg-mountain-700 text-white shadow-sm"
-                        : "text-ink-600 hover:bg-white"
-                    }`}
-                  >
-                    {n === 0 ? "Todos" : n}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-ink-300/30">
-              {/* Decir la unidad evita leer estos conteos como número de clasificaciones: cada
-                  centro poblado aparece una sola vez, en el más alto de sus peligros evaluados. */}
-              <div className="text-xs text-ink-600">Distribución</div>
-              <div className="text-[10px] text-ink-300 mb-2">
-                por centro poblado (nivel máximo)
-              </div>
-              <div className="space-y-1">
-                {([4, 3, 2, 1] as Nivel[]).map((n) => (
-                  <div key={n} className="flex items-center justify-between text-xs">
-                    <SemaforoChip nivel={n} />
-                    <span className="font-mono font-semibold">{formatNumber(stats[n])}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-ink-300/30">
-                <span className="text-ink-600">Total</span>
-                {/* El total sale del resumen del servidor, no de las filas cargadas: con la
-                    tabla paginada de 50 en 50 las dos cifras dejaron de coincidir. */}
-                <span className="font-mono font-semibold">
-                  {formatNumber(totalClasificados)} CCPP
-                </span>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* Mapa */}
-        <section>
-          <div className="mb-2">
-            <span className="text-xs text-ink-600">
-              Capas geográficas activables: lagunas, ríos y glaciares.
-            </span>
-          </div>
-          <div className="card p-1 h-[600px] overflow-hidden">
-            {puntos.status === "loading" ? (
-              <div className="h-full grid place-items-center text-ink-600">Cargando mapa…</div>
-            ) : puntos.status === "ok" ? (
-              <Suspense fallback={<div className="h-full grid place-items-center text-ink-600">Cargando mapa…</div>}>
-                <MapaPeligros
-                  ref={mapaRef}
-                  capas={capas.status === "ok" ? capas.data : []}
-                  puntos={puntosMapa}
-                  peligroSlug={slug || null}
-                  ambitoAcotado={Boolean(provincia || distrito)}
+            <div className="space-y-5">
+              <div>
+                <label className="block text-xs font-medium text-ink-600 mb-1">Ubicación</label>
+                <GeoSelector
+                  provincias={provincias.status === "ok" ? provincias.data : []}
+                  distritos={distritos.status === "ok" ? distritos.data : []}
+                  provincia={provincia}
+                  distrito={distrito}
+                  onChange={(p, d) => {
+                    setProvincia(p);
+                    setDistrito(d);
+                  }}
                 />
-              </Suspense>
-            ) : (
-              <EmptyState
-                title="No se pudo cargar el mapa"
-                message={puntos.error?.message}
+              </div>
+
+              <ChecklistFiltro
+                titulo="Tipo de peligro"
+                seleccion={seleccionTipos}
+                onChange={setTipos}
+                opciones={peligros.map((p) => {
+                  const Icono = iconoDe(p.icono);
+                  return {
+                    valor: p.slug,
+                    etiqueta: p.nombre,
+                    adorno: (
+                      <Icono className="w-4 h-4 shrink-0 text-mountain-700" aria-hidden />
+                    ),
+                  };
+                })}
               />
-            )}
-          </div>
 
-          {/* Frecuencia histórica de emergencias del distrito seleccionado */}
-          {/* `null` cuando no hay distrito elegido y cuando el API responde 404 (el distrito
-              no tiene fila en la fuente): el componente distingue los dos casos. */}
-          <FrecuenciaEmergencias
-            frecuencia={frecuencia.status === "ok" ? frecuencia.data : null}
-            distrito={distrito}
-          />
-
-          {/* Lista compacta */}
-          <div className="card mt-4 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <h2 className="font-display font-semibold text-mountain-900">
-                Centros poblados con clasificación de peligro
-              </h2>
-              <span className="text-sm text-ink-600">
-                {formatNumber(totalClasificados)} CCPP
-                {/* La segunda unidad. El mapa rotula sus grupos con esta, así que sumar los
-                    círculos tiene que dar aquí; sin la cifra, el visor no cuadra con nada.
-                    Difiere del conteo de CCPP porque cada centro poblado aporta una fila por
-                    peligro evaluado. */}
-                <span
-                  className="text-ink-300"
-                  title="Un centro poblado aporta una clasificación por cada peligro evaluado; es la cifra que el mapa muestra dentro de cada grupo."
-                >
-                  {" · "}
-                  {formatNumber(totalClasificaciones)} peligros clasificados
-                </span>
-                {/* Decirlo evita que la tabla se lea como el padrón completo: no tener
-                    clasificación no es lo mismo que no tener riesgo. */}
-                {sinClasificar > 0 && (
-                  <span className="text-ink-300">
-                    {" · "}
-                    {formatNumber(sinClasificar)} sin clasificación
-                  </span>
-                )}
-              </span>
+              <ChecklistFiltro
+                titulo="Nivel de peligro"
+                seleccion={niveles.map(String)}
+                onChange={(valores) => setNiveles(valores.map(Number) as Nivel[])}
+                opciones={NIVELES.map((n) => ({
+                  valor: String(n),
+                  etiqueta: NIVEL_LABEL[n],
+                  adorno: (
+                    <span
+                      className="w-3 h-3 rounded-sm shrink-0"
+                      style={{ backgroundColor: NIVEL_COLOR[n] }}
+                      aria-hidden
+                    />
+                  ),
+                }))}
+              />
             </div>
-            {filasTabla.length === 0 ? (
+          </aside>
+
+          <section>
+            {vacio ? (
               <EmptyState
-                title={
-                  sinClasificar > 0 ? "Sin clasificaciones registradas" : "Sin centros poblados"
-                }
-                message={
-                  sinClasificar > 0
-                    ? `Los ${formatNumber(sinClasificar)} centros poblados del ámbito no tienen ` +
-                      "clasificación de peligro para los filtros aplicados. La ausencia de dato no " +
-                      "equivale a ausencia de riesgo."
-                    : "Ningún centro poblado coincide con los filtros actuales."
-                }
+                title="Sin filtros que aplicar"
+                message="No hay ningún tipo de peligro o ningún nivel marcado. Marca al menos uno para ver los centros poblados expuestos."
               />
             ) : (
               <>
-                <div className="-mx-2 overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="text-xs text-ink-600 uppercase tracking-wide">
-                      <tr>
-                        <th className="text-left px-2 py-2">Centro poblado</th>
-                        <th className="text-left px-2 py-2 hidden sm:table-cell">Distrito</th>
-                        <th className="text-right px-2 py-2">Población</th>
-                        <th className="text-center px-2 py-2">Nivel</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibles.map(({ ccpp: c, nivel }) => (
-                        <tr key={c.codigo} className="border-t border-ink-300/20 hover:bg-mountain-100/40">
-                          <td className="px-2 py-2">
-                            <Link className="text-mountain-900 hover:text-mountain-700 no-underline" to={`/peligros/${c.codigo}`}>
-                              {c.nombre}
-                            </Link>
-                            <div className="text-xs text-ink-600">{c.categoria}</div>
-                          </td>
-                          <td className="px-2 py-2 hidden sm:table-cell text-ink-600">{c.distrito}</td>
-                          <td className="px-2 py-2 text-right font-mono">
-                            {c.poblacion != null ? formatNumber(c.poblacion) : "—"}
-                          </td>
-                          <td className="px-2 py-2 text-center">
-                            <span className={`chip border ${NIVEL_BG[nivel]}`}>
-                              {NIVEL_LABEL[nivel]}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <ResultadosExposicion
+                  cifras={cifras}
+                  tipos={peligros}
+                  totalClasificados={tabla.total}
+                  cargando={resumen.status === "loading"}
+                  onVerRelacion={verRelacion}
+                />
+
+                <div className="mb-2">
+                  <span className="text-xs text-ink-600">
+                    Capas geográficas activables: lagunas, ríos y glaciares.
+                  </span>
+                </div>
+                <div className="card p-1 h-[600px] overflow-hidden">
+                  {puntos.status === "loading" ? (
+                    <div className="h-full grid place-items-center text-ink-600">
+                      Cargando mapa…
+                    </div>
+                  ) : puntos.status === "ok" ? (
+                    <Suspense
+                      fallback={
+                        <div className="h-full grid place-items-center text-ink-600">
+                          Cargando mapa…
+                        </div>
+                      }
+                    >
+                      <MapaPeligros
+                        ref={mapaRef}
+                        capas={capas.status === "ok" ? capas.data : []}
+                        puntos={puntosMapa}
+                        tipos={peligros}
+                        ambitoAcotado={Boolean(provincia || distrito)}
+                      />
+                    </Suspense>
+                  ) : (
+                    <EmptyState
+                      title="No se pudo cargar el mapa"
+                      message={puntos.error?.message}
+                    />
+                  )}
                 </div>
 
-                {/* Paginación del SERVIDOR, acumulando páginas. Se pasó de «anterior/siguiente»
-                    a «cargar más» porque ahora cada página es una petición: con los botones de
-                    antes, retroceder volvía a pedir al API lo que el usuario acababa de ver. */}
-                <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-ink-300/30">
-                  <span className="text-xs text-ink-600">
-                    Mostrando {formatNumber(visibles.length)} de{" "}
-                    {formatNumber(totalClasificados)} centros poblados clasificados
-                  </span>
-                  {tabla.hayMas && (
-                    <button
-                      onClick={tabla.cargarMas}
-                      disabled={tabla.cargando}
-                      className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded border border-ink-300/40 text-ink-600 hover:bg-mountain-100 disabled:opacity-40 disabled:hover:bg-transparent"
-                    >
-                      {tabla.cargando ? "Cargando…" : `Ver ${POR_PAGINA} más`}
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                {/* Relación de centros poblados */}
+                <div ref={tablaRef} className="card mt-4 p-5 scroll-mt-24">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <h2 className="font-display font-semibold text-mountain-900">
+                      Centros poblados con clasificación de peligro
+                    </h2>
+                    <span className="text-sm text-ink-600">
+                      {formatNumber(tabla.total)} CCPP
+                    </span>
+                  </div>
+                  {tabla.resultados.length === 0 ? (
+                    <EmptyState
+                      title="Sin clasificaciones registradas"
+                      message="Ningún centro poblado del ámbito tiene clasificación de peligro para los filtros aplicados. La ausencia de dato no equivale a ausencia de riesgo."
+                    />
+                  ) : (
+                    <>
+                      <div className="-mx-2 overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="text-xs text-ink-600 uppercase tracking-wide">
+                            <tr>
+                              <th className="text-left px-2 py-2">Centro poblado</th>
+                              <th className="text-left px-2 py-2 hidden sm:table-cell">
+                                Distrito
+                              </th>
+                              <th className="text-center px-2 py-2">Nivel</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tabla.resultados.map((c) => (
+                              <tr
+                                key={c.codigo}
+                                className="border-t border-ink-300/20 hover:bg-mountain-100/40"
+                              >
+                                <td className="px-2 py-2">
+                                  <Link
+                                    className="text-mountain-900 hover:text-mountain-700 no-underline"
+                                    to={`/peligros/${c.codigo}`}
+                                  >
+                                    {c.nombre}
+                                  </Link>
+                                  <div className="text-xs text-ink-600">{c.categoria}</div>
+                                </td>
+                                <td className="px-2 py-2 hidden sm:table-cell text-ink-600">
+                                  {c.distrito}
+                                </td>
+                                <td className="px-2 py-2 text-center">
+                                  <span
+                                    className={`chip border ${NIVEL_BG[(c.nivel ?? 1) as Nivel]}`}
+                                  >
+                                    {NIVEL_LABEL[(c.nivel ?? 1) as Nivel]}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Paginación del SERVIDOR, acumulando páginas. Se pasó de «anterior/
+                          siguiente» a «cargar más» porque ahora cada página es una petición: con
+                          los botones de antes, retroceder volvía a pedir lo recién visto. */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-ink-300/30">
+                        <span className="text-xs text-ink-600">
+                          Mostrando {formatNumber(tabla.resultados.length)} de{" "}
+                          {formatNumber(tabla.total)} centros poblados clasificados
+                        </span>
+                        {tabla.hayMas && (
+                          <button
+                            onClick={tabla.cargarMas}
+                            disabled={tabla.cargando}
+                            className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded border border-ink-300/40 text-ink-600 hover:bg-mountain-100 disabled:opacity-40 disabled:hover:bg-transparent"
+                          >
+                            {tabla.cargando ? "Cargando…" : `Ver ${POR_PAGINA} más`}
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               </>
             )}
-          </div>
-        </section>
-      </div>
+          </section>
+        </div>
       </div>
     </>
   );

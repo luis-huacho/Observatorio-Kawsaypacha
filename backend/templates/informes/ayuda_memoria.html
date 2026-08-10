@@ -84,7 +84,7 @@
     Cusco) registra <strong>{{ total_ambito|miles }}</strong>
     {{ total_ambito|plural_es:"centro poblado,centros poblados" }} en el padrón del Observatorio.
     De ellos, <strong>{{ total_clasificados|miles }}</strong>
-    {{ total_clasificados|plural_es:"cuenta,cuentan" }} con clasificación de nivel de peligro{% if nombre_peligro %} frente a <strong>{{ nombre_peligro|lower }}</strong>{% endif %}{% if nivel_min %} en nivel {{ nivel_min_label|lower }} o superior{% endif %}, según la
+    {{ total_clasificados|plural_es:"cuenta,cuentan" }} con clasificación de nivel de peligro{% if nombre_peligro %} frente a <strong>{{ nombre_peligro|lower }}</strong>{% endif %}{% if niveles_pedidos %} en los niveles seleccionados{% endif %}, según la
     información de {{ fuentes|join:", " }}.
   </p>
   {% if total_clasificados %}

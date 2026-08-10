@@ -27,12 +27,10 @@
 <script>
   const COLOR = { 1: "#5BBB5D", 2: "#EBB320", 3: "#F57C15", 4: "#970A00", 0: "#9CA3AF" };
 
-  // Radio por clases graduadas y no lineal: la población de los CCPP va de 0 a 111,930 y una
-  // escala lineal deja el 90% de los puntos indistinguibles (spec 05).
-  const RADIO = [
-    "step", ["coalesce", ["get", "poblacion"], 0],
-    2.5, 1, 4, 50, 6, 200, 8.5, 1000, 12, 10000, 17,
-  ];
+  // Radio fijo: el tamaño dejó de codificar población (ADR-A17). El geojson ya no la publica,
+  // y aunque lo hiciera no serviría de escala — 948 centros poblados valen 0 y la mediana es
+  // 17 habitantes. En este mapa el único canal es el color, que es lo que el PDF explica.
+  const RADIO = 3;
 
   maplibregl.addProtocol("pmtiles", new pmtiles.Protocol().tile);
 

@@ -20,7 +20,8 @@ from ..filters import (
     CentroPobladoFilter,
     DistritoFilter,
     FrecuenciaFilter,
-    anotar_nivel,
+    condicion_clasificacion_local,
+    parametros_exposicion,
     por_ubigeo_o_nombre,
 )
 from ..throttling import DescargaThrottle
@@ -28,8 +29,23 @@ from ..throttling import DescargaThrottle
 PARAMS_CCPP = [
     OpenApiParameter("provincia", description="Ubigeo de 4 dígitos o nombre."),
     OpenApiParameter("distrito", description="Ubigeo de 6 dígitos o nombre."),
-    OpenApiParameter("peligro", description="Slug del peligro (p. ej. `movimientos_en_masa`)."),
-    OpenApiParameter("nivel_min", description="Nivel mínimo, 1-4.", type=int),
+    OpenApiParameter(
+        "peligros",
+        description="Slugs separados por coma (`sismo,heladas`). Ausente o vacío = todos.",
+    ),
+    OpenApiParameter(
+        "niveles",
+        description="Niveles separados por coma (`1,4`). Es una **selección**, no un umbral: "
+        "`1,4` deja fuera los niveles 2 y 3. Ausente o vacío = todos.",
+    ),
+    OpenApiParameter(
+        "peligro", description="Compatibilidad: un solo slug o nombre. Usar `peligros`.",
+        deprecated=True,
+    ),
+    OpenApiParameter(
+        "nivel_min", description="Compatibilidad: umbral 1-4; `3` equivale a `niveles=3,4`.",
+        type=int, deprecated=True,
+    ),
     OpenApiParameter("buscar", description="Coincidencia parcial en el nombre."),
     OpenApiParameter(
         "clasificados",
@@ -124,55 +140,65 @@ class CentroPobladoGeoJSONView(APIView):
 
         # El popup necesita el desglose por peligro. Se trae en una sola consulta y se agrupa
         # en memoria: 10,978 filas es barato, y hacerlo por punto serían 8,968 consultas.
+        # El orden lo pone la base —nivel descendente, y a igualdad el orden del catálogo—,
+        # que es el mismo criterio con el que se elige el peligro que pinta el ícono.
         peligros_por_ccpp: dict[int, list] = {}
         from apps.peligros.models import ClasificacionPeligro
 
-        condicion = ClasificacionPeligro.objects.filter(
-            centro_poblado__in=queryset.values("pk")
-        ).select_related("tipo_peligro")
-        if peligro := request.query_params.get("peligro"):
-            condicion = condicion.filter(tipo_peligro__slug=peligro)
-        if nivel_min := request.query_params.get("nivel_min"):
-            try:
-                condicion = condicion.filter(nivel__gte=int(nivel_min))
-            except (TypeError, ValueError):
-                pass
+        peligros, niveles = parametros_exposicion(request.query_params)
+        condicion = (
+            ClasificacionPeligro.objects.filter(centro_poblado__in=queryset.values("pk"))
+            .filter(condicion_clasificacion_local(peligros, niveles))
+            .select_related("tipo_peligro")
+            .order_by("-nivel", "tipo_peligro__orden")
+        )
         for c in condicion:
             peligros_por_ccpp.setdefault(c.centro_poblado_id, []).append(
-                {"p": c.tipo_peligro.nombre, "n": c.nivel}
+                {"s": c.tipo_peligro.slug, "p": c.tipo_peligro.nombre, "n": c.nivel}
             )
 
         features = []
         for c in queryset.iterator(chunk_size=2000):
-            desglose = sorted(
-                peligros_por_ccpp.get(c.pk, []), key=lambda x: x["n"], reverse=True
-            )
+            desglose = peligros_por_ccpp.get(c.pk, [])
+            propiedades = {
+                "codigo": c.codigo,
+                "nombre": c.nombre,
+                "categoria": c.categoria,
+                "distrito": c.distrito.nombre,
+                "provincia": c.distrito.provincia.nombre,
+                "ubigeo_distrito": c.distrito_id,
+                "altitud": c.altitud,
+                # 0 = sin dato. Mantenerlo como categoría propia, y no como nivel bajo, es
+                # lo que impide que un vacío de información se lea como ausencia de riesgo.
+                "nivel": c.nivel or 0,
+                # Slug del peligro que gana, que es la FORMA del ícono en el visor. Se decide
+                # aquí y no en el cliente: el símbolo y el desglose del popup salen del mismo
+                # cálculo, y duplicarlo garantiza que acaben discrepando. "" = sin dato.
+                "peligro": desglose[0]["s"] if desglose else "",
+                # Cuántas clasificaciones aporta este punto con los filtros puestos. Es el
+                # número que el visor suma dentro de cada círculo agrupado: la unidad de
+                # 10,978, no la de 3,238. Vale 0 para los que no cumplen, que siguen en la
+                # respuesta para pintarse en gris — y así el conteo del mapa sí reacciona a
+                # los filtros, cosa que `point_count` de MapLibre no podía hacer.
+                "clasificaciones": len(desglose),
+                # Serializado: las propiedades de un feature agrupado tienen que ser
+                # escalares (spec 05), así que el desglose viaja como texto y el popup lo
+                # parsea.
+                "peligros": json.dumps(desglose, ensure_ascii=False),
+            }
+            # Desglose por nivel y por tipo, que es lo único que `clusterProperties` sabe
+            # acumular: MapLibre suma escalares que ya vengan en el feature, así que sin esto
+            # un grupo no puede decir de qué peligros y de qué niveles está hecho. Se emiten
+            # **solo las claves distintas de cero** — el punto medio tiene 1.2 clasificaciones
+            # y llenar 13 ceros por feature engordaría el payload de 2 MB sin decir nada.
+            for entrada in desglose:
+                clave = f"n{entrada['n']}"
+                propiedades[clave] = propiedades.get(clave, 0) + 1
+                propiedades[f"p_{entrada['s']}"] = 1
             features.append({
                 "type": "Feature",
                 "geometry": {"type": "Point", "coordinates": [c.lon, c.lat]},
-                "properties": {
-                    "codigo": c.codigo,
-                    "nombre": c.nombre,
-                    "categoria": c.categoria,
-                    "distrito": c.distrito.nombre,
-                    "provincia": c.distrito.provincia.nombre,
-                    "ubigeo_distrito": c.distrito_id,
-                    "poblacion": c.poblacion or 0,
-                    "altitud": c.altitud,
-                    # 0 = sin dato. Mantenerlo como categoría propia, y no como nivel bajo, es
-                    # lo que impide que un vacío de información se lea como ausencia de riesgo.
-                    "nivel": c.nivel or 0,
-                    # Cuántas clasificaciones aporta este punto con los filtros puestos. Es el
-                    # número que el visor suma dentro de cada círculo agrupado: la unidad de
-                    # 10,978, no la de 3,238. Vale 0 para los que no cumplen, que siguen en la
-                    # respuesta para pintarse en gris — y así el conteo del mapa sí reacciona a
-                    # los filtros, cosa que `point_count` de MapLibre no podía hacer.
-                    "clasificaciones": len(desglose),
-                    # Serializado: las propiedades de un feature agrupado tienen que ser
-                    # escalares (spec 05), así que el desglose viaja como texto y el popup lo
-                    # parsea.
-                    "peligros": json.dumps(desglose, ensure_ascii=False),
-                },
+                "properties": propiedades,
             })
 
         cuerpo = {"type": "FeatureCollection", "features": features}
@@ -203,15 +229,9 @@ class TipoPeligroViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ResumenPeligrosView(APIView):
-    """`/api/peligros/resumen/` — cifras de la portada y del panel de distribución."""
+    """`/api/peligros/resumen/` — cifras de la portada y de la grilla de resultados."""
 
-    @extend_schema(
-        parameters=[
-            OpenApiParameter("provincia"), OpenApiParameter("distrito"),
-            OpenApiParameter("peligro"), OpenApiParameter("nivel_min", type=int),
-        ],
-        responses={200: dict},
-    )
+    @extend_schema(parameters=PARAMS_CCPP, responses={200: dict})
     def get(self, request):
         queryset = CentroPoblado.objects.all()
         if provincia := request.query_params.get("provincia"):
@@ -222,12 +242,8 @@ class ResumenPeligrosView(APIView):
             queryset = por_ubigeo_o_nombre(
                 queryset, "distrito__ubigeo", "distrito__nombre", distrito
             )
-        datos = consultas.resumen(
-            queryset,
-            peligro=request.query_params.get("peligro", ""),
-            nivel_min=request.query_params.get("nivel_min", ""),
-        )
-        return Response(datos)
+        peligros, niveles = parametros_exposicion(request.query_params)
+        return Response(consultas.resumen(queryset, peligros=peligros, niveles=niveles))
 
 
 class FrecuenciaListaView(APIView):

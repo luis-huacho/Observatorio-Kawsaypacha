@@ -134,6 +134,7 @@ class Command(BaseCommand):
                 "categoria_geo": p["categoria_geo"],
                 "orden": p["orden"],
                 "color": p["color"],
+                "icono": p["icono"],
             }
             for p in PELIGROS
         ]

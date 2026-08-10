@@ -44,8 +44,9 @@ Disparo: guardar `CapaCartografica` con archivo nuevo, o acción "(Re)generar ti
 ## Capa CCPP: GeoJSON agrupado, no tile vectorial
 
 > **Cambio respecto de la versión anterior de este spec.** Los centros poblados del visor **ya no
-> se leen de `ccpp.pmtiles`**. El dueño del proyecto pidió *marker clustering* con símbolos
-> proporcionales a la población, y **MapLibre solo agrupa fuentes `geojson`**: no existe clustering
+> se leen de `ccpp.pmtiles`**. El dueño del proyecto pidió *marker clustering* (entonces con
+> símbolos proporcionales a población, que ADR-A17 retiró después), y **MapLibre solo agrupa
+> fuentes `geojson`**: no existe clustering
 > sobre fuentes vectoriales, ni parámetro que lo habilite. Las capas de contexto (ríos, lagunas,
 > glaciares) siguen en PMTiles sin cambios; la excepción es únicamente la capa CCPP.
 >
@@ -75,42 +76,52 @@ Disparo: guardar `CapaCartografica` con archivo nuevo, o acción "(Re)generar ti
 > reimplementar supercluster en Python y a pedir datos en cada paneo; queda como salida si el
 > payload llegara a molestar.
 
-### Símbolos proporcionales y clusters
+### Los canales del símbolo (ADR-A17)
 
-La población de los CCPP es muy asimétrica —mediana 23 habitantes, máximo 111,930 en la ciudad del
-Cusco—, así que una escala lineal deja el 90% de los puntos indistinguibles y una escala continua
-(raíz) no se puede leyendar. Clases graduadas, con el reparto real del padrón:
+**Un punto suelto codifica dos variables: la FORMA dice el tipo de peligro y el COLOR dice el
+nivel.** Ni el tamaño ni la población entran ya en la ecuación.
 
-| Población | CCPP | radio |
-|---|---:|---:|
-| 0 (sin dato) | 948 | 2.5 |
-| 1 – 49 | 5,471 | 4 |
-| 50 – 199 | 1,938 | 6 |
-| 200 – 999 | 521 | 8.5 |
-| 1,000 – 9,999 | 77 | 12 |
-| ≥ 10,000 | 13 | 17 |
+| canal | qué dice | cómo |
+|---|---|---|
+| ícono | tipo de peligro que gana: mayor nivel, y a igualdad el primero por `TipoPeligro.orden` | `icon-image` = `["concat","peligro-",["get","peligro"],"-",["to-string",["get","nivel"]]]`. El ganador **lo decide el servidor** y viaja en `peligro`; recalcularlo en el cliente separaría el símbolo del popup |
+| color | nivel 1-4 | horneado en la imagen: 36 bitmaps (9 tipos × 4 niveles) |
+| gris liso | sin clasificación | capa `circle` aparte (`ccpp-sin-dato`), sin ícono: darle uno lo haría parecer evaluado |
 
-**El círculo agrupado codifica tres variables y ninguna es «cuántos puntos hay»** (ADR-A16):
+**Por qué 36 imágenes rasterizadas y no SDF.** Con `{sdf: true}` bastaría una por tipo y el color
+saldría de `icon-color`, pero SDF resuelve mal los íconos de **trazo** como los de lucide: adelgaza
+el contorno hasta hacerlo ilegible al tamaño de un punto de mapa. 36 bitmaps de 88×88 no cuestan
+nada y dan control total sobre el disco, el anillo y el grosor.
+
+**La población salió como canal visual.** La fuente la trae y el reparto real es este —948 CCPP con
+0 y mediana 17 habitantes—, así que 6,419 de 8,968 caían en los dos peldaños más pequeños y el
+tamaño no distinguía casi nada. Peor: el diámetro hablaba de población y el número de
+clasificaciones, dos cosas distintas en el mismo círculo.
+
+**El círculo agrupado codifica tres variables y ninguna es «cuántos puntos hay»** (ADR-A16, con el
+tamaño revisado por A17):
 
 | canal | qué dice | `clusterProperties` |
 |---|---|---|
 | número | clasificaciones que pasan los filtros | `clasif` = `["+", ["coalesce", ["get","clasificaciones"], 0]]` |
-| tamaño | población de los CCPP que aportan alguna | `pobClasif` = suma de `poblacion` con `clasificaciones > 0`; repliegue a `pob` (total) cuando el grupo no aporta ninguna |
+| tamaño | **lo mismo que el número** — así los dos hablan del mismo conjunto | `clasif`, escala `step` 9→26 px |
 | color | el **peor** nivel que contiene | `nivelMax` = `["max", ["coalesce", ["get","nivel"], 0]]` |
+| desglose | de qué niveles y de qué tipos está hecho el grupo | `niv1..niv4` y `t_<slug>`, sumas de las `n<k>` / `p_<slug>` del feature |
 
 ```js
 cluster: true, clusterRadius: 50, clusterMaxZoom: 12,
 clusterProperties: {
-  pob:       ["+",   ["coalesce", ["get", "poblacion"], 0]],
-  clasif:    ["+",   ["coalesce", ["get", "clasificaciones"], 0]],
-  pobClasif: ["+",   ["case", [">", ["coalesce", ["get","clasificaciones"], 0], 0],
-                              ["coalesce", ["get", "poblacion"], 0], 0]],
-  nivelMax:  ["max", ["coalesce", ["get", "nivel"],     0]],
+  clasif:   ["+",   ["coalesce", ["get", "clasificaciones"], 0]],
+  nivelMax: ["max", ["coalesce", ["get", "nivel"],           0]],
+  niv1: ["+", ["coalesce", ["get","n1"], 0]],  // … niv2, niv3, niv4
+  ...Object.fromEntries(tipos.map(t => [`t_${t.slug}`,
+        ["+", ["coalesce", ["get", `p_${t.slug}`], 0]]])),
 }
 ```
 
-El tamaño sigue la escala de la tabla de arriba, desplazada un peldaño; el color no puede verse
-más benigno que el centro poblado más expuesto que agrupa.
+MapLibre solo sabe acumular escalares que **ya vengan en el feature**, así que sin `n<k>` y
+`p_<slug>` un grupo no puede decir de qué está hecho. El API los emite **solo cuando no son cero**:
+el punto medio tiene 1.2 clasificaciones, y trece ceros por feature engordarían un payload de 2 MB
+sin aportar nada.
 
 **Por qué el número no es `point_count`.** Cuenta lo que hay en la fuente, y la fuente no se
 recorta con los filtros: los que no cumplen se quedan para pintarse en gris (`clasificados=1` es
@@ -122,9 +133,21 @@ que sin filtros mientras la tabla ya había encogido. Sumando `clasificaciones` 
 Un grupo sin ninguna clasificación se dibuja **sin número**: el gris ya dice «sin dato», y un «0»
 se leería como «evaluado, y sin peligro».
 
-Tres capas sobre la misma fuente: `ccpp-puntos` (`["!", ["has","point_count"]]`), `ccpp-clusters`
-y `ccpp-clusters-num` (`["has","point_count"]`). El punto suelto va **debajo** del cluster: a zoom
-intermedio conviven y el grupo resume más información. Clic en cluster →
+#### Dos gotchas que no dan ningún error
+
+1. **`icon-allow-overlap` es obligatorio.** Sin él, el motor de etiquetado de MapLibre descarta por
+   colisión la mayoría de los 3,238 símbolos y el visor se ve medio vacío **sin una sola línea en
+   consola**. Va con `icon-ignore-placement: true`.
+2. **La capa `symbol` se añade DESPUÉS de registrar las imágenes**, no en el estilo inicial. Un
+   `icon-image` que apunta a una imagen inexistente emite un error *por punto* y no dibuja nada.
+   Como red de seguridad hay un `styleimagemissing` que registra un píxel blanco, de modo que un
+   ícono que falle degrada a punto liso en vez de desaparecer.
+
+Cuatro capas sobre la misma fuente: `ccpp-sin-dato` (suelto y `clasificaciones == 0`, círculo
+gris), `ccpp-puntos` (suelto y `clasificaciones > 0`, **`symbol`** con el ícono del tipo),
+`ccpp-clusters` y `ccpp-clusters-num` (`["has","point_count"]`). Los sueltos van **debajo** del
+cluster: a zoom intermedio conviven y el grupo resume más información. `symbol-sort-key` =
+`["-", 4, ["get","nivel"]]` para que donde se solapen gane el más grave. Clic en cluster →
 `getClusterExpansionZoom` + `easeTo`.
 
 **El conmutador «Mostrar sin clasificación» va por `setFilter`, no por `setData`.** Los agregados
@@ -152,7 +175,7 @@ No es una CapaCartografica: comando `manage.py generar_tiles_ccpp` (encadenado t
 { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-71.9767, -13.5192] },
   "properties": { "codigo": "0801010001", "nombre": "CUSCO", "categoria": "CIUDAD",
     "distrito": "CUSCO", "provincia": "CUSCO", "ubigeo_distrito": "080101",
-    "poblacion": 111930, "altitud": 3439,
+    "altitud": 3439, "peligro": "sismo", "n4": 1, "p_sismo": 1,
     "nivel_sismo": 4, "nivel_max": 4 } }
 ```
 Los nueve slugs, que deben coincidir con `TipoPeligro.slug` y con `PELIGROS` en `frontend/src/lib/types.ts`: `nivel_sismo`, `nivel_heladas`, `nivel_bajas_temperaturas`, `nivel_friaje`, `nivel_sequia`, **`nivel_lluvias_intensas`**, `nivel_inundacion`, **`nivel_incendios_forestales`**, `nivel_movimientos_en_masa`, más `nivel_max`.

@@ -35,15 +35,20 @@ export default function GeoSelector({
       .sort((a, b) => a.localeCompare(b, "es"));
   }, [distritosApi, provincia]);
 
+  // Apilados siempre, y con `min-w-0`. Antes era `flex-col sm:flex-row`, pero ese breakpoint
+  // mira el ancho de la **ventana** y no el del contenedor: en escritorio ponía los dos selects
+  // en fila dentro del panel de filtros de 280 px, donde no caben. Sin `min-w-0` un `<select>`
+  // no encoge por debajo de su opción más larga, así que el segundo se salía de la tarjeta y se
+  // superponía a los resultados; con él cabían, pero ilegibles a ~125 px cada uno.
   return (
-    <div className="flex flex-col sm:flex-row gap-2">
+    <div className="flex flex-col gap-2 w-full">
       {/* `aria-label` en los dos: el rótulo «Ubicación» que hay encima describe el par, no cada
           select, así que un lector de pantalla anunciaría dos combos sin nombre. */}
       <select
         aria-label="Provincia"
         value={provincia}
         onChange={(e) => onChange(e.target.value, "")}
-        className="control"
+        className="control min-w-0 flex-1"
       >
         <option value="">Todas las provincias</option>
         {provincias.map((p) => (
@@ -55,7 +60,7 @@ export default function GeoSelector({
         value={distrito}
         onChange={(e) => onChange(provincia, e.target.value)}
         disabled={!provincia}
-        className="control"
+        className="control min-w-0 flex-1"
       >
         <option value="">Todos los distritos</option>
         {distritos.map((d) => (

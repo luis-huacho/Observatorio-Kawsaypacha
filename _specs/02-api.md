@@ -10,15 +10,29 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 |---|---|---|
 | `GET /api/territorio/provincias/` | — | sin paginar (13) |
 | `GET /api/territorio/distritos/` | `provincia=<ubigeo4>` | sin paginar (112) |
-| `GET /api/ccpp/` | `provincia`, `distrito` (ubigeo6), `peligro` (slug), `nivel_min` 1-4, `buscar`, `clasificados`, `page` | Padrón con `nivel` anotado (máximo tras los filtros; `null` = sin dato). **`clasificados=1`** deja solo los que tienen clasificación: es lo que usa la tabla del visor, porque el padrón completo la convertiría en una lista de «sin dato» (5,730 de 8,968 en la región). Ordena por nivel descendente con los «sin dato» al final |
+| `GET /api/ccpp/` | `provincia`, `distrito` (ubigeo6), `peligros` (slugs CSV), `niveles` (1-4 CSV), `buscar`, `clasificados`, `page` | Padrón con `nivel` anotado (máximo tras los filtros; `null` = sin dato). **`clasificados=1`** deja solo los que tienen clasificación: es lo que usa la tabla del visor, porque el padrón completo la convertiría en una lista de «sin dato» (5,730 de 8,968 en la región). Ordena por nivel descendente con los «sin dato» al final |
 | `GET /api/ccpp/{codigo}/` | — | ficha con clasificaciones anidadas |
 | `GET /api/ccpp/export.xlsx` | mismos filtros que la lista | openpyxl, streaming |
 | `GET /api/ccpp/geojson/` | mismos filtros que la lista, **sin paginar** | Puntos del visor (ver 05 / ADR-A13). `FeatureCollection` de `Point`; ver el ejemplo y la nota de tamaño más abajo |
-| `GET /api/peligros/tipos/` | — | catálogo (9) con orden y color |
-| `GET /api/peligros/resumen/` | `provincia`, `distrito`, `peligro`, `nivel_min` | agregados para cifras del home/visor. Devuelve **las dos unidades** (por CCPP y por clasificación) rotuladas; ver el ejemplo |
+| `GET /api/peligros/tipos/` | — | catálogo (9) con orden, color e **`icono`** (nombre lucide en kebab-case). Es la fuente del selector y de los símbolos del visor: el frontend no conoce los peligros de antemano |
+| `GET /api/peligros/resumen/` | `provincia`, `distrito`, `peligros`, `niveles` | agregados para cifras del home/visor. Devuelve **las dos unidades** (por CCPP y por clasificación) rotuladas; ver el ejemplo |
 | `GET /api/peligros/frecuencia/` | `distrito`, `provincia`, `categoria` | Lista, sin paginar (90 de 112): una entrada por distrito **con datos de cualquiera de las dos tablas** |
 | `GET /api/peligros/frecuencia/{ubigeo}/` | — | El panel de un distrito. **404** si no tiene fila (ver abajo) |
 | `GET /api/peligros/frecuencia/export.xlsx` | ídem | Incluye los totales declarados marcados, o el Excel dejaría a Cusco en cero |
+
+> **Los filtros de exposición son listas, no valores sueltos (ADR-A17).** `peligros=sismo,heladas`
+> y `niveles=1,4`, ambos CSV. Es una **selección**, no un umbral: `niveles=1,4` deja fuera los
+> niveles 2 y 3, consulta que el antiguo `nivel_min` no podía expresar. Reglas del parser, que
+> vive en un solo sitio (`apps/api/filters.py: parametros_exposicion`) porque lo comparten la
+> lista, el geojson, el export, el resumen, la ayuda memoria y el visor headless:
+>
+> - Ausente, vacío, o con solo valores desconocidos → **no restringe nada**.
+> - Se aceptan `peligro` (un slug o nombre) y `nivel_min` (umbral) como **compatibilidad**: hay
+>   ayudas memoria compartidas con esas URL. `nivel_min=3` se traduce a `niveles=3,4`. Si vienen
+>   las dos formas, gana la nueva.
+> - **Tipo y nivel se aplican en una sola condición de join**, nunca en dos pasos. Con listas la
+>   trampa es más fácil de pisar: un centro poblado con sismo en nivel 1 y heladas en nivel 4 no
+>   cumple `peligros=sismo&niveles=4`, pero dos filtros separados encontrarían cada uno su fila.
 
 > **Desviación deliberada respecto de la primera versión de este contrato.** El ejemplo original
 > mostraba `?distrito=…` devolviendo **un objeto** y 404 para Acomayo, pero el mismo endpoint sin
@@ -40,7 +54,7 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 MapLibre solo agrupa fuentes `geojson` (ADR-A13), así que la capa de centros poblados no sale del tile vectorial. El endpoint devuelve **el padrón que pasa los filtros**, sin paginar, e incluye **también los no clasificados** — el visor los pinta en gris, y ese vacío de información es en sí mismo un dato.
 
 ```jsonc
-// GET /api/ccpp/geojson/?provincia=0803&peligro=sismo&nivel_min=3
+// GET /api/ccpp/geojson/?provincia=0803&peligros=sismo,inundacion&niveles=3,4
 {
   "type": "FeatureCollection",
   "features": [
@@ -48,7 +62,11 @@ MapLibre solo agrupa fuentes `geojson` (ADR-A13), así que la capa de centros po
       "geometry": { "type": "Point", "coordinates": [-71.97675606, -13.51927548] },
       "properties": {
         "codigo": "0801010001", "nombre": "CUSCO", "categoria": "CIUDAD",
-        "distrito": "CUSCO", "provincia": "CUSCO", "poblacion": 111930, "altitud": 3439,
+        "distrito": "CUSCO", "provincia": "CUSCO", "altitud": 3439,
+        // Sin `poblacion` (ADR-A17). `peligro` = el que pinta el ícono: mayor nivel, y a
+        // igualdad el primero del catálogo. `n<k>` y `p_<slug>` son el desglose que suma
+        // `clusterProperties`, y **solo vienen las claves distintas de cero**.
+        "peligro": "sismo", "n4": 1, "p_sismo": 1,
         // Máximo de los peligros que sobrevivieron a los filtros. 0 = sin dato.
         "nivel": 4,
         // Cuántas clasificaciones sobrevivieron a los filtros. 0 en los que no cumplen,
@@ -84,16 +102,23 @@ Decisión de tamaño: se sirve el `FeatureCollection` completo en vez de agrupar
 // El payload declara la unidad de cada bloque en un campo `unidades`: las dos lecturas
 // difieren en 3.4× y cualquier cliente que dibuje una de las dos tiene que poder rotularla.
 {
+  // `poblacion_total` no lo usa /peligros (ADR-A17: la población salió del visor); lo
+  // consume el comparador de distritos como población del ámbito.
   "total_ccpp": 123, "poblacion_total": 130000,
-  // [+] Distribución por nivel MÁXIMO de cada centro poblado: es lo que pinta el panel
-  // "Distribución" de /peligros y lo que debe cuadrar con el conteo de la tabla.
+  // [+] Distribución por nivel MÁXIMO de cada centro poblado: es lo que debe cuadrar con el
+  // conteo de la tabla de /peligros.
   // NO se puede derivar de `por_peligro` — sumar por peligro cuenta cada CCPP tantas veces
   // como peligros tenga evaluados (ACOMAYO: 75 CCPP → 225 clasificaciones). Tiene que venir
-  // agregado del servidor, y debe respetar los mismos filtros de peligro y nivel mínimo.
+  // agregado del servidor, y debe respetar los mismos filtros de peligro y nivel.
   "por_ccpp": { "niveles": { "1": 0, "2": 0, "3": 26, "4": 49 }, "sin_clasificar": 0 },
   "por_peligro": [
+    // `centros_poblados` coincide siempre con la suma de `niveles`, y no por casualidad: la
+    // constraint `unica_clasificacion_ccpp_peligro` impide dos filas del mismo peligro en un
+    // mismo centro poblado. Por eso la grilla de resultados puede rotular cada FILA como
+    // centros poblados sin ambigüedad; la de 3.4× solo aparece al sumar la COLUMNA.
     { "peligro": "Sismo", "slug": "sismo",
-      "niveles": { "1": 0, "2": 3, "3": 40, "4": 80 }, "sin_dato": 0 }
+      "niveles": { "1": 0, "2": 3, "3": 40, "4": 80 },
+      "centros_poblados": 123, "sin_dato": 0 }
   ]
 }
 
@@ -238,13 +263,13 @@ Tres reglas del payload que la interfaz no puede reinventar:
 | Endpoint | Params | Notas |
 |---|---|---|
 | `GET /api/comparador/distritos/` | `ubigeos=080101,080301` (2–4), `anio` | por distrito: población, conteo CCPP por peligro×nivel, frecuencia de emergencias, inversión (si `disponible`), nº medidas publicadas |
-| `GET /api/distritos/{ubigeo}/ayuda-memoria.pdf` | `anio`, `peligro` (slug), `nivel_min` | WeasyPrint; cache en `media/informes/` 24 h, invalidado por imports |
+| `GET /api/distritos/{ubigeo}/ayuda-memoria.pdf` | `anio`, `peligros` (CSV), `niveles` (CSV) | WeasyPrint; cache en `media/informes/` 24 h, invalidado por imports |
 
 **La maqueta de la ayuda memoria ya existe**: `prototype/src/components/ReporteImpresion.tsx`, validada en pantalla y en vista previa de impresión. Es HTML+CSS estándar, que es justo lo que consume WeasyPrint, así que la plantilla del backend parte de ahí en vez de diseñarse de cero. Estructura del documento: membrete PREDES · ámbito y filtros aplicados · fecha de generación · párrafo de presentación redactado con las cifras del propio filtro · mapa · distribución por nivel · emergencias del distrito · tabla de centros poblados clasificados · fuentes y firma institucional.
 
 Notas de contrato heredadas de la maqueta:
 
-- **El alcance es un distrito**, con `peligro` y `nivel_min` como refinamientos opcionales. Un reporte regional o provincial produce decenas de páginas y deja de servir para una mesa técnica.
+- **El alcance es un distrito**, con `peligros` y `niveles` como refinamientos opcionales. Un reporte regional o provincial produce decenas de páginas y deja de servir para una mesa técnica.
 - La tabla lista **solo los centros poblados clasificados**; los "sin dato" se cuentan en el texto como vacío de información, que es en sí mismo un argumento de incidencia.
 - **El mapa se renderiza en el servidor** (decisión del dueño del proyecto). El worker abre una página headless (Playwright + Chromium) con un visor mínimo que consume `/api/ccpp/geojson/` y las capas de contexto, encuadra el distrito y captura el PNG, que WeasyPrint incrusta. Se prefiere esto a que el cliente envíe el canvas de su vista: así el PDF se puede generar **desde el admin y por lotes**, sin depender de que alguien tenga el visor abierto, y el documento es reproducible a partir de sus parámetros. Coste asumido: Chromium en la imagen del backend (~400 MB) y un punto más de fallo — si la captura falla, el PDF sale **sin mapa** y con el resto del contenido intacto, nunca con un hueco roto.
 - Los textos de firma salen de `ConfiguracionSitio` y `BloqueTexto`, no cableados como en el prototipo.

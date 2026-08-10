@@ -27,17 +27,76 @@ class DistritoFilter(django_filters.FilterSet):
         return por_ubigeo_o_nombre(queryset, "provincia__ubigeo", "provincia__nombre", value)
 
 
+def _lista(valor) -> list[str]:
+    """`"sismo, heladas"` → `["sismo", "heladas"]`. Vacío o ausente → `[]`."""
+    return [parte.strip() for parte in str(valor or "").split(",") if parte.strip()]
+
+
+def parametros_exposicion(datos) -> tuple[list[str], list[int]]:
+    """Lee los filtros de exposición de un querydict: `(slugs de peligro, niveles)`.
+
+    Único sitio donde se interpretan los cuatro parámetros, para que el listado, el geojson,
+    el export, el resumen y la ayuda memoria no puedan divergir en qué entienden por lo mismo.
+
+    Los filtros son **selección múltiple**, no umbrales: `niveles=1,4` pide «Bajo» y «Muy alto»
+    y deja fuera los de en medio, que con el antiguo `nivel_min` era inexpresable.
+
+    Se aceptan `peligro` (un slug o nombre) y `nivel_min` (umbral) como compatibilidad: hay
+    ayudas memoria compartidas con esas URL y el comparador todavía las emite. `nivel_min=3`
+    significa lo que significaba, los niveles 3 y 4. Si vienen las dos formas gana la nueva.
+
+    Una lista vacía —ausente, `peligros=`, o con solo valores desconocidos— no restringe nada.
+    """
+    peligros = _lista(datos.get("peligros"))
+    if not peligros and (unico := str(datos.get("peligro") or "").strip()):
+        peligros = [unico]
+
+    niveles = [int(n) for n in _lista(datos.get("niveles")) if n.isdigit() and 1 <= int(n) <= 4]
+    if not niveles:
+        try:
+            minimo = int(datos.get("nivel_min") or 0)
+        except (TypeError, ValueError):
+            minimo = 0
+        if 1 <= minimo <= 4:
+            niveles = list(range(minimo, 5))
+
+    return _a_slugs(peligros), sorted(set(niveles))
+
+
+def _a_slugs(valores: list[str]) -> list[str]:
+    """Normaliza a slug lo que puede venir como slug o como nombre del peligro.
+
+    El nombre se acepta porque el GeoSelector del prototipo trabajaba con nombres y quedan
+    enlaces vivos. Se resuelve **aquí**, contra las 9 filas del catálogo, y no dentro del `Q`:
+    así la condición del join es un `__in` de slugs y no se duplica por cada grafía admitida.
+    """
+    if not valores:
+        return []
+    from apps.peligros.models import TipoPeligro
+
+    catalogo = {}
+    for tipo in TipoPeligro.objects.all():
+        catalogo[tipo.slug.lower()] = tipo.slug
+        catalogo[tipo.nombre.lower()] = tipo.slug
+    resueltos = [catalogo[v.lower()] for v in valores if v.lower() in catalogo]
+    return sorted(set(resueltos))
+
+
 class CentroPobladoFilter(django_filters.FilterSet):
     """Filtros del visor y de la tabla de /peligros.
 
-    `peligro` y `nivel_min` se resuelven **en una sola condición de join**, no en dos pasos.
+    `peligros` y `niveles` se resuelven **en una sola condición de join**, no en dos pasos.
     Aplicarlos por separado dejaría pasar un centro poblado que tiene el peligro pedido en
     nivel 1 y otro peligro distinto en nivel 4: cada filtro encontraría su fila y el conjunto
-    resultante mentiría. Es la misma semántica que el prototipo resolvía en memoria.
+    resultante mentiría. Es la misma semántica que el prototipo resolvía en memoria, y con
+    selección múltiple la trampa es más fácil de pisar, no menos.
     """
 
     provincia = django_filters.CharFilter(method="filtrar_provincia")
     distrito = django_filters.CharFilter(method="filtrar_distrito")
+    peligros = django_filters.CharFilter(method="marcador")
+    niveles = django_filters.CharFilter(method="marcador")
+    # Compatibilidad; los traduce `parametros_exposicion`.
     peligro = django_filters.CharFilter(method="marcador")
     nivel_min = django_filters.NumberFilter(method="marcador")
     buscar = django_filters.CharFilter(field_name="nombre", lookup_expr="icontains")
@@ -46,10 +105,13 @@ class CentroPobladoFilter(django_filters.FilterSet):
 
     class Meta:
         model = CentroPoblado
-        fields = ["provincia", "distrito", "peligro", "nivel_min", "buscar", "categoria"]
+        fields = [
+            "provincia", "distrito", "peligros", "niveles", "peligro", "nivel_min",
+            "buscar", "categoria",
+        ]
 
     def marcador(self, queryset, name, value):
-        """No-op: `peligro`, `nivel_min` y `clasificados` se aplican juntos en `filter_queryset`."""
+        """No-op: los filtros de exposición se aplican juntos en `filter_queryset`."""
         return queryset
 
     def filtrar_provincia(self, queryset, name, value):
@@ -62,10 +124,11 @@ class CentroPobladoFilter(django_filters.FilterSet):
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
+        peligros, niveles = parametros_exposicion(self.data)
         queryset = anotar_nivel(
             queryset,
-            peligro=self.data.get("peligro") or "",
-            nivel_min=self.data.get("nivel_min") or "",
+            peligros=peligros,
+            niveles=niveles,
             solo_clasificados=str(self.data.get("clasificados") or "").lower()
             in {"1", "true", "sí", "si"},
         )
@@ -77,34 +140,44 @@ class CentroPobladoFilter(django_filters.FilterSet):
         return queryset.order_by(F("nivel").desc(nulls_last=True), "nombre")
 
 
-def condicion_clasificacion(peligro: str = "", nivel_min="") -> Q:
-    """Condición que una clasificación debe cumplir para contar, dados los filtros."""
+def condicion_clasificacion(peligros=(), niveles=()) -> Q:
+    """Condición que una clasificación debe cumplir para contar, **desde `CentroPoblado`**.
+
+    Las dos partes van en un solo `Q` a propósito: ver el docstring de `CentroPobladoFilter`.
+    """
     condicion = Q()
-    if peligro:
-        # El slug es la clave canónica; se acepta el nombre porque el GeoSelector del
-        # prototipo trabajaba con nombres y algún enlace viejo puede seguir usándolos.
-        condicion &= Q(clasificaciones__tipo_peligro__slug=peligro) | Q(
-            clasificaciones__tipo_peligro__nombre__iexact=peligro
-        )
-    try:
-        minimo = int(nivel_min)
-    except (TypeError, ValueError):
-        minimo = 0
-    if minimo:
-        condicion &= Q(clasificaciones__nivel__gte=minimo)
+    if peligros:
+        condicion &= Q(clasificaciones__tipo_peligro__slug__in=peligros)
+    if niveles:
+        condicion &= Q(clasificaciones__nivel__in=niveles)
     return condicion
 
 
-def anotar_nivel(queryset, peligro: str = "", nivel_min="", solo_clasificados: bool = False):
+def condicion_clasificacion_local(peligros=(), niveles=()) -> Q:
+    """La misma condición, escrita **desde `ClasificacionPeligro`**.
+
+    Existen las dos porque hay consultas que parten del centro poblado (tabla, mapa, anotación
+    del nivel) y otras que parten de la clasificación (el bloque `por_peligro` del resumen).
+    Tenerlas juntas es lo que evita que una se actualice y la otra no.
+    """
+    condicion = Q()
+    if peligros:
+        condicion &= Q(tipo_peligro__slug__in=peligros)
+    if niveles:
+        condicion &= Q(nivel__in=niveles)
+    return condicion
+
+
+def anotar_nivel(queryset, peligros=(), niveles=(), solo_clasificados: bool = False):
     """Añade `nivel` = máximo de las clasificaciones que sobreviven a los filtros.
 
-    Es la unidad que usan la tabla, el panel de distribución y el **color** de los símbolos del
+    Es la unidad que usan la tabla, la grilla de resultados y el **color** de los símbolos del
     mapa: **centros poblados contados una vez, en su nivel más alto**. Agregar sobre las
     clasificaciones daría 10,978 donde la tabla lista 3,238 (los 75 CCPP de Acomayo tienen 3
     peligros cada uno). El **número** de los grupos del visor sí cuenta en esa otra unidad, y
     para eso el geojson expone `clasificaciones` por punto (ADR-A16).
     """
-    condicion = condicion_clasificacion(peligro, nivel_min)
+    condicion = condicion_clasificacion(peligros, niveles)
     queryset = queryset.annotate(
         nivel=Max("clasificaciones__nivel", filter=condicion if condicion else None)
     )

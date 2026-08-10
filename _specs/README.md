@@ -14,6 +14,56 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 10/08/2026 — /peligros vuelve a responder una sola pregunta
+
+La revisión partió de una sospecha del cliente: que la data de `/peligros` estaba mal procesada.
+**No lo estaba.** Recalculadas las dos bases desde cero contra los Excel originales, las cifras del
+sitio coinciden exactamente: 10,978 clasificaciones, 3,238 centros poblados clasificados,
+distribución por nivel máximo {1: 31, 2: 253, 3: 922, 4: 2,032}, y los nueve totales por tipo. Lo
+que estaba mal era **la pantalla**, y de tres maneras.
+
+**Se mezclaban los dos ejes de la fuente.** `Base_Nivel Peligro_CCPP` mide exposición (por centro
+poblado, 9 peligros) y `Base_Frecuencia_Peligro` mide ocurrencia (por distrito, 21 tipos de evento).
+No son convertibles —`INCENDIO FORESTAL` es *inducido por acción humana* en una y *meteorológico* en
+la otra— y el panel de emergencias, embebido bajo el mapa, no reaccionaba a los filtros de la
+página. Ajustar «Tipo de peligro» y ver las barras quietas se lee como un cálculo roto. **ADR-A17**
+saca la frecuencia de esta ruta; su modelo, importador, endpoints, export, comparador y PDF quedan
+intactos, y dónde reubicarla lo decide el cliente.
+
+**Los filtros no dejaban preguntar lo que la gente pregunta.** Un peligro a la vez y un umbral de
+«nivel mínimo». Ahora son checklists: varios peligros simultáneos, y niveles sueltos con su nombre
+—Muy alto, Alto, Medio, Bajo—, de modo que «Muy alto y Bajo sin lo de en medio» pasa a ser
+expresable, que antes no lo era. El API acompaña con `peligros=`/`niveles=` en CSV; `peligro` y
+`nivel_min` sobreviven traducidos por un parser único, porque hay ayudas memoria compartidas con
+esas URL.
+
+**Los resultados vivían dentro del panel de filtros** y se leían como una leyenda del mapa. Salen
+al lado, como grilla por tipo de exposición. El hallazgo que la hace posible sin ambigüedad: dentro
+de una fila, «clasificaciones» y «centros poblados» **son la misma cifra**, porque
+`unica_clasificacion_ccpp_peligro` impide dos filas del mismo peligro en un centro poblado. La
+diferencia de 3.4× solo aparece al sumar la columna, y el pie declara las dos.
+
+**En el mapa, la población dejó de ser un canal visual.** El cliente pidió no usarla; la fuente sí
+la trae, pero 948 de los 8,968 centros poblados valen 0 y la mediana es 17 habitantes, así que el
+tamaño no distinguía nada y además hablaba de algo distinto del número del mismo círculo. El
+diámetro pasa a leer el mismo conteo que el número, y el canal que queda libre lo ocupa el **tipo
+de peligro**, dibujado como ícono; el color se reserva al nivel. Los íconos salen del catálogo
+(`TipoPeligro.icono`, editable en el admin), no de una tabla en el frontend.
+
+De paso, dos fallos silenciosos que aparecieron al tocar esto:
+
+- **El popup del mapa nunca mostró los peligros de un centro poblado.** Leía `p.clasif` —una
+  propiedad *de grupo*, inexistente en un punto suelto— y esperaba unas claves que el API nunca
+  envió, así que siempre caía en «sin clasificación registrada», también sobre los 3,238 que sí la
+  tienen. Nada fallaba.
+- **El selector de distrito se salía del panel de filtros** y se superponía a los resultados: el
+  breakpoint `sm:flex-row` mira el ancho de la *ventana*, no el del contenedor de 280 px, y un
+  `<select>` sin `min-w-0` no encoge por debajo de su opción más larga.
+
+Y una trampa del visor que ahora está en el spec 05: sin `icon-allow-overlap`, MapLibre descarta por
+colisión la mayoría de los símbolos **sin emitir un solo error**, y la capa `symbol` hay que añadirla
+después de registrar las imágenes o escupe un error por punto y no pinta nada.
+
 ### Actualización 10/08/2026 — Inversión deja de estar diferida, y su unidad es la municipalidad
 
 Llegó la data que ADR-D3 estaba esperando: `Base_Prespuesto_PP0068_cusco_final.xlsx` (corte

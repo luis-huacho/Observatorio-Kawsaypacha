@@ -31,24 +31,24 @@ TIMEOUT_MS = 25_000
 ESPERA_PINTADO_MS = 8_000
 
 
-def url_visor(distrito, peligro: str = "", nivel_min="") -> str:
+def url_visor(distrito, peligros=(), niveles=()) -> str:
     params = {"distrito": distrito.ubigeo, "ancho": ANCHO, "alto": ALTO}
-    if peligro:
-        params["peligro"] = peligro
-    if nivel_min:
-        params["nivel_min"] = nivel_min
+    if peligros:
+        params["peligros"] = ",".join(peligros)
+    if niveles:
+        params["niveles"] = ",".join(str(n) for n in niveles)
     base = settings.RENDER_MAPA_BASE_URL.rstrip("/")
     return f"{base}{reverse('visor-mapa')}?{urlencode(params)}"
 
 
-def capturar_mapa(distrito, peligro: str = "", nivel_min="") -> tuple[str | None, str | None]:
+def capturar_mapa(distrito, peligros=(), niveles=()) -> tuple[str | None, str | None]:
     """Devuelve `(data_uri_png, None)` o `(None, motivo_del_fallo)`."""
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
         return None, "Playwright no está instalado en esta imagen"
 
-    url = url_visor(distrito, peligro=peligro, nivel_min=nivel_min)
+    url = url_visor(distrito, peligros=peligros, niveles=niveles)
     try:
         with sync_playwright() as p:
             navegador = p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"])

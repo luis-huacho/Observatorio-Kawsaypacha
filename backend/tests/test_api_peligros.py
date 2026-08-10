@@ -73,7 +73,49 @@ def test_resumen_declara_sus_dos_unidades(api, datos_muestra):
     assert set(datos["por_ccpp"]["niveles"]) == {"1", "2", "3", "4"}
     assert set(datos["unidades"]) == {"por_ccpp", "por_peligro"}
     for entrada in datos["por_peligro"]:
-        assert set(entrada) == {"peligro", "slug", "niveles", "sin_dato"}
+        assert set(entrada) == {"peligro", "slug", "niveles", "centros_poblados", "sin_dato"}
+
+
+def test_el_visor_ya_no_publica_poblacion(api, datos_muestra):
+    """La población sale del visor: la fuente la trae, pero no sirve como magnitud.
+
+    948 de los 8,968 centros poblados valen 0 y la mediana es 17 habitantes, así que como
+    canal visual —radio del símbolo, columna comparable— es ilegible y engañosa.
+
+    Sale de **la lista y del mapa**, que son las piezas donde se leía como escala. Sigue en la
+    ficha individual, donde es un atributo del lugar, y en `poblacion_total` del resumen, que
+    es lo que el comparador de distritos publica como población del ámbito.
+    """
+    listado = api.get("/api/ccpp/?page_size=5").json()
+    geojson = api.get("/api/ccpp/geojson/").json()
+
+    assert all("poblacion" not in fila for fila in listado["results"])
+    assert all("poblacion" not in f["properties"] for f in geojson["features"])
+    assert "poblacion" in api.get("/api/ccpp/0801010001/").json()
+    assert "poblacion_total" in api.get("/api/peligros/resumen/").json()
+
+
+def test_por_peligro_cuenta_centros_poblados_dentro_de_cada_fila(api, datos_muestra):
+    """Dentro de un tipo de peligro, «clasificaciones» y «centros poblados» son lo mismo.
+
+    Lo garantiza la constraint `unica_clasificacion_ccpp_peligro`: un centro poblado no puede
+    tener dos filas del mismo peligro. Por eso la grilla de resultados puede rotular cada fila
+    como centros poblados sin ambigüedad — la unidad solo se vuelve equívoca al **sumar** entre
+    tipos, que es donde aparecen las 10,978 frente a las 3,238.
+    """
+    from apps.peligros.models import ClasificacionPeligro
+
+    datos = api.get("/api/peligros/resumen/").json()
+
+    for entrada in datos["por_peligro"]:
+        ccpp_del_tipo = (
+            ClasificacionPeligro.objects.filter(tipo_peligro__slug=entrada["slug"])
+            .values("centro_poblado")
+            .distinct()
+            .count()
+        )
+        assert entrada["centros_poblados"] == ccpp_del_tipo
+        assert entrada["centros_poblados"] == sum(entrada["niveles"].values())
 
 
 def test_las_dos_unidades_del_resumen_cuadran_con_la_base(api, datos_muestra):
@@ -120,7 +162,7 @@ def test_el_listado_ordena_por_nivel_con_los_sin_dato_al_final(api, datos_muestr
     assert niveles.index(None) > len(con_dato) - 1 if None in niveles else True
 
 
-def test_peligro_y_nivel_min_anotan_pero_no_recortan(api, datos_muestra):
+def test_los_filtros_anotan_pero_no_recortan(api, datos_muestra):
     """Sin `clasificados=1` la respuesta trae **todos** los centros poblados.
 
     Es deliberado —el mapa pinta en gris los que no cumplen— pero significa que `count` no
@@ -130,8 +172,8 @@ def test_peligro_y_nivel_min_anotan_pero_no_recortan(api, datos_muestra):
     from apps.territorio.models import CentroPoblado
 
     total = CentroPoblado.objects.count()
-    sin_recortar = api.get("/api/ccpp/?peligro=sismo&nivel_min=4").json()
-    recortado = api.get("/api/ccpp/?clasificados=1&peligro=sismo&nivel_min=4").json()
+    sin_recortar = api.get("/api/ccpp/?peligros=sismo&niveles=4").json()
+    recortado = api.get("/api/ccpp/?clasificados=1&peligros=sismo&niveles=4").json()
 
     assert sin_recortar["count"] == total
     assert 0 < recortado["count"] < total
@@ -142,21 +184,104 @@ def test_peligro_y_nivel_se_aplican_como_una_sola_condicion(api, datos_muestra):
     """Un centro poblado con sismo en nivel bajo y otro peligro en nivel 4 **no** cumple.
 
     Aplicar los dos filtros por separado daría un conjunto mayor y falso: cada filtro
-    encontraría su propia fila del join y el resultado mentiría.
+    encontraría su propia fila del join y el resultado mentiría. Con selección múltiple la
+    trampa es la misma y más fácil de pisar: basta con que el centro poblado tenga *alguno*
+    de los peligros marcados y *alguno* de los niveles marcados, en filas distintas.
     """
     from apps.peligros.models import ClasificacionPeligro
 
     esperados = {
         c.centro_poblado.codigo
         for c in ClasificacionPeligro.objects.filter(
-            tipo_peligro__slug="sismo", nivel__gte=3
+            tipo_peligro__slug="sismo", nivel__in=[3, 4]
         ).select_related("centro_poblado")
     }
     respuesta = api.get(
-        "/api/ccpp/?clasificados=1&peligro=sismo&nivel_min=3&page_size=200"
+        "/api/ccpp/?clasificados=1&peligros=sismo&niveles=3,4&page_size=200"
     ).json()
 
     assert {r["codigo"] for r in respuesta["results"]} == esperados
+
+
+def test_varios_peligros_marcados_unen_sus_centros_poblados(api, datos_muestra):
+    """Marcar dos peligros trae la unión, no la intersección: es una lista de casillas."""
+    from apps.peligros.models import ClasificacionPeligro
+
+    esperados = {
+        c.centro_poblado.codigo
+        for c in ClasificacionPeligro.objects.filter(
+            tipo_peligro__slug__in=["sismo", "inundacion"], nivel__in=[4]
+        ).select_related("centro_poblado")
+    }
+    assert esperados, "la muestra no tiene sismo ni inundación en nivel 4"
+
+    respuesta = api.get(
+        "/api/ccpp/?clasificados=1&peligros=sismo,inundacion&niveles=4&page_size=500"
+    ).json()
+
+    assert {r["codigo"] for r in respuesta["results"]} == esperados
+
+
+def test_los_niveles_no_tienen_que_ser_contiguos(api, datos_muestra):
+    """El filtro dejó de ser un umbral: se puede pedir «Muy alto» y «Bajo» sin lo de en medio.
+
+    Con el `nivel_min` de antes esta consulta era imposible de expresar.
+    """
+    from apps.peligros.models import ClasificacionPeligro
+
+    esperados = {
+        c.centro_poblado.codigo
+        for c in ClasificacionPeligro.objects.filter(
+            tipo_peligro__slug="sismo", nivel__in=[1, 4]
+        ).select_related("centro_poblado")
+    }
+    assert esperados, "la muestra no tiene sismo en niveles 1 ni 4"
+
+    respuesta = api.get(
+        "/api/ccpp/?clasificados=1&peligros=sismo&niveles=1,4&page_size=500"
+    ).json()
+    devueltos = {r["codigo"] for r in respuesta["results"]}
+
+    assert devueltos == esperados
+    intermedios = set(
+        ClasificacionPeligro.objects.filter(tipo_peligro__slug="sismo", nivel__in=[2, 3])
+        .exclude(centro_poblado__clasificaciones__nivel__in=[1, 4])
+        .values_list("centro_poblado__codigo", flat=True)
+    )
+    assert not (devueltos & intermedios)
+
+
+def test_un_parametro_vacio_equivale_a_no_mandarlo(api, datos_muestra):
+    """`peligros=` vacío no restringe nada: es lo mismo que omitirlo.
+
+    Es contrato del API, no de la pantalla. El visor nunca emite este caso —cuando el usuario
+    desmarca todas las casillas muestra su estado vacío sin llegar a pedir—, pero el API tiene
+    que responder algo definido, y «vacío = sin restricción» es lo que ya hacía `nivel_min`
+    con un valor no numérico.
+    """
+    from apps.territorio.models import CentroPoblado
+
+    total = CentroPoblado.objects.count()
+
+    assert api.get("/api/ccpp/?peligros=&niveles=").json()["count"] == total
+    assert api.get("/api/ccpp/").json()["count"] == total
+    con_clasificacion = CentroPoblado.objects.filter(clasificaciones__isnull=False).distinct()
+    assert (
+        api.get("/api/ccpp/?clasificados=1&peligros=&niveles=").json()["count"]
+        == con_clasificacion.count()
+    )
+
+
+def test_los_parametros_antiguos_siguen_funcionando(api, datos_muestra):
+    """`peligro` y `nivel_min` sobreviven como alias: hay ayudas memoria compartidas con esas URL.
+
+    `nivel_min=3` se traduce a los niveles 3 y 4, que es lo que significaba el umbral.
+    """
+    nuevo = api.get("/api/ccpp/?clasificados=1&peligros=sismo&niveles=3,4&page_size=200").json()
+    antiguo = api.get("/api/ccpp/?clasificados=1&peligro=sismo&nivel_min=3&page_size=200").json()
+
+    assert antiguo["count"] == nuevo["count"] > 0
+    assert {r["codigo"] for r in antiguo["results"]} == {r["codigo"] for r in nuevo["results"]}
 
 
 def test_geojson_devuelve_una_feature_por_centro_poblado_con_coordenadas(api, datos_muestra):
@@ -204,7 +329,7 @@ def test_los_que_no_pasan_el_filtro_siguen_en_el_mapa_con_cero(api, datos_muestr
     from apps.peligros.models import ClasificacionPeligro
 
     sin_filtro = api.get("/api/ccpp/geojson/").json()
-    filtrado = api.get("/api/ccpp/geojson/?peligro=sismo&nivel_min=4").json()
+    filtrado = api.get("/api/ccpp/geojson/?peligros=sismo&niveles=4").json()
 
     assert len(filtrado["features"]) == len(sin_filtro["features"])
 
@@ -212,12 +337,86 @@ def test_los_que_no_pasan_el_filtro_siguen_en_el_mapa_con_cero(api, datos_muestr
     cumplen = {
         c.centro_poblado.codigo
         for c in ClasificacionPeligro.objects.filter(
-            tipo_peligro__slug="sismo", nivel__gte=4
+            tipo_peligro__slug="sismo", nivel__in=[4]
         ).select_related("centro_poblado")
     }
     assert cumplen, "la muestra no tiene ningún sismo en nivel 4"
     assert all(por_codigo[c]["clasificaciones"] == 1 for c in cumplen if c in por_codigo)
     assert any(p["clasificaciones"] == 0 for p in por_codigo.values())
+
+
+def test_el_punto_declara_el_peligro_que_pinta_su_icono(api, datos_muestra):
+    """El símbolo codifica el **tipo** en la forma, así que el punto tiene que decir cuál.
+
+    Cuando varios peligros pasan el filtro gana el de mayor nivel, y si empatan el primero por
+    `orden` del catálogo. Se decide **en el servidor** y no en el cliente: el ícono del mapa y
+    el desglose del popup salen del mismo cálculo, y duplicarlo es garantizar que se separen.
+    """
+    from apps.peligros.models import ClasificacionPeligro, TipoPeligro
+
+    orden = {t.slug: t.orden for t in TipoPeligro.objects.all()}
+    datos = api.get("/api/ccpp/geojson/").json()
+
+    revisados = 0
+    for feature in datos["features"]:
+        props = feature["properties"]
+        suyas = list(
+            ClasificacionPeligro.objects.filter(
+                centro_poblado__codigo=props["codigo"]
+            ).select_related("tipo_peligro")
+        )
+        if not suyas:
+            assert props["nivel"] == 0 and props["peligro"] == ""
+            continue
+        gana = min(suyas, key=lambda c: (-c.nivel, orden[c.tipo_peligro.slug]))
+        assert props["peligro"] == gana.tipo_peligro.slug
+        assert props["nivel"] == gana.nivel
+        revisados += 1
+
+    assert revisados > 0, "la muestra no dejó ningún centro poblado clasificado"
+
+
+def test_el_punto_desglosa_por_nivel_y_por_tipo_para_los_grupos(api, datos_muestra):
+    """`n<k>` y `p_<slug>` son lo que suma `clusterProperties` (requisito de agrupación).
+
+    MapLibre solo sabe acumular escalares que ya vengan en el feature, así que un grupo no
+    puede decir «de qué» es a menos que cada punto traiga su desglose. Se emiten **solo las
+    claves distintas de cero** para no inflar un payload de 2 MB con ceros.
+    """
+    from apps.peligros.models import ClasificacionPeligro
+
+    datos = api.get("/api/ccpp/geojson/?peligros=sismo,inundacion").json()
+
+    for feature in datos["features"]:
+        props = feature["properties"]
+        suyas = ClasificacionPeligro.objects.filter(
+            centro_poblado__codigo=props["codigo"],
+            tipo_peligro__slug__in=["sismo", "inundacion"],
+        ).select_related("tipo_peligro")
+
+        por_nivel = {n: sum(1 for c in suyas if c.nivel == n) for n in (1, 2, 3, 4)}
+        for n, cuantas in por_nivel.items():
+            assert props.get(f"n{n}", 0) == cuantas
+            assert not (cuantas == 0 and f"n{n}" in props), f"n{n} en cero no debe emitirse"
+        for slug in ("sismo", "inundacion"):
+            presente = any(c.tipo_peligro.slug == slug for c in suyas)
+            assert props.get(f"p_{slug}", 0) == int(presente)
+            assert not (not presente and f"p_{slug}" in props)
+
+        assert sum(props.get(f"n{n}", 0) for n in (1, 2, 3, 4)) == props["clasificaciones"]
+
+
+def test_el_desglose_del_popup_trae_el_slug_de_cada_peligro(api, datos_muestra):
+    """El popup pinta el ícono de cada peligro, y para eso necesita el slug, no solo el nombre."""
+    import json
+
+    datos = api.get("/api/ccpp/geojson/").json()
+    con_datos = [f for f in datos["features"] if f["properties"]["clasificaciones"] > 0]
+    assert con_datos
+
+    desglose = json.loads(con_datos[0]["properties"]["peligros"])
+    assert desglose and set(desglose[0]) == {"s", "p", "n"}
+    assert desglose == sorted(desglose, key=lambda d: -d["n"])
 
 
 def test_el_conteo_del_mapa_cuadra_con_el_del_resumen(api, datos_muestra):
@@ -232,13 +431,13 @@ def test_el_conteo_del_mapa_cuadra_con_el_del_resumen(api, datos_muestra):
 
     from apps.peligros.models import ClasificacionPeligro
 
-    geojson = api.get("/api/ccpp/geojson/?peligro=sismo&nivel_min=2").json()
-    resumen = api.get("/api/peligros/resumen/?peligro=sismo&nivel_min=2").json()
+    geojson = api.get("/api/ccpp/geojson/?peligros=sismo&niveles=2,3,4").json()
+    resumen = api.get("/api/peligros/resumen/?peligros=sismo&niveles=2,3,4").json()
 
     del_mapa = sum(f["properties"]["clasificaciones"] for f in geojson["features"])
     del_resumen = sum(sum(p["niveles"].values()) for p in resumen["por_peligro"])
     sin_coordenadas = (
-        ClasificacionPeligro.objects.filter(tipo_peligro__slug="sismo", nivel__gte=2)
+        ClasificacionPeligro.objects.filter(tipo_peligro__slug="sismo", nivel__in=[2, 3, 4])
         .filter(Q(centro_poblado__lat=None) | Q(centro_poblado__lon=None))
         .count()
     )
@@ -358,6 +557,19 @@ def test_el_export_de_frecuencia_respeta_el_filtro_tambien_para_los_declarados(
     }
 
     assert ubigeos == {ollanta.ubigeo}
+
+
+def test_cada_tipo_de_peligro_trae_su_icono(api, datos_muestra):
+    """El visor no conoce los peligros: forma del símbolo y etiqueta salen del catálogo.
+
+    Sin ícono en el API el frontend tendría que mantener su propia tabla de 9 entradas, y
+    añadir un peligro en el admin exigiría desplegar el frontend para que se viera en el mapa.
+    """
+    tipos = api.get("/api/peligros/tipos/").json()
+
+    assert len(tipos) == 9
+    assert all(t["icono"] for t in tipos), "algún tipo de peligro se quedó sin ícono"
+    assert len({t["icono"] for t in tipos}) == 9, "dos peligros comparten ícono"
 
 
 def test_tipos_de_peligro_traen_slug_color_y_categoria(api):

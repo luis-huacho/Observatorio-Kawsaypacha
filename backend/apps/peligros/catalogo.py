@@ -10,28 +10,42 @@ Verificado contra los archivos reales el 02/08/2026 (ver 01-modelo-datos.md).
 """
 
 # hoja del Excel → (nombre del peligro, slug, categoria_geo, orden)
+#
+# `icono` es un nombre de la librería lucide en kebab-case. Viaja por el API para que el
+# visor no tenga que conocer los peligros: el símbolo del mapa codifica el **tipo** con la
+# forma del ícono y el **nivel** con el color, así que añadir un peligro en el admin no
+# obliga a tocar el frontend. `color` ya no pinta esos símbolos —lo hace el nivel— y queda
+# para las piezas donde el peligro es la única dimensión (chips, gráficos por tipo).
 PELIGROS: list[dict] = [
     {"hoja": "Sismo", "nombre": "Sismo", "slug": "sismo",
-     "categoria_geo": "Geodinamica interna", "orden": 1, "color": "#8b5cf6"},
+     "categoria_geo": "Geodinamica interna", "orden": 1, "color": "#8b5cf6",
+     "icono": "activity"},
     {"hoja": "Heladas", "nombre": "Heladas", "slug": "heladas",
-     "categoria_geo": "Metereologicas", "orden": 2, "color": "#38bdf8"},
+     "categoria_geo": "Metereologicas", "orden": 2, "color": "#38bdf8",
+     "icono": "snowflake"},
     {"hoja": "Bajas temperaturas", "nombre": "Bajas temperaturas", "slug": "bajas_temperaturas",
-     "categoria_geo": "Metereologicas", "orden": 3, "color": "#0ea5e9"},
+     "categoria_geo": "Metereologicas", "orden": 3, "color": "#0ea5e9",
+     "icono": "thermometer-snowflake"},
     {"hoja": "Friaje", "nombre": "Friaje", "slug": "friaje",
-     "categoria_geo": "Metereologicas", "orden": 4, "color": "#22d3ee"},
+     "categoria_geo": "Metereologicas", "orden": 4, "color": "#22d3ee",
+     "icono": "wind"},
     {"hoja": "Sequía", "nombre": "Sequía", "slug": "sequia",
-     "categoria_geo": "Metereologicas", "orden": 5, "color": "#f59e0b"},
+     "categoria_geo": "Metereologicas", "orden": 5, "color": "#f59e0b",
+     "icono": "sun-dim"},
     # La hoja se llama "Lluvias"; la columna PELIGRO dice "Lluvias intensas".
     {"hoja": "Lluvias", "nombre": "Lluvias intensas", "slug": "lluvias_intensas",
-     "categoria_geo": "Metereologicas", "orden": 6, "color": "#3b82f6"},
+     "categoria_geo": "Metereologicas", "orden": 6, "color": "#3b82f6",
+     "icono": "cloud-rain"},
     {"hoja": "Inundación", "nombre": "Inundación", "slug": "inundacion",
-     "categoria_geo": "Metereologicas", "orden": 7, "color": "#2563eb"},
+     "categoria_geo": "Metereologicas", "orden": 7, "color": "#2563eb",
+     "icono": "waves"},
     # La hoja se llama "Incendios Forestales" (F mayúscula); PELIGRO dice "Incendios forestales".
     {"hoja": "Incendios Forestales", "nombre": "Incendios forestales",
      "slug": "incendios_forestales", "categoria_geo": "Metereologicas", "orden": 8,
-     "color": "#ef4444"},
+     "color": "#ef4444", "icono": "flame"},
     {"hoja": "Movimientos en masa", "nombre": "Movimientos en masa", "slug": "movimientos_en_masa",
-     "categoria_geo": "Geodinamica externa", "orden": 9, "color": "#a16207"},
+     "categoria_geo": "Geodinamica externa", "orden": 9, "color": "#a16207",
+     "icono": "mountain"},
 ]
 
 PELIGRO_POR_HOJA = {p["hoja"]: p for p in PELIGROS}

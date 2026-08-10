@@ -51,18 +51,26 @@ def _por_ubigeo_o_nombre(queryset, campo_ubigeo: str, campo_nombre: str, valor: 
     return queryset.filter(**{f"{campo_nombre}__iexact": valor})
 
 
-def resumen(queryset_ccpp, peligro: str = "", nivel_min="") -> dict:
-    """Cifras del panel de distribución y de la portada.
+def resumen(queryset_ccpp, peligros=(), niveles=(), *, peligro: str = "", nivel_min="") -> dict:
+    """Cifras de la grilla de resultados y de la portada.
 
     Devuelve **las dos unidades, rotuladas**, porque difieren en 3.4× y confundirlas fue un
     error real del prototipo:
 
     - `por_ccpp`: centros poblados contados una vez, en su nivel máximo. Es la unidad de la
-      tabla y del mapa, y la única con la que el umbral de "nivel mínimo" se lee bien.
+      tabla y del color de los símbolos del mapa.
     - `por_peligro`: filas de clasificación. Un CCPP aporta una por cada peligro evaluado, así
       que los 75 centros poblados de Acomayo suman 225.
+
+    `peligro`/`nivel_min` se aceptan como compatibilidad (los emiten el comparador y la ayuda
+    memoria) y se traducen con el mismo parser que usa el API, para que no haya dos lecturas.
     """
-    from apps.api.filters import anotar_nivel
+    from apps.api.filters import anotar_nivel, condicion_clasificacion_local, parametros_exposicion
+
+    if not peligros and not niveles and (peligro or nivel_min):
+        peligros, niveles = parametros_exposicion(
+            {"peligro": peligro, "nivel_min": nivel_min}
+        )
 
     total_ccpp = queryset_ccpp.count()
     poblacion_total = queryset_ccpp.aggregate(t=Sum("poblacion"))["t"] or 0
@@ -73,7 +81,7 @@ def resumen(queryset_ccpp, peligro: str = "", nivel_min="") -> dict:
     # reagrupa por `nivel`, el `Max` se calcula sobre el grupo entero y el `Count` acaba
     # contando filas del join. Con los 3 peligros de Acomayo eso daba 225 donde hay 75
     # centros poblados, que es exactamente el error que este bloque existe para evitar.
-    anotado = anotar_nivel(queryset_ccpp, peligro=peligro, nivel_min=nivel_min)
+    anotado = anotar_nivel(queryset_ccpp, peligros=peligros, niveles=niveles)
     niveles_ccpp = {str(n): 0 for n in range(1, 5)}
     sin_clasificar = 0
     for nivel in anotado.order_by().values_list("nivel", flat=True):
@@ -83,18 +91,8 @@ def resumen(queryset_ccpp, peligro: str = "", nivel_min="") -> dict:
             niveles_ccpp[str(nivel)] += 1
 
     # --- Por peligro (clasificaciones) ------------------------------------
-    # La condición se rearma con los campos locales: `filters.condicion_clasificacion` está
-    # escrita desde CentroPoblado (`clasificaciones__…`) y aquí se consulta desde la propia
-    # ClasificacionPeligro.
     filtro = Q(centro_poblado__in=queryset_ccpp.values("pk"))
-    if peligro:
-        filtro &= Q(tipo_peligro__slug=peligro) | Q(tipo_peligro__nombre__iexact=peligro)
-    try:
-        minimo = int(nivel_min)
-    except (TypeError, ValueError):
-        minimo = 0
-    if minimo:
-        filtro &= Q(nivel__gte=minimo)
+    filtro &= condicion_clasificacion_local(peligros, niveles)
 
     conteos: dict[str, dict[str, int]] = {}
     for fila in (
@@ -107,15 +105,21 @@ def resumen(queryset_ccpp, peligro: str = "", nivel_min="") -> dict:
 
     por_peligro = []
     for tipo in TipoPeligro.objects.all():
-        if peligro and tipo.slug != peligro and tipo.nombre.lower() != peligro.lower():
+        if peligros and tipo.slug not in peligros:
             continue
-        niveles = {str(n): 0 for n in range(1, 5)}
-        niveles.update(conteos.get(tipo.slug, {}))
-        evaluados = sum(niveles.values())
+        niveles_tipo = {str(n): 0 for n in range(1, 5)}
+        niveles_tipo.update(conteos.get(tipo.slug, {}))
+        evaluados = sum(niveles_tipo.values())
         por_peligro.append({
             "peligro": tipo.nombre,
             "slug": tipo.slug,
-            "niveles": niveles,
+            "niveles": niveles_tipo,
+            # Centros poblados con ESTE peligro tras los filtros. Coincide con la suma de
+            # `niveles` y no es casualidad: `unica_clasificacion_ccpp_peligro` impide que un
+            # centro poblado tenga dos filas del mismo peligro, así que dentro de una fila las
+            # dos unidades son la misma. Se publica con su nombre para que la grilla de
+            # resultados pueda rotular «centros poblados» sin que nadie tenga que deducirlo.
+            "centros_poblados": evaluados,
             # Centros poblados del ámbito sin clasificación de ESTE peligro. Ausencia de dato
             # no es ausencia de riesgo: es un vacío de información, y se reporta como tal.
             "sin_dato": total_ccpp - evaluados,
@@ -123,6 +127,8 @@ def resumen(queryset_ccpp, peligro: str = "", nivel_min="") -> dict:
 
     return {
         "total_ccpp": total_ccpp,
+        # No lo usa /peligros —la población salió del visor por ilegible como escala— pero sí
+        # el comparador de distritos, que la publica como población del ámbito.
         "poblacion_total": poblacion_total,
         "por_ccpp": {"niveles": niveles_ccpp, "sin_clasificar": sin_clasificar},
         "por_peligro": por_peligro,
