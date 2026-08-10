@@ -114,32 +114,81 @@ export type MedidaDetalle = Medida & {
   enlaces: EnlaceExterno[];
 };
 
-export type InversionDistrito = {
-  ubigeo: string;
-  distrito: string;
-  provincia: string;
+/**
+ * La unidad de Inversión es la **municipalidad**, no el distrito: quien tiene PIA, PIM y
+ * devengado es la entidad ejecutora, y una provincial gestiona presupuesto de toda su
+ * provincia. `ubigeo_distrito` es su sede, y puede ser null cuando no casa con el padrón.
+ */
+export type InversionEntidad = {
+  codigo: string;
+  entidad: string;
+  ambito: "distrital" | "provincial" | "mancomunidad" | "regional" | "nacional";
+  ubigeo_distrito: string | null;
+  distrito: string | null;
+  provincia: string | null;
   pia: number;
   pim: number;
   devengado: number;
-  pct_prevencion: number;
-  pct_respuesta: number;
+  /** null = no se puede calcular (PIM cero), que no es lo mismo que 0 %. */
+  pct_ejecucion: number | null;
+  saldo: number;
+  variacion_pia_pim: number;
+  pct_variacion_pia_pim: number | null;
+  pim_institucional: number | null;
+  pct_0068_institucional: number | null;
+  pim_proyectos: number;
+  pim_actividades: number;
+  pct_proyectos: number | null;
+};
+
+export type InversionProceso = {
+  slug: string;
+  nombre: string;
+  color: string;
+  pim: number;
+  devengado: number;
+  pct: number | null;
+};
+
+export type InversionPuntoTendencia = {
+  anio: number;
+  corte: string;
+  /** Corte a mitad de año: su % de ejecución no se compara con el de un año cerrado. */
+  es_parcial: boolean;
+  fuente: string;
+  pia: number;
+  pim: number;
+  devengado: number;
 };
 
 export type Inversion = {
-  _mock?: boolean;
   anio: number;
+  corte: string;
+  es_parcial: boolean;
+  fuente: string;
+  ambito: string;
+  unidad: string;
   agregados: {
-    pim_total: number;
-    ejecutado: number;
-    porcentaje_ejecucion: number;
-    municipios_con_ppr_0068: number;
+    pia: number;
+    pim: number;
+    devengado: number;
+    pct_ejecucion: number | null;
+    saldo: number;
+    variacion_pia_pim: number;
+    entidades_con_presupuesto: number;
+    entidades_en_ambito: number;
+    pct_0068_institucional: number | null;
+    entidades_con_institucional: number;
+    pim_proyectos: number;
+    pim_actividades: number;
+    pct_proyectos: number | null;
   };
-  por_distrito: InversionDistrito[];
-  comparacion_prevencion_respuesta: {
-    prevencion_total: number;
-    respuesta_total: number;
-  };
-  tendencia: Array<{ anio: number; pim: number; devengado: number }>;
+  procesos: InversionProceso[];
+  /** Lo que el catálogo aún no imputa a ningún proceso. No se reparte ni se esconde. */
+  sin_clasificar: { pim: number; devengado: number; pct: number | null };
+  tendencia: InversionPuntoTendencia[];
+  por_entidad: InversionEntidad[];
+  ejercicios: Array<{ anio: number; corte: string; es_parcial: boolean }>;
 };
 
 export type PrioridadDistrito = {
@@ -392,7 +441,9 @@ export type ComparadorRespuesta = {
   inversion_disponible: boolean;
 };
 
-// --- Inversión (diferida, ADR-D3) ------------------------------------------
+// --- Inversión (PP 0068) ---------------------------------------------------
+// El estado «sin datos» sigue siendo un modo válido: mientras ningún ejercicio esté publicado,
+// el endpoint responde `disponible: false` y la ruta muestra su estado vacío.
 export type InversionResponse =
   | { disponible: false; motivo: string }
   | ({ disponible: true } & Inversion);
