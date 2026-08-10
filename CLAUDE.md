@@ -64,6 +64,7 @@ Plataforma web pública de monitoreo de GRD y ACC en la región Cusco, para PRED
 - **El menú superior va en una sola línea en escritorio** (`Header.tsx`): enlaces con `whitespace-nowrap`, logo y `nav` con `shrink-0`, y el buscador como el que cede espacio (`min-w-0`). Se mide en `e2e/header.spec.ts`; hay que volver a medirlo si se añade una entrada al menú.
 - "Prioridades" está desactivada por decisión de reunión (sin datos en el plazo) — no reactivar sin pedido explícito del usuario. "Comparar distritos" está **fuera del menú** (ADR-P2) pero su ruta y su endpoint siguen vivos — tampoco reactivar el enlace sin pedido explícito.
 - La data de Inversión aún no ha sido entregada por el cliente: el módulo debe tolerar estado "sin datos".
+- **Un push va SIEMPRE a los dos remotos**, nunca a uno solo: `git push origin master && git push drinux master` (`origin` = GitHub, `drinux` = Bitbucket del cliente). Se mantienen espejados, y `git push` a secas solo alcanza `origin`, que es la forma fácil de dejar al cliente atrás sin enterarse. Commitear siempre; **empujar solo cuando el usuario lo pida**.
 
 # Directivas del Agente
 
