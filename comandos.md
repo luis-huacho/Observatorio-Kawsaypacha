@@ -227,7 +227,14 @@ docker compose logs -f backend worker nginx
 
 # Cargar SITE_DOMAIN, API_DOMAIN y la llave antes de las comprobaciones
 set -a && . ./.env && set +a
+```
 
+```fish
+# Lo mismo en fish
+for l in (grep -v '^#' .env | grep .); set -gx (string split -m1 = $l); end
+```
+
+```bash
 # Vida del backend; responde 200 aunque la base o el buscador estén caídos
 curl -s https://$API_DOMAIN/api/salud/
 
