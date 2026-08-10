@@ -11,8 +11,20 @@
 # - nginx, certbot, backup y frontend quedan fuera (perfil "prod"): el frontend en dev corre en
 #   el host con `npm run dev`, que da recarga instantánea y mapas de fuentes.
 #
-# Para probar el modo producción en local —SPA compilada servida por nginx— se levanta sin este
-# override y con SITE_DOMAIN=localhost.
+# Este es el modo del día a día: el código va montado, así que **`--build` solo hace falta cuando
+# cambian las dependencias** (pyproject.toml / uv.lock), no al editar código.
+#
+# Para probar el modo producción en local —SPA compilada servida por nginx en el :80— está el
+# tercer override, compose.local.yml:
+#
+#   docker compose -f compose.yaml -f compose.dev.yml down          # ver el aviso de abajo
+#   docker compose -f compose.yaml -f compose.local.yml up -d --build
+#   docker compose -f compose.yaml -f compose.local.yml run --rm frontend
+#   docker compose -f compose.yaml -f compose.local.yml exec backend python manage.py collectstatic --noinput
+#
+# Los dos modos comparten nombre de proyecto, así que **hay que bajar uno antes de levantar el
+# otro**: al pasar a dev, nginx no se detiene solo —su perfil "prod" solo impide arrancarlo— y se
+# queda sirviendo en el :80 el bundle viejo del volumen web_dist contra el backend nuevo.
 
 services:
   db:

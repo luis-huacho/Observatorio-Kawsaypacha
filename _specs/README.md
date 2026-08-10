@@ -14,6 +14,34 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 10/08/2026 — el spec mandaba al modo lento para el día a día
+
+El spec 07 describía **dos** modos de compose cuando ya había tres, y para «probar producción en
+local» remitía a un mecanismo que había dejado de existir: levantar sin override y con
+`SITE_DOMAIN=localhost`. Eso lo sustituyó `compose.local.yml`, que el spec no mencionaba en ningún
+sitio. La misma frase obsoleta estaba repetida en la cabecera de `compose.dev.yml`, que es donde uno
+la lee.
+
+La consecuencia no fue un fallo sino un coste diario: siguiendo la documentación se acaba trabajando
+en `compose.local.yml`, donde el código entra por `COPY` y **cada cambio pide `--build`** —y en el
+frontend, además, relanzar el contenedor de un solo uso que publica `dist/`—. El modo con el código
+montado y recarga en caliente, `compose.dev.yml`, llevaba todo el tiempo en el repositorio.
+
+Lo que hacía difícil verlo es que los tres modos se parecen en la superficie y se diferencian en una
+sola cosa: **de dónde sale el código que corre**. El spec ahora abre con esa tabla y describe los
+tres, con dos advertencias que antes no estaban en ningún sitio: que comparten nombre de proyecto y
+hay que bajar uno antes de levantar otro —al pasar a desarrollo, `nginx` no se detiene solo, porque
+`profiles: ["prod"]` solo impide *arrancarlo*, y se queda sirviendo en el `:80` el bundle viejo de
+`web_dist` contra el backend nuevo—, y que el frontend **no se puede montar** en su contenedor:
+`frontend` no es un servidor sino un `alpine` de un solo uso que vuelca `dist/` en el volumen y
+termina, así que en desarrollo lo compila Vite en el host.
+
+De paso se corrigió la tabla de servicios, que atribuía al servicio `frontend` un «perfil build» que
+no existe: en `compose.yaml` no tiene `profiles`, solo `restart: "no"`; quien le pone
+`profiles: ["prod"]` es el override de desarrollo.
+
+Sin cambios de código: los tres archivos de compose ya eran correctos.
+
 ### Actualización 05/08/2026 — el sitio no se recuperaba solo de un cuelgue
 
 `restart: unless-stopped` cubría que un proceso muriera, y nada más. El fallo contrario —gunicorn
