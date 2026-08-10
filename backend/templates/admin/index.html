@@ -182,6 +182,38 @@ que sin esta tarjeta nadie se enteraría.
   {% endif %}
 </div>
 
+{% comment %}
+--- Catálogo de procesos de la GRD ---
+Lo que responde: cuánto del presupuesto publicado en /inversion no está imputado a ningún
+proceso. Se cuela sin ruido —los gráficos se dibujan igual, con una barra «sin clasificar»—, así
+que sin esta tarjeta un catálogo a medias pasaría inadvertido.
+{% endcomment %}
+{% if inversion %}
+<div class="rounded-lg border border-base-200 dark:border-base-800 px-4 py-3 text-sm mb-8">
+  <span class="font-semibold">Inversión (PP 0068).</span>
+  Publicados los ejercicios {{ inversion.ejercicios_visibles|join:", " }}.
+  {% if inversion.pim_sin_clasificar %}
+    <span class="text-yellow-700">
+      S/ {{ inversion.pim_sin_clasificar|miles }} de PIM ({{ inversion.codigos_sin_proceso }}
+      código(s)) no están imputados a ningún proceso de la GRD y se muestran como
+      «sin clasificar».
+    </span>
+    <a class="underline" href="{% url 'admin:inversion_clasificacionactividad_changelist' %}?proceso__isnull=True">
+      Clasificarlos
+    </a>
+  {% else %}
+    Todo el presupuesto publicado está imputado a un proceso de la GRD.
+  {% endif %}
+  {% if inversion.codigos_automaticos %}
+    {{ inversion.codigos_automaticos }} clasificación(es) siguen con la asignación automática
+    propuesta, sin revisar por PREDES.
+    <a class="underline" href="{% url 'admin:inversion_clasificacionactividad_changelist' %}?automatico__exact=1">
+      Revisarlas
+    </a>
+  {% endif %}
+</div>
+{% endif %}
+
 {# --- Estado de los datos --- #}
 <div class="rounded-lg border border-base-200 dark:border-base-800 px-4 py-3 text-sm">
   <span class="font-semibold">Datos de exposición.</span>

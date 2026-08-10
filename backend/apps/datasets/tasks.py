@@ -9,14 +9,13 @@ def procesar_dataset(upload_id: int, encadenar: bool = True) -> None:
     Corre en el worker (django-tasks). El resultado —conteos, advertencias o error— queda en el
     log del DatasetUpload, que es lo que PREDES lee en el admin para saber qué corregir.
     """
-    from apps.datasets.importers import frecuencia, nivel_peligro
+    from apps.datasets.importers import frecuencia, inversion, nivel_peligro
     from apps.datasets.models import DatasetUpload
 
     importadores = {
         DatasetUpload.Tipo.PELIGROS_CCPP: nivel_peligro.importar,
         DatasetUpload.Tipo.FRECUENCIA: frecuencia.importar,
-        # INVERSION: sin importador — la ventana está diferida (ADR-D3) y el formato del
-        # Excel no está definido. Modelar contra un formato imaginado se tira a la basura.
+        DatasetUpload.Tipo.INVERSION: inversion.importar,
     }
 
     upload = DatasetUpload.objects.get(pk=upload_id)

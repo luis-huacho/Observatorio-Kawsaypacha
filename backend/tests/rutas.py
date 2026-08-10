@@ -13,6 +13,11 @@ AQUI = pathlib.Path(__file__).resolve().parent
 #: ver `tests/datos/generar_muestras.py` para el detalle de qué contiene cada una.
 MUESTRA_NIVEL = AQUI / "datos" / "nivel_peligro_muestra.xlsx"
 MUESTRA_FRECUENCIA = AQUI / "datos" / "frecuencia_muestra.xlsx"
+#: Las dos series de inversión, en CSV como salen de `scripts/`. Se escriben a mano y no se
+#: generan: cada fila representa un caso —proyecto, actividad conocida, código desconocido,
+#: municipalidad fuera del padrón, gobierno regional— y hay que poder leerlas.
+MUESTRA_INVERSION = AQUI / "datos" / "inversion_serie_muestra.csv"
+MUESTRA_INVERSION_INSTITUCIONAL = AQUI / "datos" / "inversion_institucional_muestra.csv"
 
 #: Los Excel completos (5.4 MB), que **no** se versionan. Solo las pruebas `lento` los usan, y
 #: se saltan solas cuando no están.

@@ -64,6 +64,8 @@ urlpatterns = [
 
     path("sitio/", views.SitioView.as_view(), name="sitio"),
     path("mapas/capas/", views.CapasMapaView.as_view(), name="mapas-capas"),
+    # `export.xlsx` antes de `inversion/`: si no, DRF nunca llegaría a la ruta concreta.
+    path("inversion/export.xlsx", views.InversionExportView.as_view(), name="inversion-export"),
     path("inversion/", views.InversionView.as_view(), name="inversion"),
     path("metricas/evento/", views.MetricaEventoView.as_view(), name="metricas-evento"),
     # Visor mínimo que el navegador headless captura para el mapa del PDF. Público a

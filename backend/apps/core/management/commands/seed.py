@@ -83,6 +83,7 @@ class Command(BaseCommand):
         self._catalogo_peligros()
         self._catalogo_eventos()
         self._fuentes()
+        self._catalogo_procesos_grd()
 
         self._titulo("Sitio, capas y biblioteca")
         self._sitio()
@@ -179,6 +180,37 @@ class Command(BaseCommand):
 
         semilla.sembrar(Fuente, FUENTES, "nombre", actualizar=True)
         self._ok(f"{len(FUENTES)} fuentes")
+
+    def _catalogo_procesos_grd(self):
+        """Procesos de la GRD y el mapeo de actividades del PP 0068.
+
+        Los procesos se actualizan en cada corrida: son código. **Las clasificaciones no**: son
+        una propuesta que PREDES corrige en el admin, y volver a sembrarlas con `actualizar`
+        deshacía su trabajo en el siguiente despliegue. Solo se crean las que falten.
+        """
+        from apps.inversion.catalogo import ACTIVIDAD_A_PROCESO, PROCESOS_GRD
+        from apps.inversion.models import ClasificacionActividad, ProcesoGRD
+
+        semilla.sembrar(ProcesoGRD, PROCESOS_GRD, "slug", actualizar=True)
+        procesos = {p.slug: p for p in ProcesoGRD.objects.all()}
+
+        # El nombre real de cada actividad llega con la importación; hasta entonces vale el
+        # código, que es lo que identifica la fila.
+        registros = [
+            {
+                "codigo": codigo,
+                "nombre": codigo,
+                "origen": ClasificacionActividad.Origen.ACTIVIDAD,
+                "proceso": procesos[slug],
+                "automatico": True,
+            }
+            for codigo, slug in ACTIVIDAD_A_PROCESO.items()
+        ]
+        creadas, _ = semilla.sembrar(ClasificacionActividad, registros, "codigo")
+        self._ok(
+            f"{len(PROCESOS_GRD)} procesos de la GRD y {len(registros)} actividades "
+            f"clasificadas ({creadas} nuevas)"
+        )
 
     # -- Sitio -------------------------------------------------------------
     def _sitio(self):

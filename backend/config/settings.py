@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.territorio",
     "apps.peligros",
+    "apps.inversion",
     "apps.datasets",
     "apps.medidas",
     "apps.normativa",
@@ -237,6 +238,22 @@ UNFOLD = {
                     {"title": "Emergencias", "icon": "crisis_alert",
                      "link": lambda r: reverse_lazy(
                          "admin:peligros_frecuenciaemergencia_changelist")},
+                ],
+            },
+            {
+                "title": "Inversión (PP 0068)",
+                "items": [
+                    {"title": "Ejercicios", "icon": "event_available",
+                     "link": lambda r: reverse_lazy("admin:inversion_ejercicio_changelist")},
+                    {"title": "Presupuesto por entidad", "icon": "payments",
+                     "link": lambda r: reverse_lazy(
+                         "admin:inversion_presupuestoentidad_changelist")},
+                    {"title": "Procesos de la GRD", "icon": "rule",
+                     "link": lambda r: reverse_lazy(
+                         "admin:inversion_clasificacionactividad_changelist")},
+                    {"title": "Entidades ejecutoras", "icon": "account_balance",
+                     "link": lambda r: reverse_lazy(
+                         "admin:inversion_entidadejecutora_changelist")},
                 ],
             },
             {

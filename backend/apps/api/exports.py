@@ -93,3 +93,44 @@ CABECERAS_CCPP = [
     "Población", "Altitud (m)", "Latitud", "Longitud", "Nivel", "Nivel (descripción)",
 ]
 ANCHOS_CCPP = [13, 30, 14, 18, 18, 14, 11, 11, 12, 12, 7, 20]
+
+
+CABECERAS_INVERSION = [
+    "Ejercicio", "Corte", "Fuente", "Código MEF", "Entidad", "Ámbito", "Provincia", "Distrito",
+    "Ubigeo distrito", "PIA (0068)", "PIM (0068)", "Devengado (0068)", "% ejecución",
+    "Saldo por ejecutar", "Variación PIA-PIM", "PIM institucional", "% del 0068 sobre el total",
+    "PIM proyectos", "PIM actividades", "% en proyectos",
+]
+ANCHOS_INVERSION = [10, 10, 26, 12, 42, 14, 18, 18, 14, 15, 15, 15, 12, 17, 17, 17, 20, 15, 15, 13]
+
+
+def filas_inversion(filas, ejercicio):
+    """Una fila por entidad, con los derivados ya calculados por `inversion.consultas`.
+
+    Se exportan los mismos números que la pantalla —no los recalcula el export— y cada fila
+    repite ejercicio, corte y fuente: el archivo viaja suelto por correo, y sin el corte nadie
+    puede saber que un 47 % de ejecución es de medio año.
+    """
+    for f in filas:
+        yield [
+            ejercicio.anio,
+            ejercicio.corte,
+            ejercicio.get_fuente_display(),
+            f["codigo"],
+            f["entidad"],
+            f["ambito"],
+            f["provincia"] or "",
+            f["distrito"] or "",
+            f["ubigeo_distrito"] or "",
+            f["pia"],
+            f["pim"],
+            f["devengado"],
+            f["pct_ejecucion"],
+            f["saldo"],
+            f["variacion_pia_pim"],
+            f["pim_institucional"],
+            f["pct_0068_institucional"],
+            f["pim_proyectos"],
+            f["pim_actividades"],
+            f["pct_proyectos"],
+        ]
