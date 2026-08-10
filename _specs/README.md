@@ -64,6 +64,43 @@ Y una trampa del visor que ahora está en el spec 05: sin `icon-allow-overlap`, 
 colisión la mayoría de los símbolos **sin emitir un solo error**, y la capa `symbol` hay que añadirla
 después de registrar las imágenes o escupe un error por punto y no pinta nada.
 
+### Actualización 10/08/2026 — Inversión gana ficha, comparación y paginado
+
+Tres cosas que el uso reclamaba en cuanto la ventana tuvo datos: **comparar ejercicios** (había
+cinco años cargados y solo se veían de uno en uno), **una ficha por municipalidad** (el detalle
+por actividad estaba en la base y no se podía consultar) y **paginar** la tabla, que servía sus
+116 filas de golpe.
+
+**El «ranking» no era un ranking.** Ordenaba en el cliente, y en cuanto la tabla se pagina eso
+ordena solo lo que ya está cargado. El listado se va a `/api/inversion/entidades/` con el sobre de
+DRF y el orden se resuelve en SQL — **con desempate por código de entidad**, que no es cosmético:
+sin un orden total, dos filas empatadas salen en distinto orden en dos consultas y la paginación
+repite unas y se salta otras sin que nada falle a la vista. Hay una prueba que recorre las páginas
+de una en una y exige que cada municipalidad aparezca exactamente una vez.
+
+**La comparación va en su propia vista** (`?vista=comparar`) y no como columnas de la tabla del
+ejercicio. **ADR-D5** registra la decisión delicada: el Δ de % de ejecución **se muestra aunque uno
+de los dos ejercicios sea un corte parcial**, marcado, en vez de suprimirse. Un 47.7 % de medio año
+contra un 86.4 % de año cerrado no es una caída, y ocultarlo empuja a calcularlo fuera de la
+plataforma, donde ya nadie pone la advertencia. La marca viaja en el dato (`comparable`), la
+leyenda va pegada a la tabla y el Excel lleva una columna «Comparabilidad» fila a fila, porque el
+archivo viaja solo por correo.
+
+**Los filtros se mudan a la URL.** Era la condición para que la vista de comparación fuera
+enlazable y para que volver de una ficha no devolviera al ejercicio por defecto. La prueba E2E de
+ese recorrido fue la que destapó que `backTo` era una ruta fija y perdía los filtros.
+
+Dos trampas que quedan escritas en el plan de pruebas, porque las dos hacían pasar un test que no
+comprobaba nada: `esperarApi` casa **por subcadena**, así que pedir `/api/inversion/` atrapaba la
+respuesta de `/api/inversion/entidades/` —cuyo cuerpo no tiene `disponible`— y el test daba por
+vacía una ventana llena; y la espera hay que armarla **antes** de `goto`, porque la respuesta puede
+llegar antes del `load` y entonces `waitForResponse` no la ve nunca.
+
+De paso, dos arreglos: el importador no rellenaba el nombre de las clasificaciones que la semilla
+ya había creado, así que las 30 actividades conocidas se mostraban con su código; y la tarjeta de
+cifra, duplicada en dos rutas, se promueve a `components/KPI.tsx` antes de que la ficha fuera la
+tercera copia.
+
 ### Actualización 10/08/2026 — Inversión deja de estar diferida, y su unidad es la municipalidad
 
 Llegó la data que ADR-D3 estaba esperando: `Base_Prespuesto_PP0068_cusco_final.xlsx` (corte

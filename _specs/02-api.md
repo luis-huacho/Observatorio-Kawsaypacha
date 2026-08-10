@@ -210,8 +210,14 @@ Notas del contrato:
 
 | Endpoint | Params |
 |---|---|
-| `GET /api/inversion/` | `anio` (default: el más reciente visible), `ambito` (`municipal` por defecto \| distrital \| provincial \| regional \| todos), `provincia` (ubigeo o nombre) |
-| `GET /api/inversion/export.xlsx` | los mismos |
+| `GET /api/inversion/` | `anio` (default: el más reciente visible), `ambito` (`municipal` por defecto \| distrital \| provincial \| regional \| todos), `provincia` (ubigeo o nombre), `comparar_con` |
+| `GET /api/inversion/entidades/` | los mismos + `buscar`, `ordenar`, `page`, `page_size`. **Paginado** |
+| `GET /api/inversion/entidades/{codigo}/` | `anio`. `codigo` = código MEF de la entidad ejecutora |
+| `GET /api/inversion/export.xlsx` | los mismos que el listado, sin paginar |
+
+**El tablero y la tabla van en endpoints distintos, a propósito.** `/api/inversion/` sirve las piezas que se dibujan juntas y hablan del mismo ejercicio (agregados, procesos, tendencia, ejercicios); la tabla se pagina y su orden se resuelve en el servidor, porque ordenar en el cliente ordenaría solo lo ya cargado. Ojo al probarlo: `/api/inversion/entidades/` **contiene** la cadena `/api/inversion/`, y un matcher por subcadena atrapa la respuesta equivocada.
+
+`ordenar` acepta `pim` (por defecto), `ejecucion`, `saldo`, `institucional` y `variacion` (este último solo con `comparar_con`). Todos ordenan **con desempate por código de entidad**: sin un orden total, la paginación repite unas filas y se salta otras sin que nada falle a la vista.
 
 Sin ningún ejercicio `visible`:
 ```json
@@ -240,23 +246,51 @@ Con datos:
   "sin_clasificar": { "pim": 0, "devengado": 0, "pct": 0 },
   "tendencia": [ { "anio": 2022, "corte": "anual", "es_parcial": false, "fuente": "…",
                    "pia": 18060834, "pim": 48813109, "devengado": 37260987 } ],
-  "por_entidad": [ { "codigo": "300684", "entidad": "MUNICIPALIDAD PROVINCIAL DEL CUZCO",
-                     "ambito": "provincial", "ubigeo_distrito": "080101",
-                     "distrito": "CUSCO", "provincia": "CUSCO",
-                     "pia": 0, "pim": 0, "devengado": 0, "pct_ejecucion": 0.0,
-                     "saldo": 0, "variacion_pia_pim": 0, "pct_variacion_pia_pim": 0.0,
-                     "pia_institucional": 176788063, "pim_institucional": 270220526,
-                     "devengado_institucional": 128401242, "pct_0068_institucional": 0.0,
-                     "pim_proyectos": 0, "pim_actividades": 0, "pct_proyectos": 0.0 } ],
   "ejercicios": [ { "anio": 2026, "corte": "2026-06", "es_parcial": true } ]
 }
+
+// GET /api/inversion/entidades/?anio=2026&ordenar=saldo  → sobre estándar de DRF
+{ "count": 116, "next": "…?page=2", "previous": null,
+  "results": [ { "codigo": "300684", "entidad": "MUNICIPALIDAD PROVINCIAL DEL CUZCO",
+                 "ambito": "provincial", "ubigeo_distrito": "080101",
+                 "distrito": "CUSCO", "provincia": "CUSCO",
+                 "pia": 54508, "pim": 1278015, "devengado": 371786, "pct_ejecucion": 0.291,
+                 "saldo": 906229, "variacion_pia_pim": 1223507, "pct_variacion_pia_pim": 22.4,
+                 "pia_institucional": 176788063, "pim_institucional": 270220526,
+                 "devengado_institucional": 128401242, "pct_0068_institucional": 0.0047,
+                 "pim_proyectos": 0, "pim_actividades": 1278015, "pct_proyectos": 0.0 } ] }
+
+// Con `comparar_con=2025`, cada fila añade:
+"comparacion": { "anio": 2025, "corte": "anual", "es_parcial": false,
+                 "comparable": false, "sin_presupuesto": false,
+                 "pia": 40000, "pim": 585804, "devengado": 500000, "pct_ejecucion": 0.85,
+                 "delta_pim": 692211, "pct_delta_pim": 1.18,
+                 "delta_devengado": -128214, "delta_pct_ejecucion": -0.56 }
+
+// GET /api/inversion/entidades/300757/  → la ficha de una municipalidad
+{ "disponible": true,
+  "entidad": { "codigo": "300757", "nombre": "…", "ambito": "distrital",
+               "ambito_nombre": "Municipalidad distrital", "ubigeo_distrito": "080910",
+               "distrito": "PICHARI", "provincia": "LA CONVENCION", "sin_territorio": false },
+  "anio": 2026, "corte": "2026-06", "es_parcial": true, "fuente": "…",
+  "serie": [ { "anio": 2022, "corte": "anual", "es_parcial": false, "…": "los mismos derivados" } ],
+  "procesos": [ … ], "sin_clasificar": { … },
+  "actividades": [ { "codigo": "2534780", "nombre": "CREACION DEL SERVICIO…",
+                     "origen": "proyecto", "proceso": "Prevención y reducción",
+                     "proceso_slug": "prevencion_reduccion",
+                     "pia": 0, "pim": 6150969, "devengado": 6150968, "pct_ejecucion": 1.0 } ],
+  "ejercicios": [ … ] }
 ```
 
-Tres reglas del payload que la interfaz no puede reinventar:
+La `serie` **omite los ejercicios sin presupuesto** en vez de rellenarlos con ceros: no participar del programa un año no es participar con cero soles. Las `actividades` no se paginan —3 de media por entidad y ejercicio, 50 en el máximo real—, con el mismo criterio por el que no se paginan los 112 distritos.
+
+Cinco reglas del payload que la interfaz no puede reinventar:
 
 - **`es_parcial` y `corte` viajan con el dato**, en la raíz y en cada punto de `tendencia`. Un % de ejecución de medio año se calcula contra un PIM anual: cualquier cliente que lo dibuje tiene que poder advertirlo.
 - **Un porcentaje que no se puede calcular es `null`, no `0`.** Una municipalidad sin total institucional no tiene un 0 % de su presupuesto en el 0068.
 - **Los importes institucionales de `agregados` y su porcentaje salen del mismo universo**: solo las entidades que tienen ese dato. Con el numerador de las 116 y el denominador de las 114 que tienen total, el porcentaje saldría inflado sin que nada lo dijera, y publicar un total institucional que no cuadre con el porcentaje de al lado es el mismo problema por otra vía. Por eso `entidades_con_institucional` viaja junto a las tres cifras: es su rótulo. Sin ninguna entidad con dato, los tres son `null` y no cero.
+- **`comparacion.comparable`** es `false` cuando los dos ejercicios tienen cortes distintos. El Δ de % de ejecución se sirve igual —así se decidió (ADR-D5)— pero nadie debe pintarlo sin la marca: un 47.7 % de medio año contra un 86.4 % de año cerrado no es una caída. Las variaciones de PIA, PIM y devengado sí son comparables.
+- **`comparacion.sin_presupuesto`** distingue «no participó del programa ese año» de «participó con cero». En ese caso los deltas son `null`: aparecer de la nada no es no haber cambiado.
 
 ## Productos de incidencia
 

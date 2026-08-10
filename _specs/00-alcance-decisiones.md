@@ -79,6 +79,16 @@ Complementan a las ventanas: portada (hero administrable), buscador global, noti
 >
 > Decisión del dueño del proyecto, sobre alcance pedido en reunión: «saber por municipalidad local cómo es el avance de ejecución del presupuesto, en el marco del 0068».
 
+> **ADR-D5 — La comparación entre ejercicios muestra el Δ de % de ejecución aunque uno de los dos sea un corte parcial, marcado.** El ejercicio en curso llega a mitad de año, y su porcentaje de ejecución se calcula contra un PIM anual: en 2026 sale 47.7 % frente al 86.4 % de 2025, y esa diferencia **no mide una caída de ejecución**, mide medio año contra un año entero. Se evaluó suprimir ese Δ y mostrar «—»; se decidió mostrarlo y marcarlo, porque el año en curso es justo el que interesa y ocultarlo empuja a calcularlo a mano fuera de la plataforma, donde ya nadie pone la advertencia.
+>
+> **Riesgo aceptado por el dueño del proyecto**: la cifra puede circular sin su contexto. Mitigaciones, las tres necesarias:
+>
+> 1. La marca **viaja en el dato**, no en la interfaz: `comparable` en el payload de cada fila y del agregado. Ningún cliente tiene que redescubrir la regla.
+> 2. En pantalla, asterisco en la celda y **leyenda pegada a la tabla**, no al pie de la página.
+> 3. En el Excel, una columna **«Comparabilidad»** fila a fila. La pantalla lleva su leyenda al lado, pero el archivo viaja solo por correo.
+>
+> Las variaciones de PIA, PIM y devengado **sí** son comparables entre cortes distintos y no llevan marca; solo el porcentaje de ejecución la lleva.
+
 ## Fuera de alcance (esta fase)
 
 - Ventana Prioridades (ADR-P1).

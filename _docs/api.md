@@ -210,10 +210,20 @@ día para otro.
 
 ## Inversión
 
-**`GET /api/inversion/`** — el tablero del PP 0068 **por municipalidad**. Acepta `anio`, `ambito`
-(`municipal` por defecto, `distrital`, `provincial`, `regional`, `todos`) y `provincia` (ubigeo o
-nombre). **`GET /api/inversion/export.xlsx`** devuelve la misma tabla en Excel, con los mismos
-filtros.
+**`GET /api/inversion/`** — el tablero del PP 0068 **por municipalidad**: agregados, procesos,
+tendencia y ejercicios publicados. Acepta `anio`, `ambito` (`municipal` por defecto, `distrital`,
+`provincial`, `regional`, `todos`), `provincia` (ubigeo o nombre) y `comparar_con`.
+
+**`GET /api/inversion/entidades/`** — la tabla, **paginada** (50 por página, techo 200) y ordenada
+en el servidor con `ordenar` (`pim`, `ejecucion`, `saldo`, `institucional`, `variacion`). Acepta
+además `buscar`. Ojo al consumirlo: su ruta **contiene** `/api/inversion/`, así que un matcher por
+subcadena atrapa la respuesta equivocada.
+
+**`GET /api/inversion/entidades/{codigo}/`** — la ficha de una municipalidad por su código MEF:
+serie de todos los ejercicios publicados, reparto por procesos y desglose de actividades.
+
+**`GET /api/inversion/export.xlsx`** devuelve la misma tabla en Excel, con los mismos filtros y sin
+paginar; con `comparar_con` añade las columnas del otro ejercicio y una de «Comparabilidad».
 
 Mientras PREDES no publique ningún ejercicio, responde:
 
