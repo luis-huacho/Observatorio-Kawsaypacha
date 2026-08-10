@@ -11,23 +11,35 @@ buscado. Por defecto se miran las dos geografías del archivo: dónde está la u
 gasta (DEPARTAMENTO_EJECUTORA_NOMBRE) y a qué departamento se dirige la meta
 (DEPARTAMENTO_META_NOMBRE).
 
-Ejemplo:
+Con `--hasta-ejercicio` se descartan además las columnas de los años posteriores al
+indicado. Eso obliga a rearmar cada línea, así que **solo en ese caso** se pierde la copia
+byte a byte: los campos conservados salen con sus bytes originales, pero el separador y las
+comillas se vuelven a escribir. Sin la bandera, el camino byte a byte es el de siempre.
+
+Ejemplos:
 
     python3 scripts/get_data_cusco.py \\
         data/inversion/comparativo_gastos_2022_2026.csv \\
-        data/inversion/comparativo_cusco_gastos_2022_2026.csv
+        data/inversion/comparativo_cusco_gastos_2022_2025.csv \\
+        --hasta-ejercicio 2025
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 
 BOM = b"\xef\xbb\xbf"
 SEPARADOR = b'","'
+COMILLA = b'"'
 COLUMNAS_POR_DEFECTO = ("DEPARTAMENTO_EJECUTORA_NOMBRE", "DEPARTAMENTO_META_NOMBRE")
 BUFFER = 1024 * 1024
 PASO_PROGRESO = 1_000_000
+
+# Las columnas de importe llevan el ejercicio al final (PIA_2024, DEVENGADO_2026…);
+# ninguna columna de dimensión termina en _<4 dígitos>.
+EJERCICIO = re.compile(rb"_(\d{4})$")
 
 
 def pelar(campo: bytes) -> bytes:
@@ -100,6 +112,16 @@ def analizar_argumentos() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--hasta-ejercicio",
+        type=int,
+        default=0,
+        metavar="AÑO",
+        help=(
+            "Descartar las columnas de importe de los ejercicios posteriores a AÑO "
+            "(p. ej. 2025 quita las siete columnas de 2026). Sin esto se copian las 88."
+        ),
+    )
+    parser.add_argument(
         "--limite",
         type=int,
         default=0,
@@ -107,6 +129,28 @@ def analizar_argumentos() -> argparse.Namespace:
         help="Procesar solo las primeras N filas de datos. Para pruebas rápidas.",
     )
     return parser.parse_args()
+
+
+def columnas_conservadas(nombres: list[bytes], hasta: int) -> list[int]:
+    """Índices de las columnas que sobreviven al corte por ejercicio."""
+    conservadas = []
+    for indice, nombre in enumerate(nombres):
+        anio = EJERCICIO.search(nombre)
+        if anio and int(anio.group(1)) > hasta:
+            continue
+        conservadas.append(indice)
+    return conservadas
+
+
+def rearmar(campos: list[bytes], conservadas: list[int]) -> bytes:
+    """Vuelve a escribir la línea con solo las columnas conservadas.
+
+    Los campos van entrecomillados uno a uno y ninguno contiene comillas ni `","` —está
+    comprobado sobre el archivo completo—, así que basta con pelar los extremos, unir por
+    el separador y envolver el conjunto. No hace falta un csv.writer.
+    """
+    trozos = [pelar(campos[indice]) for indice in conservadas]
+    return COMILLA + SEPARADOR.join(trozos) + COMILLA
 
 
 def main() -> None:
@@ -123,6 +167,28 @@ def main() -> None:
         n_columnas = len(nombres)
         largo_terminador = len(terminador)
 
+        conservadas = None
+        if args.hasta_ejercicio:
+            conservadas = columnas_conservadas(nombres, args.hasta_ejercicio)
+            descartadas = n_columnas - len(conservadas)
+            if not descartadas:
+                print(
+                    f"Aviso: ninguna columna es posterior a {args.hasta_ejercicio}; "
+                    "se copian las 88.",
+                    file=sys.stderr,
+                )
+                conservadas = None
+            else:
+                cabecera = COMILLA + SEPARADOR.join(nombres[i] for i in conservadas) + COMILLA
+                if cruda.startswith(BOM):
+                    cabecera = BOM + cabecera
+                cruda = cabecera + terminador
+                print(
+                    f"Corte por ejercicio: se descartan {descartadas} columnas "
+                    f"posteriores a {args.hasta_ejercicio}; quedan {len(conservadas)}.",
+                    file=sys.stderr,
+                )
+
         print(
             f"Columnas: {n_columnas}. Buscando {args.departamento!r} en "
             + ", ".join(args.columnas),
@@ -133,7 +199,7 @@ def main() -> None:
         por_columna = [0] * len(indices)
 
         with open(args.salida, "wb", buffering=BUFFER) as salida:
-            salida.write(cruda)  # cabecera verbatim, con BOM y terminador originales
+            salida.write(cruda)  # cabecera con BOM y terminador originales
 
             for cruda_fila in entrada:
                 leidas += 1
@@ -159,7 +225,10 @@ def main() -> None:
                             acierto = True
                     if acierto:
                         coincidentes += 1
-                        salida.write(cruda_fila)
+                        if conservadas is None:
+                            salida.write(cruda_fila)
+                        else:
+                            salida.write(rearmar(campos, conservadas) + terminador)
 
                 if args.limite and leidas >= args.limite:
                     break
