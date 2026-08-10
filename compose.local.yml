@@ -17,8 +17,15 @@ services:
   # construir las URL absolutas de `/tiles/` y `/media/` que devuelve a la SPA. En este modo el
   # backend no publica el 8000, así que apuntarlo ahí deja al visor pidiendo tiles a un puerto
   # cerrado (ERR_CONNECTION_REFUSED) mientras todo lo demás funciona.
+  #
+  # `DEBUG` se fija aquí en vez de dejarlo al valor de backend/.env, por simetría con
+  # compose.dev.yml —que fuerza DEBUG=True— y porque si no, el modo que existe para simular
+  # producción hereda lo que haya quedado en el .env: con DEBUG=True un 404 sale con la traza de
+  # Django en vez de la página real, que es justo lo que este modo tendría que estar comprobando.
+  # Requiere que ALLOWED_HOSTS incluya el host usado (`localhost`); ya lo hace.
   backend:
     environment:
+      DEBUG: "False"
       BACKEND_URL: http://localhost
       SITE_URL: http://localhost
       CORS_ALLOWED_ORIGINS: http://localhost
@@ -26,6 +33,7 @@ services:
 
   worker:
     environment:
+      DEBUG: "False"
       BACKEND_URL: http://localhost
       RENDER_MAPA_BASE_URL: http://backend:8000
 

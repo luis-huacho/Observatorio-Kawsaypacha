@@ -135,9 +135,10 @@ Todo por el puerto 80: en este modo no queda ningún otro puerto publicado.
 Ojo con `VITE_*`: **Vite las hornea en el bundle durante el build**, no las lee en runtime. Si
 cambias una, hay que reconstruir la imagen del frontend (`--build`), no basta con reiniciar.
 
-Y con dos cosas más de este modo: es fiel solo con `DEBUG=False` en `backend/.env` (en desarrollo,
-`compose.dev.yml` fuerza `True`; aquí no se fuerza nada), y con `DEBUG=False` **`ALLOWED_HOSTS` tiene
-que contener el host que uses** — si abres el sitio desde otra máquina por IP, Django responde 400
+Los dos overrides fijan `DEBUG` y no lo heredan de `backend/.env`: `compose.dev.yml` lo fuerza a
+`True` y `compose.local.yml` a `False`, para que cada modo sea fiel a lo que simula sin depender de
+lo que haya quedado en el `.env`. Con `DEBUG=False`, **`ALLOWED_HOSTS` tiene que contener el host que
+uses** — trae `localhost`, pero si abres el sitio desde otra máquina por IP, Django responde 400
 hasta que la añadas.
 
 ## Pruebas

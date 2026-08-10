@@ -40,7 +40,18 @@ De paso se corrigió la tabla de servicios, que atribuía al servicio `frontend`
 no existe: en `compose.yaml` no tiene `profiles`, solo `restart: "no"`; quien le pone
 `profiles: ["prod"]` es el override de desarrollo.
 
-Sin cambios de código: los tres archivos de compose ya eran correctos.
+Al verificar el modo local salió un cuarto desajuste, este sí de comportamiento: `compose.local.yml`
+**no fijaba `DEBUG`** y lo heredaba de `backend/.env`, mientras que `compose.dev.yml` sí lo fuerza a
+`True`. O sea que el modo que existe para simular producción corría con `DEBUG=True` y servía la
+traza de depuración de Django en un 404 —una de las cosas que tendría que estar comprobando—, y ser
+fiel dependía de acordarse de editar el `.env`. Ahora lo fija a `False`, junto a las otras variables
+que ya sobreescribe. `ALLOWED_HOSTS` ya traía `localhost`, así que no hizo falta nada más.
+
+Verificado sobre `compose.local.yml`: el 404 sale limpio, y la suite E2E contra el bundle servido por
+nginx queda en 56 pruebas en verde y 6 saltadas por condición, incluida la del PDF con mapa —la que
+ejercita `RENDER_MAPA_BASE_URL`—. De paso quedó a la vista que la prueba del selector de mapa base se
+salta en escritorio y en móvil porque su localizador no encuentra el control: esa función no está
+cubierta hoy. Pendiente de abrir en el tracker.
 
 ### Actualización 05/08/2026 — el sitio no se recuperaba solo de un cuelgue
 

@@ -71,7 +71,8 @@ Qué cambia respecto de la base:
 
 - `backend` y `worker` reciben `BACKEND_URL`, `SITE_URL` y `CORS_ALLOWED_ORIGINS` = `http://localhost`. `BACKEND_URL` es la URL con la que **el navegador del visitante** alcanza el backend —el API la usa para construir las URL absolutas de `/tiles/` y `/media/`—, y aquí el backend no publica el `8000`: apuntarla ahí deja al visor pidiendo tiles a un puerto cerrado. Para lo interno está `RENDER_MAPA_BASE_URL=http://backend:8000`, que es lo que usa el Chromium que renderiza el PDF dentro del contenedor;
 - `nginx` **reemplaza** `conf.d` por `deploy/nginx/local/` —mismo target, así que compose sustituye en vez de acumular— y monta la configuración de producción en `/etc/nginx/comun` para los includes compartidos; publica solo el `80:80`;
-- `certbot` y `backup` van a `profiles: ["nunca"]`.
+- `certbot` y `backup` van a `profiles: ["nunca"]`;
+- **`DEBUG=False`**, fijado aquí y no heredado de `backend/.env`, por simetría con el override de desarrollo —que fuerza `True`—. Si se hereda, el modo que existe para simular producción acaba sirviendo la traza de depuración de Django en un 404, que es justo una de las cosas que tendría que estar comprobando. Exige que `ALLOWED_HOSTS` incluya el host usado; trae `localhost`.
 
 Sigue exigiendo `SITE_DOMAIN` y `API_DOMAIN` en el `.env` de la raíz —`compose.yaml` las declara con `:?`— aunque la configuración local no las use.
 
