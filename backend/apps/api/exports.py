@@ -63,15 +63,27 @@ def respuesta_excel(nombre_archivo: str, hoja: str, cabeceras, filas, anchos=Non
 NIVELES = {1: "Bajo", 2: "Medio", 3: "Alto", 4: "Muy alto"}
 
 
-def filas_ccpp(queryset):
-    """Una fila por centro poblado, con su nivel máximo ya anotado.
+def filas_ccpp(queryset, tipos):
+    """Una fila por centro poblado, con su nivel máximo y **todos sus peligros**.
 
     Se exporta la misma unidad que muestra la tabla —centros poblados, no clasificaciones—
-    para que el Excel cuadre con lo que el usuario tenía en pantalla.
+    para que el Excel cuadre con lo que el usuario tenía en pantalla. Por eso los peligros no
+    abren fila: van en una columna de texto legible y, además, uno por columna con su nivel,
+    que es lo que permite filtrar y pivotar en Excel.
+
+    Los peligros salen de `clasificaciones_filtradas`, el `to_attr` que arma el viewset con los
+    mismos `peligros`/`niveles` de la petición y en el mismo orden con el que el visor elige el
+    ícono: así el Excel de una consulta filtrada no puede hablar de lo que el mapa oculta. Se
+    lee **sin repliegue** a propósito — un `getattr` con defecto convertiría la pérdida del
+    prefetch en una consulta por fila, silenciosa hasta producción.
     """
     campos = queryset.select_related("distrito__provincia").iterator(chunk_size=2000)
     for c in campos:
         nivel = getattr(c, "nivel", None)
+        peligros = {
+            clasificacion.tipo_peligro_id: clasificacion.nivel
+            for clasificacion in c.clasificaciones_filtradas
+        }
         yield [
             c.codigo,
             c.nombre,
@@ -79,19 +91,35 @@ def filas_ccpp(queryset):
             c.distrito.provincia.nombre,
             c.distrito.nombre,
             c.distrito_id,
-            c.altitud,
-            c.lat,
-            c.lon,
             nivel or "",
             NIVELES.get(nivel, "Sin dato clasificado"),
+            "; ".join(
+                f"{clasificacion.tipo_peligro.nombre} "
+                f"({clasificacion.nivel} · {NIVELES[clasificacion.nivel]})"
+                for clasificacion in c.clasificaciones_filtradas
+            ),
+            # Enteros, no texto: es lo que deja ordenar y filtrar la columna por nivel, que es
+            # justo el motivo de que exista. Vacío = ese peligro no está clasificado aquí, o no
+            # pasa los filtros.
+            *(peligros.get(tipo.pk, "") for tipo in tipos),
         ]
 
 
+#: Columnas fijas. Las de peligro se añaden después, **desde el catálogo**: un décimo peligro
+#: aparece en el Excel sin tocar código, igual que aparece en el visor.
 CABECERAS_CCPP = [
     "Código INEI", "Centro poblado", "Categoría", "Provincia", "Distrito", "Ubigeo distrito",
-    "Altitud (m)", "Latitud", "Longitud", "Nivel", "Nivel (descripción)",
+    "Nivel", "Nivel (descripción)", "Peligros",
 ]
-ANCHOS_CCPP = [13, 30, 14, 18, 18, 14, 11, 12, 12, 7, 20]
+ANCHOS_CCPP = [13, 30, 14, 18, 18, 14, 7, 20, 60]
+
+
+def cabeceras_ccpp(tipos) -> list[str]:
+    return CABECERAS_CCPP + [f"{tipo.nombre} (nivel)" for tipo in tipos]
+
+
+def anchos_ccpp(tipos) -> list[int]:
+    return ANCHOS_CCPP + [max(10, len(tipo.nombre) + 3) for tipo in tipos]
 
 
 CABECERAS_INVERSION = [

@@ -14,6 +14,33 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 11/08/2026 — el Excel de /peligros decía menos que la pantalla
+
+El botón «Excel» de `/peligros` descargaba las columnas de antes de rehacer la sección: altitud,
+latitud y longitud —las tres que ya se habían quitado de la ficha por ser ruido para quien
+consulta exposición— y **ningún peligro**. Solo llevaba `Nivel`, el máximo tras los filtros, así
+que quien abría el archivo veía que un centro poblado era «Muy alto» pero no de qué. Es justo la
+columna que la tabla sí muestra en pantalla.
+
+**Se conserva una fila por centro poblado**, que es la unidad de la tabla y del contador (3,238
+en toda la región); las 10,978 clasificaciones son la otra unidad y confundirlas es el error que
+el proyecto lleva evitando. Los peligros entran en **dos formas complementarias**: una columna
+`Peligros` legible de un vistazo —`Sismo (4 · Muy alto); Heladas (3 · Alto)`, la traducción a
+texto de la columna de la tabla— y **una columna por peligro del catálogo** con su nivel como
+número, que es lo que permite filtrar «los que tienen sismo en 4» o hacer una tabla dinámica.
+
+No hizo falta consulta nueva: la vista del export ya instanciaba el viewset con `action="list"`,
+así que el `Prefetch` con `to_attr="clasificaciones_filtradas"` —mismos filtros, mismo orden que
+el ícono del visor— **ya venía montado y nadie lo leía**. Se lee **sin repliegue** a propósito:
+un `getattr` con defecto convertiría la pérdida futura del prefetch en una consulta por fila,
+silenciosa hasta producción. Las columnas de peligro salen de `TipoPeligro`, así que un décimo
+peligro entra en el Excel sin tocar código.
+
+La prueba que había solo contaba filas, y por eso no vio nada de esto. Ahora se comprueban las
+columnas, que **el nivel de cada peligro cae en su columna** —la desalineación es el fallo
+probable de una tabla con columnas dinámicas, y Excel no se queja de una fila más corta—, que un
+Excel filtrado no habla de lo que el mapa oculta, y que el export no consulta uno a uno.
+
 ### Actualización 11/08/2026 — el visor gana los límites, y los distritos su centroide
 
 El visor no dibujaba ninguna división política, y la falta de geometría distrital arrastraba una

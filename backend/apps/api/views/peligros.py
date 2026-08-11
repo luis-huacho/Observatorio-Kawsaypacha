@@ -138,12 +138,15 @@ class CentroPobladoExportView(APIView):
         vista = CentroPobladoViewSet(request=request, action="list", format_kwarg=None)
         vista.kwargs = {}
         queryset = vista.filter_queryset(vista.get_queryset())
+        # El catálogo se lee una vez y se pasa a las tres funciones: cabecera, anchos y celdas
+        # se derivan de la misma lista, que es lo que impide que se desalineen.
+        tipos = list(TipoPeligro.objects.all())
         return exports.respuesta_excel(
             "centros-poblados-cusco.xlsx",
             "Centros poblados",
-            exports.CABECERAS_CCPP,
-            exports.filas_ccpp(queryset),
-            exports.ANCHOS_CCPP,
+            exports.cabeceras_ccpp(tipos),
+            exports.filas_ccpp(queryset, tipos),
+            exports.anchos_ccpp(tipos),
         )
 
 
@@ -344,9 +347,9 @@ class FrecuenciaGeoJSONView(APIView):
     cero (ADR-D1) quedan fuera: un ícono de emergencia sobre ellos afirmaría algo que la fuente
     no dice, y son justo los distritos de los que no hay información.
 
-    El punto es el centroide de sus centros poblados —ver `consultas.centroides_distritales`—,
-    porque en el proyecto no hay geometría distrital. Es una aproximación, y por eso el popup
-    del visor habla del distrito y no del punto.
+    El punto es el centroide del distrito (ADR-A20) —ver `consultas.centroides_distritales`—,
+    con repliegue a la mediana de sus centros poblados cuando falta. Sigue representando al
+    distrito entero, y por eso el popup del visor habla del distrito y no del punto.
     """
 
     @extend_schema(

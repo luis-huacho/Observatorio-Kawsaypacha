@@ -40,7 +40,7 @@ API desde otro dominio hay que pedir que lo añadan a `CORS_ALLOWED_ORIGINS`. De
 | `GET /api/ccpp/` | El padrón de 8,968 centros poblados, paginado |
 | `GET /api/ccpp/{codigo}/` | Ficha de un centro poblado con sus clasificaciones |
 | `GET /api/ccpp/geojson/` | Los mismos, como FeatureCollection para el mapa |
-| `GET /api/ccpp/export.xlsx` | Lo filtrado, en Excel |
+| `GET /api/ccpp/export.xlsx` | Lo filtrado, en Excel: una fila por centro poblado, con sus peligros en una columna legible y una columna por peligro con su nivel |
 | `GET /api/peligros/tipos/` | El catálogo de 9 peligros con slug, color y categoría |
 | `GET /api/peligros/resumen/` | Agregados para las tarjetas y el gráfico de distribución |
 | `GET /api/peligros/frecuencia/` | Frecuencia de emergencias, un registro por distrito |
