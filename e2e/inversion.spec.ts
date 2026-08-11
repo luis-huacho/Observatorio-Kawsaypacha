@@ -22,6 +22,7 @@ import { abrirMenu } from "./fixtures";
  */
 const API_TABLERO = /\/api\/inversion\/(\?|$)/;
 const API_LISTADO = /\/api\/inversion\/entidades\//;
+const API_MAPA = /\/api\/inversion\/mapa\//;
 
 /**
  * Abre la ruta **armando la espera antes de navegar**.
@@ -34,6 +35,20 @@ async function abrir(page: Page, ruta: string, api: RegExp = API_TABLERO) {
   const respuesta = esperarApi(page, api);
   await page.goto(ruta);
   return (await respuesta).json();
+}
+
+/**
+ * La tabla de municipalidades, acotada a su sección.
+ *
+ * Desde que el cuadro de evolución existe hay dos `<table>` en la página, y un `table tbody tr`
+ * suelto empezaría a leer las cifras por año como si fueran filas del ranking — sin dar ningún
+ * error, porque también son números.
+ */
+function tablaDeMunicipalidades(page: Page) {
+  return page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Municipalidades" }) })
+    .locator("table");
 }
 
 test.describe("Inversión (PP 0068)", () => {
@@ -80,14 +95,15 @@ test.describe("Inversión (PP 0068)", () => {
     // `select` dispara una petición: hay que esperarla antes de leer el DOM.
     const cuerpo = await abrir(page, "/inversion");
     test.skip(!cuerpo.disponible, "no hay ejercicio publicado en este entorno");
-    // Que haya filas es la señal de que el listado ya respondió; esperar la petición sería otra
-    // carrera, porque puede haberse resuelto antes de que el test llegue a pedirla.
-    await expect(page.locator("table tbody tr").first()).toBeVisible();
+    // Acotado a su sección: la página tiene dos tablas desde que existe el cuadro de evolución,
+    // y `table tbody tr` a secas leería las cifras por año como si fueran municipalidades.
+    const listado = tablaDeMunicipalidades(page);
+    await expect(listado.locator("tbody tr").first()).toBeVisible();
 
     // `textContent` y no `innerText`: las columnas que se ocultan por ancho siguen en el DOM,
     // pero `innerText` de un nodo con `display:none` devuelve cadena vacía.
     const columna = async (n: number) =>
-      (await page.locator(`table tbody tr td:nth-child(${n})`).allTextContents()).map((t) =>
+      (await listado.locator(`tbody tr td:nth-child(${n})`).allTextContents()).map((t) =>
         Number(t.replace(/[^\d-]/g, "")),
       );
     const noCreciente = (valores: number[]) => valores.every((v, i) => i === 0 || valores[i - 1] >= v);
@@ -111,13 +127,14 @@ test.describe("Inversión (PP 0068)", () => {
 
     const pie = page.getByText(/Mostrando .* de .* municipalidades/i);
     await expect(pie).toBeVisible();
-    const antes = await page.locator("table tbody tr").count();
+    const listado = tablaDeMunicipalidades(page);
+    const antes = await listado.locator("tbody tr").count();
 
     const boton = page.getByRole("button", { name: /Ver \d+ más/ });
     test.skip(!(await boton.isVisible()), "el entorno tiene una sola página de municipalidades");
 
     await boton.click();
-    await expect.poll(async () => page.locator("table tbody tr").count()).toBeGreaterThan(antes);
+    await expect.poll(async () => listado.locator("tbody tr").count()).toBeGreaterThan(antes);
   });
 
   test("la ficha de una municipalidad se abre y conserva el ejercicio al volver", async ({
@@ -139,6 +156,51 @@ test.describe("Inversión (PP 0068)", () => {
 
     await page.getByRole("link", { name: /Volver a Inversión/i }).click();
     await expect(page).toHaveURL(/anio=2026/);
+  });
+
+  test("el cuadro de evolución trae una fila por ejercicio publicado", async ({ page }) => {
+    const cuerpo = await abrir(page, "/inversion");
+    test.skip(!cuerpo.disponible, "sin ejercicio publicado");
+
+    const cuadro = page.locator("section", { hasText: /^Tendencia/ }).first();
+    await expect(cuadro.locator("tbody tr")).toHaveCount(cuerpo.tendencia.length);
+    // El PIA es la tercera serie: sin él, la distancia hasta el PIM —la variación— no se ve.
+    await expect(cuadro.getByText("PIA", { exact: true }).first()).toBeVisible();
+    if (cuerpo.tendencia.some((t: { es_parcial: boolean }) => t.es_parcial)) {
+      await expect(cuadro.getByText(/^\* Ejercicio con corte parcial/)).toBeVisible();
+    }
+  });
+
+  test("el visor declara el dinero que no puede pintar", async ({ page }) => {
+    // Se afirma sobre la leyenda y el pie, que son DOM real. El canvas de MapLibre no se
+    // inspecciona: un `expect` sobre píxeles falla por razones que no son el fallo que importa.
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    await expect(visor.locator("canvas")).toBeVisible();
+    await expect(visor.getByRole("button", { name: "Devengado" })).toBeVisible();
+
+    // ADR-D6: a nivel distrital las municipalidades provinciales no se pintan, y su importe se
+    // declara. Que el pie exista es lo que impide que el mapa se lea como el total del programa.
+    expect(mapa.no_ubicado.entidades).toBeGreaterThan(0);
+    await expect(visor.getByText(/no aparecen en el mapa/i)).toBeVisible();
+    await expect(visor.getByText(/sin municipalidad \(\d+\)/)).toBeVisible();
+  });
+
+  test("cambiar el visor a provincia no deja nada fuera del mapa", async ({ page }) => {
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion?nivel=provincial");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    // Todas las municipalidades caen dentro de alguna provincia, así que a este nivel el mapa
+    // cubre el ámbito entero y el pie de «no aparecen» desaparece.
+    expect(mapa.no_ubicado.entidades).toBe(0);
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    await expect(visor.getByText(/no aparecen en el mapa/i)).toHaveCount(0);
   });
 
   test("una municipalidad que no existe no deja la página en blanco", async ({ page }) => {

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip,
   XAxis, YAxis,
@@ -8,10 +8,17 @@ import { ChevronRight, Download } from "lucide-react";
 import { urlApi, useApi, useApiPaginado } from "@/lib/api";
 import { registrarExport } from "@/lib/metricas";
 import { useBloque } from "@/lib/sitio";
-import type { InversionEntidad, InversionResponse } from "@/lib/types";
+import type {
+  CapaMapa,
+  InversionEntidad,
+  InversionMapaResponse,
+  InversionResponse,
+  MetricaMapa,
+} from "@/lib/types";
 import { formatNumber, formatPct, formatSoles } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
 import KPI from "@/components/KPI";
+import MapaInversion from "@/components/MapaInversion";
 import PageHeader from "@/components/PageHeader";
 
 /**
@@ -40,13 +47,24 @@ const ORDENES_COMPARACION: Record<string, string> = {
   ...ORDENES,
 };
 
+const METRICAS_MAPA: MetricaMapa[] = ["pia", "pim", "devengado", "pct_ejecucion"];
+
 export default function InversionView() {
   const [params, setParams] = useSearchParams();
+  const navegar = useNavigate();
   const anio = params.get("anio") || "";
   const provincia = params.get("provincia") || "";
   const comparando = params.get("vista") === "comparar";
   const compararCon = comparando ? params.get("comparar_con") || "" : "";
   const orden = params.get("ordenar") || (comparando ? "variacion" : "pim");
+  // El nivel y la métrica del mapa también viven en la URL: así el visor es enlazable con la
+  // vista puesta, que es la forma en que estas cifras se citan en una reunión.
+  const nivelMapa = params.get("nivel") === "provincial" ? "provincial" : "distrital";
+  const metricaMapa = (
+    METRICAS_MAPA.includes(params.get("metrica") as MetricaMapa)
+      ? params.get("metrica")
+      : "pim"
+  ) as MetricaMapa;
 
   const ponerParam = (clave: string, valor: string) => {
     const siguientes = new URLSearchParams(params);
@@ -65,6 +83,13 @@ export default function InversionView() {
     ...filtros,
     ordenar: orden,
   });
+  // Aparte del tablero, y a propósito: si el mapa falla, la ventana sigue sirviendo sus cifras.
+  const mapa = useApi<InversionMapaResponse>("/inversion/mapa/", {
+    anio: anio || undefined,
+    provincia: provincia || undefined,
+    nivel: nivelMapa,
+  });
+  const capasMapa = useApi<CapaMapa[]>("/mapas/capas/");
   const textoEnPreparacion = useBloque(
     "inversion.en_preparacion",
     "<p>PREDES está consolidando los datos de inversión del PP 0068. La sección se publicará " +
@@ -72,6 +97,7 @@ export default function InversionView() {
   );
 
   const datos = inv.status === "ok" && inv.data.disponible ? inv.data : null;
+  const mapaDatos = mapa.status === "ok" && mapa.data.disponible ? mapa.data : null;
 
   // Del catálogo y no de las filas: con la tabla paginada, un selector construido con lo que
   // se ve solo ofrecería las provincias de la primera página. `/territorio/provincias/` va sin
@@ -246,12 +272,12 @@ export default function InversionView() {
                 sub="presupuesto aprobado y aún no gastado"
               />
               <KPI
-                label="Presupuesto institucional total"
+                label="Presupuesto institucional (PIM)"
                 value={a.pim_institucional === null ? "Sin dato" : formatSoles(a.pim_institucional)}
                 sub={
                   a.pct_0068_institucional === null
                     ? "ninguna municipalidad con total institucional"
-                    : `el PP 0068 es el ${formatPct(a.pct_0068_institucional)}, sobre ${a.entidades_con_institucional} municipalidad(es)`
+                    : `PIA ${formatSoles(a.pia_institucional ?? 0)} · el PP 0068 es el ${formatPct(a.pct_0068_institucional)}, sobre ${a.entidades_con_institucional} municipalidad(es)`
                 }
               />
             </section>
@@ -285,10 +311,16 @@ export default function InversionView() {
                 <h2 className="font-display font-semibold text-mountain-900 mb-2">
                   ¿En qué se invierte? — procesos de la GRD
                 </h2>
-                <p className="text-xs text-ink-600 mb-4">
-                  PIM por proceso. {formatPct(a.pct_proyectos ?? 0)} del presupuesto está en
-                  proyectos de inversión y el resto en actividades.
+                <p className="text-xs text-ink-600 mb-3">
+                  PIM por proceso. El reparto se clasifica por actividad y no por producto: a
+                  nivel de producto, «Acciones comunes» y los proyectos se llevan tres cuartas
+                  partes y el gráfico no dice nada.
                 </p>
+                <ProyectosVsActividades
+                  proyectos={a.pim_proyectos}
+                  actividades={a.pim_actividades}
+                  pct={a.pct_proyectos}
+                />
                 <div className="h-64">
                   <ResponsiveContainer>
                     <BarChart data={procesos} layout="vertical" margin={{ left: 8 }}>
@@ -316,15 +348,17 @@ export default function InversionView() {
                 Tendencia {d.tendencia[0]?.anio}-{d.tendencia[d.tendencia.length - 1]?.anio}
               </h2>
               <p className="text-xs text-ink-600 mb-4">
-                PIM y devengado en millones de soles. La serie combina el comparativo del MEF con
-                la base entregada por PREDES, y los ejercicios con corte parcial van marcados con
-                un asterisco.
+                PIA, PIM y devengado en millones de soles. Las tres juntas cuentan el ciclo
+                completo: lo aprobado al abrir el año, lo que quedó tras las modificaciones y lo
+                que se llegó a gastar. La serie combina el comparativo del MEF con la base
+                entregada por PREDES, y los ejercicios con corte parcial van con asterisco.
               </p>
               <div className="h-64">
                 <ResponsiveContainer>
                   <LineChart
                     data={d.tendencia.map((t) => ({
                       etiqueta: t.es_parcial ? `${t.anio}*` : String(t.anio),
+                      PIA: t.pia / 1e6,
                       PIM: t.pim / 1e6,
                       Devengado: t.devengado / 1e6,
                     }))}
@@ -334,14 +368,105 @@ export default function InversionView() {
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip formatter={(v: number) => `S/ ${v.toFixed(1)}M`} />
                     <Legend />
+                    {/* El PIA va punteado: es el punto de partida, no una tercera magnitud del
+                        mismo rango — la distancia entre él y el PIM es la variación. */}
+                    <Line
+                      type="monotone"
+                      dataKey="PIA"
+                      stroke="#B8753C"
+                      strokeWidth={2}
+                      strokeDasharray="5 4"
+                    />
                     <Line type="monotone" dataKey="PIM" stroke="#007480" strokeWidth={2.5} />
                     <Line type="monotone" dataKey="Devengado" stroke="#009257" strokeWidth={2.5} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+
+              <div className="overflow-x-auto mt-5">
+                <table className="w-full text-sm min-w-[44rem]">
+                  <thead className="text-xs uppercase text-ink-600">
+                    <tr>
+                      <th className="text-left py-2">Ejercicio</th>
+                      <th className="text-right py-2">PIA</th>
+                      <th className="text-right py-2">PIM</th>
+                      <th className="text-right py-2 hidden lg:table-cell">Variación PIA-PIM</th>
+                      <th className="text-right py-2">Devengado</th>
+                      <th className="text-right py-2">% Ejec.</th>
+                      <th className="text-right py-2">Saldo</th>
+                      <th className="text-left py-2 pl-6 hidden lg:table-cell">Fuente</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.tendencia.map((t) => (
+                      <tr
+                        key={t.anio}
+                        className={`border-t border-ink-300/20 ${t.anio === d.anio ? "bg-mountain-100/40" : ""}`}
+                      >
+                        <td className="py-2">
+                          {t.anio}
+                          {t.es_parcial && (
+                            <span className="text-xs text-yellow-800" title={`Corte a ${t.corte}`}>
+                              {" "}
+                              *
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 text-right font-mono">{formatSoles(t.pia)}</td>
+                        <td className="py-2 text-right font-mono">{formatSoles(t.pim)}</td>
+                        <td className="py-2 text-right font-mono hidden lg:table-cell">
+                          {formatSoles(t.pim - t.pia)}
+                        </td>
+                        <td className="py-2 text-right font-mono">{formatSoles(t.devengado)}</td>
+                        <td className="py-2 text-right font-mono">
+                          {t.pim === 0 ? "—" : formatPct(t.devengado / t.pim)}
+                        </td>
+                        <td className="py-2 text-right font-mono">
+                          {formatSoles(t.pim - t.devengado)}
+                        </td>
+                        <td className="py-2 pl-6 text-xs text-ink-600 hidden lg:table-cell">
+                          {t.fuente}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               {d.tendencia.some((t) => t.es_parcial) && (
-                <p className="text-xs text-ink-600 mt-2">
-                  * Ejercicio con corte parcial: el devengado no cubre el año completo.
+                <p className="text-xs text-ink-600 mt-3">
+                  * Ejercicio con corte parcial: el devengado no cubre el año completo, así que su
+                  % de ejecución no se compara con el de un año cerrado.
+                </p>
+              )}
+            </section>
+
+            <section className="card p-5 mt-6">
+              <h2 className="font-display font-semibold text-mountain-900 mb-2">
+                ¿Dónde está el presupuesto? — {d.anio}
+              </h2>
+              <p className="text-xs text-ink-600 mb-4">
+                El presupuesto es de municipalidades, no de territorios, así que cada polígono
+                muestra solo el dinero que se le puede atribuir sin repartirlo. Lo que no cabe en
+                el nivel elegido se declara debajo del mapa.
+              </p>
+              {mapaDatos && capasMapa.status === "ok" ? (
+                <MapaInversion
+                  datos={mapaDatos}
+                  capas={capasMapa.data}
+                  metrica={metricaMapa}
+                  onMetrica={(m) => ponerParam("metrica", m === "pim" ? "" : m)}
+                  onNivel={(n) => ponerParam("nivel", n === "distrital" ? "" : n)}
+                  onSeleccionar={(fila) => {
+                    if (mapaDatos.nivel === "provincial") ponerParam("provincia", fila.ubigeo);
+                    else if (fila.codigo_entidad)
+                      navegar(`/inversion/${fila.codigo_entidad}?${params.toString()}`);
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-ink-600">
+                  {mapa.status === "error" || capasMapa.status === "error"
+                    ? "El mapa no está disponible ahora mismo. Las cifras de esta página no dependen de él."
+                    : "Cargando el mapa…"}
                 </p>
               )}
             </section>
@@ -457,6 +582,53 @@ export default function InversionView() {
         </section>
       </div>
     </>
+  );
+}
+
+/**
+ * Proyectos de inversión contra actividades, en una sola barra.
+ *
+ * Era una frase suelta bajo el gráfico de procesos («el 26 % está en proyectos»), y un
+ * porcentaje sin forma no deja ver que en algunos ámbitos la obra pública se come casi todo el
+ * programa mientras la gestión corriente se queda sin nada.
+ */
+function ProyectosVsActividades({
+  proyectos,
+  actividades,
+  pct,
+}: {
+  proyectos: number;
+  actividades: number;
+  pct: number | null;
+}) {
+  const total = proyectos + actividades;
+  if (total <= 0) return null;
+  const anchoProyectos = (proyectos / total) * 100;
+  return (
+    <div className="mb-4">
+      <div className="flex h-5 rounded overflow-hidden border border-ink-300/40">
+        <div
+          className="bg-sky-700"
+          style={{ width: `${anchoProyectos}%` }}
+          title={`Proyectos de inversión: ${formatSoles(proyectos)}`}
+        />
+        <div
+          className="bg-earth-200"
+          style={{ width: `${100 - anchoProyectos}%` }}
+          title={`Actividades: ${formatSoles(actividades)}`}
+        />
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-600 mt-1.5">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-[2px] bg-sky-700 shrink-0" />
+          Proyectos de inversión {formatPct(pct ?? 0)} · {formatSoles(proyectos)}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-[2px] bg-earth-200 shrink-0" />
+          Actividades · {formatSoles(actividades)}
+        </span>
+      </div>
+    </div>
   );
 }
 

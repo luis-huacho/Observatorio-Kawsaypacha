@@ -16,7 +16,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import maplibregl, { type LayerSpecification } from "maplibre-gl";
-import { Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Layers } from "lucide-react";
 import type { CapaMapa, Nivel, TipoPeligroApi } from "@/lib/types";
@@ -35,6 +34,7 @@ import { Siren } from "lucide-react";
 /** Clave interna con la que viaja el glifo de emergencias por el mismo canal que los peligros. */
 const SLUG_EMERGENCIAS = "__emergencias__";
 import { buscarLugares } from "@/lib/search";
+import { registrarProtocoloPmtiles } from "@/lib/pmtiles";
 import {
   BuscarLugarControl,
   DescargarPNGControl,
@@ -137,9 +137,6 @@ function filtroClusters(mostrarSinDato: boolean): maplibregl.ExpressionSpecifica
   if (mostrarSinDato) return grupo;
   return ["all", grupo, [">", ["get", "clasif"], 0]];
 }
-
-// El protocolo pmtiles:// se registra una sola vez por sesión, no por instancia de mapa.
-let protocoloRegistrado = false;
 
 /**
  * Toda mutación del estilo (paint, datos, visibilidad) exige que el estilo esté cargado.
@@ -395,10 +392,7 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
   useEffect(() => {
     if (!contenedor.current || mapa.current) return;
 
-    if (!protocoloRegistrado) {
-      maplibregl.addProtocol("pmtiles", new Protocol().tile);
-      protocoloRegistrado = true;
-    }
+    registrarProtocoloPmtiles();
 
     const map = new maplibregl.Map({
       container: contenedor.current,

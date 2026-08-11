@@ -10,6 +10,7 @@ Ningún derivado se guarda. Todos salen de `PresupuestoEntidad` (totales) y `Pre
 from decimal import Decimal
 
 from django.db.models import (
+    Count,
     DecimalField,
     ExpressionWrapper,
     F,
@@ -528,6 +529,158 @@ def actividades_entidad(entidad: EntidadEjecutora, ejercicio: Ejercicio) -> list
         }
         for f in filas
     ]
+
+
+#: Los dos niveles a los que el presupuesto se puede pintar sin inventar nada (ADR-D6).
+NIVELES = ("distrital", "provincial")
+NIVEL_POR_DEFECTO = "distrital"
+
+
+def _cortes(valores: list[float]) -> list[float]:
+    """Los cuatro quintiles de una lista de importes: cinco tramos para la leyenda.
+
+    Quintiles y no una rampa lineal porque la distribución está muy sesgada —una municipalidad
+    provincial concentra órdenes de magnitud más que una distrital pequeña—, y con una escala
+    lineal el mapa sale con un polígono oscuro y todos los demás pálidos.
+
+    Pueden salir repetidos (con muchos ceros, los tres primeros cortes valen 0). No se
+    deduplican: el cliente clasifica cada fila recorriendo la lista, así que un tramo vacío se
+    dibuja vacío en la leyenda, que es la verdad. Lo que no se puede hacer con esto es un `step`
+    de MapLibre, que exige cortes estrictamente crecientes.
+    """
+    if not valores:
+        return [0.0, 0.0, 0.0, 0.0]
+    ordenados = sorted(valores)
+    n = len(ordenados)
+    return [float(ordenados[min(n - 1, n * k // 5)]) for k in (1, 2, 3, 4)]
+
+
+def mapa(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="", nivel=NIVEL_POR_DEFECTO) -> dict:
+    """El coroplético: el presupuesto del ámbito, sobre el polígono al que se le puede atribuir.
+
+    **La regla es ADR-D6**: se pinta lo que se puede atribuir sin inventarlo, y lo que no se
+    puede ubicar se declara en `no_ubicado` — nunca se reparte. De ahí que una municipalidad
+    provincial no coloree su distrito capital: su presupuesto es de toda la provincia, y
+    volcarlo sobre la capital pintaría un distrito de oscuro con el dinero de los otros catorce.
+
+    Las cuatro métricas viajan en cada fila a propósito. Conmutar entre PIA, PIM, devengado y %
+    de ejecución no dispara otra petición, así que dos métricas del mismo mapa no pueden acabar
+    viniendo de ejercicios distintos si alguien cambia la visibilidad entre medias.
+    """
+    from apps.territorio.models import Distrito, Provincia
+
+    nivel = nivel if nivel in NIVELES else NIVEL_POR_DEFECTO
+    universo = entidades(ambito, provincia)
+    base = PresupuestoEntidad.objects.filter(ejercicio=ejercicio, entidad__in=universo)
+
+    if nivel == "provincial":
+        clave, nombre = "entidad__provincia__ubigeo", "entidad__provincia__nombre"
+        atribuible = Q(entidad__provincia__isnull=False)
+        campos = [clave, nombre]
+    else:
+        clave, nombre = "entidad__distrito__ubigeo", "entidad__distrito__nombre"
+        atribuible = Q(
+            entidad__ambito=EntidadEjecutora.Ambito.DISTRITAL, entidad__distrito__isnull=False
+        )
+        # Agrupar también por entidad es seguro aquí y no lo sería a nivel provincial: ningún
+        # distrito tiene dos municipalidades distritales, así que la fila no se parte y el
+        # polígono puede enlazar con la ficha de su municipalidad.
+        campos = [clave, nombre, "entidad__codigo", "entidad__nombre", "entidad__provincia__nombre"]
+
+    agrupadas = (
+        base.filter(atribuible)
+        .values(*campos)
+        .annotate(
+            pia=_suma("pia"),
+            pim=_suma("pim"),
+            devengado=_suma("devengado"),
+            entidades=Count("entidad", distinct=True),
+        )
+        .order_by(clave)
+    )
+
+    filas = [
+        {
+            "ubigeo": f[clave],
+            "nombre": f[nombre],
+            "provincia": f.get("entidad__provincia__nombre") if nivel == "distrital" else f[nombre],
+            "codigo_entidad": f.get("entidad__codigo"),
+            "entidad": f.get("entidad__nombre"),
+            "entidades": f["entidades"],
+            "pia": float(f["pia"]),
+            "pim": float(f["pim"]),
+            "devengado": float(f["devengado"]),
+            "saldo": float(f["pim"] - f["devengado"]),
+            "pct_ejecucion": _porcentaje(f["devengado"], f["pim"]),
+        }
+        for f in agrupadas
+    ]
+
+    fuera = base.exclude(atribuible)
+    resto = fuera.aggregate(pia=_suma("pia"), pim=_suma("pim"), devengado=_suma("devengado"))
+    provinciales = fuera.filter(entidad__ambito=EntidadEjecutora.Ambito.PROVINCIAL).count()
+    sin_geografia = fuera.count() - provinciales
+
+    if nivel == "distrital":
+        alcance = Distrito.objects.all()
+        if provincia:
+            campo = "provincia__ubigeo" if provincia.isdigit() else "provincia__nombre__iexact"
+            alcance = alcance.filter(**{campo: provincia})
+        motivo_sin_dato = (
+            "Distritos sin municipalidad distrital con presupuesto en este ejercicio. Los "
+            "trece que son capital de provincia no la tienen: su municipalidad es la "
+            "provincial, y gestiona el presupuesto de toda la provincia."
+        )
+    else:
+        alcance = Provincia.objects.all()
+        if provincia:
+            campo = "ubigeo" if provincia.isdigit() else "nombre__iexact"
+            alcance = alcance.filter(**{campo: provincia})
+        motivo_sin_dato = "Provincias sin ninguna municipalidad con presupuesto en este ejercicio."
+
+    return {
+        "nivel": nivel,
+        "ambito": ambito,
+        "filas": filas,
+        # Los cortes se calculan sobre lo pintado, así que el color es relativo a la vista. Es
+        # el precio de los quintiles, y se paga imprimiendo los rangos en soles en la leyenda.
+        "cortes": {m: _cortes([f[m] for f in filas]) for m in ("pia", "pim", "devengado")},
+        "no_ubicado": {
+            "pia": float(resto["pia"]),
+            "pim": float(resto["pim"]),
+            "devengado": float(resto["devengado"]),
+            "entidades": provinciales + sin_geografia,
+            "motivo": _motivo_no_ubicado(nivel, provinciales, sin_geografia),
+        },
+        "poligonos": {
+            "pintados": len(filas),
+            "sin_dato": max(0, alcance.count() - len(filas)),
+            "motivo": motivo_sin_dato,
+        },
+    }
+
+
+def _motivo_no_ubicado(nivel: str, provinciales: int, sin_geografia: int) -> str:
+    """El texto que acompaña al importe que el nivel elegido no puede pintar.
+
+    Se redacta aquí y no en el frontend porque la advertencia tiene que viajar con el dato:
+    cualquier cliente que dibuje este mapa —o lo exporte— necesita poder decir qué falta.
+    """
+    if not (provinciales or sin_geografia):
+        return ""
+    partes = []
+    if provinciales:
+        partes.append(
+            f"{provinciales} municipalidad(es) provincial(es), cuyo presupuesto cubre toda su "
+            "provincia y no un distrito"
+        )
+    if sin_geografia:
+        donde = "distrito" if nivel == "distrital" else "provincia"
+        partes.append(f"{sin_geografia} entidad(es) que el padrón no ubica en ningún {donde}")
+    return (
+        "No se pinta el presupuesto de " + " y ".join(partes) + ". Su importe se declara aparte "
+        "en vez de repartirse."
+    )
 
 
 def sin_clasificar_pendiente() -> dict:

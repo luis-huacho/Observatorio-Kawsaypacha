@@ -78,6 +78,7 @@ urlpatterns = [
     path("mapas/capas/", views.CapasMapaView.as_view(), name="mapas-capas"),
     # `export.xlsx` antes de `inversion/`: si no, DRF nunca llegaría a la ruta concreta.
     path("inversion/export.xlsx", views.InversionExportView.as_view(), name="inversion-export"),
+    path("inversion/mapa/", views.InversionMapaView.as_view(), name="inversion-mapa"),
     path(
         "inversion/entidades/",
         views.InversionEntidadesView.as_view(),

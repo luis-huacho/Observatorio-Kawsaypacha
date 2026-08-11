@@ -363,6 +363,54 @@ export type InversionDetalleResponse =
   | { disponible: false; motivo: string }
   | ({ disponible: true } & InversionEntidadDetalle);
 
+/** Una fila del coroplético: un distrito o una provincia (`/api/inversion/mapa/`). */
+export type InversionMapaFila = {
+  /** Seis dígitos a nivel distrital, cuatro a nivel provincial. Casa con `UBIGEO`/`IDPROV`. */
+  ubigeo: string;
+  nombre: string;
+  provincia: string | null;
+  /** Solo a nivel distrital: el polígono enlaza con la ficha de su municipalidad. */
+  codigo_entidad: string | null;
+  entidad: string | null;
+  entidades: number;
+  pia: number;
+  pim: number;
+  devengado: number;
+  saldo: number;
+  /** null = PIM cero: no hay avance que calcular, y no es un 0 %. */
+  pct_ejecucion: number | null;
+};
+
+/** Las métricas que se pueden pintar. Las tres de dinero llevan cortes; el % los tiene fijos. */
+export type MetricaMapa = "pia" | "pim" | "devengado" | "pct_ejecucion";
+
+export type InversionMapa = {
+  anio: number;
+  corte: string;
+  es_parcial: boolean;
+  nivel: "distrital" | "provincial";
+  ambito: string;
+  filas: InversionMapaFila[];
+  /** Cuatro quintiles por métrica de dinero. Pueden repetirse: la leyenda dibuja el tramo vacío. */
+  cortes: Record<"pia" | "pim" | "devengado", number[]>;
+  /**
+   * Lo que este nivel no puede atribuir a ningún polígono (ADR-D6). No se reparte: se declara.
+   * `motivo` viene redactado del backend para que la advertencia viaje con el dato.
+   */
+  no_ubicado: {
+    pia: number;
+    pim: number;
+    devengado: number;
+    entidades: number;
+    motivo: string;
+  };
+  poligonos: { pintados: number; sin_dato: number; motivo: string };
+};
+
+export type InversionMapaResponse =
+  | { disponible: false; motivo: string }
+  | ({ disponible: true } & InversionMapa);
+
 export type PrioridadDistrito = {
   ubigeo: string;
   distrito: string;

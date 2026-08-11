@@ -14,6 +14,59 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 11/08/2026 — Inversión gana su mapa, y el mapa declara lo que no pinta
+
+El cliente pidió tres cosas sobre `/inversion` tras fijar el vocabulario presupuestal (PIM = PIA ±
+modificaciones, `0 ≤ devengado ≤ PIM`, avance = devengado/PIM): confirmar los once indicadores de
+su hoja «Campos», un cuadro de evolución en el tiempo, y **un visor con mapa de calor por PIA /
+PIM / devengado**.
+
+Los once indicadores **estaban los once** — se auditaron uno a uno contra `apps/inversion/consultas.py`,
+sin añadir ningún cálculo. Lo que faltaba era enseñarlos: el PIA institucional viajaba en el
+payload y no se pintaba, la tendencia dibujaba PIM y devengado pero **no el PIA**, y proyectos vs
+productos era una frase suelta. Los tres arreglados, más un cuadro bajo la línea con una fila por
+ejercicio (PIA, PIM, variación, devengado, % de ejecución, saldo y fuente).
+
+**El mapa era la parte con enjundia, y no por lo técnico.** El plan anterior lo daba por imposible
+—«no hay geometrías distritales en el proyecto»—, pero ADR-A20 las había traído dos días antes y
+sus llaves casan exactas con el padrón: `UBIGEO` es `Distrito.ubigeo`, `IDPROV` es
+`Provincia.ubigeo`. El problema real era otro: **el presupuesto es de municipalidades y los
+polígonos son de territorios**. De los 112 distritos de Cusco, 99 tienen municipalidad distrital;
+los 13 que faltan son exactamente las capitales de provincia, cuya municipalidad es la provincial y
+gestiona el presupuesto de toda la provincia.
+
+De ahí **ADR-D6**: se pinta el dinero que se puede atribuir al polígono sin inventarlo, y lo que no
+se puede ubicar se declara —nunca se reparte—. Volcar el presupuesto provincial sobre el distrito
+capital habría pintado un distrito de oscuro con el dinero de los otros catorce, que es la misma
+invención de cifras distritales que fundó ADR-D4. En 2026 eso son **S/ 44,240,618 pintados y
+S/ 10,350,637 declarados al pie**, que suman los S/ 54,591,255 de la tarjeta de arriba.
+
+Esa suma es la prueba, y hay dos que la fijan en las dos direcciones (`test_el_mapa_no_pierde_ni_inventa_un_sol`).
+Existen porque **un mapa al que le falta dinero se ve exactamente igual que uno correcto**: es el
+tipo de fallo que ninguna revisión visual encuentra.
+
+Cuatro cosas más que salieron por el camino:
+
+- **La invariante del SIAF ahora se comprueba al importar.** `devengado > PIM` e importes negativos
+  rechazan el archivo entero, enumerando las filas malas en un solo mensaje. Se cumplía en las
+  1,902 filas cargadas y en los dos CSV de origen, pero nadie lo estaba mirando.
+- **Un polígono sin municipalidad se pinta en blanco, no en gris claro.** El primer intento usaba
+  un gris que era indistinguible del tramo más bajo de la rampa — justo la diferencia que el mapa
+  existe para enseñar. Se vio en la primera captura.
+- **La advertencia del corte parcial se repite junto al mapa.** El banner está arriba de la página,
+  pero un mapa se recorta para una lámina y viaja solo; a mitad de año, un 50 % de ejecución sin su
+  contexto se lee como mala gestión.
+- **El registro del protocolo `pmtiles://` se mudó a `lib/pmtiles.ts`.** Estaba en un `let` de
+  módulo dentro de `MapaPeligros`, y con un segundo mapa cada componente habría registrado su
+  propio `Protocol` — sin que MapLibre se queje.
+
+Y un fallo silencioso que el propio cambio creó y las pruebas encontraron: **al haber ahora dos
+`<table>` en `/inversion`**, el test del ranking empezó a leer el cuadro de evolución como si fuera
+el listado de municipalidades. Las cifras por año también son números, así que ordenaba «mal» sin
+que nada explotara. Los selectores del spec se acotaron a su sección.
+
+`pytest` 238/238 (5 deseleccionadas por `lento`), Playwright 69 pasan y 4 se saltan.
+
 ### Actualización 11/08/2026 — el Excel de /peligros decía menos que la pantalla
 
 El botón «Excel» de `/peligros` descargaba las columnas de antes de rehacer la sección: altitud,

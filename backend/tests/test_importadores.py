@@ -514,3 +514,61 @@ def test_inversion_rechaza_un_archivo_que_no_es_ninguna_de_las_series(importar_i
     assert upload.estado == DatasetUpload.Estado.ERROR
     assert "Base 2026" not in upload.log["error"]
     assert "hoja" in upload.log["error"].lower()
+
+
+def test_inversion_rechaza_un_devengado_mayor_que_el_pim(importar_inversion, tmp_path):
+    """El SIAF bloquea devengar por encima del PIM, así que un archivo así está mal en origen.
+
+    Sin esta comprobación entraría sin protestar y produciría un avance de ejecución superior al
+    100 % — una cifra que se ve plausible en una tabla y que nadie sabría de dónde salió.
+    """
+    from apps.datasets.models import DatasetUpload
+    from apps.inversion.models import PresupuestoEntidad
+
+    lineas = MUESTRA_INVERSION.read_text(encoding="utf-8").splitlines()
+    # La segunda fila lleva PIA 100000, PIM 120000 y devengado 90000: se le pasa el devengado.
+    lineas[1] = lineas[1].replace(",100000.00,120000.00,90000.00,", ",100000.00,120000.00,130000.00,")
+    roto = tmp_path / "devengado_sobre_pim.csv"
+    roto.write_text("\n".join(lineas), encoding="utf-8")
+
+    upload = importar_inversion(roto)
+
+    assert upload.estado == DatasetUpload.Estado.ERROR
+    assert "devengado" in upload.log["error"].lower()
+    assert "Fila 2" in upload.log["error"]
+    # El reemplazo es atómico: un archivo rechazado no deja nada a medio escribir.
+    assert not PresupuestoEntidad.objects.exists()
+
+
+def test_inversion_rechaza_importes_negativos(importar_inversion, tmp_path):
+    """Un PIM negativo no existe: es un error de extracción, no un recorte presupuestal."""
+    from apps.datasets.models import DatasetUpload
+    from apps.inversion.models import PresupuestoEntidad
+
+    lineas = MUESTRA_INVERSION.read_text(encoding="utf-8").splitlines()
+    lineas[1] = lineas[1].replace(",100000.00,120000.00,90000.00,", ",100000.00,-120000.00,0.00,")
+    roto = tmp_path / "pim_negativo.csv"
+    roto.write_text("\n".join(lineas), encoding="utf-8")
+
+    upload = importar_inversion(roto)
+
+    assert upload.estado == DatasetUpload.Estado.ERROR
+    assert "negativo" in upload.log["error"].lower()
+    assert not PresupuestoEntidad.objects.exists()
+
+
+def test_inversion_enumera_varias_filas_malas_en_un_solo_mensaje(importar_inversion, tmp_path):
+    """Quien sube el archivo lo corrige una vez, no una fila por intento."""
+    from apps.datasets.models import DatasetUpload
+
+    lineas = MUESTRA_INVERSION.read_text(encoding="utf-8").splitlines()
+    lineas[1] = lineas[1].replace(",100000.00,120000.00,90000.00,", ",100000.00,120000.00,130000.00,")
+    lineas[3] = lineas[3].replace(",200000.00,400000.00,100000.00,", ",200000.00,400000.00,500000.00,")
+    roto = tmp_path / "dos_filas_malas.csv"
+    roto.write_text("\n".join(lineas), encoding="utf-8")
+
+    upload = importar_inversion(roto)
+
+    assert upload.estado == DatasetUpload.Estado.ERROR
+    assert "Fila 2" in upload.log["error"]
+    assert "Fila 4" in upload.log["error"]

@@ -51,6 +51,30 @@ Estilo de **solo contorno** (`fill-opacity: 0`): un relleno taparía ríos, lagu
 centros poblados. La provincial va más marcada que la distrital para poder distinguirlas
 superpuestas, y las dos con `orden` 0 y 1 para dibujarse por debajo de todo lo demás.
 
+### El coroplético de Inversión (ADR-D6)
+
+`MapaInversion.tsx` reutiliza estas dos capas, y es el segundo consumidor que tienen. Cuatro
+cosas que hay que saber antes de tocarlo:
+
+- **Las llaves son `UBIGEO` (6 dígitos, distrito) e `IDPROV` (4, provincia)**, y casan sin
+  traducción con `Distrito.ubigeo` y `Provincia.ubigeo`. Sobreviven a tippecanoe porque
+  `ATRIBUTOS` de `pipeline.py` **no tiene entrada para estas capas**: sin `-select`, ogr2ogr
+  conserva todos los campos. Añadir una entrada para adelgazar el tile rompería el mapa.
+- **El color se calcula en JavaScript y se inyecta como `["match", ["get", "UBIGEO"], …]`**, con
+  una rama por polígono. Los tiles solo traen geometría y códigos; el dinero llega por el API.
+  Se descartó `feature-state`, que exigiría `promoteId`, volver a aplicar el estado en cada
+  `sourcedata` y que aun así solo alcanza a los tiles ya cargados.
+- **El componente no hereda el `estilo` del catálogo**, que es de contorno con `fill-opacity: 0`
+  a propósito. Monta su propio `fill` y su propio `line`.
+- **Las dos capas se montan a la vez y se conmuta su visibilidad.** Reconstruir la fuente al
+  cambiar de nivel deja una ventana en la que el estilo todavía no está cargado, y ahí las
+  mutaciones de `paint` se pierden **sin dar ningún error**.
+
+El registro del protocolo `pmtiles://` vive en **`frontend/src/lib/pmtiles.ts`** desde que hay
+dos mapas con tiles. Estaba en un `let` de módulo dentro de `MapaPeligros`, y con dos
+componentes cada uno tendría su bandera y registraría su propio `Protocol`: el segundo pisa al
+primero y quedan dos cachés de tiles vivas, otra vez sin que MapLibre se queje.
+
 > **Por qué no el WMS de GeoPerú.** Se evaluó
 > `espacialg.geoperu.gob.pe/geoserver/geoperu/peru_distrito_/wms`, que publica los mismos
 > límites. Responde en 0.2 s y tiene CORS abierto, pero **su WFS está bloqueado (403 en

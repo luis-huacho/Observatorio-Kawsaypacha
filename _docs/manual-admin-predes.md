@@ -153,6 +153,11 @@ Después de importar hay **un paso más que en los otros datos**, y es a propós
    publica: la revisión es de PREDES.
 2. Se revisan las cifras y se marca **visible**. La página aparece al recargar.
 
+**Si el archivo trae un devengado mayor que su PIM, la carga se rechaza entera** y el registro
+enumera las filas. No es una manía del sistema: el PIM es el techo de gasto y el SIAF no deja
+devengar por encima, así que un archivo así viene mal de origen y hay que pedirlo de nuevo. Lo
+mismo con cualquier importe negativo. Nada se escribe hasta que el archivo esté bien.
+
 Dos avisos que conviene leer en el registro de la carga:
 
 - **Municipalidades «sin territorio».** Son las que no casan con el padrón de distritos, hoy cuatro
@@ -232,7 +237,20 @@ Merece la pena recorrerlo en la capacitación, porque es donde se ve el efecto d
   anunciarla, en **Menú** se marca «visible» en los dos enlaces «Comparar distritos» (el del menú
   principal y el del pie). Es el mismo mecanismo con el que se puede ocultar cualquier sección.
 - **`/buscar`** — busca en todo el contenido publicado, tolera errores de tecleo.
-- **`/inversion`** — cuánto y cómo ejecuta cada **municipalidad** el presupuesto del PP 0068.
+- **`/inversion`** — cuánto y cómo ejecuta cada **municipalidad** el presupuesto del PP 0068,
+  con un mapa que colorea el territorio por PIA, PIM, devengado o % de ejecución.
+
+### Por qué el mapa de Inversión tiene trece distritos en blanco
+
+No es un error ni un dato que falte. **El presupuesto lo tiene la municipalidad, no el
+territorio**, y las capitales de provincia no tienen municipalidad distrital: quien gobierna ahí
+es la municipalidad provincial, que gestiona el presupuesto de **toda** su provincia. Pintar ese
+dinero sobre el distrito capital diría que ese distrito recibe lo que en realidad se reparte entre
+todos los de la provincia.
+
+Por eso el mapa hace dos cosas en vez de una: deja esos polígonos en blanco, y **debajo declara
+cuánto dinero no está dibujado y por qué**. Si lo que se quiere es una lámina sin huecos, se
+cambia el selector a **«Provincia»**: a ese nivel entra todo y no queda nada fuera.
 
 ### Dos cifras que no significan lo mismo
 

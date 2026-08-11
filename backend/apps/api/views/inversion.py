@@ -39,6 +39,11 @@ PARAMS_AMBITO = [
     ),
     OpenApiParameter("provincia", str, description="Ubigeo o nombre de provincia."),
 ]
+PARAMS_MAPA = PARAMS_AMBITO + [
+    OpenApiParameter(
+        "nivel", str, description="distrital (por defecto) o provincial: el polígono que se pinta."
+    ),
+]
 PARAMS_LISTADO = PARAMS_AMBITO + [
     OpenApiParameter("buscar", str, description="Texto en el nombre de la municipalidad."),
     OpenApiParameter(
@@ -192,6 +197,35 @@ class InversionEntidadDetalleView(APIView):
                 {"anio": e.anio, "corte": e.corte, "es_parcial": e.es_parcial}
                 for e in consultas.Ejercicio.objects.filter(visible=True).order_by("-anio")
             ],
+        })
+
+
+class InversionMapaView(APIView):
+    """`/api/inversion/mapa/` — el coroplético por distrito o por provincia (ADR-D6).
+
+    Va aparte del tablero porque tiene su propio eje —el `nivel`— y porque el tablero se
+    dibuja igual sin él: si esta petición falla, la ventana sigue sirviendo sus cifras.
+    """
+
+    @method_decorator(cache_control(max_age=300, public=True))
+    @extend_schema(parameters=PARAMS_MAPA, responses={200: dict})
+    def get(self, request):
+        ejercicio = consultas.ejercicio_para(request.query_params.get("anio"))
+        if ejercicio is None:
+            return Response({"disponible": False, "motivo": MOTIVO_SIN_DATOS})
+
+        ambito, provincia = _parametros(request)
+        return Response({
+            "disponible": True,
+            "anio": ejercicio.anio,
+            "corte": ejercicio.corte,
+            "es_parcial": ejercicio.es_parcial,
+            **consultas.mapa(
+                ejercicio,
+                ambito=ambito,
+                provincia=provincia,
+                nivel=(request.query_params.get("nivel") or "").strip(),
+            ),
         })
 
 

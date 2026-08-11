@@ -92,10 +92,29 @@ Complementan a las ventanas: portada (hero administrable), buscador global, noti
 >
 > Las variaciones de PIA, PIM y devengado **sí** son comparables entre cortes distintos y no llevan marca; solo el porcentaje de ejecución la lleva.
 
+> **ADR-D6 — El mapa de Inversión pinta el dinero sobre el polígono al que se le puede atribuir; lo que no se puede ubicar se declara, nunca se reparte.** Supera la exclusión de ADR-D4 («mapa coroplético fuera de alcance por falta de geometrías»): ADR-A20 trajo los límites distritales y provinciales como capas propias, y sus llaves casan exactas con el padrón — `UBIGEO` (`080108`) es `Distrito.ubigeo` e `IDPROV` (`0802`) es `Provincia.ubigeo`, sin tabla de traducción.
+>
+> El problema que resuelve es el de siempre en esta ventana: **el presupuesto es de municipalidades y los polígonos son de territorios**, y las dos cosas no casan una a una. De los 112 distritos de Cusco, **99 tienen municipalidad distrital**; los 13 restantes son exactamente las capitales de provincia, cuya municipalidad es la provincial y gestiona el presupuesto de toda la provincia. De ahí las cuatro combinaciones y lo que hace cada una:
+>
+> | `ambito` | `nivel` | Resultado |
+> |---|---|---|
+> | municipal | provincial | 13 polígonos = suma de todas las municipalidades de la provincia. Sin huecos. |
+> | municipal | distrital | 99 polígonos; las 13 provinciales y las 4 sin distrito no se pintan y su importe sale al pie. |
+> | distrital | distrital | 99 polígonos, nada que declarar. |
+> | provincial | distrital | Nada pintable: el mapa lo dice en lugar de quedarse en blanco. |
+>
+> **Alternativa descartada**: volcar el presupuesto de una municipalidad provincial sobre su distrito capital. Pintaría un distrito de oscuro con el dinero de los otros catorce, y es la misma invención de cifras distritales que fundó ADR-D4.
+>
+> Consecuencias que no son opcionales:
+>
+> 1. El payload lleva **`no_ubicado`** con su importe, su recuento y **su motivo ya redactado**: la advertencia viaja con el dato, no con la interfaz.
+> 2. Lo pintado más lo declarado es **exactamente** el total del ámbito. Hay dos pruebas que lo fijan en las dos direcciones (`test_el_mapa_no_pierde_ni_inventa_un_sol`); sin ellas, un mapa al que le falta dinero se ve idéntico a uno correcto.
+> 3. Un polígono **sin municipalidad se pinta en blanco**, no en gris claro. El primer intento usaba un gris que era indistinguible del tramo más bajo de la rampa — justo la diferencia que el mapa existe para enseñar.
+> 4. Las tres métricas de dinero usan **quintiles** (relativos a la vista, con los rangos en soles siempre en la leyenda); el **% de ejecución usa cortes fijos** 25/50/75/90, porque con una escala relativa el mismo 90 % se pintaría de verde o de rojo según con quién compartiera pantalla.
+
 ## Fuera de alcance (esta fase)
 
 - Ventana Prioridades (ADR-P1).
-- Mapa coroplético por distrito en Inversión: no hay geometrías distritales en el proyecto (ADR-D4).
 - Scraping automático de Consulta Amigable MEF: la inversión se carga por archivo, vía `DatasetUpload`.
 - i18n quechua, series temporales, 7 procesos GRD, directorio de actores (roadmap futuro, ver `archive/05-roadmap.md`).
 

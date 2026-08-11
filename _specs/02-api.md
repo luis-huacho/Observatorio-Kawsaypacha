@@ -241,6 +241,7 @@ Notas del contrato:
 | `GET /api/inversion/` | `anio` (default: el más reciente visible), `ambito` (`municipal` por defecto \| distrital \| provincial \| regional \| todos), `provincia` (ubigeo o nombre), `comparar_con` |
 | `GET /api/inversion/entidades/` | los mismos + `buscar`, `ordenar`, `page`, `page_size`. **Paginado** |
 | `GET /api/inversion/entidades/{codigo}/` | `anio`. `codigo` = código MEF de la entidad ejecutora |
+| `GET /api/inversion/mapa/` | `anio`, `ambito`, `provincia` + `nivel` (`distrital` por defecto \| `provincial`) |
 | `GET /api/inversion/export.xlsx` | los mismos que el listado, sin paginar |
 
 **El tablero y la tabla van en endpoints distintos, a propósito.** `/api/inversion/` sirve las piezas que se dibujan juntas y hablan del mismo ejercicio (agregados, procesos, tendencia, ejercicios); la tabla se pagina y su orden se resuelve en el servidor, porque ordenar en el cliente ordenaría solo lo ya cargado. Ojo al probarlo: `/api/inversion/entidades/` **contiene** la cadena `/api/inversion/`, y un matcher por subcadena atrapa la respuesta equivocada.
@@ -319,6 +320,33 @@ Cinco reglas del payload que la interfaz no puede reinventar:
 - **Los importes institucionales de `agregados` y su porcentaje salen del mismo universo**: solo las entidades que tienen ese dato. Con el numerador de las 116 y el denominador de las 114 que tienen total, el porcentaje saldría inflado sin que nada lo dijera, y publicar un total institucional que no cuadre con el porcentaje de al lado es el mismo problema por otra vía. Por eso `entidades_con_institucional` viaja junto a las tres cifras: es su rótulo. Sin ninguna entidad con dato, los tres son `null` y no cero.
 - **`comparacion.comparable`** es `false` cuando los dos ejercicios tienen cortes distintos. El Δ de % de ejecución se sirve igual —así se decidió (ADR-D5)— pero nadie debe pintarlo sin la marca: un 47.7 % de medio año contra un 86.4 % de año cerrado no es una caída. Las variaciones de PIA, PIM y devengado sí son comparables.
 - **`comparacion.sin_presupuesto`** distingue «no participó del programa ese año» de «participó con cero». En ese caso los deltas son `null`: aparecer de la nada no es no haber cambiado.
+
+### El mapa — `GET /api/inversion/mapa/`
+
+Alimenta el coroplético de `/inversion`, y su contrato **es ADR-D6**: se pinta lo que se puede atribuir al polígono sin inventarlo, y lo que no se puede ubicar se declara.
+
+```jsonc
+// GET /api/inversion/mapa/?anio=2026&nivel=distrital
+{ "disponible": true, "anio": 2026, "corte": "2026-06", "es_parcial": true,
+  "nivel": "distrital", "ambito": "municipal",
+  "filas": [ { "ubigeo": "080910", "nombre": "PICHARI", "provincia": "LA CONVENCION",
+               "codigo_entidad": "300757", "entidad": "MUNICIPALIDAD DISTRITAL DE PICHARI",
+               "entidades": 1, "pia": 123997, "pim": 9331232, "devengado": 7178924,
+               "saldo": 2152308, "pct_ejecucion": 0.769 } ],
+  "cortes": { "pia": [...4], "pim": [28750, 55000, 94740, 216445], "devengado": [...4] },
+  "no_ubicado": { "pia": …, "pim": 10350637, "devengado": …, "entidades": 17,
+                  "motivo": "No se pinta el presupuesto de 13 municipalidad(es) provincial(es)…" },
+  "poligonos": { "pintados": 99, "sin_dato": 13, "motivo": "Distritos sin municipalidad…" } }
+```
+
+Cuatro cosas que no son detalles de implementación:
+
+- **`ubigeo` casa directamente con el tile**: seis dígitos = `UBIGEO` de `limites-distritales`, cuatro = `IDPROV` de `limites-provinciales`. No hay traducción intermedia.
+- **Las cuatro métricas viajan en cada fila.** Conmutar entre PIA, PIM, devengado y % de ejecución no dispara otra petición, así que dos métricas del mismo mapa no pueden acabar viniendo de ejercicios distintos si alguien cambia la visibilidad entre medias.
+- **`suma(filas) + no_ubicado == el total del ámbito`, siempre.** Es la contabilidad completa del mapa, y hay dos pruebas que la fijan: un mapa al que le falta dinero se ve exactamente igual que uno correcto.
+- **`poligonos.sin_dato`** cuenta los polígonos sin municipalidad —a nivel distrital son las 13 capitales de provincia— y es distinto de una municipalidad con PIM cero, que **sí** aparece en `filas` con sus ceros y su `pct_ejecucion: null`.
+
+Los `cortes` son los cuatro quintiles de lo pintado, así que el color es relativo a la vista: al acotar por provincia, un mismo distrito puede cambiar de tono. Se sirve así a propósito —una rampa lineal sobre una distribución tan sesgada deja un polígono oscuro y todos los demás pálidos— y el precio se paga imprimiendo los rangos en soles en la leyenda. Pueden salir repetidos (con muchos ceros, los tres primeros valen 0): el cliente clasifica recorriendo la lista, así que un tramo vacío se dibuja vacío. Lo que **no** se puede hacer con ellos es un `step` de MapLibre, que exige cortes estrictamente crecientes. El **% de ejecución no tiene cortes en el payload**: son fijos (25/50/75/90) porque es un porcentaje, y con una escala relativa el mismo 90 % se pintaría de verde o de rojo según con quién compartiera pantalla.
 
 ## Productos de incidencia
 

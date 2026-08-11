@@ -404,3 +404,118 @@ def test_el_export_comparado_lleva_la_advertencia_en_cada_fila(
     assert "Δ PIM" in cabeceras
     columna = cabeceras.index("Comparabilidad")
     assert all("no es comparable" in f[columna] for f in filas[1:])
+
+
+# --- El mapa (ADR-D6) -----------------------------------------------------------------------
+#
+# El riesgo del coroplético no es que se vea mal: es que se vea bien y falte dinero. Pintar el
+# presupuesto de una municipalidad provincial sobre su distrito capital, o dejar caer en
+# silencio a las entidades sin territorio, produce un mapa impecable con cifras que no suman.
+# Las dos primeras pruebas son la contabilidad completa del mapa, y son las que hacen cumplir
+# ADR-D6: lo pintado más lo declarado es exactamente el total del ámbito.
+
+
+def test_el_mapa_distrital_solo_pinta_lo_que_puede_atribuir(api, inversion_cargada):
+    cuerpo = api.get("/api/inversion/mapa/?anio=2026&nivel=distrital").json()
+
+    assert cuerpo["disponible"] is True
+    assert cuerpo["nivel"] == "distrital"
+
+    # Un polígono por distrito con municipalidad distrital, sin repetir.
+    ubigeos = [f["ubigeo"] for f in cuerpo["filas"]]
+    assert len(ubigeos) == len(set(ubigeos))
+    assert all(len(u) == 6 for u in ubigeos)
+
+    # La provincial de Cusco y la entidad sin territorio no se pintan; su importe se declara.
+    assert "300684" not in {f["codigo_entidad"] for f in cuerpo["filas"]}
+    assert cuerpo["no_ubicado"]["entidades"] == 2
+    assert cuerpo["no_ubicado"]["motivo"]
+
+
+def test_el_mapa_no_pierde_ni_inventa_un_sol(api, inversion_cargada):
+    """La prueba de ADR-D6, en las dos direcciones.
+
+    A nivel provincial el mapa cubre todo el ámbito; a nivel distrital deja fuera lo que no
+    puede ubicar, y eso sale en `no_ubicado`. En los dos casos, pintado + declarado == total.
+    """
+    total = api.get("/api/inversion/?anio=2026").json()["agregados"]["pim"]
+
+    distrital = api.get("/api/inversion/mapa/?anio=2026&nivel=distrital").json()
+    assert (
+        sum(f["pim"] for f in distrital["filas"]) + distrital["no_ubicado"]["pim"]
+        == pytest.approx(total)
+    )
+
+    provincial = api.get("/api/inversion/mapa/?anio=2026&nivel=provincial").json()
+    assert (
+        sum(f["pim"] for f in provincial["filas"]) + provincial["no_ubicado"]["pim"]
+        == pytest.approx(total)
+    )
+    # Un ubigeo de provincia tiene cuatro dígitos, y la fila agrega varias municipalidades.
+    assert all(len(f["ubigeo"]) == 4 for f in provincial["filas"])
+    assert any(f["entidades"] > 1 for f in provincial["filas"])
+
+
+def test_el_mapa_arrastra_las_cuatro_metricas_en_cada_fila(api, inversion_cargada):
+    """Conmutar entre PIA, PIM, devengado y % de ejecución no puede disparar otra petición: si
+    lo hiciera, dos métricas del mismo mapa podrían venir de ejercicios distintos."""
+    fila = next(
+        f
+        for f in api.get("/api/inversion/mapa/?anio=2026&nivel=distrital").json()["filas"]
+        if f["pim"] > 0
+    )
+
+    assert {"pia", "pim", "devengado", "saldo", "pct_ejecucion"} <= set(fila)
+    assert fila["saldo"] == pytest.approx(fila["pim"] - fila["devengado"])
+    assert fila["pct_ejecucion"] == pytest.approx(fila["devengado"] / fila["pim"])
+
+
+def test_una_municipalidad_con_pim_cero_no_tiene_porcentaje_de_ejecucion(api, inversion_cargada):
+    """Sin denominador no hay avance. Un 0 % aquí diría «no gastó lo que tenía», y no tenía."""
+    fila = next(
+        f
+        for f in api.get("/api/inversion/mapa/?anio=2026&nivel=distrital").json()["filas"]
+        if f["pim"] == 0
+    )
+
+    assert fila["pct_ejecucion"] is None
+
+
+def test_un_ambito_sin_geografia_lo_dice_en_vez_de_quedarse_en_blanco(api, inversion_cargada):
+    """Las provinciales no se pueden pintar por distrito: el mapa lo explica."""
+    cuerpo = api.get("/api/inversion/mapa/?anio=2026&nivel=distrital&ambito=provincial").json()
+
+    assert cuerpo["filas"] == []
+    assert cuerpo["no_ubicado"]["pim"] > 0
+    assert cuerpo["no_ubicado"]["motivo"]
+
+
+def test_los_cortes_de_la_escala_son_crecientes_y_no_revientan_con_pocas_filas(
+    api, inversion_cargada
+):
+    """Los quintiles se calculan sobre lo pintado. Con dos filas siguen saliendo cuatro cortes:
+    la leyenda tiene que poder dibujarse igual, aunque varios tramos queden vacíos."""
+    cortes = api.get("/api/inversion/mapa/?anio=2026&nivel=distrital").json()["cortes"]
+
+    assert set(cortes) == {"pia", "pim", "devengado"}
+    for metrica, valores in cortes.items():
+        assert len(valores) == 4, metrica
+        assert valores == sorted(valores), metrica
+
+
+def test_el_mapa_se_acota_por_provincia(api, inversion_cargada):
+    cuerpo = api.get("/api/inversion/mapa/?anio=2026&nivel=distrital&provincia=CUSCO").json()
+
+    assert cuerpo["filas"]
+    assert all(f["ubigeo"].startswith("0801") for f in cuerpo["filas"])
+
+
+def test_el_mapa_sin_ejercicio_visible_sirve_el_mismo_estado_vacio(api, inversion_cargada):
+    from apps.inversion.models import Ejercicio
+
+    Ejercicio.objects.update(visible=False)
+
+    cuerpo = api.get("/api/inversion/mapa/").json()
+
+    assert cuerpo["disponible"] is False
+    assert cuerpo["motivo"]

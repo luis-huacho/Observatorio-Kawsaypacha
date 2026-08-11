@@ -62,6 +62,37 @@ def _importe(valor, contexto: str) -> Decimal:
         raise ValueError(f"{contexto}: no se puede interpretar el importe {valor!r}.")
 
 
+#: Cuántas filas malas se enumeran antes de resumir. Un archivo con la columna cambiada de sitio
+#: las tiene todas mal, y volcar 1,900 líneas en el log no ayuda a nadie.
+MAX_FILAS_EN_ERROR = 10
+
+
+def _validar_importes(filas, contexto: str) -> list[str]:
+    """Comprueba las dos reglas del SIAF sobre cada fila: `0 ≤ devengado ≤ PIM`.
+
+    El PIM es el techo del gasto —el SIAF bloquea devengar por encima— y ningún importe puede
+    ser negativo. Un archivo que las incumple está mal en origen, y dejarlo entrar produciría un
+    avance de ejecución superior al 100 %: una cifra que se ve plausible en una tabla y de la
+    que después nadie sabe de dónde salió.
+
+    Devuelve los problemas en vez de lanzar en la primera fila, para que quien sube el archivo
+    lo corrija de una vez y no de uno en uno.
+    """
+    problemas = []
+    for n, fila in enumerate(filas, start=2):
+        pia = _importe(fila["PIA"], f"Fila {n}, PIA")
+        pim = _importe(fila["PIM"], f"Fila {n}, PIM")
+        devengado = _importe(fila["DEVENGADO"], f"Fila {n}, DEVENGADO")
+        if negativos := [c for c, v in (("PIA", pia), ("PIM", pim), ("devengado", devengado)) if v < 0]:
+            problemas.append(f"Fila {n} ({contexto}): {', '.join(negativos)} con importe negativo.")
+        elif devengado > pim:
+            problemas.append(
+                f"Fila {n} ({contexto}): el devengado ({devengado}) supera al PIM ({pim}). "
+                "El PIM es el techo de gasto y el SIAF no permite devengar por encima."
+            )
+    return problemas
+
+
 def _ambito(nivel_gobierno: str, nombre: str):
     from apps.inversion.models import EntidadEjecutora
 
@@ -516,6 +547,17 @@ def importar(upload) -> dict:
     todas = programa + institucional
     if not todas:
         raise ValueError("El archivo no tiene ninguna fila con datos.")
+
+    # Antes de tocar la base: si el archivo incumple las reglas del SIAF no hay nada que
+    # discutir sobre él, y fallar aquí deja el mensaje completo en vez de la primera fila mala.
+    problemas = _validar_importes(programa, "programa") + _validar_importes(
+        institucional, "institucional"
+    )
+    if problemas:
+        listado = "\n".join(problemas[:MAX_FILAS_EN_ERROR])
+        if len(problemas) > MAX_FILAS_EN_ERROR:
+            listado += f"\n… y {len(problemas) - MAX_FILAS_EN_ERROR} fila(s) más con el mismo tipo de problema."
+        raise ValueError(f"El archivo tiene importes imposibles y no se ha importado:\n{listado}")
 
     resolutor = _Resolutor()
     if not resolutor.distritos:

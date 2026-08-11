@@ -222,6 +222,17 @@ subcadena atrapa la respuesta equivocada.
 **`GET /api/inversion/entidades/{codigo}/`** — la ficha de una municipalidad por su código MEF:
 serie de todos los ejercicios publicados, reparto por procesos y desglose de actividades.
 
+**`GET /api/inversion/mapa/`** — el coroplético. Acepta los mismos filtros más `nivel`
+(`distrital` por defecto, o `provincial`). Cada fila lleva el `ubigeo` que casa con el tile de
+límites —seis dígitos con `UBIGEO`, cuatro con `IDPROV`— y **las cuatro métricas a la vez** (PIA,
+PIM, devengado y % de ejecución), para que conmutar entre ellas no dispare otra petición.
+
+Lo que hay que leer siempre junto a `filas` es **`no_ubicado`**: el importe que ese nivel no puede
+atribuir a ningún polígono, con su recuento y su motivo ya redactado. A nivel distrital son las 13
+municipalidades provinciales —su presupuesto cubre toda la provincia, no un distrito— más las que
+el padrón no ubica. **La suma de `filas` más `no_ubicado` es exactamente el total del ámbito**: si
+al dibujar el mapa solo se usa `filas`, se está publicando una cifra menor que la del tablero.
+
 **`GET /api/inversion/export.xlsx`** devuelve la misma tabla en Excel, con los mismos filtros y sin
 paginar; con `comparar_con` añade las columnas del otro ejercicio y una de «Comparabilidad».
 
