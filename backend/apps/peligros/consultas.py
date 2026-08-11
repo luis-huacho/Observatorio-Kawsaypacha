@@ -76,7 +76,6 @@ def resumen(queryset_ccpp, peligros=(), niveles=(), *, peligro: str = "", nivel_
         )
 
     total_ccpp = queryset_ccpp.count()
-    poblacion_total = queryset_ccpp.aggregate(t=Sum("poblacion"))["t"] or 0
 
     # --- Por centro poblado (nivel máximo) ---------------------------------
     # El conteo se hace en Python sobre una fila por centro poblado. Encadenar
@@ -130,9 +129,6 @@ def resumen(queryset_ccpp, peligros=(), niveles=(), *, peligro: str = "", nivel_
 
     return {
         "total_ccpp": total_ccpp,
-        # No lo usa /peligros —la población salió del visor por ilegible como escala— pero sí
-        # el comparador de distritos, que la publica como población del ámbito.
-        "poblacion_total": poblacion_total,
         "por_ccpp": {"niveles": niveles_ccpp, "sin_clasificar": sin_clasificar},
         "por_peligro": por_peligro,
         # Se declara la unidad de cada bloque en el propio payload: cualquier cliente que

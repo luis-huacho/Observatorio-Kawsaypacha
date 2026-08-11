@@ -156,7 +156,6 @@ export default function Comparar() {
                   <p className="text-xs text-ink-600">{t.provincia}</p>
 
                   <dl className="mt-4 space-y-2 text-sm">
-                    <Dato etiqueta="Población" valor={formatNumber(t.poblacion)} />
                     <Dato etiqueta="Centros poblados" valor={formatNumber(t.total_ccpp)} />
                     <Dato
                       etiqueta="Con clasificación"

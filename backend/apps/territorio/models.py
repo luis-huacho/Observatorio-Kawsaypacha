@@ -79,6 +79,16 @@ class CentroPoblado(TimeStampedMixin):
     lat = models.FloatField(null=True, blank=True)
     lon = models.FloatField(null=True, blank=True)
     altitud = models.IntegerField(null=True, blank=True)
+    #: **Sin fuente: no se importa ni se publica** (ADR-A19).
+    #:
+    #: El Excel de exposición trae una columna `POBLACION`, pero no es un padrón que el cliente
+    #: haya entregado ni respaldado. Salió primero del visor por ilegible como escala —948 de
+    #: los 8,968 centros poblados valen 0 y la mediana es 17 habitantes— y después del producto
+    #: entero por falta de respaldo.
+    #:
+    #: El campo se conserva vacío a propósito: borrarlo sería una migración irreversible, y el
+    #: día que PREDES entregue un padrón oficial basta con volver a importar. Si algo lo vuelve
+    #: a llenar, revisar antes de dónde salió el dato.
     poblacion = models.PositiveIntegerField(null=True, blank=True)
     vigente = models.BooleanField(default=True)  # [+] futuro (depuraciones INEI)
     fuente_padron = models.CharField(max_length=100, blank=True)  # [+] futuro

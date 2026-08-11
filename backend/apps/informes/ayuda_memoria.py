@@ -89,7 +89,6 @@ def reunir_datos(distrito, peligros=(), niveles=()) -> dict:
         "total_ambito": total_ambito,
         "total_clasificados": total_clasificados,
         "sin_dato": total_ambito - total_clasificados,
-        "poblacion_expuesta": sum(f["poblacion"] or 0 for f in filas),
         "criticos": sum(1 for f in filas if f["nivel_max"] >= 3),
         "niveles": [
             {"nivel": n, "label": NIVEL_LABEL[n], "color": NIVEL_COLOR[n],
@@ -136,7 +135,6 @@ def _filas_tabla(ccpp_ambito, peligros=(), niveles=()):
                 "codigo": ccpp.codigo,
                 "nombre": ccpp.nombre,
                 "categoria": ccpp.categoria or "—",
-                "poblacion": ccpp.poblacion,
                 "altitud": ccpp.altitud,
                 "peligros": [],
                 "nivel_max": c.nivel,

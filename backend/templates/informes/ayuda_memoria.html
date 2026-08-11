@@ -92,8 +92,6 @@
       {% if criticos %}<strong>{{ criticos|miles }}</strong> de esos centros poblados
       {{ criticos|plural_es:"presenta,presentan" }} al menos un peligro clasificado en nivel
       <strong>alto o muy alto</strong>. {% endif %}
-      La población registrada en los centros poblados clasificados asciende a
-      <strong>{{ poblacion_expuesta|miles }}</strong> habitantes según el padrón vigente.
     </p>
   {% endif %}
   {% if frecuencia and frecuencia.total %}
@@ -197,9 +195,8 @@
     <table class="datos tabla-larga">
       <thead>
         <tr>
-          <th style="width: 38mm">Centro poblado</th>
+          <th style="width: 44mm">Centro poblado</th>
           <th style="width: 22mm">Categoría</th>
-          <th style="width: 16mm" class="num">Población</th>
           <th style="width: 16mm" class="num">Altitud</th>
           <th>Peligros clasificados</th>
         </tr>
@@ -209,7 +206,6 @@
           <tr>
             <td>{{ f.nombre }}</td>
             <td>{{ f.categoria }}</td>
-            <td class="num">{% if f.poblacion != None %}{{ f.poblacion|miles }}{% else %}—{% endif %}</td>
             <td class="num">{% if f.altitud != None %}{{ f.altitud|miles }} m{% else %}—{% endif %}</td>
             <td>{% for p in f.peligros %}{% if not forloop.first %}; {% endif %}<span
                 class="punto" style="background: {{ p.color }}"></span>{{ p.peligro }}:

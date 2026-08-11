@@ -23,7 +23,7 @@ import {
   Wind,
   type LucideIcon,
 } from "lucide-react";
-import type { Map as MapaMaplibre } from "maplibre-gl";
+import type { ExpressionSpecification, Map as MapaMaplibre } from "maplibre-gl";
 import { NIVEL_COLOR } from "./semaforo";
 import type { Nivel, TipoPeligroApi } from "./types";
 
@@ -49,6 +49,63 @@ export const ICONO_GENERICO = TriangleAlert;
 
 export function iconoDe(nombre: string | undefined): LucideIcon {
   return (nombre && ICONOS[nombre]) || ICONO_GENERICO;
+}
+
+/**
+ * Ranuras de la corona: un ícono por peligro del centro poblado.
+ *
+ * Nueve, el catálogo entero, igual que en el backend. Antes se dibujaba **solo el de mayor
+ * nivel** y los demás quedaban escondidos en el popup — con 3.4 peligros de media por lugar,
+ * el mapa ocultaba la mayor parte de lo evaluado.
+ */
+export const RANURAS = 9;
+
+/** Diámetro visual del símbolo a `icon-size: 1`, que es lo que separa dos íconos vecinos. */
+const DIAMETRO_ICONO = 40;
+
+/**
+ * Posiciones de los `total` íconos de un punto, en píxeles respecto de su ubicación.
+ *
+ * Uno solo va centrado; a partir de dos se reparten en un anillo cuyo radio crece con el
+ * número de peligros, de modo que la separación entre vecinos sea siempre la misma y no se
+ * solapen ni con dos ni con nueve. El primero va arriba, que es el de mayor nivel.
+ *
+ * `icon-offset` se multiplica por `icon-size`, así que la corona encoge y crece con el
+ * símbolo sin necesidad de recalcular nada por zoom.
+ */
+export function corona(total: number): [number, number][] {
+  if (total <= 1) return [[0, 0]];
+  const radio = DIAMETRO_ICONO / (2 * Math.sin(Math.PI / total));
+  const redondear = (n: number) => Math.round(n * 10) / 10;
+  return Array.from({ length: total }, (_, k) => {
+    const angulo = -Math.PI / 2 + (2 * Math.PI * k) / total;
+    return [redondear(radio * Math.cos(angulo)), redondear(radio * Math.sin(angulo))];
+  });
+}
+
+/**
+ * `icon-offset` de la ranura `k`, según cuántos peligros tenga el punto.
+ *
+ * Es un `match` sobre el total y no una cuenta con `["get","dx"]` porque **MapLibre no sabe
+ * construir un array de dos números a partir de dos expresiones**: no hay forma de expresar
+ * un par (x, y) calculado. `match`, en cambio, sí devuelve arrays literales, y el total ya
+ * viaja en el feature.
+ */
+export function desplazamientoRanura(k: number): ExpressionSpecification {
+  // Los pares van envueltos en `["literal", …]`: un array suelto dentro de una expresión se
+  // interpreta como llamada a función y MapLibre rechaza la capa entera —«Expression name
+  // must be a string, but found number»— sin dibujar un solo símbolo.
+  const literal = (par: [number, number]) => ["literal", par];
+  const casos: unknown[] = [];
+  for (let total = k + 1; total <= RANURAS; total++) {
+    casos.push(total, literal(corona(total)[k]));
+  }
+  return [
+    "match",
+    ["coalesce", ["get", "clasificaciones"], 1],
+    ...casos,
+    literal([0, 0]),
+  ] as unknown as ExpressionSpecification;
 }
 
 /** Identificador de la imagen registrada en el mapa para un tipo y un nivel. */

@@ -95,7 +95,7 @@ Decisión de tamaño: se sirve el `FeatureCollection` completo en vez de agrupar
   "codigo": "0801010001", "nombre": "CUSCO", "categoria": "CIUDAD",
   "departamento": "CUSCO", "provincia": "CUSCO", "distrito": "CUSCO",
   "ubigeo_distrito": "080101", "lat": -13.51927548, "lon": -71.97675606,
-  "altitud": 3439, "poblacion": 111930,
+  "altitud": 3439,
   "clasificaciones": [
     { "peligro": "Sismo", "peligro_slug": "sismo", "categoria_geo": "Geodinamica interna",
       "nivel": 4, "fuente": "SIGRID_CENEPRED", "fuente_url": "https://n9.cl/lic6j" }
@@ -108,9 +108,7 @@ Decisión de tamaño: se sirve el `FeatureCollection` completo en vez de agrupar
 // El payload declara la unidad de cada bloque en un campo `unidades`: las dos lecturas
 // difieren en 3.4× y cualquier cliente que dibuje una de las dos tiene que poder rotularla.
 {
-  // `poblacion_total` no lo usa /peligros (ADR-A17: la población salió del visor); lo
-  // consume el comparador de distritos como población del ámbito.
-  "total_ccpp": 123, "poblacion_total": 130000,
+  "total_ccpp": 123,
   // [+] Distribución por nivel MÁXIMO de cada centro poblado: es lo que debe cuadrar con el
   // conteo de la tabla de /peligros.
   // NO se puede derivar de `por_peligro` — sumar por peligro cuenta cada CCPP tantas veces

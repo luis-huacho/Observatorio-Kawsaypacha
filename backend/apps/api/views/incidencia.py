@@ -80,7 +80,6 @@ class ComparadorView(APIView):
             "ubigeo": distrito.ubigeo,
             "distrito": distrito.nombre,
             "provincia": distrito.provincia.nombre,
-            "poblacion": resumen["poblacion_total"],
             "total_ccpp": resumen["total_ccpp"],
             "por_ccpp": resumen["por_ccpp"],
             "por_peligro": resumen["por_peligro"],

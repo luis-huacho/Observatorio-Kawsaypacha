@@ -19,7 +19,11 @@ COLUMNAS_ESPERADAS = [
 
 # Índices de columna, para que el desempaquetado no dependa del orden literal del `for`.
 C_PROV, C_DIST, C_CODIGO, C_NOMBRE, C_CATEGORIA = 1, 2, 3, 4, 5
-C_ALTITUD, C_LON, C_LAT, C_POBLACION = 6, 7, 8, 9
+# `POBLACION` (índice 9) se lee de la cabecera pero **no se importa**: el Excel la trae, pero
+# no es un padrón que el cliente haya entregado ni respaldado, así que el sitio no la publica
+# (ADR-A19). La columna sigue en `COLUMNAS_ESPERADAS` porque la validación de estructura
+# compara la cabecera completa: quitarla de ahí haría fallar la importación del archivo real.
+C_ALTITUD, C_LON, C_LAT = 6, 7, 8
 C_PELIGRO, C_TIP_PELIG, C_NIVEL, C_FUENTE, C_LINK = 10, 11, 12, 13, 14
 
 
@@ -116,7 +120,7 @@ def importar(upload) -> dict:
             datos = ccpp_por_codigo.setdefault(
                 codigo,
                 {"nombre": "", "categoria": "", "provincia": "", "distrito": "",
-                 "lat": None, "lon": None, "altitud": None, "poblacion": None},
+                 "lat": None, "lon": None, "altitud": None},
             )
             datos["nombre"] = _mejor(datos["nombre"], _texto(r[C_NOMBRE]))
             datos["categoria"] = _mejor(datos["categoria"], _texto(r[C_CATEGORIA]))
@@ -126,7 +130,6 @@ def importar(upload) -> dict:
                 ("lat", _decimal(r[C_LAT])),
                 ("lon", _decimal(r[C_LON])),
                 ("altitud", _entero(r[C_ALTITUD])),
-                ("poblacion", _entero(r[C_POBLACION])),
             ):
                 if datos[campo] is None:
                     datos[campo] = valor
@@ -273,7 +276,7 @@ def _sincronizar_territorio(ccpp_por_codigo, Provincia, Distrito, CentroPoblado)
         d.nombre_normalizado = normalizar_nombre(d.nombre)
     Distrito.objects.bulk_create(nuevos)
 
-    campos = ["nombre", "categoria", "lat", "lon", "altitud", "poblacion"]
+    campos = ["nombre", "categoria", "lat", "lon", "altitud"]
     pk_por_codigo = dict(CentroPoblado.objects.values_list("codigo", "pk"))
     nuevos_ccpp, actualizar = [], []
     for codigo, d in ccpp_por_codigo.items():
@@ -285,7 +288,6 @@ def _sincronizar_territorio(ccpp_por_codigo, Provincia, Distrito, CentroPoblado)
             lat=d["lat"],
             lon=d["lon"],
             altitud=d["altitud"],
-            poblacion=d["poblacion"],
         )
         if codigo in pk_por_codigo:
             obj.pk = pk_por_codigo[codigo]

@@ -28,11 +28,6 @@ export type PeligroDeCcpp = { slug: string; nombre: string; nivel: Nivel };
 /** Ficha completa: `/api/ccpp/{codigo}/`. */
 export type CentroPobladoDetalle = CentroPoblado & {
   clasificaciones: ClasificacionPeligro[];
-  /**
-   * La ficha sí publica la población, aunque el listado y el mapa ya no (ADR-A17): aquí es un
-   * atributo del centro poblado, no una escala con la que compararlo contra los otros 8,967.
-   */
-  poblacion: number | null;
 };
 
 export type Nivel = 1 | 2 | 3 | 4;
@@ -41,7 +36,12 @@ export type ClasificacionPeligro = {
   codigo_ccpp: string;
   peligro: string;
   peligro_slug: string;
-  tipo: string | null;
+  /**
+   * El `TIP_PELIG` de la fuente (Geodinamica interna/externa, Metereologicas). Aquí había un
+   * `tipo` que el API dejó de enviar y que nadie actualizó: la ficha lo pintaba y mostraba «—»
+   * en las 3,238 fichas sin que `tsc` pudiera avisar, porque el tipo lo declaraba.
+   */
+  categoria_geo: string;
   nivel: Nivel;
   fuente: string | null;
   fuente_url: string | null;
@@ -488,8 +488,6 @@ export type Distrito = {
  */
 export type ResumenPeligros = {
   total_ccpp: number;
-  /** No lo usa /peligros —la población salió del visor (ADR-A17)—; sí el comparador de distritos. */
-  poblacion_total: number;
   por_ccpp: {
     niveles: Record<"1" | "2" | "3" | "4", number>;
     sin_clasificar: number;
@@ -607,7 +605,6 @@ export type ComparadorDistrito = {
   ubigeo: string;
   distrito: string;
   provincia: string;
-  poblacion: number;
   total_ccpp: number;
   por_ccpp: ResumenPeligros["por_ccpp"];
   por_peligro: ResumenPeligros["por_peligro"];

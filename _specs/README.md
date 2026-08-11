@@ -14,6 +14,44 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 11/08/2026 — la ficha del centro poblado: fuera lo que no hay, dentro un mapa
+
+Tres cosas de `/peligros/:codigo`, y la del medio arrastró medio backend.
+
+**La columna «Tipo / Detalle» estaba muerta.** Renderizaba `p.tipo`, un campo que el API dejó
+de enviar en el commit `1932527` —pasó a `peligro_slug` + `categoria_geo`— y que el tipo de TS
+nunca actualizó. Mostraba «—» en las 3,238 fichas y `tsc` no podía avisar, porque el tipo
+declaraba el campo fantasma. Se quita la columna y se corrige el tipo.
+
+**La población sale del producto entero (ADR-A19).** El Excel trae una columna `POBLACION`,
+pero no es un padrón que el cliente haya entregado ni respaldado. ADR-A17 ya la había retirado
+como canal visual del mapa por ilegible —948 de 8,968 valen 0 y la mediana es 17 habitantes—;
+ahora deja de importarse y de publicarse en las nueve superficies donde estaba: lista, ficha,
+geojson, resumen, comparador, export, tiles, buscador y PDF. **El campo del modelo se conserva
+vacío**: borrarlo sería irreversible y el día que llegue un padrón oficial basta con reimportar.
+Una migración de datos vacía lo ya cargado, para que la base no guarde una cifra que el sitio
+no respalda.
+
+Dos efectos que había que decidir y no dejar pasar:
+
+- El **PDF de ayuda memoria** pierde su frase de «N habitantes expuestos» y su columna. Si el
+  dato no es publicable en pantalla, tampoco en un documento que va a una mesa técnica.
+- El **autocompletado de lugares** ordenaba por población descendente. Habría seguido
+  funcionando con todos los valores a `NULL`, degradándose en silencio; pasa a alfabético.
+
+**La ficha gana un mapa.** Antes solo daba las coordenadas como texto. No se reutiliza
+`MapaPeligros` —seis props obligatorias, ningún interruptor, y con `tipos: []` ni siquiera
+dibuja los símbolos— ni se renderiza una imagen en servidor, que sería **más** costosa: el
+único renderizador del repo es Chromium headless, tarda segundos por captura y obligaría a
+cachear una imagen por centro poblado. Se hace un `MapaPunto.tsx` pequeño que **comparte los
+íconos y la corona** con el visor: `corona()` y `desplazamientoRanura()` salen de
+`MapaPeligros` a `lib/iconosPeligro.ts`, de modo que tocar la geometría cambia los dos mapas a
+la vez.
+
+De paso, la cabecera de cifras desaparece entera: con la población fuera quedaban altitud y
+coordenadas, y el mapa sitúa el punto mejor que un par de decimales. Los dos datos siguen en el
+API —el mapa necesita `lat`/`lon`—: es presentación, no datos.
+
 ### Actualización 11/08/2026 — las emergencias vuelven a /peligros, pero como capa aparte
 
 ADR-A17 sacó la frecuencia de emergencias de la página y dejó por escrito que su reubicación la

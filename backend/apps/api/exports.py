@@ -79,7 +79,6 @@ def filas_ccpp(queryset):
             c.distrito.provincia.nombre,
             c.distrito.nombre,
             c.distrito_id,
-            c.poblacion,
             c.altitud,
             c.lat,
             c.lon,
@@ -90,9 +89,9 @@ def filas_ccpp(queryset):
 
 CABECERAS_CCPP = [
     "Código INEI", "Centro poblado", "Categoría", "Provincia", "Distrito", "Ubigeo distrito",
-    "Población", "Altitud (m)", "Latitud", "Longitud", "Nivel", "Nivel (descripción)",
+    "Altitud (m)", "Latitud", "Longitud", "Nivel", "Nivel (descripción)",
 ]
-ANCHOS_CCPP = [13, 30, 14, 18, 18, 14, 11, 11, 12, 12, 7, 20]
+ANCHOS_CCPP = [13, 30, 14, 18, 18, 14, 11, 12, 12, 7, 20]
 
 
 CABECERAS_INVERSION = [

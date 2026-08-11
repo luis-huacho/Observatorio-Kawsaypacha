@@ -47,10 +47,10 @@ class CentroPobladoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CentroPoblado
-        # Sin `poblacion`: la fuente la trae, pero 948 centros poblados valen 0 y la mediana es
-        # 17 habitantes, así que como columna comparable o como escala del mapa es ilegible.
-        # Sigue en la ficha individual (`CentroPobladoDetalleSerializer`), donde es un atributo
-        # del lugar y no una magnitud que se compare con nada.
+        # Sin `poblacion`, en ningún sitio: el Excel la trae, pero no es un padrón entregado
+        # ni respaldado por el cliente (ADR-A19). Salió primero del visor por ilegible —948
+        # centros poblados valen 0 y la mediana es 17 habitantes— y después del producto entero
+        # por falta de fuente.
         fields = [
             "codigo", "nombre", "categoria", "departamento", "provincia",
             "distrito", "ubigeo_distrito", "lat", "lon", "altitud", "nivel", "peligros",
@@ -104,14 +104,13 @@ class CentroPobladoDetalleSerializer(CentroPobladoSerializer):
     clasificaciones = ClasificacionPeligroSerializer(many=True, read_only=True)
 
     class Meta(CentroPobladoSerializer.Meta):
-        # La ficha sí publica la población: ahí es un dato del centro poblado, no una escala
-        # con la que se le compare contra los otros 8,967.
-        #
-        # Y **sin `peligros`**: aquí está `clasificaciones`, que es lo mismo con fuente y
+        # **Sin `peligros`**: aquí está `clasificaciones`, que es lo mismo con fuente y
         # respaldo documental. Heredarlo devolvería una lista vacía —el prefetch de la ficha
         # es otro— y un campo que siempre viene vacío se lee como «este lugar no tiene».
+        #
+        # Y sin `poblacion`: el Excel la trae pero no es un padrón entregado ni respaldado por
+        # el cliente, así que el sitio no la publica en ningún sitio (ADR-A19).
         fields = [c for c in CentroPobladoSerializer.Meta.fields if c != "peligros"] + [
-            "poblacion",
             "clasificaciones",
         ]
 

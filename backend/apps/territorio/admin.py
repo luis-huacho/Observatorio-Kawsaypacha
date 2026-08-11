@@ -19,7 +19,7 @@ class DistritoAdmin(ModelAdmin):
 
 @admin.register(CentroPoblado)
 class CentroPobladoAdmin(ModelAdmin):
-    list_display = ["nombre", "codigo", "distrito", "categoria", "poblacion"]
+    list_display = ["nombre", "codigo", "distrito", "categoria"]
     list_filter = ["distrito__provincia", "categoria"]
     search_fields = ["nombre", "codigo"]
     list_select_related = ["distrito", "distrito__provincia"]

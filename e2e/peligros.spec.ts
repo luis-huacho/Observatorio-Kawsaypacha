@@ -430,6 +430,34 @@ test.describe("Visor de exposición a peligros", () => {
     await expect(page.getByText(nombre).first()).toBeVisible();
   });
 
+  test("la ficha sitúa el punto en un mapa y no publica lo que no hay", async ({ page }) => {
+    // El mapa de la ficha no es el visor reutilizado —aquel arrastra clustering, buscador y
+    // leyenda— sino uno mínimo que comparte los íconos. Lo que se comprueba es que pinta y que
+    // la consola queda limpia: un `icon-image` sin su imagen registrada escupe un error por
+    // símbolo, y con la corona son varios por punto.
+    const errores = vigilarConsola(page);
+    await page.goto("/peligros");
+    const filas = (await (await esperarApi(page, "/api/ccpp/?")).json()).results;
+    const conVarios = filas.find((f: { peligros: unknown[] }) => f.peligros.length > 1);
+    expect(conVarios, "el API no devolvió ninguno con varios peligros").toBeTruthy();
+
+    await page.goto(`/peligros/${conVarios.codigo}`);
+    await esperarApi(page, `/api/ccpp/${conVarios.codigo}/`);
+    await esperarMapaPintado(page);
+
+    // La población no tiene fuente respaldada; la columna «Tipo / Detalle» mostraba «—» en las
+    // 3,238 fichas porque el API dejó de enviar ese campo; y altitud y coordenadas se ocultan
+    // porque el mapa sitúa el punto mejor que un par de decimales.
+    for (const rotulo of ["Población", "Altitud", "Coordenadas"]) {
+      await expect(page.getByText(rotulo, { exact: true })).toHaveCount(0);
+    }
+    await expect(page.getByRole("columnheader", { name: /Tipo \/ Detalle/ })).toHaveCount(0);
+    await expect(page.getByRole("columnheader", { name: "Peligro" })).toBeVisible();
+    await expect(page.getByRole("row")).toHaveCount(conVarios.peligros.length + 1); // + cabecera
+
+    expect(errores, `errores en consola:\n${errores.join("\n")}`).toEqual([]);
+  });
+
   test("la ayuda memoria descarga un PDF de verdad", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === "movil", "la descarga se comprueba en escritorio");
 

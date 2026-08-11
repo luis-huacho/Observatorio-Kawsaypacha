@@ -19,6 +19,12 @@ El TDR exige actualización "por carga de archivos sin asistencia técnica": el 
 
 `DEPARTAMEN, PROVINCIA, DISTRITO, CODIGO (10 díg INEI), NOMB_CPOB, CATEGORIA, ALTITUD, LONGITUD, LATITUD, POBLACION, PELIGRO, TIP_PELIG, NIVEL_PELI (1-4), Fuente, Link`
 
+> **`POBLACION` se lee pero NO se importa** (ADR-A19). La columna existe en el archivo y sigue
+> en `COLUMNAS_ESPERADAS` —la validación de estructura compara la cabecera completa y quitarla
+> haría fallar la importación del archivo real— pero su valor se descarta: no es un padrón que
+> el cliente haya entregado ni respaldado. El campo del modelo se conserva vacío para que baste
+> reimportar el día que llegue uno oficial.
+
 **El nombre de la hoja no es el nombre del peligro.** La fuente de verdad es la columna `PELIGRO`, que dentro de cada hoja es constante pero difiere del título en dos casos. El catálogo canónico (hoja → nombre → slug → `TIP_PELIG`) es:
 
 | Hoja | `PELIGRO` | slug | `TIP_PELIG` | Clasificaciones |
@@ -87,7 +93,7 @@ Se aplica a: Medida, Norma, Documento, Noticia, Video, Evento, HeroSlide. Tambi�
 |---|---|---|
 | `Provincia` | `ubigeo` char(4) unique, `nombre`; [+] `poblacion_censo`, `superficie_km2` | 13 filas |
 | `Distrito` | `ubigeo` char(6) unique, FK `provincia`, `nombre`, `nombre_normalizado` (index; para resolver Excel de frecuencia); [+] `poblacion_censo`, `superficie_km2`, `contacto_gdr` | 112 filas |
-| `CentroPoblado` | `codigo` char(10) INEI unique+index, FK `distrito` (index), `nombre`, `categoria`, `lat`, `lon`, `altitud`, `poblacion` (nullables como en el prototipo); [+] `vigente` bool, `fuente_padron`, `anio_padron` | 8,968 filas; índice `(distrito, nombre)` |
+| `CentroPoblado` | `codigo` char(10) INEI unique+index, FK `distrito` (index), `nombre`, `categoria`, `lat`, `lon`, `altitud` (nullables como en el prototipo); **`poblacion` se conserva VACÍO** (ADR-A19); [+] `vigente` bool, `fuente_padron`, `anio_padron` | 8,968 filas; índice `(distrito, nombre)` |
 
 ### peligros
 | Modelo | Campos | Claves/índices |

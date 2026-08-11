@@ -33,7 +33,7 @@ def test_forma_del_detalle_de_un_centro_poblado(api, datos_muestra):
 
     assert set(datos) >= {
         "codigo", "nombre", "categoria", "departamento", "provincia", "distrito",
-        "ubigeo_distrito", "lat", "lon", "altitud", "poblacion", "clasificaciones",
+        "ubigeo_distrito", "lat", "lon", "altitud", "clasificaciones",
     }
     assert datos["departamento"] == "CUSCO"
     assert datos["ubigeo_distrito"] == "080101"
@@ -68,7 +68,7 @@ def test_resumen_declara_sus_dos_unidades(api, datos_muestra):
     """
     datos = api.get("/api/peligros/resumen/").json()
 
-    assert set(datos) >= {"total_ccpp", "poblacion_total", "por_ccpp", "por_peligro", "unidades"}
+    assert set(datos) >= {"total_ccpp", "por_ccpp", "por_peligro", "unidades"}
     assert set(datos["por_ccpp"]) == {"niveles", "sin_clasificar"}
     assert set(datos["por_ccpp"]["niveles"]) == {"1", "2", "3", "4"}
     assert set(datos["unidades"]) == {"por_ccpp", "por_peligro"}
@@ -76,23 +76,39 @@ def test_resumen_declara_sus_dos_unidades(api, datos_muestra):
         assert set(entrada) == {"peligro", "slug", "niveles", "centros_poblados", "sin_dato"}
 
 
-def test_el_visor_ya_no_publica_poblacion(api, datos_muestra):
-    """La población sale del visor: la fuente la trae, pero no sirve como magnitud.
+def test_la_poblacion_no_se_publica_en_ningun_sitio(api, datos_muestra):
+    """El Excel trae `POBLACION`, pero no es un padrón entregado ni respaldado (ADR-A19).
 
-    948 de los 8,968 centros poblados valen 0 y la mediana es 17 habitantes, así que como
-    canal visual —radio del símbolo, columna comparable— es ilegible y engañosa.
-
-    Sale de **la lista y del mapa**, que son las piezas donde se leía como escala. Sigue en la
-    ficha individual, donde es un atributo del lugar, y en `poblacion_total` del resumen, que
-    es lo que el comparador de distritos publica como población del ámbito.
+    Salió primero del visor por ilegible como escala —948 de los 8,968 centros poblados valen 0
+    y la mediana es 17 habitantes— y después del producto entero por falta de fuente. Esta
+    prueba recorre **todas las superficies** porque el dato estaba en nueve sitios y volver a
+    colarlo en uno solo sería invisible.
     """
     listado = api.get("/api/ccpp/?page_size=5").json()
     geojson = api.get("/api/ccpp/geojson/").json()
+    ficha = api.get("/api/ccpp/0801010001/").json()
+    resumen = api.get("/api/peligros/resumen/").json()
+    comparador = api.get("/api/comparador/distritos/?ubigeos=080101,080102").json()
 
     assert all("poblacion" not in fila for fila in listado["results"])
     assert all("poblacion" not in f["properties"] for f in geojson["features"])
-    assert "poblacion" in api.get("/api/ccpp/0801010001/").json()
-    assert "poblacion_total" in api.get("/api/peligros/resumen/").json()
+    assert "poblacion" not in ficha
+    assert "poblacion_total" not in resumen
+    assert all("poblacion" not in t for t in comparador["distritos"])
+
+
+def test_el_importador_no_guarda_la_poblacion(api, datos_muestra):
+    """Aunque la columna siga en el Excel y en la validación de cabecera.
+
+    Es la prueba que impide que el dato vuelva a entrar sin que nadie lo note: la columna no se
+    puede quitar de `COLUMNAS_ESPERADAS` —la validación compara la cabecera completa— así que
+    lo único que separa «está en el archivo» de «está en la base» es que el importador la
+    ignore.
+    """
+    from apps.territorio.models import CentroPoblado
+
+    assert CentroPoblado.objects.exists()
+    assert not CentroPoblado.objects.exclude(poblacion=None).exists()
 
 
 def test_por_peligro_cuenta_centros_poblados_dentro_de_cada_fila(api, datos_muestra):
