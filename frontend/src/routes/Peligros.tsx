@@ -206,7 +206,7 @@ export default function Peligros() {
     <>
       <PageHeader
         titulo="Exposición a peligros naturales"
-        descripcion="Mapa de exposición a peligros climáticos y geodinámicos en los centros poblados de Cusco. Datos provenientes de SIGRID-CENEPRED. Activa o desactiva las capas geográficas (lagunas, ríos, glaciares) desde el control superior derecho del mapa."
+        descripcion="Mapa de exposición a peligros climáticos y geodinámicos en los centros poblados de Cusco. Datos provenientes de SIGRID-CENEPRED. Activa o desactiva las capas geográficas (límites provinciales y distritales, lagunas, ríos, glaciares) desde el control superior derecho del mapa."
         badge={
           <div className="flex flex-wrap gap-2">
             {urlAyudaMemoria ? (
@@ -374,7 +374,7 @@ export default function Peligros() {
 
                 <div className="mb-2">
                   <span className="text-xs text-ink-600">
-                    Capas geográficas activables: lagunas, ríos y glaciares.
+                    Capas geográficas activables: límites, lagunas, ríos y glaciares.
                   </span>
                 </div>
                 <div className="card p-1 h-[600px] overflow-hidden">

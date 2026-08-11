@@ -27,6 +27,39 @@ Reemplazan a los `*.demo.geojson` del prototipo (lagunas/rios/nevados → glacia
 
 **Polígono regional para el clip: resuelto (03/08/2026).** Vive en `backend/apps/mapas/datos/cusco_region.geojson` (21 KB, 485 vértices), extraído de geoBoundaries gbOpen ADM1 (CC BY 4.0); la atribución va dentro del propio archivo, que es el único sitio donde sobrevive a una copia. Bbox verificado: lon −73.98…−70.35 / lat −15.47…−11.24, que contiene el rango de glaciares del spec. Sigue siendo **provisional**: se sustituye por el polígono oficial del INEI cuando PREDES lo entregue. Glaciares se acota además por `cordillera IN (…)` y por `-spat` sobre el bbox regional, como pre-filtro barato antes del `-clipsrc`.
 
+## Límites administrativos (ADR-A20)
+
+Dos capas más, por el **mismo pipeline** que ríos, lagunas y glaciares: se descarga el GeoJSON
+una vez a `data/layers/`, `seed --capas` lo adjunta y tippecanoe publica el `.pmtiles`. **El
+visitante nunca sale al origen**; los tiles los sirve nuestro nginx como los demás.
+
+| Capa | Filtro | Features en Cusco | Tile | Por defecto |
+|---|---|---|---|---|
+| `limites-provinciales` | `CCDD=08` | 13 | 0.5 MB | **visible** |
+| `limites-distritales` | `CCDD=08` | 112 | 1.1 MB | oculta |
+
+Fuente: **`josedaniel-cb/limites-peru-geojson`** (MIT), archivos `LIM_PROVINCIAL_PERU.json` y
+`LIM_DISTRITAL_PERU.json`. Se usa la versión **completa y no la `_MIN`**: la simplificada tiene
+mediana de 46 vértices por distrito y se ve angulosa al acercarse, y tippecanoe ya simplifica
+por zoom — partir de la `_MIN` sería simplificar dos veces.
+
+Traen **`UBIGEO` por distrito**, y ahí está lo que las hace útiles más allá de dibujar: los 112
+distritos y las 13 provincias de Cusco **casan exactamente** con el padrón, sin sobrantes ni
+faltantes. Eso es lo que permite calcular el centroide de cada distrito (ver 01).
+
+Estilo de **solo contorno** (`fill-opacity: 0`): un relleno taparía ríos, lagunas y los propios
+centros poblados. La provincial va más marcada que la distrital para poder distinguirlas
+superpuestas, y las dos con `orden` 0 y 1 para dibujarse por debajo de todo lo demás.
+
+> **Por qué no el WMS de GeoPerú.** Se evaluó
+> `espacialg.geoperu.gob.pe/geoserver/geoperu/peru_distrito_/wms`, que publica los mismos
+> límites. Responde en 0.2 s y tiene CORS abierto, pero **su WFS está bloqueado (403 en
+> `/geoperu/wfs`, `/geoserver/wfs` y `/ows`)**, así que no da geometría —no serviría para los
+> centroides— y **prohíbe estilos propios** («Dynamic style usage is forbidden»): solo hay dos
+> publicados, uno con etiquetas y relleno azulado y otro con relleno gris opaco, ninguno de
+> solo líneas. Además obligaría a depender de un tercero en cada carga del visor. Queda
+> registrado para no reabrir la vía.
+
 ## Pipeline: capas subidas por admin
 
 Disparo: guardar `CapaCartografica` con archivo nuevo, o acción "(Re)generar tiles". Tarea en worker:

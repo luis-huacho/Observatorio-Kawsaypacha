@@ -39,6 +39,15 @@ class Distrito(TimeStampedMixin):
     nombre = models.CharField(max_length=100)
     # Para resolver datasets que llegan sin ubigeo (p.ej. Excel de frecuencia):
     nombre_normalizado = models.CharField(max_length=100, db_index=True, editable=False)
+    #: Centroide del distrito, para colocar lo que se dibuja **por distrito** en el visor —hoy
+    #: el ícono de emergencias—. Lo calcula `manage.py calcular_centroides` desde la capa de
+    #: límites distritales; queda vacío si el distrito no aparece en ella o si su centroide cae
+    #: fuera del polígono, y entonces se repliega a la mediana de sus centros poblados.
+    #:
+    #: Se guardan aquí y no se derivan al vuelo porque la geometría vive en un `.pmtiles`, que
+    #: es un formato de dibujo y no se puede consultar.
+    lat = models.FloatField(null=True, blank=True)
+    lon = models.FloatField(null=True, blank=True)
     poblacion_censo = models.PositiveIntegerField(null=True, blank=True)  # [+] futuro
     superficie_km2 = models.DecimalField(  # [+] futuro
         max_digits=10, decimal_places=2, null=True, blank=True

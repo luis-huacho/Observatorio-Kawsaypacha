@@ -341,32 +341,49 @@ def _periodo_abarcado(registros: list[dict]) -> str | None:
 
 
 def centroides_distritales() -> dict[str, tuple[float, float]]:
-    """`{ubigeo: (lon, lat)}` derivado de los centros poblados de cada distrito.
+    """`{ubigeo: (lon, lat)}`: dónde colgar lo que se dibuja **por distrito** en el visor.
 
-    El visor necesita un punto donde poner el ícono de emergencias, que es un dato **por
-    distrito**, y en el proyecto no hay geometría distrital: `Distrito` no tiene coordenadas y
-    no existe ninguna capa de límites administrativos —solo el polígono departamental que usa
-    el recorte de tiles—. Los 112 distritos sí tienen centros poblados georreferenciados, así
-    que este es el único punto derivable de los datos que hay.
+    Dos fuentes, en este orden:
 
-    **Mediana y no promedio**: en los distritos de selva de La Convención los centros poblados
-    se reparten a lo largo de los ríos, y un promedio se va detrás de la cola. La mediana cae
-    donde está la mayoría.
+    1. **El centroide del polígono** (`Distrito.lat`/`lon`), que calcula
+       `manage.py calcular_centroides` desde la capa de límites distritales. Es el punto
+       correcto y hoy lo tienen 111 de los 112.
+    2. **La mediana de sus centros poblados**, para los que no lo tengan.
 
-    Es una aproximación y conviene que conste: el punto no es la capital del distrito ni su
-    centro geométrico, sino dónde se concentran sus centros poblados.
+    El repliegue no es decorativo y conviene no quitarlo: un distrito se queda sin centroide si
+    no aparece en la capa de límites o si su centroide de área cae **fuera** de su propio
+    polígono —hoy LLUSCO, que es cóncavo—, y sin esta segunda vía perdería su ícono por
+    completo. Mediana y no promedio: en los distritos de selva los centros poblados se reparten
+    a lo largo de los ríos y el promedio se va detrás de la cola.
+
+    Antes de haber geometría, la mediana era la única fuente. Nunca sacaba el punto de su
+    distrito, pero se desviaba 3.4 km de mediana y hasta 27 km en los distritos grandes
+    (Echarate, Checacupe), que es lo que este orden de preferencia corrige.
     """
-    from apps.territorio.models import CentroPoblado
+    from apps.territorio.models import CentroPoblado, Distrito
+
+    centroides: dict[str, tuple[float, float]] = {
+        ubigeo: (lon, lat)
+        for ubigeo, lon, lat in Distrito.objects.exclude(lat=None)
+        .exclude(lon=None)
+        .values_list("ubigeo", "lon", "lat")
+    }
+
+    faltan = set(
+        Distrito.objects.filter(Q(lat=None) | Q(lon=None)).values_list("ubigeo", flat=True)
+    )
+    if not faltan:
+        return centroides
 
     por_distrito: dict[str, list[tuple[float, float]]] = {}
     for lon, lat, ubigeo in (
-        CentroPoblado.objects.exclude(lat=None)
+        CentroPoblado.objects.filter(distrito_id__in=faltan)
+        .exclude(lat=None)
         .exclude(lon=None)
         .values_list("lon", "lat", "distrito_id")
     ):
         por_distrito.setdefault(ubigeo, []).append((lon, lat))
 
-    return {
-        ubigeo: (median(p[0] for p in puntos), median(p[1] for p in puntos))
-        for ubigeo, puntos in por_distrito.items()
-    }
+    for ubigeo, puntos in por_distrito.items():
+        centroides[ubigeo] = (median(p[0] for p in puntos), median(p[1] for p in puntos))
+    return centroides

@@ -379,6 +379,42 @@ test.describe("Visor de exposición a peligros", () => {
       .toBeLessThan(antes);
   });
 
+  test("los límites administrativos se sirven desde este mismo servidor", async ({ page }) => {
+    // El requisito no es solo que se vean: es que **el visitante no salga al origen**. Los
+    // GeoJSON se descargan una vez y se publican como PMTiles propios, así que si el repo de
+    // origen desapareciera el observatorio seguiría igual. Un copy-paste de la URL original
+    // rompería esto sin que nada se viera mal en pantalla, que es justo lo que se vigila aquí.
+    const externas: string[] = [];
+    page.on("request", (r) => {
+      const url = r.url();
+      if (/githubusercontent|github\.com|geoperu\.gob\.pe/.test(url)) externas.push(url);
+    });
+
+    await page.goto("/peligros");
+    const capas = await (await esperarApi(page, "/api/mapas/capas/")).json();
+    await esperarMapaPintado(page);
+
+    const limites = capas.filter((c: { slug: string }) => c.slug.startsWith("limites-"));
+    expect(limites, "no se publicaron las capas de límites").toHaveLength(2);
+    for (const capa of limites) {
+      expect(capa.url, `la capa ${capa.slug} apunta fuera`).toMatch(/\.pmtiles$/);
+      expect(capa.url).not.toMatch(/github|geoperu/);
+    }
+
+    // Provinciales encendidas, distritales apagadas.
+    expect(limites.find((c: { slug: string }) => c.slug === "limites-provinciales").visible_por_defecto).toBe(true);
+    expect(limites.find((c: { slug: string }) => c.slug === "limites-distritales").visible_por_defecto).toBe(false);
+
+    await page.getByRole("button", { name: /Capas/ }).click();
+    const distritales = page.getByLabel("Límites distritales");
+    await expect(distritales).not.toBeChecked();
+    await expect(page.getByLabel("Límites provinciales")).toBeChecked();
+
+    await distritales.check();
+    await esperarMapaPintado(page);
+    expect(externas, `salieron peticiones al origen:\n${externas.join("\n")}`).toEqual([]);
+  });
+
   test("los centros poblados sin clasificación se pueden ocultar", async ({ page }) => {
     const errores = vigilarConsola(page);
 

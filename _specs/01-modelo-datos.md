@@ -92,7 +92,7 @@ Se aplica a: Medida, Norma, Documento, Noticia, Video, Evento, HeroSlide. Tambi�
 | Modelo | Campos | Claves/índices |
 |---|---|---|
 | `Provincia` | `ubigeo` char(4) unique, `nombre`; [+] `poblacion_censo`, `superficie_km2` | 13 filas |
-| `Distrito` | `ubigeo` char(6) unique, FK `provincia`, `nombre`, `nombre_normalizado` (index; para resolver Excel de frecuencia); [+] `poblacion_censo`, `superficie_km2`, `contacto_gdr` | 112 filas |
+| `Distrito` | `ubigeo` char(6) unique, FK `provincia`, `nombre`, `nombre_normalizado` (index; para resolver Excel de frecuencia), **`lat`/`lon`** = centroide de su polígono (ADR-A20; lo calcula `manage.py calcular_centroides` desde la capa de límites); [+] `poblacion_censo`, `superficie_km2`, `contacto_gdr` | 112 filas; 111 con centroide |
 | `CentroPoblado` | `codigo` char(10) INEI unique+index, FK `distrito` (index), `nombre`, `categoria`, `lat`, `lon`, `altitud` (nullables como en el prototipo); **`poblacion` se conserva VACÍO** (ADR-A19); [+] `vigente` bool, `fuente_padron`, `anio_padron` | 8,968 filas; índice `(distrito, nombre)` |
 
 ### peligros

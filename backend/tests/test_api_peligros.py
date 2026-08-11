@@ -770,11 +770,20 @@ def test_una_provincia_sin_registros_responde_con_ceros_no_404(api, datos_muestr
 def test_la_capa_de_emergencias_solo_trae_distritos_con_registro(api, datos_muestra):
     """Un ícono de emergencia sobre un distrito que declara cero afirmaría lo que la fuente calla.
 
-    Y el punto tiene que caer **entre los centros poblados de ese distrito**: no hay geometría
-    distrital en el proyecto, así que se deriva de ellos, y esta prueba es lo que impide que un
-    cambio en ese cálculo mande los íconos a otra parte de la región sin que nada falle.
+    Y el punto tiene que caer **cerca de los centros poblados de ese distrito**, que es lo que
+    impide que un cambio en el cálculo mande los íconos a otra parte de la región sin que nada
+    falle.
+
+    **Cerca, no dentro**, y el margen no es pereza: el punto es el centroide del polígono
+    (ADR-A20), que no tiene por qué caer dentro del rectángulo que ocupan los caseríos. En los
+    datos reales se sale en tres distritos —Wanchaq tiene **un** centro poblado georreferenciado,
+    Yucay dos—, entre 0.4 y 2.1 km. Un margen de 5 km los cubre y sigue cazando lo que esta
+    prueba existe para cazar: un punto asignado al distrito equivocado se iría decenas o cientos
+    de kilómetros.
     """
     from apps.territorio.models import CentroPoblado
+
+    MARGEN_GRADOS = 0.05  # ~5 km
 
     datos = api.get("/api/peligros/frecuencia/geojson/").json()
     assert datos["type"] == "FeatureCollection"
@@ -789,8 +798,35 @@ def test_la_capa_de_emergencias_solo_trae_distritos_con_registro(api, datos_mues
         ).exclude(lat=None).values_list("lon", "lat")
         lones = [c[0] for c in ccpp]
         lates = [c[1] for c in ccpp]
-        assert min(lones) <= lon <= max(lones)
-        assert min(lates) <= lat <= max(lates)
+        assert min(lones) - MARGEN_GRADOS <= lon <= max(lones) + MARGEN_GRADOS, props["distrito"]
+        assert min(lates) - MARGEN_GRADOS <= lat <= max(lates) + MARGEN_GRADOS, props["distrito"]
+
+
+def test_el_punto_del_distrito_prefiere_el_centroide_y_repliega_a_la_mediana(api, datos_muestra):
+    """El orden de preferencia es lo que hace que ningún distrito se quede sin punto.
+
+    El centroide del polígono es el correcto —la mediana de centros poblados se desviaba 3.4 km
+    de mediana y hasta 27 km en los distritos grandes—, pero no todos lo tienen: un distrito
+    cóncavo puede tener su centroide de área **fuera** de sí mismo, y `calcular_centroides` lo
+    deja vacío a propósito antes que guardar un punto en otro distrito. Sin el repliegue, esos
+    perderían su ícono.
+    """
+    from apps.peligros.consultas import centroides_distritales
+    from apps.territorio.models import Distrito
+
+    # La muestra no trae centroides —los calcula un comando aparte desde la capa de límites—,
+    # así que se siembra uno para ejercitar **las dos ramas** en la misma corrida.
+    con, sin = Distrito.objects.all()[:2]
+    Distrito.objects.filter(pk=con.pk).update(lat=-13.5, lon=-72.0)
+    Distrito.objects.filter(pk=sin.pk).update(lat=None, lon=None)
+
+    centroides = centroides_distritales()
+
+    assert centroides[con.ubigeo] == (-72.0, -13.5), "no ganó el centroide guardado"
+    assert centroides.get(sin.ubigeo), f"{sin.nombre} se quedó sin punto"
+    # El repliegue es la mediana de sus centros poblados, no el centroide del otro.
+    assert centroides[sin.ubigeo] != centroides[con.ubigeo]
+    assert len(centroides) == Distrito.objects.count()
 
 
 def test_la_capa_de_emergencias_respeta_el_ambito(api, datos_muestra):

@@ -36,6 +36,8 @@ ARCHIVOS_CAPA = {
     "rios": "rios.geojson",
     "lagunas": "lagos-y-lagunas.geojson",
     "glaciares": "glaciares.geojson",
+    "limites-provinciales": "limites-provinciales.geojson",
+    "limites-distritales": "limites-distritales.geojson",
 }
 
 # Permisos por grupo (spec 03). El editor trabaja su contenido; el publicador además publica y

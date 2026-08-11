@@ -14,6 +14,38 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 11/08/2026 — el visor gana los límites, y los distritos su centroide
+
+El visor no dibujaba ninguna división política, y la falta de geometría distrital arrastraba una
+aproximación: el ícono de emergencias se colocaba en la **mediana de los centros poblados** del
+distrito porque no había forma de calcular su centroide.
+
+**Se evaluó primero el WMS de GeoPerú** y se descartó, con el porqué en el spec 05 para que
+nadie reabra la vía: responde rápido y con CORS abierto, pero su **WFS está bloqueado (403 en
+las tres rutas)** —así que no da geometría— y **prohíbe estilos propios** («Dynamic style usage
+is forbidden»), con lo que solo quedaban dos estilos, uno con etiquetas y otro con relleno gris
+opaco. Y obligaría a que cada visitante saliera a un tercero en cada carga.
+
+**`josedaniel-cb/limites-peru-geojson` (MIT) sí sirve.** Trae `UBIGEO`, y ahí está la clave: sus
+112 distritos y 13 provincias de Cusco **casan exactamente** con el padrón, sin sobrantes ni
+faltantes. Entra por el **mismo pipeline** que ríos, lagunas y glaciares —`capas.yaml` con
+`filtro_atributo: CCDD=08`, `seed --capas`, tippecanoe—, así que **no hizo falta escribir código
+para la parte visual** y, sobre todo, los tiles los sirve nuestro nginx: si el repositorio de
+origen desapareciera, el observatorio seguiría igual. Provinciales visibles por defecto (13
+polígonos dan contexto); distritales apagadas, porque 112 a escala regional compiten con los
+símbolos de peligro.
+
+Lo que la geometría desbloquea: **`manage.py calcular_centroides`** guarda el centroide de cada
+distrito en `Distrito.lat`/`lon`, y el ícono de emergencias deja de ser una aproximación. Medido
+antes de cambiarlo: la mediana se desviaba **3.4 km de mediana y hasta 27 km** en los distritos
+grandes de selva (Echarate 27.5, Checacupe 24.8). Ninguno de los dos métodos sacaba el punto de
+su distrito, así que no era un error — pero ahora es el punto correcto.
+
+**El repliegue se conserva a propósito.** 111 de los 112 tienen centroide; LLUSCO no, porque es
+cóncavo y su centroide de área cae fuera de sí mismo. El comando lo detecta y deja el campo
+vacío antes que guardar un punto en otro distrito, y `centroides_distritales()` cae en la
+mediana para ese caso. Sin esa segunda vía, el distrito perdería su ícono.
+
 ### Actualización 11/08/2026 — la ficha del centro poblado: fuera lo que no hay, dentro un mapa
 
 Tres cosas de `/peligros/:codigo`, y la del medio arrastró medio backend.

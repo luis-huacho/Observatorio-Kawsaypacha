@@ -68,3 +68,58 @@ capas:
       fill-opacity: 0.8
       line-color: "#007480"
       line-width: 0.5
+
+  # --- Límites administrativos --------------------------------------------------
+  # Son de otra naturaleza que las tres de arriba: no son elementos del territorio sino
+  # divisiones políticas, así que van con `orden` bajo (se dibujan primero, por debajo) y con
+  # estilo de SOLO CONTORNO — un relleno taparía ríos, lagunas y los propios centros poblados.
+  #
+  # Fuente: github.com/josedaniel-cb/limites-peru-geojson (MIT). Trae `UBIGEO` por distrito, que
+  # es lo que permite casarlos con el padrón: los 112 de Cusco y las 13 provincias corresponden
+  # exactamente. **Los archivos se descargan una vez y se sirven como PMTiles desde este mismo
+  # servidor**: el visitante nunca sale al repositorio de origen.
+  - slug: limites-provinciales
+    nombre: Límites provinciales
+    descripcion: >-
+      Las 13 provincias de Cusco. Da contexto sin cargar el mapa: a escala regional los
+      distritos son una malla demasiado densa.
+    tipo_geometria: poligono
+    # El departamento es CCDD en esta fuente; 08 es Cusco.
+    filtro_atributo: CCDD=08
+    min_zoom: 0
+    max_zoom: 12
+    visible_por_defecto: true
+    orden: 0
+    fuente: INEI - Límites provinciales (via josedaniel-cb/limites-peru-geojson, MIT)
+    atribucion: INEI - Límites provinciales
+    estilo:
+      tipo: fill
+      # Sin relleno: el límite es la línea, y un fill aquí escondería todo lo que hay debajo.
+      fill-color: "#0B3B26"
+      fill-opacity: 0
+      line-color: "#0B3B26"
+      line-width: ["interpolate", ["linear"], ["zoom"], 6, 0.8, 12, 2]
+      line-opacity: 0.55
+
+  - slug: limites-distritales
+    nombre: Límites distritales
+    descripcion: >-
+      Los 112 distritos de Cusco. Apagada por defecto: superpuesta a los símbolos de peligro a
+      escala regional compite con ellos.
+    tipo_geometria: poligono
+    filtro_atributo: CCDD=08
+    min_zoom: 0
+    max_zoom: 12
+    visible_por_defecto: false
+    orden: 1
+    fuente: INEI - Límites distritales (via josedaniel-cb/limites-peru-geojson, MIT)
+    atribucion: INEI - Límites distritales
+    estilo:
+      tipo: fill
+      fill-color: "#0B3B26"
+      fill-opacity: 0
+      # Más fina que la provincial y punteada por opacidad: superpuestas, hay que poder
+      # distinguir cuál es cuál de un vistazo.
+      line-color: "#555555"
+      line-width: ["interpolate", ["linear"], ["zoom"], 6, 0.3, 12, 0.9]
+      line-opacity: 0.45

@@ -7,8 +7,23 @@ pruebas.
 
 - Docker y Docker Compose.
 - Node 22 y npm, para el frontend en modo desarrollo.
-- Los **archivos de datos**, que no se versionan (145 MB): `data/layers/data/*.xlsx` y
-  `data/layers/*.geojson`. Los entrega PREDES; sin ellos el seed no tiene qué importar.
+- Los **archivos de datos**, que no se versionan (245 MB): `data/layers/data/*.xlsx` y
+  `data/layers/*.geojson`. Los Excel y las capas de ríos, lagunas y glaciares los entrega
+  PREDES; sin ellos el seed no tiene qué importar.
+- Las **dos capas de límites** salen de un repositorio público con licencia MIT y se descargan
+  una sola vez. A partir de ahí se sirven como PMTiles desde este mismo servidor: **en runtime
+  nadie sale al origen** (ADR-A20).
+
+  ```bash
+  cd data/layers
+  curl -L -o limites-distritales.geojson \
+    https://raw.githubusercontent.com/josedaniel-cb/limites-peru-geojson/main/LIM_DISTRITAL_PERU.json
+  curl -L -o limites-provinciales.geojson \
+    https://raw.githubusercontent.com/josedaniel-cb/limites-peru-geojson/main/LIM_PROVINCIAL_PERU.json
+  ```
+
+  Después de `seed --capas`, **`manage.py calcular_centroides`** guarda el centroide de cada
+  distrito a partir de esa capa; es lo que sitúa el ícono de emergencias en el visor.
 - Opcional: `uv` y Python 3.12+, si quieres correr `manage.py` desde el host.
 
 ## Primera vez
