@@ -14,6 +14,78 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 11/08/2026 — Inversión gana su reporte en PDF
+
+`/peligros` tenía su ayuda memoria desde el principio; `/inversion` solo podía sacar el Excel de
+la tabla, sin gráficas ni mapa. El cliente pidió el mismo tipo de documento, «con las gráficas y
+las tablas según se visualiza en pantalla». Alcance regional con los filtros puestos y la tabla
+completa de las 116 municipalidades, ambas decisiones suyas.
+
+**Lo que condicionó el diseño fue que WeasyPrint no ejecuta JavaScript**, así que los gráficos de
+Recharts no se podían reutilizar. Se generan en SVG desde el servidor (`apps/informes/graficos.py`),
+y resultó mejor que capturarlos: es vectorial —nítido al imprimir, donde un PNG queda pastoso—,
+determinista y probable con `assert` sobre la propia cadena. Tiene además un efecto que no es
+estético: **el PDF sigue sin imágenes rasterizadas salvo el mapa**, que es justo como las pruebas
+detectan si el mapa llegó. Pasar un gráfico a PNG rompería esa prueba sin que se note.
+
+El mapa sí necesita navegador, con su propia página de un solo uso
+(`templates/informes/mapa_inversion.html`) y la misma degradación de siempre: si la captura falla,
+el documento sale sin él y con el resto intacto.
+
+Cuatro cosas que se decidieron por el camino:
+
+- **El documento declara el dinero que su mapa no pinta.** Es ADR-D6 llevado al papel: en pantalla
+  el pie está debajo del mapa, pero un PDF circula por correo sin la página que lo explica. Hay una
+  prueba que lo exige.
+- **El total de la tabla sale de `agregados`, y las filas de `listado`**: dos caminos distintos a
+  la misma cifra, con una prueba que los compara. Una contradicción dentro de la misma página no se
+  vería sin sumar 116 filas a mano.
+- **La rampa de color se mudó a `apps/informes/escalas.py`**, de donde la leen el visor headless y
+  la leyenda del propio PDF. Iban a ser tres copias; un mapa y su leyenda desincronizados serían un
+  documento que miente sin que nada falle.
+- **Sin ejercicio publicado el reporte responde 200 con un PDF de una página** que explica el
+  vacío, no un 404. Un documento en blanco se leería como «no hay inversión pública en gestión del
+  riesgo», que es falso.
+
+**Y por el camino salió un fallo viejo y serio, que llevaba ahí desde la ayuda memoria.** El
+coroplético provincial del reporte salía **en blanco** —contornos dibujados, leyenda correcta al
+lado— y la causa no estaba en el mapa nuevo: el autoescape de Django convierte `&` en `&amp;`
+dentro de `{{ … }}`, y una URL metida en una cadena de JavaScript no lleva entidades HTML. **Del
+segundo parámetro en adelante se perdían todos.** Sin `nivel`, el API cae a `distrital` y devuelve
+ubigeos de seis dígitos que ningún polígono provincial puede casar.
+
+Lo grave es lo que implicaba en `/peligros`, donde el mismo patrón existía desde el principio: una
+ayuda memoria pedida con filtros —`?peligros=sismo&niveles=4`— **embebía el mapa del distrito
+entero**, mientras su línea de filtros decía «Peligros: Sismo · Niveles: muy alto». Un documento
+que se contradice a sí mismo en la misma página, sin un solo error en el log. Nadie lo había visto
+porque el caso sin filtros lleva un único parámetro y no tiene ningún `&` que escapar.
+
+Arreglado en los dos visores: la consulta se compone con `urlencode` —que percent-codifica los
+valores, y es lo que hace que `|safe` sea seguro ahí— y la URL se imprime con `|safe`. Se descartó
+`|escapejs`: funciona, pero escapa `=` y `-` y deja la URL ilegible justo cuando alguien abre esa
+página en un navegador para depurar, que es para lo que es pública. Tres pruebas nuevas lo fijan,
+una de ellas comprobando que un valor con comillas no se sale de la cadena de JavaScript.
+
+Cinco fallos que solo se vieron mirando el PDF renderizado, no ejecutando pruebas:
+
+1. **Un comentario de plantilla impreso en la portada.** En Django, `{# … #}` es de **una sola
+   línea**: escrito en varias, se imprime tal cual. Para eso está `{% comment %}`.
+2. **Los gráficos en dos columnas se salían del margen derecho** — tienen ancho fijo, y a media
+   caja no caben. Se apilaron; reducirlos habría dejado las etiquetas de los procesos ilegibles.
+3. **El total se repetía en cada página**: WeasyPrint repite el `tfoot` igual que el `thead`, y un
+   «Total del ámbito» debajo de seis filas se lee como si esas seis sumaran el total.
+   `display: table-row-group` lo deja una sola vez, al final.
+4. **Las filas se partían por el salto de página**, y su mitad de arriba aparecía vacía en la
+   siguiente como si fuera una municipalidad sin datos.
+5. **El coroplético desperdiciaba un tercio del ancho.** Cusco es más alto que ancho, así que en un
+   lienzo apaisado se ajusta por altura. Se captura casi cuadrado y la leyenda va a su lado.
+
+De paso se eliminó `ayuda_memoria.sello_datos()`, que no tenía ningún llamador y daba a entender
+que los informes tenían invalidación de caché.
+
+`pytest` 259/259, más las 7 marcadas `lento` —que también pasan, incluida la que exige que el
+reporte traiga su mapa de verdad—. Playwright 22/22 en `/inversion`.
+
 ### Actualización 11/08/2026 — Inversión gana su mapa, y el mapa declara lo que no pinta
 
 El cliente pidió tres cosas sobre `/inversion` tras fijar el vocabulario presupuestal (PIM = PIA ±

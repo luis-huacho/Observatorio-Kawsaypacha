@@ -13,7 +13,6 @@ import unicodedata
 from datetime import datetime
 
 from django.conf import settings
-from django.db.models import Max
 from django.template.loader import render_to_string
 from django.utils import timezone
 
@@ -170,9 +169,3 @@ def _bloque(clave: str) -> str:
 
     bloque = BloqueTexto.objects.filter(clave=clave).first()
     return bloque.cuerpo if bloque else ""
-
-
-def sello_datos() -> str:
-    """Marca de la última importación; invalida la caché de informes al reimportar."""
-    ultimo = ClasificacionPeligro.objects.aggregate(m=Max("actualizado_en"))["m"]
-    return ultimo.isoformat() if ultimo else "vacio"

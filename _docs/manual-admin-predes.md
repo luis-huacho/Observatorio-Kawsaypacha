@@ -240,6 +240,19 @@ Merece la pena recorrerlo en la capacitación, porque es donde se ve el efecto d
 - **`/inversion`** — cuánto y cómo ejecuta cada **municipalidad** el presupuesto del PP 0068,
   con un mapa que colorea el territorio por PIA, PIM, devengado o % de ejecución.
 
+### Dos descargas, para dos cosas distintas
+
+En `/inversion` hay dos botones y conviene no confundirlos:
+
+- **Reporte (PDF)** — el tablero tal como se ve: las cifras, las gráficas, el mapa y la tabla
+  completa. Es el documento que se lleva impreso a una reunión, con membrete y fecha.
+- **Excel** — solo la tabla, pero **con todas las columnas** y lista para filtrar y sumar. Es lo
+  que se manda a quien va a trabajar con los números.
+
+El PDF respeta lo que haya en pantalla: el ejercicio, la provincia, el orden de la tabla y **la
+vista del mapa** (métrica y si está por distrito o por provincia). Si se quiere un reporte con el
+mapa de % de ejecución por provincia, se pone así en pantalla y se descarga.
+
 ### Por qué el mapa de Inversión tiene trece distritos en blanco
 
 No es un error ni un dato que falte. **El presupuesto lo tiene la municipalidad, no el

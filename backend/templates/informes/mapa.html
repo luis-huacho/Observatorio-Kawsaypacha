@@ -25,6 +25,19 @@
 <script src="{% static 'vendor/pmtiles.js' %}"></script>
 
 <script>
+{% comment %}
+  `|safe` en las URL, y no es un descuido.
+
+  El autoescape de Django convierte `&` en `&amp;`, y una URL dentro de una cadena de JavaScript
+  no lleva entidades HTML: **del segundo parámetro en adelante se perdían todos, en silencio**.
+  El mapa se dibujaba igual, con los datos equivocados.
+
+  Es seguro porque la vista compone la consulta con `urlencode`, que percent-codifica los valores:
+  después de eso la URL no puede contener comillas, `<`, ni un `&` que no sea separador, así que
+  no hay forma de salirse de la cadena ni de cerrar el `<script>`. Se descartó `|escapejs`, que
+  también funciona pero escapa `=` y `-`: deja la URL ilegible justo cuando alguien abre esta
+  página en un navegador para depurar el mapa, que es para lo que es pública.
+{% endcomment %}
   const COLOR = { 1: "#5BBB5D", 2: "#EBB320", 3: "#F57C15", 4: "#970A00", 0: "#9CA3AF" };
 
   // Radio fijo: el tamaño dejó de codificar población (ADR-A17). El geojson ya no la publica,
@@ -57,8 +70,8 @@
     let capas = [];
     try {
       [puntos, capas] = await Promise.all([
-        fetch("{{ url_geojson }}").then((r) => r.json()),
-        fetch("{{ url_capas }}").then((r) => r.json()),
+        fetch("{{ url_geojson|safe }}").then((r) => r.json()),
+        fetch("{{ url_capas|safe }}").then((r) => r.json()),
       ]);
     } catch (e) {
       // Sin datos no hay mapa útil. Se señaliza el FALLO, no "listo": marcar listo haría que

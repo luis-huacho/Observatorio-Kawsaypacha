@@ -14,7 +14,7 @@ El contrato de «sin datos» se conserva tal cual: mientras ningún ejercicio es
 responden `{disponible: false, motivo}` o 404, y el frontend muestra su estado vacío sin ningún
 caso especial.
 """
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_control
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -227,6 +227,50 @@ class InversionMapaView(APIView):
                 nivel=(request.query_params.get("nivel") or "").strip(),
             ),
         })
+
+
+class InversionReporteView(APIView):
+    """`/api/inversion/reporte.pdf` — el tablero de la ventana, en un documento.
+
+    El hermano de la ayuda memoria de `/peligros`: mismo membrete, misma maqueta y la misma
+    exigencia de que sus cifras cuadren con las de la pantalla desde la que se pidió. Lleva las
+    gráficas (en SVG, porque WeasyPrint no ejecuta JavaScript), el mapa y la tabla completa.
+
+    Sin ejercicio visible **no da 404**: devuelve un documento de una página que explica el
+    vacío, por el mismo criterio con el que el Excel trae su hoja «Sin datos».
+    """
+
+    throttle_classes = [DescargaThrottle]
+
+    @extend_schema(
+        parameters=PARAMS_MAPA + [
+            OpenApiParameter("ordenar", str, description="El orden de la tabla, como el listado."),
+            OpenApiParameter(
+                "sin_mapa",
+                bool,
+                description="`1` omite la captura del mapa (más rápido, y salida determinista "
+                "para las pruebas).",
+            ),
+        ],
+        responses={200: bytes},
+    )
+    def get(self, request):
+        from apps.informes.reporte_inversion import generar_pdf
+
+        ambito, provincia = _parametros(request)
+        pdf, nombre = generar_pdf(
+            anio=request.query_params.get("anio"),
+            ambito=ambito,
+            provincia=provincia,
+            ordenar=(request.query_params.get("ordenar") or "").strip(),
+            nivel=(request.query_params.get("nivel") or "").strip()
+            or consultas.NIVEL_POR_DEFECTO,
+            metrica=(request.query_params.get("metrica") or "").strip(),
+            con_mapa=request.query_params.get("sin_mapa") not in {"1", "true", "True"},
+        )
+        respuesta = HttpResponse(pdf, content_type="application/pdf")
+        respuesta["Content-Disposition"] = f'attachment; filename="{nombre}"'
+        return respuesta
 
 
 class InversionExportView(APIView):

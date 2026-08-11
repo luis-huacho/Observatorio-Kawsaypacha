@@ -38,6 +38,36 @@ def miles(valor) -> str:
         return str(valor)
 
 
+@register.filter
+def soles(valor) -> str:
+    """Importe con el formato del sitio: `S/ 54,591,255`, sin decimales.
+
+    Sin decimales a propósito: son presupuestos públicos de millones de soles, y los céntimos
+    solo alargan la columna. El separador es el mismo que `miles`, por lo mismo que aquel.
+    """
+    if valor is None or valor == "":
+        return "—"
+    try:
+        return f"S/ {float(valor):,.0f}"
+    except (TypeError, ValueError):
+        return "—"
+
+
+@register.filter
+def pct(valor) -> str:
+    """Fracción 0-1 como porcentaje. `None` es «—», nunca «0 %».
+
+    La diferencia importa: una municipalidad con PIM cero no ha ejecutado el 0 % de lo que
+    tenía, es que no tenía nada que ejecutar.
+    """
+    if valor is None or valor == "":
+        return "—"
+    try:
+        return f"{float(valor) * 100:.1f} %"
+    except (TypeError, ValueError):
+        return "—"
+
+
 @register.simple_tag
 def logo_predes() -> str:
     """Ruta del logo para WeasyPrint.

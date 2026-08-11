@@ -4,9 +4,9 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip,
   XAxis, YAxis,
 } from "recharts";
-import { ChevronRight, Download } from "lucide-react";
+import { ChevronRight, Download, FileText } from "lucide-react";
 import { urlApi, useApi, useApiPaginado } from "@/lib/api";
-import { registrarExport } from "@/lib/metricas";
+import { registrar, registrarExport } from "@/lib/metricas";
 import { useBloque } from "@/lib/sitio";
 import type {
   CapaMapa,
@@ -143,6 +143,16 @@ export default function InversionView() {
     ordenar: orden,
     comparar_con: compararCon || undefined,
   });
+  // El reporte lleva **también** el nivel y la métrica del mapa: es lo que hace que el documento
+  // sea reproducible desde el enlace con el que se pidió, igual que la ayuda memoria de
+  // /peligros arrastra sus filtros de peligro y nivel.
+  const urlReporte = urlApi("/inversion/reporte.pdf", {
+    anio: d.anio,
+    provincia: provincia || undefined,
+    ordenar: orden,
+    nivel: nivelMapa,
+    metrica: metricaMapa,
+  });
 
   const ejecucion = [
     { etapa: "PIA", monto: a.pia },
@@ -163,15 +173,26 @@ export default function InversionView() {
         titulo="Inversión"
         descripcion={`¿Están las municipalidades de Cusco ejecutando el presupuesto que se les aprobó para reducir el riesgo de desastres? Programa Presupuestal 0068 — ejercicio ${d.anio}.`}
         badge={
-          <a
-            href={urlExport}
-            onClick={() => registrarExport("/inversion", String(d.anio))}
-            title="Descarga la tabla de municipalidades con los filtros actuales"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 text-white text-sm font-medium border border-white/25 transition hover:bg-white/25 no-underline"
-          >
-            <Download className="w-4 h-4" />
-            Excel
-          </a>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={urlReporte}
+              onClick={() => registrar("descarga_pdf", "/inversion", String(d.anio))}
+              title="Reporte del tablero con los filtros actuales: gráficas, mapa y la tabla completa"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-mountain-900 text-sm font-medium transition hover:bg-mountain-100 no-underline"
+            >
+              <FileText className="w-4 h-4" />
+              Reporte (PDF)
+            </a>
+            <a
+              href={urlExport}
+              onClick={() => registrarExport("/inversion", String(d.anio))}
+              title="Descarga la tabla de municipalidades con los filtros actuales"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 text-white text-sm font-medium border border-white/25 transition hover:bg-white/25 no-underline"
+            >
+              <Download className="w-4 h-4" />
+              Excel
+            </a>
+          </div>
         }
       />
 

@@ -70,6 +70,27 @@ cosas que hay que saber antes de tocarlo:
   cambiar de nivel deja una ventana en la que el estilo todavía no está cargado, y ahí las
   mutaciones de `paint` se pierden **sin dar ningún error**.
 
+### El coroplético en el PDF
+
+El reporte de inversión incrusta este mismo mapa, capturado con Chromium headless por
+**`templates/informes/mapa_inversion.html`** — el hermano de `mapa.html`, con el mismo protocolo
+(`__mapaListo` / `__mapaError` / `__mapaAvisos`) y las mismas trampas ya documentadas:
+`preserveDrawingBuffer: true` y URL reescritas contra el origen de la propia página.
+
+Dos diferencias con el visor de peligros que sí son decisiones:
+
+- **Sin mapa base.** Un coroplético sobre teselas de OSM se lee peor —los colores compiten con el
+  fondo— y ahorra depender de un servicio externo justo cuando alguien necesita el documento.
+- **Encuadre fijo de la región**, no ajustado a lo pintado: los tiles no entregan sus geometrías
+  hasta estar cargados, y perseguir el encuadre dispararía otra ronda de carga justo cuando la
+  captura espera el `idle`. Con un filtro de provincia se ve la provincia pintada dentro de
+  Cusco, que además avisa al lector de que está viendo un recorte.
+
+**La rampa de color no se declara en la plantilla**: viene de `apps/informes/escalas.py`, que es
+también de donde la lee la leyenda del PDF. Un mapa y su propia leyenda desincronizados serían un
+documento que miente sin que nada falle. Queda una copia en `MapaInversion.tsx`, que es la
+frontera frontend/backend de siempre.
+
 El registro del protocolo `pmtiles://` vive en **`frontend/src/lib/pmtiles.ts`** desde que hay
 dos mapas con tiles. Estaba en un `let` de módulo dentro de `MapaPeligros`, y con dos
 componentes cada uno tendría su bandera y registraría su propio `Protocol`: el segundo pisa al
