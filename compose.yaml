@@ -44,6 +44,10 @@ services:
       - static:/app/staticfiles
       # Los Excel y GeoJSON canónicos, de solo lectura: `manage.py seed` los importa desde aquí.
       - ./data/layers:/datos:ro
+      # Los CSV del PP 0068. Montaje aparte y no dentro de `/datos` porque anidar un montaje
+      # dentro de otro de solo lectura falla; `seed` no los toca —la inversión entra por
+      # `DatasetUpload`, ver el runbook de `_docs/despliegue.md`—.
+      - ./data/inversion:/datos-inversion:ro
     depends_on:
       db:
         condition: service_healthy
@@ -60,6 +64,7 @@ services:
     volumes:
       - media:/app/media
       - ./data/layers:/datos:ro
+      - ./data/inversion:/datos-inversion:ro
     depends_on:
       db:
         condition: service_healthy

@@ -61,6 +61,7 @@ services:
       - /app/.venv
       - media:/app/media
       - ./data/layers:/datos:ro
+      - ./data/inversion:/datos-inversion:ro
 
   worker:
     # La misma imagen que el backend: es el mismo código, y tenerlas distintas haría que una
@@ -78,6 +79,7 @@ services:
       - /app/.venv
       - media:/app/media
       - ./data/layers:/datos:ro
+      - ./data/inversion:/datos-inversion:ro
 
   frontend:
     profiles: ["prod"]

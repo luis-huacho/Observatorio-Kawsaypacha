@@ -47,6 +47,7 @@ defensa.
 | DNS de `observatorio.predes.org.pe` y `obs.predes.org.pe` apuntando al servidor | PREDES |
 | Credenciales SMTP y `GEMINI_API_KEY` | PREDES (opcionales: sin ellas esas funciones se degradan con aviso) |
 | `data/layers/` con los Excel y GeoJSON (145 MB) | PREDES |
+| `data/inversion/` con los CSV del PP 0068 | PREDES / el desarrollador |
 
 Convención de rutas usada en todo el documento; ajústalas si prefieres otras:
 
@@ -252,6 +253,8 @@ MEILI_URL=http://127.0.0.1:7700
 MEILI_MASTER_KEY=<la misma que meilisearch.env>
 RENDER_MAPA_BASE_URL=http://127.0.0.1:8000
 DATOS_FUENTE_DIR=/srv/observatorio/data/layers
+# Sin contenedores no hay montajes: la inversión se importa leyendo directamente de
+# /srv/observatorio/data/inversion/ (ver «Cargar los datos» en despliegue.md).
 
 DJANGO_SUPERUSER_USERNAME= / _EMAIL= / _PASSWORD=
 ```
