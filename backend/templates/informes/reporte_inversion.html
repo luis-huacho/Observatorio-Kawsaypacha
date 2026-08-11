@@ -1,0 +1,357 @@
+{% load informes %}<!--
+  Reporte de Inversión (PP 0068) — el hermano de `ayuda_memoria.html`.
+
+  Mismo membrete, mismo CSS y mismo criterio: el documento va a una mesa técnica, así que cada
+  cifra tiene que poder rastrearse hasta la pantalla de la que salió. El orden de las secciones
+  es el de `/inversion` a propósito, para que quien llega con el sitio abierto no tenga que
+  buscar.
+
+  Los gráficos son SVG en línea, generados en `informes/graficos.py`: WeasyPrint no ejecuta
+  JavaScript. Van con `|safe` porque los construye el servidor y sus etiquetas ya vienen
+  escapadas.
+-->
+<meta charset="utf-8">
+<title>Reporte de inversión PP 0068{% if disponible %} — {{ anio }}{% endif %}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 14mm 13mm 16mm 13mm;
+    @bottom-right {
+      content: "Página " counter(page) " de " counter(pages);
+      font-family: sans-serif; font-size: 7pt; color: #6B7280;
+    }
+    @bottom-left {
+      content: "Observatorio Kallpachakuy — PREDES";
+      font-family: sans-serif; font-size: 7pt; color: #6B7280;
+    }
+  }
+  body { font-family: sans-serif; font-size: 9pt; color: #1F2937; line-height: 1.45; }
+  h1 { font-size: 15pt; color: #0B3B26; margin: 10pt 0 0; }
+  h2 { font-size: 10.5pt; color: #0B3B26; margin: 12pt 0 3pt; }
+  p { margin: 0 0 5pt; }
+  .membrete { border-bottom: 2px solid #14654A; padding-bottom: 6pt; }
+  .membrete td { vertical-align: top; }
+  .marca { font-weight: 700; color: #0B3B26; font-size: 10pt; }
+  .fino { font-size: 7.5pt; color: #6B7280; }
+  .ambito th { text-align: left; color: #6B7280; font-weight: 500; width: 32mm;
+               padding: 1pt 8pt 1pt 0; vertical-align: top; white-space: nowrap; }
+  .ambito td { padding: 1pt 0; }
+  table.datos { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  table.datos th, table.datos td { border: 0.5pt solid #D1D5DB; padding: 2.5pt 4pt;
+                                   text-align: left; }
+  table.datos thead th { background: #E7F0EA; font-weight: 600; }
+  table.datos tfoot td { background: #F3F7F4; font-weight: 700; }
+  /* WeasyPrint repite el `tfoot` en cada página igual que el `thead`, y un «Total del
+     ámbito» debajo de seis filas se lee como si esas seis sumaran el total. Con
+     `table-row-group` sale una sola vez, al final. */
+  table.datos tfoot { display: table-row-group; }
+  /* `nowrap`: sin él, «S/ 9,331,232» se parte en dos líneas y la tabla dobla de alto. */
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .punto { display: inline-block; width: 6pt; height: 6pt; border: 0.4pt solid #9CA3AF;
+           vertical-align: middle; margin-right: 2pt; }
+  .evitar-corte { break-inside: avoid; }
+  .tabla-larga { break-inside: auto; }
+  .tabla-larga thead { display: table-header-group; }   /* cabecera repetida en cada página */
+  /* Sin esto, una fila alta se parte por el salto de página y su mitad de arriba aparece
+     vacía en la siguiente, como si fuera una municipalidad sin datos. */
+  .tabla-larga tr { break-inside: avoid; }
+  /* Las cuatro cifras de cabecera, con la misma jerarquía que las tarjetas de la pantalla. */
+  .cifras td { width: 25%; border: 0.5pt solid #D1D5DB; padding: 5pt 6pt; vertical-align: top; }
+  .cifras .rotulo { font-size: 7pt; color: #6B7280; text-transform: uppercase;
+                    letter-spacing: 0.03em; }
+  .cifras .valor { font-size: 12pt; font-weight: 700; color: #0B3B26; }
+  .aviso { font-size: 7.5pt; color: #8A5A00; border-left: 1.5pt solid #EBB320;
+           padding-left: 5pt; margin: 0 0 4pt; }
+  .declaracion { font-size: 7.5pt; color: #4B5563; border-left: 1.5pt solid #B8753C;
+                 padding-left: 5pt; margin: 3pt 0 0; }
+  .cierre { margin-top: 14pt; padding-top: 5pt; border-top: 0.5pt solid #D1D5DB;
+            font-size: 7.5pt; color: #6B7280; }
+</style>
+
+<table class="membrete" width="100%">
+  <tr>
+    <td>
+      <img src="{% logo_predes %}" alt="PREDES — Centro de Estudios y Prevención de Desastres"
+           style="height: 34pt">
+    </td>
+    <td style="text-align: right">
+      <div class="marca">Observatorio Kallpachakuy</div>
+      <div class="fino">
+        Gestión del Riesgo de Desastres<br>
+        y Adaptación al Cambio Climático · Región Cusco
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% if not disponible %}
+  {% comment %} Una página que explica el vacío. Un PDF en blanco se leería como «no hay inversión pública
+     en gestión del riesgo», que es una afirmación falsa. {% endcomment %}
+  <h1>Reporte de inversión — Programa Presupuestal 0068</h1>
+  <p style="margin-top: 10pt">{{ motivo }}</p>
+  <p class="fino">
+    Este documento se genera a partir de los ejercicios presupuestales publicados en el
+    Observatorio. En cuanto PREDES publique uno, el reporte saldrá con sus cifras.
+  </p>
+  <div class="cierre">
+    {{ firma|safe }}
+    <p>Generado el {{ generado_en|date:"j \d\e F \d\e Y" }} a las
+       {{ generado_en|date:"H:i" }} h.</p>
+  </div>
+{% else %}
+
+<h1>Reporte de inversión — Programa Presupuestal 0068</h1>
+
+<table class="ambito" width="100%" style="font-size: 8pt; margin-top: 6pt">
+  <tr><th>Ámbito</th>
+      <td>{{ ambito_nombre|capfirst }}{% if provincia %} de la provincia de
+          {{ provincia }}{% else %} de la región Cusco{% endif %}</td></tr>
+  <tr><th>Ejercicio</th>
+      <td>{{ anio }}{% if es_parcial %} — corte a {{ corte }} (ejercicio en curso){% endif %}</td></tr>
+  <tr><th>Fuente</th><td>{{ fuente }}</td></tr>
+  <tr><th>Unidad de análisis</th>
+      <td>La municipalidad (entidad ejecutora), no el distrito</td></tr>
+  <tr><th>Generado</th>
+      <td>{{ generado_en|date:"j \d\e F \d\e Y" }}, {{ generado_en|date:"H:i" }} h</td></tr>
+</table>
+
+{% if es_parcial %}
+  {% comment %} El aviso va junto a las cifras y no al pie: es el mismo criterio por el que el Excel lleva
+     su columna «Comparabilidad» (ADR-D5). Un documento en papel viaja sin su pantalla. {% endcomment %}
+  <p class="aviso" style="margin-top: 8pt">
+    <strong>El ejercicio {{ anio }} está en curso</strong> (corte a {{ corte }}). El porcentaje
+    de ejecución se calcula contra un PIM anual, así que no es comparable con el de un ejercicio
+    cerrado: un 50 % a mitad de año no es media ejecución perdida.
+  </p>
+{% endif %}
+
+{# --- Las cuatro cifras de cabecera, como en pantalla --- #}
+<table class="cifras" width="100%" style="border-collapse: collapse; margin-top: 8pt">
+  <tr>
+    <td>
+      <div class="rotulo">PIM del PP 0068 · {{ anio }}</div>
+      <div class="valor">{{ agregados.pim|soles }}</div>
+      <div class="fino">PIA {{ agregados.pia|soles }}</div>
+    </td>
+    <td>
+      <div class="rotulo">Devengado</div>
+      <div class="valor">{{ agregados.devengado|soles }}</div>
+      <div class="fino">{{ agregados.pct_ejecucion|pct }} de ejecución</div>
+    </td>
+    <td>
+      <div class="rotulo">Saldo por ejecutar</div>
+      <div class="valor">{{ agregados.saldo|soles }}</div>
+      <div class="fino">aprobado y aún no gastado</div>
+    </td>
+    <td>
+      <div class="rotulo">Presupuesto institucional (PIM)</div>
+      <div class="valor">{{ agregados.pim_institucional|soles }}</div>
+      <div class="fino">
+        {% if agregados.pct_0068_institucional %}el PP 0068 es el
+        {{ agregados.pct_0068_institucional|pct }}, sobre
+        {{ agregados.entidades_con_institucional }} municipalidad(es){% else %}sin dato{% endif %}
+      </div>
+    </td>
+  </tr>
+</table>
+
+{# --- Ejecución y procesos --- #}
+{% comment %}
+  Apilados y no en dos columnas: los SVG tienen ancho fijo, y a media caja se salían del margen
+  derecho. Reducirlos habría dejado las etiquetas de los procesos ilegibles en papel.
+{% endcomment %}
+<section class="evitar-corte" style="margin-top: 10pt">
+  <h2>¿Se ejecuta lo proyectado? — {{ anio }}</h2>
+  <p class="fino">
+    De lo aprobado al abrir el año (PIA) a lo gastado. La variación PIA-PIM del ámbito es de
+    {{ agregados.variacion_pia_pim|soles }}.
+  </p>
+  {{ grafico_ejecucion|safe }}
+</section>
+
+<section class="evitar-corte" style="margin-top: 8pt">
+  <h2>¿En qué se invierte? — procesos de la GRD</h2>
+  <p class="fino">
+    El reparto se clasifica por actividad y no por producto: a nivel de producto, «Acciones
+    comunes» y los proyectos se llevan tres cuartas partes y el gráfico no dice nada.
+  </p>
+  {{ grafico_procesos|safe }}
+</section>
+
+{# --- Proyectos vs actividades --- #}
+<section class="evitar-corte" style="margin-top: 8pt">
+  <h2>Proyectos de inversión frente a actividades</h2>
+  {{ grafico_origen|safe }}
+  <div class="fino" style="margin-top: 3pt">
+    <span class="punto" style="background: {{ color_proyectos }}"></span>Proyectos de inversión
+    {{ agregados.pct_proyectos|pct }} · {{ agregados.pim_proyectos|soles }}
+    &nbsp;&nbsp;
+    <span class="punto" style="background: {{ color_actividades }}"></span>Actividades ·
+    {{ agregados.pim_actividades|soles }}
+  </div>
+  {% if sin_clasificar.pim %}
+    <p class="declaracion">
+      {{ sin_clasificar.pim|soles }} ({{ sin_clasificar.pct|pct }}) cuelgan de códigos que el
+      catálogo aún no imputa a ningún proceso. No se reparten entre los demás ni se ocultan:
+      es la medida de lo que le falta al catálogo.
+    </p>
+  {% endif %}
+</section>
+
+{# --- Tendencia --- #}
+<section class="evitar-corte" style="margin-top: 8pt">
+  <h2>Evolución del presupuesto {{ anio_desde }}-{{ anio_hasta }}</h2>
+  <p class="fino">
+    PIA, PIM y devengado. Las tres juntas cuentan el ciclo completo: lo aprobado al abrir el
+    año, lo que quedó tras las modificaciones y lo que se llegó a gastar. El PIA va punteado.
+  </p>
+  {{ grafico_tendencia|safe }}
+  <table class="datos" style="margin-top: 5pt">
+    <thead>
+      <tr>
+        <th style="width: 15mm">Ejercicio</th>
+        <th class="num" style="width: 22mm">PIA</th>
+        <th class="num" style="width: 22mm">PIM</th>
+        <th class="num" style="width: 24mm">Variación PIA-PIM</th>
+        <th class="num" style="width: 22mm">Devengado</th>
+        <th class="num" style="width: 13mm">% Ejec.</th>
+        <th class="num" style="width: 22mm">Saldo</th>
+        <th style="width: 16mm">Fuente</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tendencia %}
+        <tr>
+          <td>{{ t.anio }}{% if t.es_parcial %} *{% endif %}</td>
+          <td class="num">{{ t.pia|soles }}</td>
+          <td class="num">{{ t.pim|soles }}</td>
+          <td class="num">{{ t.variacion|soles }}</td>
+          <td class="num">{{ t.devengado|soles }}</td>
+          <td class="num">{{ t.pct|pct }}</td>
+          <td class="num">{{ t.saldo|soles }}</td>
+          <td class="fino">{{ t.fuente_corta }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="fino" style="margin-top: 2pt">
+    * Ejercicio con corte parcial: el devengado no cubre el año completo, así que su % de
+    ejecución no se compara con el de un año cerrado.
+  </div>
+</section>
+
+{# --- Mapa --- #}
+<section class="evitar-corte" style="margin-top: 10pt">
+  <h2>¿Dónde está el presupuesto? — {{ metrica_nombre }}, {{ anio }}</h2>
+  {% if mapa_png %}
+    <table width="100%"><tr>
+      <td style="width: 62%; vertical-align: top">
+        <img src="{{ mapa_png }}" style="width: 100%; border: 0.5pt solid #D1D5DB"
+             alt="Mapa del presupuesto del PP 0068 por {{ nivel }}">
+      </td>
+      <td style="width: 38%; vertical-align: top; padding-left: 8pt">
+        <div class="fino" style="margin-bottom: 4pt">
+          {{ metrica_nombre }} por
+          {% if nivel == "provincial" %}provincia{% else %}distrito{% endif %}.
+        </div>
+        {% for t in leyenda %}
+          <div class="fino" style="margin-bottom: 2pt">
+            <span class="punto" style="background: {{ t.color }}"></span>{{ t.etiqueta }}
+          </div>
+        {% endfor %}
+        <div class="fino" style="margin-bottom: 2pt">
+          <span class="punto" style="background: {{ color_sin_municipalidad }}"></span>sin
+          municipalidad ({{ mapa.poligonos.sin_dato }})
+        </div>
+        {% if metrica != "pct_ejecucion" %}
+          <div class="fino" style="margin-top: 5pt">
+            Los cinco tramos son quintiles de lo que se está viendo, así que el color es relativo
+            a este recorte. Por eso los rangos van en soles.
+          </div>
+        {% endif %}
+      </td>
+    </tr></table>
+  {% elif mapa_error %}
+    <p class="aviso">No fue posible generar el mapa para este documento ({{ mapa_error }}). El
+    resto del contenido no se ve afectado; el visor en línea sigue disponible.</p>
+  {% endif %}
+
+  {% comment %} ADR-D6 llevado al papel: lo que el nivel no puede pintar se declara. Un PDF viaja solo,
+     sin la página que lo explica, así que esto NO es opcional. {% endcomment %}
+  {% if mapa.no_ubicado.entidades %}
+    <p class="declaracion">
+      <strong>{{ mapa.no_ubicado.pim|soles }} no aparecen en el mapa.</strong>
+      {{ mapa.no_ubicado.motivo }} Sí están contados en las cifras de cabecera y en la tabla.
+    </p>
+  {% endif %}
+  {% if mapa.poligonos.sin_dato %}
+    <p class="declaracion" style="border-left-color: #D1D5DB">{{ mapa.poligonos.motivo }}</p>
+  {% endif %}
+</section>
+
+{# --- Tabla de municipalidades --- #}
+<section style="margin-top: 10pt">
+  <h2>Municipalidades ({{ filas|length|miles }})</h2>
+  {% if not filas %}
+    <p class="fino">Ninguna entidad ejecutora en el ámbito seleccionado.</p>
+  {% else %}
+    <table class="datos tabla-larga">
+      <thead>
+        <tr>
+          <th style="width: 48mm">Municipalidad</th>
+          <th style="width: 20mm">Provincia</th>
+          <th class="num" style="width: 21mm">PIA</th>
+          <th class="num" style="width: 21mm">PIM</th>
+          <th class="num" style="width: 21mm">Devengado</th>
+          <th class="num" style="width: 13mm">% Ejec.</th>
+          <th class="num" style="width: 21mm">Saldo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in filas %}
+          <tr>
+            <td>{{ f.entidad }}</td>
+            <td>{{ f.provincia|default:"—" }}</td>
+            <td class="num">{{ f.pia|soles }}</td>
+            <td class="num">{{ f.pim|soles }}</td>
+            <td class="num">{{ f.devengado|soles }}</td>
+            <td class="num">{{ f.pct_ejecucion|pct }}</td>
+            <td class="num">{{ f.saldo|soles }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      {% comment %} El total sale de `agregados`, la misma fuente que las cifras de cabecera. Si algún día
+         dejara de cuadrar con la suma de las filas, sería que alguien metió una consulta
+         paralela — y hay una prueba que lo vigila. {% endcomment %}
+      <tfoot>
+        <tr>
+          <td colspan="2">Total del ámbito</td>
+          <td class="num">{{ agregados.pia|soles }}</td>
+          <td class="num">{{ agregados.pim|soles }}</td>
+          <td class="num">{{ agregados.devengado|soles }}</td>
+          <td class="num">{{ agregados.pct_ejecucion|pct }}</td>
+          <td class="num">{{ agregados.saldo|soles }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  {% endif %}
+</section>
+
+{# --- Fuentes y firma --- #}
+<div class="cierre evitar-corte">
+  <p>
+    <strong>Fuentes.</strong> Ejecución presupuestal del PP 0068: la serie 2022-2025 procede
+    del comparativo del MEF (Consulta Amigable, «MEF» en el cuadro) y el ejercicio en curso
+    de la base entregada por PREDES («PREDES»). Límites
+    administrativos: INEI. La unidad de análisis es la <strong>municipalidad (entidad
+    ejecutora)</strong> y no el distrito: una municipalidad provincial gestiona presupuesto de
+    toda su provincia, así que no hay forma de repartirlo por distritos sin inventar cifras.
+  </p>
+  {{ firma|safe }}
+  <p>
+    Documento generado automáticamente desde el Observatorio Kallpachakuy el
+    {{ generado_en|date:"j \d\e F \d\e Y" }} a las {{ generado_en|date:"H:i" }} h. Refleja el
+    estado de la base de datos en esa fecha.
+  </p>
+</div>
+{% endif %}

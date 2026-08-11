@@ -242,6 +242,7 @@ Notas del contrato:
 | `GET /api/inversion/entidades/` | los mismos + `buscar`, `ordenar`, `page`, `page_size`. **Paginado** |
 | `GET /api/inversion/entidades/{codigo}/` | `anio`. `codigo` = código MEF de la entidad ejecutora |
 | `GET /api/inversion/mapa/` | `anio`, `ambito`, `provincia` + `nivel` (`distrital` por defecto \| `provincial`) |
+| `GET /api/inversion/reporte.pdf` | los del mapa + `ordenar` y `sin_mapa` |
 | `GET /api/inversion/export.xlsx` | los mismos que el listado, sin paginar |
 
 **El tablero y la tabla van en endpoints distintos, a propósito.** `/api/inversion/` sirve las piezas que se dibujan juntas y hablan del mismo ejercicio (agregados, procesos, tendencia, ejercicios); la tabla se pagina y su orden se resuelve en el servidor, porque ordenar en el cliente ordenaría solo lo ya cargado. Ojo al probarlo: `/api/inversion/entidades/` **contiene** la cadena `/api/inversion/`, y un matcher por subcadena atrapa la respuesta equivocada.
@@ -345,6 +346,29 @@ Cuatro cosas que no son detalles de implementación:
 - **Las cuatro métricas viajan en cada fila.** Conmutar entre PIA, PIM, devengado y % de ejecución no dispara otra petición, así que dos métricas del mismo mapa no pueden acabar viniendo de ejercicios distintos si alguien cambia la visibilidad entre medias.
 - **`suma(filas) + no_ubicado == el total del ámbito`, siempre.** Es la contabilidad completa del mapa, y hay dos pruebas que la fijan: un mapa al que le falta dinero se ve exactamente igual que uno correcto.
 - **`poligonos.sin_dato`** cuenta los polígonos sin municipalidad —a nivel distrital son las 13 capitales de provincia— y es distinto de una municipalidad con PIM cero, que **sí** aparece en `filas` con sus ceros y su `pct_ejecucion: null`.
+
+### El reporte — `GET /api/inversion/reporte.pdf`
+
+El equivalente de la ayuda memoria de `/peligros` para esta ventana: el tablero completo en un
+documento, con sus gráficas, su mapa y la tabla de las 116 municipalidades. Alcance **regional
+con los filtros puestos**, no una ficha por municipalidad.
+
+Cuatro decisiones del contrato:
+
+- **Sin ejercicio visible responde 200 con un PDF de una página** que explica el vacío, no un 404.
+  Un documento en blanco se leería como «no hay inversión pública en gestión del riesgo», que es
+  falso; es el mismo criterio de la hoja «Sin datos» del Excel.
+- **Las gráficas son SVG generado en servidor** (`apps/informes/graficos.py`). WeasyPrint no
+  ejecuta JavaScript, así que los de Recharts no se pueden reutilizar; el SVG además es vectorial
+  y determinista, y deja el PDF sin imágenes rasterizadas salvo el mapa —que es como las pruebas
+  detectan si el mapa llegó—.
+- **El único que necesita navegador es el mapa**, con la misma degradación de siempre: si la
+  captura falla, el documento sale sin él y con el resto intacto.
+- **El documento declara el importe que su mapa no pinta** (ADR-D6). En pantalla el pie está
+  debajo del mapa; en un PDF que circula por correo, si la declaración no viaja dentro no viaja.
+
+`sin_mapa=1` omite la captura: es lo que usan las pruebas para tener una salida determinista y
+rápida.
 
 Los `cortes` son los cuatro quintiles de lo pintado, así que el color es relativo a la vista: al acotar por provincia, un mismo distrito puede cambiar de tono. Se sirve así a propósito —una rampa lineal sobre una distribución tan sesgada deja un polígono oscuro y todos los demás pálidos— y el precio se paga imprimiendo los rangos en soles en la leyenda. Pueden salir repetidos (con muchos ceros, los tres primeros valen 0): el cliente clasifica recorriendo la lista, así que un tramo vacío se dibuja vacío. Lo que **no** se puede hacer con ellos es un `step` de MapLibre, que exige cortes estrictamente crecientes. El **% de ejecución no tiene cortes en el payload**: son fijos (25/50/75/90) porque es un porcentaje, y con una escala relativa el mismo 90 % se pintaría de verde o de rojo según con quién compartiera pantalla.
 

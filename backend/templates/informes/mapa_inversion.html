@@ -1,0 +1,161 @@
+<!--
+  Visor mínimo para la captura del coroplético del reporte de inversión.
+
+  Es el hermano de `mapa.html`, con el mismo criterio: una página de un solo uso que dibuja lo
+  justo que va al PDF y avisa cuando terminó. Se mantiene aparte del componente de React porque
+  reutilizarlo obligaría a levantar un build del frontend dentro del worker.
+
+  Ni la rampa de color ni los cortes se declaran aquí: la primera llega de `informes/escalas.py`
+  —la misma que usa la leyenda del PDF— y los segundos vienen calculados del API. Lo único que
+  queda duplicado es la copia de `MapaInversion.tsx`, que es la frontera frontend/backend de
+  siempre (ADR-D6, spec 05).
+-->
+{% load static %}<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; }
+  #mapa { width: {{ ancho }}px; height: {{ alto }}px; }
+  .maplibregl-ctrl-attrib { font-size: 9px; }
+</style>
+<div id="mapa"></div>
+
+<!-- Servidos por el propio backend, no desde un CDN: el worker que genera el PDF puede estar en
+     un servidor sin salida a internet. -->
+<script src="{% static 'vendor/maplibre-gl.js' %}"></script>
+<link href="{% static 'vendor/maplibre-gl.css' %}" rel="stylesheet">
+<script src="{% static 'vendor/pmtiles.js' %}"></script>
+
+<script>
+{% comment %}
+  `|safe` en las URL, y no es un descuido.
+
+  El autoescape de Django convierte `&` en `&amp;`, y una URL dentro de una cadena de JavaScript
+  no lleva entidades HTML: **del segundo parámetro en adelante se perdían todos, en silencio**.
+  El mapa se dibujaba igual, con los datos equivocados.
+
+  Es seguro porque la vista compone la consulta con `urlencode`, que percent-codifica los valores:
+  después de eso la URL no puede contener comillas, `<`, ni un `&` que no sea separador, así que
+  no hay forma de salirse de la cadena ni de cerrar el `<script>`. Se descartó `|escapejs`, que
+  también funciona pero escapa `=` y `-`: deja la URL ilegible justo cuando alguien abre esta
+  página en un navegador para depurar el mapa, que es para lo que es pública.
+{% endcomment %}
+  // La escala llega desde `apps/informes/escalas.py`, no declarada aquí: el mapa y la leyenda
+  // del PDF la leen del mismo sitio, y así no pueden desincronizarse.
+  const ESCALA = {{ escala }};
+
+  const CAPAS = {
+    distrital: { slug: "limites-distritales", propiedad: "UBIGEO" },
+    provincial: { slug: "limites-provinciales", propiedad: "IDPROV" },
+  };
+
+  // Encuadre fijo de la región, y no un ajuste a lo pintado: los tiles no dan sus geometrías
+  // hasta que están cargados, y perseguir el encuadre dispararía otra ronda de carga justo
+  // cuando la captura está esperando el `idle`. Con un filtro de provincia se ve la provincia
+  // pintada dentro de Cusco, que además dice al lector que está viendo un recorte.
+  const CUSCO = [[-73.99, -15.47], [-70.34, -11.20]];
+
+  const metrica = "{{ metrica }}";
+  const nivel = CAPAS["{{ nivel }}"] ? "{{ nivel }}" : "distrital";
+
+  maplibregl.addProtocol("pmtiles", new pmtiles.Protocol().tile);
+
+  /** Reescribe cualquier URL contra el origen de ESTA página. Ver `mapa.html`: `BACKEND_URL` es
+      la URL del visitante, y este navegador corre dentro del contenedor. */
+  const enEsteOrigen = (u) => {
+    try {
+      const url = new URL(u, location.origin);
+      return location.origin + url.pathname + url.search;
+    } catch (e) {
+      return u;
+    }
+  };
+
+  /** El tramo (0-4) de un valor, o -1 si no se puede calcular. Igual que en el componente. */
+  const tramo = (valor, cortes) => {
+    if (valor === null || valor === undefined) return -1;
+    let i = 0;
+    while (i < cortes.length && valor > cortes[i]) i += 1;
+    return i;
+  };
+
+  (async () => {
+    let datos = null;
+    let capas = [];
+    try {
+      [datos, capas] = await Promise.all([
+        fetch("{{ url_mapa|safe }}").then((r) => r.json()),
+        fetch("{{ url_capas|safe }}").then((r) => r.json()),
+      ]);
+    } catch (e) {
+      window.__mapaError = "no se pudieron cargar los datos: " + e;
+      return;
+    }
+    if (!datos || datos.disponible === false) {
+      // Sin ejercicio publicado no hay mapa que dibujar. Se señaliza el fallo: un mapa en blanco
+      // incrustado en el PDF como si fuera el mapa es peor que no llevarlo.
+      window.__mapaError = "no hay ningún ejercicio publicado";
+      return;
+    }
+
+    const capa = capas.find((c) => c.slug === CAPAS[nivel].slug);
+    if (!capa) {
+      window.__mapaError = "falta la capa " + CAPAS[nivel].slug + " en el catálogo";
+      return;
+    }
+
+    window.__mapaAvisos = [];
+
+    const cortes = metrica === "pct_ejecucion" ? ESCALA.cortes_ejecucion : datos.cortes[metrica];
+    const rampa = metrica === "pct_ejecucion" ? ESCALA.rampa_ejecucion : ESCALA.rampa_dinero;
+    const pares = [];
+    for (const f of datos.filas) {
+      const t = tramo(f[metrica], cortes);
+      pares.push(f.ubigeo, t < 0 ? ESCALA.no_calculable : rampa[t]);
+    }
+
+    const mapa = new maplibregl.Map({
+      container: "mapa",
+      // Sin mapa base: un coroplético sobre teselas de OSM se lee peor —los colores compiten con
+      // el fondo— y ahorra la dependencia de un servicio externo justo en el peor momento.
+      style: { version: 8, sources: {}, layers: [
+        { id: "fondo", type: "background", paint: { "background-color": "#F7F7F4" } },
+      ] },
+      attributionControl: { compact: false, customAttribution: "INEI · límites administrativos" },
+      interactive: false,
+      // Sin esto el canvas WebGL se lee en blanco: el navegador puede descartar el búfer en
+      // cuanto termina de pintar, y la captura llega después.
+      preserveDrawingBuffer: true,
+    });
+
+    mapa.on("load", () => {
+      mapa.addSource("limites", { type: "vector", url: "pmtiles://" + enEsteOrigen(capa.url) });
+      mapa.addLayer({
+        id: "relleno", type: "fill", source: "limites", "source-layer": capa.slug,
+        paint: {
+          // `match` exige al menos una rama: sin filas, color plano.
+          "fill-color": pares.length
+            ? ["match", ["get", CAPAS[nivel].propiedad]].concat(pares, [ESCALA.sin_municipalidad])
+            : ESCALA.sin_municipalidad,
+          "fill-opacity": 1,
+        },
+      });
+      mapa.addLayer({
+        id: "contorno", type: "line", source: "limites", "source-layer": capa.slug,
+        paint: { "line-color": "#8F8F8A", "line-width": 0.6, "line-opacity": 0.8 },
+      });
+
+      mapa.fitBounds(CUSCO, { padding: 20, animate: false });
+
+      mapa.once("idle", () => { window.__mapaListo = true; });
+      setTimeout(() => { window.__mapaListo = true; }, {{ espera_ms }});
+    });
+
+    // Igual que en `mapa.html`: los errores de MapLibre no abortan la captura. Una tesela que no
+    // responde no puede costar el mapa entero; lo fatal —no tener datos— ya se trató arriba.
+    mapa.on("error", (e) => {
+      const aviso = String((e && e.error && e.error.message) || e);
+      if (window.__mapaAvisos.length < 10 && !window.__mapaAvisos.includes(aviso)) {
+        window.__mapaAvisos.push(aviso);
+      }
+    });
+  })();
+</script>

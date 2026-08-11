@@ -21,6 +21,7 @@ from .inversion import (
     InversionEntidadesView,
     InversionExportView,
     InversionMapaView,
+    InversionReporteView,
     InversionView,
 )
 from .salud import SaludView
@@ -62,6 +63,7 @@ __all__ = [
     "InversionEntidadesView",
     "InversionExportView",
     "InversionMapaView",
+    "InversionReporteView",
     "InversionView",
     "MedidaViewSet",
     "MetricaEventoView",

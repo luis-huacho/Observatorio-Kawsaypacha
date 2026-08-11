@@ -227,6 +227,28 @@ test.describe("Inversión (PP 0068)", () => {
     }
   });
 
+  test("el reporte en PDF se ofrece y se descarga de verdad", async ({ page, request }) => {
+    const cuerpo = await abrir(page, "/inversion");
+    test.skip(!cuerpo.disponible, "sin ejercicio publicado");
+
+    const boton = page.getByRole("link", { name: /Reporte \(PDF\)/i });
+    await expect(boton).toBeVisible();
+
+    // El enlace tiene que arrastrar el ejercicio y la vista del mapa: es lo que hace que el
+    // documento sea reproducible desde la misma URL con la que se pidió.
+    const url = await boton.getAttribute("href");
+    expect(url).toContain("/inversion/reporte.pdf");
+    expect(url).toContain("nivel=");
+    expect(url).toContain("metrica=");
+
+    // Se comprueba la RESPUESTA, no el visor de PDF del navegador: lo que puede romperse es la
+    // generación en el servidor, y el visor sería una dependencia ajena al fallo.
+    const respuesta = await request.get(`${url}&sin_mapa=1`);
+    expect(respuesta.status()).toBe(200);
+    expect(respuesta.headers()["content-type"]).toContain("application/pdf");
+    expect((await respuesta.body()).subarray(0, 4).toString()).toBe("%PDF");
+  });
+
   test("la sección sigue anunciada en el menú", async ({ page }) => {
     await page.goto("/");
     await esperarApi(page, "/api/sitio/");

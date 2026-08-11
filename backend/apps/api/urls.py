@@ -7,7 +7,7 @@ prefijo que el detalle de `/ccpp/{codigo}/`, y si el router se registrara primer
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from apps.informes.views import VisorMapaView
+from apps.informes.views import VisorMapaInversionView, VisorMapaView
 
 from . import views
 
@@ -78,6 +78,7 @@ urlpatterns = [
     path("mapas/capas/", views.CapasMapaView.as_view(), name="mapas-capas"),
     # `export.xlsx` antes de `inversion/`: si no, DRF nunca llegaría a la ruta concreta.
     path("inversion/export.xlsx", views.InversionExportView.as_view(), name="inversion-export"),
+    path("inversion/reporte.pdf", views.InversionReporteView.as_view(), name="inversion-reporte"),
     path("inversion/mapa/", views.InversionMapaView.as_view(), name="inversion-mapa"),
     path(
         "inversion/entidades/",
@@ -94,5 +95,10 @@ urlpatterns = [
     # Visor mínimo que el navegador headless captura para el mapa del PDF. Público a
     # propósito: abrirlo en un navegador normal es la forma de depurar ese mapa.
     path("informes/visor-mapa/", VisorMapaView.as_view(), name="visor-mapa"),
+    path(
+        "informes/visor-mapa-inversion/",
+        VisorMapaInversionView.as_view(),
+        name="visor-mapa-inversion",
+    ),
     path("", include(router.urls)),
 ]

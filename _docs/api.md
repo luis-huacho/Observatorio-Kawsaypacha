@@ -233,6 +233,15 @@ municipalidades provinciales —su presupuesto cubre toda la provincia, no un di
 el padrón no ubica. **La suma de `filas` más `no_ubicado` es exactamente el total del ámbito**: si
 al dibujar el mapa solo se usa `filas`, se está publicando una cifra menor que la del tablero.
 
+**`GET /api/inversion/reporte.pdf`** devuelve el tablero entero en un documento: las cifras de
+cabecera, las gráficas, el mapa y la tabla completa de municipalidades con su total. Acepta los
+mismos filtros que la ventana más `nivel` y `metrica` del mapa, así que el documento es
+reproducible desde la misma URL con la que se pidió. `sin_mapa=1` omite la captura del mapa, que
+es lo único que necesita navegador.
+
+Sin ningún ejercicio publicado **responde 200 con un PDF de una página** que explica el vacío, no
+un 404: un documento en blanco se leería como «no hay inversión pública en gestión del riesgo».
+
 **`GET /api/inversion/export.xlsx`** devuelve la misma tabla en Excel, con los mismos filtros y sin
 paginar; con `comparar_con` añade las columnas del otro ejercicio y una de «Comparabilidad».
 

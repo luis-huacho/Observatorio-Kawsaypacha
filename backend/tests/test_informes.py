@@ -215,3 +215,234 @@ def test_sin_mapa_el_pdf_no_lleva_ninguna_imagen(api, datos_muestra, sin_throttl
     _, contenido = _pdf(api, "080101")
 
     assert contenido.count(b"/Subtype /Image") == 0
+
+
+# --- Reporte de Inversión (PP 0068) ---------------------------------------------------------
+#
+# Mismo criterio que la ayuda memoria: lo que se prueba no es que salga un PDF, sino que diga lo
+# mismo que la pantalla. Aquí hay además una obligación propia —ADR-D6—: el documento tiene que
+# declarar el dinero que su mapa no puede pintar, porque en papel no hay pantalla al lado que lo
+# compense.
+
+
+@pytest.fixture
+def inversion_publicada(importar, datos_muestra):
+    from apps.datasets.models import DatasetUpload
+    from apps.inversion.models import Ejercicio
+    from tests.rutas import MUESTRA_INVERSION, MUESTRA_INVERSION_INSTITUCIONAL
+
+    importar(tipo=DatasetUpload.Tipo.INVERSION, archivo=MUESTRA_INVERSION)
+    importar(tipo=DatasetUpload.Tipo.INVERSION, archivo=MUESTRA_INVERSION_INSTITUCIONAL)
+    Ejercicio.objects.update(visible=True)
+
+
+def _reporte(api, extra=""):
+    respuesta = api.get(f"/api/inversion/reporte.pdf?sin_mapa=1{extra}")
+    contenido = (
+        b"".join(respuesta.streaming_content)
+        if hasattr(respuesta, "streaming_content")
+        else respuesta.content
+    )
+    return respuesta, contenido
+
+
+def test_el_reporte_de_inversion_se_genera(api, inversion_publicada, sin_throttling):
+    respuesta, contenido = _reporte(api)
+
+    assert respuesta.status_code == 200
+    assert respuesta["Content-Type"] == "application/pdf"
+    assert contenido.startswith(b"%PDF")
+    assert "attachment" in respuesta["Content-Disposition"]
+    assert "reporte-inversion-pp0068" in respuesta["Content-Disposition"]
+
+
+def test_el_reporte_lee_de_las_mismas_consultas_que_el_api(api, inversion_publicada):
+    """El papel y la pantalla comparten `inversion.consultas`, no dos consultas parecidas.
+
+    Es la única forma de garantizar que coinciden: dos implementaciones «equivalentes» divergen
+    en cuanto una se toca, y un documento impreso no se puede comprobar en mitad de una reunión.
+    """
+    from apps.informes import reporte_inversion
+    from apps.inversion import consultas
+
+    datos = reporte_inversion.reunir_datos()
+    ejercicio = consultas.ejercicio_para()
+
+    assert datos["agregados"] == consultas.agregados(ejercicio)
+    assert datos["procesos"] == consultas.procesos(ejercicio)["procesos"]
+    assert [f["codigo"] for f in datos["filas"]] == [
+        f["codigo"] for f in consultas.por_entidad(consultas.listado(ejercicio))
+    ]
+
+
+def test_el_total_de_la_tabla_es_el_agregado_del_ambito(api, inversion_publicada):
+    """La fila de total sale de `agregados`, y la tabla de `listado`: son dos caminos distintos
+    hasta la misma cifra. Si se separaran, el documento se contradiría a sí mismo en la misma
+    página y nadie lo notaría sin sumar 116 filas a mano."""
+    from apps.informes import reporte_inversion
+
+    datos = reporte_inversion.reunir_datos()
+
+    assert datos["agregados"]["pim"] == pytest.approx(sum(f["pim"] for f in datos["filas"]))
+    assert datos["agregados"]["devengado"] == pytest.approx(
+        sum(f["devengado"] for f in datos["filas"])
+    )
+
+
+def test_el_reporte_declara_el_dinero_que_su_mapa_no_pinta(api, inversion_publicada):
+    """ADR-D6 llevado al papel.
+
+    En pantalla, quien mira el mapa tiene el pie debajo; en un PDF que circula por correo, si la
+    declaración no viaja dentro del documento no viaja en absoluto.
+    """
+    from apps.informes import reporte_inversion
+
+    datos = reporte_inversion.reunir_datos(nivel="distrital")
+
+    assert datos["mapa"]["no_ubicado"]["entidades"] > 0
+    assert datos["mapa"]["no_ubicado"]["motivo"]
+
+    _, contenido = _reporte(api, "&nivel=distrital")
+    assert contenido.startswith(b"%PDF")
+
+
+def test_el_reporte_avisa_del_corte_parcial(api, inversion_publicada):
+    """Un % de ejecución de medio año contra un PIM anual no es media ejecución perdida."""
+    from apps.informes import reporte_inversion
+
+    parcial = reporte_inversion.reunir_datos(anio=2026)
+    cerrado = reporte_inversion.reunir_datos(anio=2025)
+
+    assert parcial["es_parcial"] is True
+    assert parcial["corte"] == "2026-06"
+    assert cerrado["es_parcial"] is False
+
+
+def test_sin_ejercicio_publicado_el_reporte_explica_el_vacio_y_no_es_404(
+    api, inversion_publicada, sin_throttling
+):
+    """Un PDF vacío se leería como «no hay inversión pública en gestión del riesgo».
+
+    Es el mismo criterio con el que el Excel trae su hoja «Sin datos» en vez de un libro en
+    blanco.
+    """
+    from apps.inversion.models import Ejercicio
+
+    Ejercicio.objects.update(visible=False)
+
+    respuesta, contenido = _reporte(api)
+
+    assert respuesta.status_code == 200
+    assert contenido.startswith(b"%PDF")
+
+
+def test_acotar_por_provincia_recorta_la_tabla_y_el_total_a_la_vez(api, inversion_publicada):
+    """Recortar uno sin el otro daría un documento con un total que no es de lo que enseña."""
+    from apps.informes import reporte_inversion
+
+    region = reporte_inversion.reunir_datos()
+    cusco = reporte_inversion.reunir_datos(provincia="CUSCO")
+
+    assert len(cusco["filas"]) <= len(region["filas"])
+    assert cusco["agregados"]["pim"] == pytest.approx(sum(f["pim"] for f in cusco["filas"]))
+    assert cusco["provincia"] == "CUSCO"
+
+
+def test_la_leyenda_del_mapa_usa_la_escala_compartida(api, inversion_publicada):
+    """La leyenda y el mapa leen la rampa del mismo módulo (`informes/escalas.py`).
+
+    Si cada uno tuviera la suya, el documento podría pintar un tramo de un color y describirlo
+    de otro sin que nada fallara.
+    """
+    from apps.informes import escalas, reporte_inversion
+
+    dinero = reporte_inversion.reunir_datos(metrica="pim")
+    ejecucion = reporte_inversion.reunir_datos(metrica="pct_ejecucion")
+
+    assert [t["color"] for t in dinero["leyenda"]] == escalas.RAMPA_DINERO
+    assert [t["color"] for t in ejecucion["leyenda"]] == escalas.RAMPA_EJECUCION
+    # Los rangos van en soles / en porcentaje, nunca en «bajo/alto»: el color de las métricas de
+    # dinero es relativo a la vista, así que sin las cifras no se sabe de qué habla el mapa.
+    assert "S/" in dinero["leyenda"][0]["etiqueta"]
+    assert "%" in ejecucion["leyenda"][0]["etiqueta"]
+
+
+def test_una_metrica_inventada_cae_a_la_de_por_defecto(api, inversion_publicada):
+    from apps.informes import reporte_inversion
+
+    assert reporte_inversion.reunir_datos(metrica="loquesea")["metrica"] == "pim"
+
+
+@pytest.mark.lento
+def test_el_reporte_con_mapa_trae_el_mapa(api, inversion_publicada, sin_throttling):
+    """Con Chromium disponible, el reporte **tiene que traer** su mapa.
+
+    Mismo aprendizaje que en la ayuda memoria: tolerar el camino degradado dejó el documento
+    meses sin mapa en producción sin que la suite dijera nada.
+    """
+    if not _chromium_disponible():
+        pytest.skip("Chromium no está disponible en esta imagen")
+
+    respuesta = api.get("/api/inversion/reporte.pdf")
+    contenido = (
+        b"".join(respuesta.streaming_content)
+        if hasattr(respuesta, "streaming_content")
+        else respuesta.content
+    )
+
+    assert respuesta.status_code == 200
+    assert contenido.count(b"/Subtype /Image") >= 1, "el reporte salió sin el mapa"
+
+
+@pytest.mark.lento
+def test_sin_mapa_el_reporte_no_lleva_ninguna_imagen(api, inversion_publicada, sin_throttling):
+    """La contraparte de la anterior, y además la prueba de que **las gráficas son vectoriales**:
+    si se generaran como PNG, esta cuenta no daría cero y la de arriba no significaría nada."""
+    _, contenido = _reporte(api)
+
+    assert contenido.count(b"/Subtype /Image") == 0
+
+
+# --- Los visores que captura el navegador ---------------------------------------------------
+
+
+def test_el_visor_de_peligros_conserva_todos_sus_filtros(api, datos_muestra):
+    """Django escapa `&` como `&amp;` dentro de `{{ … }}`, y una URL en un `fetch` de JavaScript
+    no lleva entidades HTML: del segundo parámetro en adelante se perdían todos.
+
+    El daño era silencioso y grave: el PDF decía «Peligros: Sismo · Niveles: muy alto» en su
+    línea de filtros y **el mapa de al lado mostraba el distrito entero**. Ningún error, ningún
+    aviso, y un documento que se contradice a sí mismo en la misma página.
+    """
+    html = api.get(
+        "/api/informes/visor-mapa/?distrito=080101&peligros=sismo&niveles=4"
+    ).content.decode()
+
+    assert "&amp;" not in html
+    assert "peligros=sismo" in html
+    assert "niveles=4" in html
+
+
+def test_el_visor_de_inversion_conserva_el_nivel(api, inversion_publicada):
+    """El mismo fallo, aquí con consecuencia visible: sin `nivel`, el API cae a `distrital` y
+    devuelve ubigeos de seis dígitos que **ningún polígono provincial puede casar**. El mapa
+    salía en blanco, con sus contornos dibujados y su leyenda correcta al lado."""
+    html = api.get(
+        "/api/informes/visor-mapa-inversion/?anio=2026&ambito=municipal&nivel=provincial"
+    ).content.decode()
+
+    assert "&amp;" not in html
+    assert "nivel=provincial" in html
+    assert "ambito=municipal" in html
+
+
+def test_los_visores_no_dejan_escapar_comillas_a_la_cadena_de_javascript(api, datos_muestra):
+    """La URL se compone con parámetros de la petición, y va dentro de una cadena de JS.
+
+    El escapado HTML que causaba el fallo anterior **también** impedía esto por accidente;
+    quitarlo sin más habría abierto una inyección. Por eso la URL se arma con `urlencode` y se
+    imprime con `escapejs`, no con `|safe`.
+    """
+    html = api.get('/api/informes/visor-mapa/?distrito=080101"+alert(1)+"').content.decode()
+
+    assert '"+alert(1)+"' not in html
