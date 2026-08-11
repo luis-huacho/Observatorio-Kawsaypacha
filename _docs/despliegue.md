@@ -12,6 +12,7 @@ va mal. Requisito 8 del TDR: servidor propio, dominio, HTTPS y backups automáti
 | Credenciales SMTP | PREDES | Los avisos del flujo editorial no salen (van a los logs) |
 | API key de Gemini | PREDES o el desarrollador | El resumen automático de PDF queda deshabilitado, con aviso en el admin |
 | Los Excel y GeoJSON de `data/layers/` | PREDES | El seed no tiene qué importar |
+| Los CSV del PP 0068 de `data/inversion/` | PREDES / el desarrollador | `/inversion` se queda en «información en preparación» |
 
 Los tres últimos **no bloquean el despliegue**: la plataforma arranca y funciona sin ellos, con
 las funciones correspondientes desactivadas y avisando de por qué. Sin los Excel y GeoJSON hay que
@@ -49,8 +50,11 @@ git clone <repo> observatorio && cd observatorio
 # 1. Secretos y configuración
 cp backend/.env.example backend/.env
 cp .env.example .env
-# El bind mount de los datos fuente existe siempre, aunque los Excel aún no estén.
-mkdir -p data/layers
+# Los dos bind mount de datos fuente existen siempre, aunque los archivos aún no estén.
+# `data/layers` son los Excel y GeoJSON (`/datos`); `data/inversion`, los CSV del PP 0068
+# (`/datos-inversion`). Van en montajes separados porque anidar uno dentro de otro de solo
+# lectura falla.
+mkdir -p data/layers data/inversion
 ```
 
 En **`backend/.env`** hay que poner, como mínimo:
@@ -122,7 +126,9 @@ docker compose exec backend python manage.py meili_setup
 
 # 5. Datos. Sin los Excel y GeoJSON en data/layers/ el seed aborta: para levantar la plataforma
 #    sin ellos, `seed --solo-catalogos` (catálogos, sitio, menú, grupos y superusuario).
+#    El seed NO carga la inversión: eso va aparte, en «Cargar los datos» de más abajo.
 docker compose exec backend python manage.py seed --capas --tiles
+docker compose exec backend python manage.py calcular_centroides
 
 # 6. Reconstruir el frontend con la llave ya en su sitio, y publicarlo
 docker compose build frontend && docker compose run --rm frontend
@@ -217,6 +223,156 @@ Quien recoge el certificado renovado es nginx, que se recarga cada 6 h desde
 `deploy/nginx/docker-entrypoint.d/40-recarga-periodica.sh`. Sin esa recarga, nginx seguiría
 sirviendo el certificado viejo hasta que caducara.
 
+## Cargar los datos
+
+El seed importa peligros y frecuencia; **la inversión va aparte**. Esta sección es el
+procedimiento completo, y sirve tanto para la carga inicial como para reemplazar los datos por
+una entrega nueva.
+
+**Qué se limpia solo y qué no**, que es lo que más confusión causa:
+
+| Dato | Al reimportar |
+|---|---|
+| Peligros por centro poblado | **Se limpia solo.** El importador hace `ClasificacionPeligro…delete()` antes de escribir |
+| Frecuencia de emergencias | **Se limpia solo.** Borra `FrecuenciaEmergencia` y `TotalDeclaradoEmergencias` |
+| Inversión (PP 0068) | **No del todo.** Solo reemplaza los años que trae el archivo, y `PresupuestoEntidad` va por *upsert*: una entidad o un ejercicio que desaparezca del archivo nuevo sobrevive |
+| Capas cartográficas (GeoJSON) | **No.** `seed --capas` **salta toda capa que ya tenga archivo adjunto** y lo dice como si fuera un éxito («ya tiene archivo adjunto»). Para reimportar un GeoJSON hay que soltarlo antes |
+| El padrón: provincias, distritos y centros poblados | **Nunca**, y no debe forzarse. Ver el aviso de abajo |
+
+Es decir: en una **carga inicial** basta con `seed`. En una **recarga** hay dos cosas que el seed
+no hace por su cuenta —la inversión y el GeoJSON de las capas— y ambas necesitan un paso previo.
+
+> **No borres `Provincia`, `Distrito` ni `CentroPoblado`.** Es la trampa más cara de esta
+> operación, porque no falla: `Medida.distrito`, `GaleriaMedida.centro_poblado` y
+> `EntidadEjecutora.distrito`/`provincia` son `SET_NULL`, así que borrar el padrón deja **en
+> silencio** las medidas publicadas sin distrito y todas las municipalidades «sin territorio»; y
+> `ClasificacionPeligro`, `FrecuenciaEmergencia` y `TotalDeclaradoEmergencias` caen por cascada.
+> El importador nunca lo borra a propósito (ver `_sincronizar_territorio` en
+> `importers/nivel_peligro.py`): un centro poblado que desaparezca del Excel se marcaría como no
+> vigente, no se elimina. Si el padrón nuevo difiere del cargado, eso se resuelve hablando con
+> PREDES, no con un `delete()`.
+
+```bash
+# 0. Los archivos, en las carpetas montadas del anfitrión:
+#      data/layers/data/Base_Nivel Peligro_CCPP_Cusco.xlsx   → /datos/data/
+#      data/layers/data/Base_Frecuencia_Peligro_Cusco.xlsx   → /datos/data/
+#      data/layers/*.geojson                                 → /datos/
+#      data/inversion/pp0068_cusco_*.csv                     → /datos-inversion/
+docker compose exec backend sh -c 'ls /datos/data /datos-inversion'
+
+# 1. SOLO si ya hubo una carga de inversión. En una base nueva, saltar este paso.
+#    Peligros y frecuencia NO necesitan esto: sus importadores borran antes de escribir.
+#    El orden importa: `PresupuestoActividad` protege a `ClasificacionActividad` con PROTECT.
+#    NO se borran `ClasificacionActividad` ni `ProcesoGRD`: son el catálogo que PREDES edita,
+#    y `automatico=False` marca sus decisiones, que ninguna importación debe deshacer.
+docker compose exec -T backend python manage.py shell <<'EOF'
+from apps.inversion.models import (
+    Ejercicio, EntidadEjecutora, PresupuestoActividad, PresupuestoEntidad)
+PresupuestoActividad.objects.all().delete()
+PresupuestoEntidad.objects.all().delete()
+EntidadEjecutora.objects.all().delete()
+Ejercicio.objects.all().delete()
+print("inversión limpia")
+EOF
+
+# 2. SOLO en una recarga: soltar el GeoJSON de las capas. `seed --capas` salta las que ya
+#    tienen archivo, así que sin esto se quedarían con el GeoJSON viejo y el seed no avisaría.
+#    En una base nueva no hay nada adjunto y este paso no hace falta.
+docker compose exec -T backend python manage.py shell <<'EOF'
+from apps.mapas.models import CapaCartografica
+for capa in CapaCartografica.objects.all():
+    if capa.archivo_geojson:
+        capa.archivo_geojson.delete(save=False)   # borra también el archivo de media
+    capa.estado_tiles = CapaCartografica.EstadoTiles.PENDIENTE
+    capa.log_error = ""
+    capa.features_generados = 0
+    capa.save()
+    print("suelta:", capa.slug)
+EOF
+
+# 3. Catálogos, territorio, peligros, frecuencia, capas y tiles. Reemplazo total y síncrono.
+#    NUNCA con --demo en producción: siembra el contenido editorial de demostración.
+#    En la salida, las capas tienen que decir «adjuntado …», no «ya tiene archivo adjunto»:
+#    lo segundo significa que el paso 2 no surtió efecto.
+#    `--tiles` sí regenera TODAS las capas con archivo, al contrario que el comando
+#    `generar_tiles`, que se salta las que están en «ok» salvo con `--rehacer`.
+docker compose exec backend python manage.py seed --capas --tiles
+
+# 4. Centroides distritales. Después de --capas: lee la capa de límites ya adjunta.
+docker compose exec backend python manage.py calcular_centroides
+
+# 5. Inversión, por `DatasetUpload` — el único camino de importación del proyecto.
+#    El orden de los dos archivos da igual: ninguno pisa lo que no trae.
+docker compose exec -T backend python manage.py shell <<'EOF'
+from pathlib import Path
+from django.core.files import File
+from apps.datasets.models import DatasetUpload
+from apps.datasets.tasks import procesar_dataset
+
+for ruta in ["/datos-inversion/pp0068_cusco_2022_2026_largo.csv",
+             "/datos-inversion/pp0068_cusco_institucional_2022_2026.csv"]:
+    p = Path(ruta)
+    up = DatasetUpload(tipo=DatasetUpload.Tipo.INVERSION)
+    with p.open("rb") as fh:
+        up.archivo.save(p.name, File(fh), save=True)
+    procesar_dataset.func(up.pk)
+    up.refresh_from_db()
+    print(f"{p.name}: {up.estado} | {up.filas_importadas}/{up.filas_leidas}")
+    assert up.estado == "activo", (up.log or {}).get("error")
+EOF
+
+# 6. Buscador
+docker compose exec backend python manage.py meili_setup
+docker compose exec backend python manage.py meili_rebuild
+```
+
+**7. Publicar los ejercicios.** Importar **no publica**: los `Ejercicio` nacen ocultos y
+`/inversion` muestra «información en preparación» hasta que alguien los marque. Es deliberado —la
+revisión es de PREDES— así que lo normal es hacerlo desde el **admin → Inversión → Ejercicios
+presupuestales → casilla «visible»**. Para la carga inicial vale el atajo:
+
+```bash
+docker compose exec -T backend python manage.py shell -c \
+  "from apps.inversion.models import Ejercicio; print(Ejercicio.objects.update(visible=True))"
+```
+
+### Que los datos entraron
+
+Las cifras de la derecha son las de la entrega de agosto de 2026: si salen otras, o el archivo es
+otro o algo no entró.
+
+```bash
+set -a && . ./.env && set +a
+
+curl -s https://$API_DOMAIN/api/peligros/resumen/ | grep -o '"total_ccpp":[0-9]*'
+curl -s "https://$API_DOMAIN/api/inversion/?anio=2026"
+curl -s "https://$API_DOMAIN/api/inversion/mapa/?anio=2026&nivel=distrital"
+docker compose exec backend python manage.py meili_estado
+```
+
+| Comprobación | Valor esperado |
+|---|---|
+| `/peligros/resumen/` | `total_ccpp` **8,968**; los niveles suman **3,238**; sin clasificar **5,730** |
+| `/peligros/frecuencia/` | **90** distritos con fila |
+| `/inversion/?anio=2026` | PIM **54,591,255** · devengado **26,064,745** · saldo **28,526,510** |
+| `/inversion/mapa/?nivel=distrital` | `poligonos.pintados` **99**, `sin_dato` **13**, `no_ubicado.pim` **10,350,637** sobre **17** entidades |
+| `/mapas/capas/` | las 5 capas, todas en estado `ok` |
+
+Las **17 entidades sin ubicar** son correctas: 13 municipalidades provinciales —su presupuesto
+cubre toda la provincia, no un distrito (ADR-D6)— y 4 de La Convención que no casan con el padrón,
+que salen como advertencia en el log de la carga.
+
+El reporte en PDF **con su mapa**, con el mismo criterio que la ayuda memoria —descargarlo no
+basta, porque sale igual sin mapa—:
+
+```bash
+curl -so /tmp/inv.pdf "https://$API_DOMAIN/api/inversion/reporte.pdf" \
+  && grep -ac '/Subtype /Image' /tmp/inv.pdf     # tiene que dar 1
+```
+
+Tiene que dar **exactamente 1**: el mapa es la única imagen rasterizada del documento, porque las
+gráficas se generan en SVG vectorial.
+
 ## Comprobaciones tras desplegar
 
 ```bash
@@ -236,7 +392,7 @@ curl -s https://$API_DOMAIN/api/peligros/resumen/ | grep -o '"total_ccpp":[0-9]*
 # prevista— y así estuvo saliendo en producción local sin que nada lo dijera. El mapa es la única
 # imagen rasterizada del documento, así que contarlas es la comprobación: tiene que dar ≥ 1.
 curl -so /tmp/am.pdf https://$API_DOMAIN/api/distritos/080101/ayuda-memoria.pdf \
-  && grep -c '/Subtype /Image' /tmp/am.pdf
+  && grep -ac '/Subtype /Image' /tmp/am.pdf
 
 # Buscador, dos comprobaciones distintas y las dos necesarias:
 # a. Sin llave → 401. Confirma que el proxy manda la ruta y no la raíz (un 405 sería el proxy mal).
@@ -292,7 +448,9 @@ E2E_URL=https://$SITE_DOMAIN npx playwright test
 |---|---|
 | Desplegar una actualización | `git pull && docker compose build backend frontend && docker compose up -d && docker compose run --rm frontend && docker compose exec nginx nginx -s reload` |
 | Migraciones (normalmente automáticas) | `docker compose exec backend python manage.py migrate` |
-| Sembrar o resembrar datos | `docker compose exec backend python manage.py seed` |
+| Sembrar o resembrar peligros y frecuencia | `docker compose exec backend python manage.py seed` — reemplazo total, se limpia solo |
+| Reimportar un GeoJSON de capa | Ver [Cargar los datos](#cargar-los-datos): hay que soltar el archivo antes, o `seed --capas` la salta |
+| Cargar o reemplazar la inversión | Ver [Cargar los datos](#cargar-los-datos): el seed no la toca, y solo reemplaza los años del archivo |
 | **Comprobar el buscador** (servicio + índices al día) | `docker compose exec backend python manage.py meili_estado` |
 | **Comprobar la cola** (¿avanza el worker?) | `docker compose exec backend python manage.py cola_estado` |
 | Ver la salud de los contenedores | `docker compose ps` — la columna `Status` dice `healthy` / `unhealthy` |
