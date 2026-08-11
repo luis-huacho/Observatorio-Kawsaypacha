@@ -56,6 +56,35 @@ export function idImagen(slug: string, nivel: number): string {
   return `peligro-${slug}-${nivel}`;
 }
 
+/**
+ * Símbolo de la capa de emergencias. **Uno solo para toda la capa**, y a propósito fuera del
+ * juego `peligro-*`.
+ *
+ * Comparte mapa con la exposición y son ejes que no se mezclan —una cuenta lo ocurrido por
+ * distrito, la otra a qué está expuesto cada centro poblado—, así que se distingue en los tres
+ * canales a la vez: fondo **cuadrado** en vez de círculo, color **fijo** fuera de la escala de
+ * niveles, y un ícono que no es ninguno de los nueve peligros. Si compartiera cualquiera de
+ * los tres, un ícono de emergencia sobre un distrito se leería como un décimo peligro o como
+ * un nivel más.
+ */
+export const ID_EMERGENCIAS = "emergencias-distrito";
+const COLOR_EMERGENCIAS = "#0B3B26"; // mountain-900, ausente de la escala de niveles
+
+/** Registra el símbolo de emergencias. `svg` es el glifo serializado, como en los peligros. */
+export async function registrarIconoEmergencias(
+  mapa: MapaMaplibre,
+  svg: string
+): Promise<void> {
+  if (!svg || mapa.hasImage(ID_EMERGENCIAS)) return;
+  try {
+    const datos = await pintar(svg, COLOR_EMERGENCIAS, "cuadrado");
+    if (!mapa.getCanvas() || mapa.hasImage(ID_EMERGENCIAS)) return;
+    mapa.addImage(ID_EMERGENCIAS, datos, { pixelRatio: 2 });
+  } catch {
+    // Igual que con los peligros: `styleimagemissing` deja un punto liso en su lugar.
+  }
+}
+
 const LADO = 44; // px del bitmap; se dibuja a 2x y se declara `pixelRatio: 2`.
 const PROPORCION_GLIFO = 0.52;
 
@@ -96,8 +125,17 @@ export async function registrarIconos(
   );
 }
 
-/** Disco del color del nivel, anillo blanco y el glifo del peligro encima, en blanco. */
-async function pintar(svg: string, color: string): Promise<ImageData> {
+/**
+ * Fondo del color indicado, anillo blanco y el glifo encima, en blanco.
+ *
+ * La `forma` es lo que separa los dos ejes de un vistazo: los peligros van en **disco** y las
+ * emergencias en **cuadrado redondeado**.
+ */
+async function pintar(
+  svg: string,
+  color: string,
+  forma: "disco" | "cuadrado" = "disco"
+): Promise<ImageData> {
   const lado = LADO * 2;
   const lienzo = document.createElement("canvas");
   lienzo.width = lado;
@@ -108,7 +146,14 @@ async function pintar(svg: string, color: string): Promise<ImageData> {
   const centro = lado / 2;
   const radio = centro - 3;
   ctx.beginPath();
-  ctx.arc(centro, centro, radio, 0, Math.PI * 2);
+  if (forma === "disco") {
+    ctx.arc(centro, centro, radio, 0, Math.PI * 2);
+  } else {
+    // Lado algo menor que el diámetro para que los dos símbolos pesen visualmente parecido: a
+    // igual medida, un cuadrado ocupa un tercio más de área que su círculo inscrito.
+    const l = radio * 1.72;
+    ctx.roundRect(centro - l / 2, centro - l / 2, l, l, radio * 0.42);
+  }
   ctx.fillStyle = color;
   ctx.fill();
   ctx.lineWidth = 3;

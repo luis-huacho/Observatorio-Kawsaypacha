@@ -14,6 +14,47 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > aquí como una entrada nueva. El ciclo —severidades, la regla de cierre, qué se hace al cerrar—
 > está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 11/08/2026 — las emergencias vuelven a /peligros, pero como capa aparte
+
+ADR-A17 sacó la frecuencia de emergencias de la página y dejó por escrito que su reubicación la
+decidiría el cliente. Esta es esa decisión, y **ADR-A18** la registra.
+
+Vuelve, pero no donde estaba. Antes era una sección más colgando del mapa, y ahí el problema no
+era el sitio sino la falta de separación: los filtros de exposición no podían afectarla —son 21
+tipos de evento por distrito frente a 9 peligros por centro poblado, y `INCENDIO FORESTAL` es
+«inducido por acción humana» en un eje y «meteorológico» en el otro— así que ajustar «Tipo de
+peligro» dejaba las barras quietas y la pantalla parecía mal calculada.
+
+Ahora es **una capa que se enciende**, con su bloque propio de dos casillas: *Ver las
+emergencias* y *Agrupar por tipo de evento*. El visor marca los distritos con registro y bajo él
+aparece un gráfico de barras de la provincia. **Depende solo de la provincia** —ni del distrito
+ni de los checklists—, y esa independencia es lo que hace evidente, sin explicarlo, que son dos
+ejes que no se mezclan.
+
+Lo que hubo que construir, porque no existía:
+
+- **Un agregado provincial.** El eje de ocurrencia solo estaba disponible distrito a distrito.
+- **Un punto por distrito** donde colgar el ícono: el proyecto no tiene geometría distrital, así
+  que se deriva de la **mediana** de sus centros poblados. Mediana y no promedio, que en los
+  distritos de selva se va detrás de los caseríos dispersos por los ríos. Es una aproximación y
+  consta como tal; el popup habla del distrito, no del punto.
+
+**Dos cosas que los datos obligaron a poner en pantalla:**
+
+- **La cobertura.** Espinar declara 77 emergencias con **1 de sus 8 distritos** registrados y
+  Cusco 608 con los 8: sin decirlo, Espinar parece la provincia más tranquila de la región
+  cuando lo que le faltan son los datos. El subtítulo declara «N de M distritos con registro» y
+  avisa cuando la cifra subestima.
+- **Que las dos agrupaciones no suman igual.** El distrito de Cusco declara sus 134 emergencias
+  por familia pero no por evento (ADR-D1), así que la provincia suma 608 agrupando por tipo de
+  evento y 474 por evento. No es un descuadre: es lo que la fuente sabe. El gráfico lo dice en
+  vez de dejar que el total cambie al pulsar una casilla.
+
+El símbolo del visor es único y distinto del de exposición en los tres canales a la vez
+—cuadrado en vez de círculo, color fijo fuera de la escala de niveles, e ícono que no es ninguno
+de los nueve peligros—: compartir cualquiera lo habría hecho leerse como un décimo peligro.
+`FrecuenciaEmergencias.tsx`, la versión por distrito que quedó huérfana en agosto, se elimina.
+
 ### Actualización 10/08/2026 — el visor mostraba un peligro de cada siete
 
 Ajustes al rediseño anterior, pedidos al recorrerlo ya en funcionamiento. El de fondo: **el

@@ -32,6 +32,18 @@ urlpatterns = [
         views.FrecuenciaExportView.as_view(),
         name="frecuencia-export",
     ),
+    # Las dos concretas van **antes** que `<str:ubigeo>`, que si no se las come: «geojson» y
+    # «provincia» encajarían como ubigeo y acabarían en un 404 del detalle.
+    path(
+        "peligros/frecuencia/geojson/",
+        views.FrecuenciaGeoJSONView.as_view(),
+        name="frecuencia-geojson",
+    ),
+    path(
+        "peligros/frecuencia/provincia/<str:ubigeo>/",
+        views.FrecuenciaProvinciaView.as_view(),
+        name="frecuencia-provincia",
+    ),
     path("peligros/frecuencia/", views.FrecuenciaListaView.as_view(), name="frecuencia-lista"),
     path(
         "peligros/frecuencia/<str:ubigeo>/",

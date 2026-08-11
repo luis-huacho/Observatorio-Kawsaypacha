@@ -4,6 +4,9 @@ Viven aquí y no en las vistas porque los consumen tres sitios: el API, la ayuda
 el comparador de distritos. Que los tres lean del mismo lugar es lo que garantiza que el PDF
 diga lo mismo que la pantalla desde la que se pidió.
 """
+import re
+from statistics import median
+
 from django.db.models import Count, Q, Sum
 
 from apps.peligros.models import (
@@ -207,4 +210,167 @@ def frecuencia(distrito) -> dict | None:
         "desglose_disponible": bool(desglose),
         "categorias": categorias,
         "total": sum(c["total"] for c in categorias),
+    }
+
+
+#: Nota de vocabulario, porque en pantalla van al revés que aquí.
+#:
+#: La UI de /peligros llama **evento** a lo que el modelo llama `TipoEvento` (Huayco,
+#: Deslizamiento… 21) y **tipo de evento** a lo que el modelo llama `CategoriaEvento`
+#: (Geodinámica externa, Meteorológicos… 4). Los modelos no se renombran —arrastraría
+#: migración, importador, admin y export por un asunto de etiqueta—, así que las funciones de
+#: abajo publican `eventos` y `familias` con los nombres del modelo, y es el frontend quien
+#: pone los rótulos. Quien lea `categoria_slug` bajo un título que dice «tipo de evento» está
+#: viendo lo correcto.
+
+
+def frecuencia_provincia(provincia) -> dict:
+    """Emergencias registradas en **toda una provincia**, para el gráfico de /peligros.
+
+    Existe porque el eje de ocurrencia solo estaba disponible distrito a distrito y la pantalla
+    pregunta por provincia. Devuelve las **dos agrupaciones** que el gráfico puede pintar, y no
+    suman lo mismo a propósito:
+
+    - `eventos` (21 tipos) solo puede salir del desglose.
+    - `familias` (4 categorías) suma además los **subtotales declarados** de los distritos que
+      la fuente no desagrega (ADR-D1). Hoy es el distrito de Cusco, con 134 emergencias.
+
+    Así que en la provincia de Cusco `familias` suma 608 y `eventos` 474. No es un descuadre: es
+    que la fuente sabe la familia de esas 134 y no su evento. `total_sin_desglose` existe para
+    que la pantalla pueda decirlo en vez de dejar que el total cambie al pulsar una casilla.
+
+    Nunca devuelve `None`: una provincia sin ningún registro es un estado con forma —total 0,
+    listas vacías— y no un 404, porque la provincia sí existe.
+    """
+    from apps.territorio.models import Distrito
+
+    distritos = list(Distrito.objects.filter(provincia=provincia))
+    ubigeos = [d.ubigeo for d in distritos]
+
+    desglose = (
+        FrecuenciaEmergencia.objects.filter(distrito__ubigeo__in=ubigeos)
+        .values(
+            "tipo_evento__nombre",
+            "tipo_evento__slug",
+            "tipo_evento__categoria__nombre",
+            "tipo_evento__categoria__slug",
+            "tipo_evento__categoria__orden",
+        )
+        .annotate(conteo=Sum("conteo"))
+        .order_by("-conteo")
+    )
+    eventos = [
+        {
+            "evento": f["tipo_evento__nombre"],
+            "slug": f["tipo_evento__slug"],
+            "categoria": f["tipo_evento__categoria__nombre"],
+            "categoria_slug": f["tipo_evento__categoria__slug"],
+            "conteo": f["conteo"],
+        }
+        for f in desglose
+        if f["conteo"]
+    ]
+
+    # Las familias parten del desglose y se les añaden los declarados.
+    familias: dict[str, dict] = {}
+    orden_familia: dict[str, int] = {}
+    for f in desglose:
+        slug = f["tipo_evento__categoria__slug"]
+        orden_familia[slug] = f["tipo_evento__categoria__orden"]
+        entrada = familias.setdefault(
+            slug, {"categoria": f["tipo_evento__categoria__nombre"], "slug": slug, "conteo": 0}
+        )
+        entrada["conteo"] += f["conteo"]
+
+    declarados = (
+        TotalDeclaradoEmergencias.objects.filter(distrito__ubigeo__in=ubigeos)
+        .values("categoria__nombre", "categoria__slug", "categoria__orden")
+        .annotate(conteo=Sum("total"))
+    )
+    for f in declarados:
+        slug = f["categoria__slug"]
+        orden_familia[slug] = f["categoria__orden"]
+        entrada = familias.setdefault(
+            slug, {"categoria": f["categoria__nombre"], "slug": slug, "conteo": 0}
+        )
+        entrada["conteo"] += f["conteo"]
+
+    # --- Cobertura y periodo -------------------------------------------------
+    # Sin esto la cifra engaña por omisión: Espinar declara 77 emergencias con **1 de sus 8**
+    # distritos registrados y Cusco 608 con los 8, así que parece la más tranquila de la región
+    # cuando lo que le faltan son los datos.
+    con_registro: list[dict] = []
+    sin_desglose: list[dict] = []
+    for distrito in distritos:
+        datos = frecuencia(distrito)
+        if not datos or not datos["total"]:
+            continue
+        con_registro.append(datos)
+        if not datos["desglose_disponible"]:
+            sin_desglose.append({"distrito": datos["distrito"], "total": datos["total"]})
+
+    return {
+        "provincia": provincia.nombre,
+        "ubigeo": provincia.ubigeo,
+        "total": sum(f["conteo"] for f in familias.values()),
+        "distritos_con_registro": len(con_registro),
+        "distritos_en_provincia": len(distritos),
+        # El rango que **abarca** el conjunto, nunca «el periodo»: cada distrito trae el suyo
+        # (21 variantes en la región, de 5 a 23 años) y no existe una ventana común.
+        "periodo": _periodo_abarcado(con_registro),
+        "periodos_distintos": len({d["rango_fecha"] for d in con_registro if d["rango_fecha"]}),
+        "eventos": eventos,
+        "familias": sorted(familias.values(), key=lambda f: -f["conteo"]),
+        "sin_desglose": sin_desglose,
+        "total_sin_desglose": sum(d["total"] for d in sin_desglose),
+        "fuente": con_registro[0]["fuente"] if con_registro else None,
+        "fuente_url": con_registro[0]["fuente_url"] if con_registro else None,
+    }
+
+
+def _periodo_abarcado(registros: list[dict]) -> str | None:
+    """`"2003-2025"` a partir de los rangos sueltos de cada distrito.
+
+    Se leen los años con una expresión regular en vez de partir por el guion: la fuente escribe
+    el rango de 21 maneras distintas (`2007 - 2023`, `2003-2019`…) y el importador solo
+    normaliza los espacios.
+    """
+    anios = [
+        int(a)
+        for r in registros
+        if r["rango_fecha"]
+        for a in re.findall(r"\d{4}", r["rango_fecha"])
+    ]
+    return f"{min(anios)}-{max(anios)}" if anios else None
+
+
+def centroides_distritales() -> dict[str, tuple[float, float]]:
+    """`{ubigeo: (lon, lat)}` derivado de los centros poblados de cada distrito.
+
+    El visor necesita un punto donde poner el ícono de emergencias, que es un dato **por
+    distrito**, y en el proyecto no hay geometría distrital: `Distrito` no tiene coordenadas y
+    no existe ninguna capa de límites administrativos —solo el polígono departamental que usa
+    el recorte de tiles—. Los 112 distritos sí tienen centros poblados georreferenciados, así
+    que este es el único punto derivable de los datos que hay.
+
+    **Mediana y no promedio**: en los distritos de selva de La Convención los centros poblados
+    se reparten a lo largo de los ríos, y un promedio se va detrás de la cola. La mediana cae
+    donde está la mayoría.
+
+    Es una aproximación y conviene que conste: el punto no es la capital del distrito ni su
+    centro geométrico, sino dónde se concentran sus centros poblados.
+    """
+    from apps.territorio.models import CentroPoblado
+
+    por_distrito: dict[str, list[tuple[float, float]]] = {}
+    for lon, lat, ubigeo in (
+        CentroPoblado.objects.exclude(lat=None)
+        .exclude(lon=None)
+        .values_list("lon", "lat", "distrito_id")
+    ):
+        por_distrito.setdefault(ubigeo, []).append((lon, lat))
+
+    return {
+        ubigeo: (median(p[0] for p in puntos), median(p[1] for p in puntos))
+        for ubigeo, puntos in por_distrito.items()
     }

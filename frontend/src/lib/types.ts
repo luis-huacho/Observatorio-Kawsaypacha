@@ -75,6 +75,55 @@ export type FrecuenciaDistrito = {
   categorias: CategoriaEmergencia[];
 };
 
+/**
+ * `/api/peligros/frecuencia/provincia/{ubigeo4}/` — lo que pinta el gráfico de /peligros.
+ *
+ * **Ojo con el vocabulario**, que en pantalla va al revés que en el modelo: la UI llama
+ * *evento* a lo que aquí es `eventos` (Huayco, Deslizamiento… 21) y *tipo de evento* a lo que
+ * aquí es `familias` (Geodinámica externa, Meteorológicos… 4). Los rótulos los pone el
+ * frontend; el API conserva los nombres de sus modelos.
+ */
+export type FrecuenciaProvincia = {
+  provincia: string;
+  ubigeo: string;
+  total: number;
+  /** Sin esto la cifra engaña: 77 con 1 de 8 distritos no se compara con 608 con 8 de 8. */
+  distritos_con_registro: number;
+  distritos_en_provincia: number;
+  /** Rango que **abarca** el conjunto, no un periodo común: cada distrito trae el suyo. */
+  periodo: string | null;
+  periodos_distintos: number;
+  eventos: Array<{
+    evento: string;
+    slug: string;
+    categoria: string;
+    /** De aquí sale el color de la barra. */
+    categoria_slug: string;
+    conteo: number;
+  }>;
+  familias: Array<{ categoria: string; slug: string; conteo: number }>;
+  /**
+   * Distritos que declaran subtotales sin desagregar por evento (ADR-D1). Su total entra en
+   * `familias` y **no** en `eventos`, así que las dos agrupaciones no suman igual a propósito
+   * y la pantalla tiene que decirlo.
+   */
+  sin_desglose: Array<{ distrito: string; total: number }>;
+  total_sin_desglose: number;
+  fuente: string | null;
+  fuente_url: string | null;
+};
+
+/** Un distrito con emergencias en la capa del visor (`/api/peligros/frecuencia/geojson/`). */
+export type PuntoEmergencias = {
+  ubigeo: string;
+  distrito: string;
+  provincia: string;
+  total: number;
+  rango_fecha: string | null;
+  /** `null` cuando la fuente declara subtotales sin desagregar. */
+  evento_top: string | null;
+};
+
 /** Una foto de la galería de una medida. Espejo del modelo hijo `MedidaImagen` del spec 01. */
 export type MedidaImagen = {
   imagen: string;

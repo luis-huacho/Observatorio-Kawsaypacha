@@ -674,6 +674,118 @@ def test_el_export_de_frecuencia_respeta_el_filtro_tambien_para_los_declarados(
     assert ubigeos == {ollanta.ubigeo}
 
 
+def test_el_agregado_provincial_cuadra_con_sus_distritos(api, datos_muestra):
+    """El gráfico de /peligros pregunta por provincia; el eje de ocurrencia era por distrito."""
+    lista = api.get("/api/peligros/frecuencia/?provincia=0801").json()
+    provincial = api.get("/api/peligros/frecuencia/provincia/0801/").json()
+
+    assert provincial["total"] == sum(d["total"] for d in lista)
+    # Solo cuentan los que tienen algo: los que declaran cero (ADR-D1) no son «con registro».
+    assert provincial["distritos_con_registro"] == sum(1 for d in lista if d["total"] > 0)
+    assert provincial["distritos_en_provincia"] >= provincial["distritos_con_registro"]
+
+
+def test_las_dos_agrupaciones_no_suman_lo_mismo_y_el_payload_lo_explica(api, datos_muestra):
+    """`familias` incluye los subtotales declarados y `eventos` no puede incluirlos.
+
+    El distrito de Cusco declara sus emergencias por categoría pero **no por evento** (ADR-D1),
+    así que agrupar por tipo de evento da el total real y agrupar por evento da menos. No es un
+    descuadre: es lo que la fuente sabe. `total_sin_desglose` existe para que la pantalla lo
+    diga en vez de dejar que el total cambie al pulsar una casilla.
+    """
+    datos = api.get("/api/peligros/frecuencia/provincia/0801/").json()
+
+    assert sum(f["conteo"] for f in datos["familias"]) == datos["total"]
+    assert sum(e["conteo"] for e in datos["eventos"]) == datos["total"] - datos["total_sin_desglose"]
+    assert datos["total_sin_desglose"] > 0, "la muestra no tiene ningún distrito sin desglose"
+    assert [d["distrito"] for d in datos["sin_desglose"]]
+
+
+def test_los_eventos_del_agregado_van_ordenados_y_sin_ceros(api, datos_muestra):
+    """Las barras se pintan en el orden que llegan y solo de lo que ocurrió."""
+    datos = api.get("/api/peligros/frecuencia/provincia/0801/").json()
+
+    conteos = [e["conteo"] for e in datos["eventos"]]
+    assert conteos == sorted(conteos, reverse=True)
+    assert all(c > 0 for c in conteos)
+    # Cada evento declara su familia, que es de donde sale el color de su barra.
+    assert all(e["categoria_slug"] for e in datos["eventos"])
+
+
+def test_el_periodo_provincial_abarca_el_de_sus_distritos(api, datos_muestra):
+    """Es un rango **abarcado**, no un periodo común: cada distrito trae el suyo.
+
+    Anunciar «periodo 2003-2025» como si fuera una ventana única sería falso —en la región hay
+    21 variantes, de 5 a 23 años—, y por eso viaja también cuántas son.
+    """
+    import re
+
+    lista = api.get("/api/peligros/frecuencia/?provincia=0801").json()
+    datos = api.get("/api/peligros/frecuencia/provincia/0801/").json()
+
+    anios = [
+        int(a) for d in lista if d["total"] and d["rango_fecha"]
+        for a in re.findall(r"\d{4}", d["rango_fecha"])
+    ]
+    assert datos["periodo"] == f"{min(anios)}-{max(anios)}"
+    assert datos["periodos_distintos"] >= 1
+
+
+def test_una_provincia_sin_registros_responde_con_ceros_no_404(api, datos_muestra):
+    """La provincia existe aunque no haya emergencias: es un estado vacío, no un error."""
+    from apps.peligros.models import FrecuenciaEmergencia, TotalDeclaradoEmergencias
+    from apps.territorio.models import Provincia
+
+    vacia = next(
+        p for p in Provincia.objects.all()
+        if not FrecuenciaEmergencia.objects.filter(distrito__provincia=p).exists()
+        and not TotalDeclaradoEmergencias.objects.filter(distrito__provincia=p).exists()
+    )
+    respuesta = api.get(f"/api/peligros/frecuencia/provincia/{vacia.ubigeo}/")
+
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+    assert datos["total"] == 0
+    assert datos["eventos"] == [] and datos["familias"] == []
+    assert datos["distritos_con_registro"] == 0
+    assert datos["periodo"] is None
+
+
+def test_la_capa_de_emergencias_solo_trae_distritos_con_registro(api, datos_muestra):
+    """Un ícono de emergencia sobre un distrito que declara cero afirmaría lo que la fuente calla.
+
+    Y el punto tiene que caer **entre los centros poblados de ese distrito**: no hay geometría
+    distrital en el proyecto, así que se deriva de ellos, y esta prueba es lo que impide que un
+    cambio en ese cálculo mande los íconos a otra parte de la región sin que nada falle.
+    """
+    from apps.territorio.models import CentroPoblado
+
+    datos = api.get("/api/peligros/frecuencia/geojson/").json()
+    assert datos["type"] == "FeatureCollection"
+    assert datos["features"]
+
+    for feature in datos["features"]:
+        props = feature["properties"]
+        assert props["total"] > 0
+        lon, lat = feature["geometry"]["coordinates"]
+        ccpp = CentroPoblado.objects.filter(
+            distrito__ubigeo=props["ubigeo"]
+        ).exclude(lat=None).values_list("lon", "lat")
+        lones = [c[0] for c in ccpp]
+        lates = [c[1] for c in ccpp]
+        assert min(lones) <= lon <= max(lones)
+        assert min(lates) <= lat <= max(lates)
+
+
+def test_la_capa_de_emergencias_respeta_el_ambito(api, datos_muestra):
+    """Marcar la casilla no puede sacar al usuario del ámbito que ya eligió."""
+    todos = api.get("/api/peligros/frecuencia/geojson/").json()["features"]
+    cusco = api.get("/api/peligros/frecuencia/geojson/?provincia=0801").json()["features"]
+
+    assert 0 < len(cusco) < len(todos)
+    assert all(f["properties"]["provincia"] == "CUSCO" for f in cusco)
+
+
 def test_cada_tipo_de_peligro_trae_su_icono(api, datos_muestra):
     """El visor no conoce los peligros: forma del símbolo y etiqueta salen del catálogo.
 

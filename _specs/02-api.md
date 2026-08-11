@@ -19,6 +19,8 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 | `GET /api/peligros/frecuencia/` | `distrito`, `provincia`, `categoria` | Lista, sin paginar (90 de 112): una entrada por distrito **con datos de cualquiera de las dos tablas** |
 | `GET /api/peligros/frecuencia/{ubigeo}/` | — | El panel de un distrito. **404** si no tiene fila (ver abajo) |
 | `GET /api/peligros/frecuencia/export.xlsx` | ídem | Incluye los totales declarados marcados, o el Excel dejaría a Cusco en cero |
+| `GET /api/peligros/frecuencia/provincia/<ubigeo4>/` | — | **Agregado provincial** (ADR-A18): lo que pinta el gráfico de /peligros. Nunca 404 si la provincia existe: sin registros devuelve ceros, que es un estado con forma. Ver el ejemplo |
+| `GET /api/peligros/frecuencia/geojson/` | `provincia`, `distrito` | La capa del visor: un `Point` por distrito **con emergencias** (65 de 112). Los 25 que declaran cero (ADR-D1) quedan fuera — un ícono sobre ellos afirmaría lo que la fuente calla. El punto es la **mediana de los centros poblados** del distrito: no hay geometría distrital en el proyecto |
 
 > **Los filtros de exposición son listas, no valores sueltos (ADR-A17).** `peligros=sismo,heladas`
 > y `niveles=1,4`, ambos CSV. Es una **selección**, no un umbral: `niveles=1,4` deja fuera los
@@ -138,6 +140,30 @@ Decisión de tamaño: se sirve el `FeatureCollection` completo en vez de agrupar
                    { "evento": "Inundación", "slug": "inundacion", "conteo": 4 } ] }
   ],
   "total": 36
+}
+
+// GET /api/peligros/frecuencia/provincia/0801/   (ADR-A18)
+// **Las dos agrupaciones no suman lo mismo, y es correcto.** `familias` incluye los subtotales
+// que la fuente declara sin desagregar (ADR-D1) y `eventos` no puede incluirlos, así que en
+// Cusco `familias` suma 608 y `eventos` 474. `total_sin_desglose` existe para que la pantalla
+// lo explique en vez de dejar que el total cambie al pulsar una casilla.
+//
+// Ojo al vocabulario: la UI llama «evento» a `eventos` (Huayco, Deslizamiento…) y «tipo de
+// evento» a `familias` (Geodinámica externa…), al revés que los modelos.
+{
+  "provincia": "CUSCO", "ubigeo": "0801", "total": 608,
+  // Sin esto la cifra engaña: Espinar declara 77 con 1 de sus 8 distritos registrados y parece
+  // más tranquila que Cusco, cuando lo que le faltan son los datos.
+  "distritos_con_registro": 8, "distritos_en_provincia": 8,
+  // Rango que ABARCA el conjunto, nunca «el periodo»: cada distrito trae el suyo.
+  "periodo": "2003-2025", "periodos_distintos": 6,
+  "eventos": [ { "evento": "Lluvias intensas", "slug": "lluvias_intensas_evento",
+                 "categoria": "Meteorológicos / oceanográficos",
+                 "categoria_slug": "meteorologico", "conteo": 87 } ],
+  "familias": [ { "categoria": "Meteorológicos / oceanográficos",
+                  "slug": "meteorologico", "conteo": 335 } ],
+  "sin_desglose": [ { "distrito": "CUSCO", "total": 134 } ], "total_sin_desglose": 134,
+  "fuente": "SIGRID_CENEPRED", "fuente_url": "https://n9.cl/e9qwr"
 }
 
 // GET /api/peligros/frecuencia/?distrito=080101   (Cusco: la fuente no desagrega — ADR-D1)

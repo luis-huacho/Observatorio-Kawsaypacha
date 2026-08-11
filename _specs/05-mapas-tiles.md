@@ -140,6 +140,32 @@ que sin filtros mientras la tabla ya había encogido. Sumando `clasificaciones` 
 Un grupo sin ninguna clasificación se dibuja **sin número**: el gris ya dice «sin dato», y un «0»
 se leería como «evaluado, y sin peligro».
 
+### La capa de emergencias (ADR-A18)
+
+Fuente `emergencias`, **sin clustering**: son como mucho 65 puntos, uno por distrito con
+registro, y agruparlos escondería justo lo que la capa viene a mostrar. Se enciende y apaga con
+`visibility`, no recreando la fuente.
+
+**El símbolo es único y deliberadamente distinto del de exposición**, en los tres canales a la
+vez, porque comparten mapa y son ejes que no se mezclan:
+
+| | Exposición | Emergencias |
+|---|---|---|
+| fondo | círculo | **cuadrado redondeado** |
+| color | escala de nivel (verde→rojo) | **`mountain-900` fijo**, fuera de esa escala |
+| ícono | uno por tipo de peligro (9) | **`Siren`, siempre el mismo** |
+| unidad | centro poblado | distrito |
+
+Si compartiera cualquiera de los tres, un ícono de emergencia sobre un distrito se leería como
+un décimo peligro o como un nivel más. La leyenda lo separa en su propio bloque por lo mismo.
+
+**El punto no es una ubicación real del suceso**: es la mediana de lat/lon de los centros
+poblados del distrito, porque no hay geometría distrital en el proyecto (`Distrito` no tiene
+coordenadas y no existe ninguna capa de límites administrativos, solo el polígono departamental
+del recorte). Mediana y no promedio: en los distritos de selva los centros poblados se reparten
+a lo largo de los ríos y el promedio se va detrás de la cola. El popup habla del distrito, no
+del punto.
+
 #### Dos gotchas que no dan ningún error
 
 1. **`icon-allow-overlap` es obligatorio.** Sin él, el motor de etiquetado de MapLibre descarta por

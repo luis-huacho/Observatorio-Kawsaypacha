@@ -21,7 +21,17 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { Layers } from "lucide-react";
 import type { CapaMapa, Nivel, TipoPeligroApi } from "@/lib/types";
 import { NIVEL_COLOR, NIVEL_LABEL, formatNumber } from "@/lib/semaforo";
-import { iconoDe, idImagen, registrarIconos } from "@/lib/iconosPeligro";
+import {
+  ID_EMERGENCIAS,
+  iconoDe,
+  idImagen,
+  registrarIconoEmergencias,
+  registrarIconos,
+} from "@/lib/iconosPeligro";
+import { Siren } from "lucide-react";
+
+/** Clave interna con la que viaja el glifo de emergencias por el mismo canal que los peligros. */
+const SLUG_EMERGENCIAS = "__emergencias__";
 import { buscarLugares } from "@/lib/search";
 import {
   BuscarLugarControl,
@@ -349,6 +359,14 @@ type Props = {
    * como imágenes del mapa y la leyenda de formas: el visor no conoce los peligros de antemano.
    */
   tipos: TipoPeligroApi[];
+  /**
+   * Distritos con emergencias registradas (`/api/peligros/frecuencia/geojson/`). Es el **otro
+   * eje** de la fuente y por eso llega aparte: se enciende con su propia casilla y no lo tocan
+   * los filtros de peligro ni de nivel.
+   */
+  emergencias: GeoJSON.FeatureCollection<GeoJSON.Point>;
+  /** Si la capa de emergencias está encendida. */
+  verEmergencias: boolean;
   /** Si hay algún filtro geográfico activo, la cámara se ciñe a los puntos recibidos. */
   ambitoAcotado: boolean;
 };
@@ -362,7 +380,7 @@ export type MapaPeligrosHandle = {
 };
 
 const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros(
-  { capas, puntos, tipos, ambitoAcotado },
+  { capas, puntos, tipos, emergencias, verEmergencias, ambitoAcotado },
   ref
 ) {
   const contenedor = useRef<HTMLDivElement>(null);
@@ -409,9 +427,9 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
   useEffect(() => {
     const caja = cajaIconos.current;
     if (!caja) return;
-    for (const t of tipos) {
-      const svg = caja.querySelector<SVGSVGElement>(`[data-slug="${t.slug}"] svg`);
-      if (svg) svgIconos.current[t.slug] = new XMLSerializer().serializeToString(svg);
+    for (const slug of [...tipos.map((t) => t.slug), SLUG_EMERGENCIAS]) {
+      const svg = caja.querySelector<SVGSVGElement>(`[data-slug="${slug}"] svg`);
+      if (svg) svgIconos.current[slug] = new XMLSerializer().serializeToString(svg);
     }
   }, [tipos]);
 
@@ -475,6 +493,9 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
               { type: "vector" as const, url: `pmtiles://${c.url}` },
             ])
           ),
+          // Emergencias: **sin clustering**. Son 65 distritos como mucho, uno por punto, y
+          // agruparlos escondería justo lo que la capa viene a mostrar.
+          emergencias: { type: "geojson", data: VACIO },
           // Arranca vacía: los datos llegan por prop y se inyectan con setData.
           ccpp: {
             type: "geojson",
@@ -646,7 +667,30 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
       });
     });
 
-    for (const capa of [...CAPAS_PELIGRO, "ccpp-clusters"]) {
+    // Popup de un distrito con emergencias. Habla del distrito y no del punto: la posición es
+    // el centroide de sus centros poblados, no una ubicación real del suceso.
+    map.on("click", "emergencias-puntos", (e) => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const p = f.properties as Record<string, unknown>;
+      const nodo = document.createElement("div");
+      nodo.className = "text-sm";
+      nodo.innerHTML =
+        `<div class="font-bold text-base">${p.distrito}</div>` +
+        `<div class="text-ink-600 text-xs">Provincia de ${p.provincia}</div>` +
+        `<div class="mt-2"><span class="font-mono text-xl font-semibold">${formatNumber(Number(p.total))}</span>` +
+        ` <span class="text-xs">emergencias registradas</span></div>` +
+        (p.rango_fecha ? `<div class="text-xs text-ink-600">Periodo ${p.rango_fecha}</div>` : "") +
+        (p.evento_top
+          ? `<div class="mt-1 text-xs">Más frecuente: <strong>${p.evento_top}</strong></div>`
+          : `<div class="mt-1 text-xs italic text-ink-600">La fuente no desagrega por tipo de evento.</div>`);
+      new maplibregl.Popup({ offset: 10, maxWidth: "260px" })
+        .setLngLat(e.lngLat)
+        .setDOMContent(nodo)
+        .addTo(map);
+    });
+
+    for (const capa of [...CAPAS_PELIGRO, "ccpp-clusters", "emergencias-puntos"]) {
       map.on("mouseenter", capa, () => (map.getCanvas().style.cursor = "pointer"));
       map.on("mouseleave", capa, () => (map.getCanvas().style.cursor = ""));
     }
@@ -672,6 +716,31 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
     });
   }, [listo, puntos]);
 
+  // --- Capa de emergencias: datos y encendido -------------------------------------------------
+  // El encendido va por `visibility` y no recreando la fuente: los datos ya están cargados y
+  // apagar la capa es solo dejar de dibujarla. Los dos son efectos separados porque la capa se
+  // añade más tarde, cuando termina de rasterizarse su ícono.
+  useEffect(() => {
+    const map = mapa.current;
+    if (!map || !listo) return;
+    cuandoListo(map, () => {
+      (map.getSource("emergencias") as maplibregl.GeoJSONSource | undefined)?.setData(emergencias);
+    });
+  }, [listo, emergencias]);
+
+  useEffect(() => {
+    const map = mapa.current;
+    if (!map || !listo) return;
+    cuandoListo(map, () => {
+      if (!map.getLayer("emergencias-puntos")) return;
+      map.setLayoutProperty(
+        "emergencias-puntos",
+        "visibility",
+        verEmergencias ? "visible" : "none"
+      );
+    });
+  }, [listo, verEmergencias, emergencias]);
+
   // --- Símbolos: forma = tipo de peligro, color = nivel --------------------------------------
   //
   // La capa `symbol` se añade **después** de registrar las imágenes, y no en el estilo inicial.
@@ -687,9 +756,33 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
       tipos.map((t) => [t.slug, svgIconos.current[t.slug] ?? ""])
     );
 
-    registrarIconos(map, tipos, svgPorSlug).then(() => {
+    Promise.all([
+      registrarIconos(map, tipos, svgPorSlug),
+      registrarIconoEmergencias(map, svgIconos.current[SLUG_EMERGENCIAS] ?? ""),
+    ]).then(() => {
       if (cancelado || !mapa.current) return;
       cuandoListo(map, () => {
+        // La capa de emergencias, encima de todo lo de exposición: es el otro eje y no debe
+        // quedar tapada por los grupos.
+        if (!map.getLayer("emergencias-puntos")) {
+          map.addLayer({
+            id: "emergencias-puntos",
+            type: "symbol",
+            source: "emergencias",
+            layout: {
+              "icon-image": ID_EMERGENCIAS,
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
+              "icon-size": [
+                "interpolate", ["linear"], ["zoom"],
+                6, 0.5,
+                12, 0.8,
+                16, 1,
+              ],
+              visibility: "none",
+            },
+          });
+        }
         if (map.getLayer(CAPAS_PELIGRO[0])) return;
         // Ancla de la corona: cuando los íconos rodean la ubicación en vez de ocuparla, el
         // centro queda vacío y, con centros poblados vecinos, deja de verse de qué corona es
@@ -911,8 +1004,29 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
       {/* bg-white/95: la escala de opacidad de Tailwind va de 5 en 5, así que un /92 no genera
           ninguna clase y la leyenda se queda sin fondo. */}
       <div className="absolute bottom-8 right-2 z-10 bg-white/95 rounded-lg shadow px-3 py-2 max-h-[70%] overflow-y-auto">
-        {/* Cada canal del símbolo codifica una variable distinta y todas necesitan clave. */}
-        <div className="text-[11px] font-semibold text-ink-900 mb-1">Color: nivel</div>
+        {/* La capa de emergencias va PRIMERO y separada: es otro eje —lo ocurrido, por
+            distrito— y si compartiera bloque con la exposición se leería como un peligro más. */}
+        {verEmergencias && (
+          <div className="mb-2 pb-2 border-b-2 border-ink-300/50">
+            <div className="text-[11px] font-semibold text-ink-900 mb-1">Emergencias</div>
+            <div className="flex items-center gap-1.5 text-[11px] text-ink-600">
+              <span
+                className="w-4 h-4 rounded-[3px] grid place-items-center shrink-0"
+                style={{ backgroundColor: "#0B3B26" }}
+              >
+                <Siren className="w-2.5 h-2.5 text-white" />
+              </span>
+              Registradas, por distrito
+            </div>
+            <div className="text-[10px] text-ink-300 mt-0.5 max-w-[9rem] leading-tight">
+              Ocurrencia histórica. Es otro eje: no lo afectan los filtros de peligro ni nivel.
+            </div>
+          </div>
+        )}
+
+        <div className="text-[11px] font-semibold text-ink-900 mb-1">
+          Exposición — Color: nivel
+        </div>
         <div className="space-y-0.5">
           {([4, 3, 2, 1] as Nivel[]).map((n) => (
             <div key={n} className="flex items-center gap-1.5 text-[11px] text-ink-600">
@@ -983,6 +1097,9 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
             </span>
           );
         })}
+        <span data-slug={SLUG_EMERGENCIAS}>
+          <Siren strokeWidth={2.5} color="#ffffff" />
+        </span>
       </div>
     </div>
   );

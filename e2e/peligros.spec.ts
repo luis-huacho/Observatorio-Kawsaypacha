@@ -82,10 +82,11 @@ test.describe("Visor de exposición a peligros", () => {
     }
   });
 
-  test("/peligros ya no pide la frecuencia de emergencias", async ({ page }) => {
+  test("las emergencias no se piden hasta que se encienden", async ({ page }) => {
     // La frecuencia es el otro eje de la fuente —lo que ya ocurrió, por distrito y con otra
-    // taxonomía—, y mezclarla aquí hacía que los filtros de esta pantalla no la afectaran y la
-    // página pareciera mal calculada. Su endpoint sigue vivo; esta ruta no lo consume.
+    // taxonomía— y vive tras su propia casilla. Que no se pida sola es lo que mantiene los dos
+    // ejes separados: si volviera a cargarse con la página, volvería a leerse como una sección
+    // más de exposición que ignora sus filtros.
     const pedidas: string[] = [];
     page.on("request", (r) => {
       if (r.url().includes("/api/peligros/frecuencia/")) pedidas.push(r.url());
@@ -98,7 +99,96 @@ test.describe("Visor de exposición a peligros", () => {
     await page.getByLabel("Distrito").selectOption({ index: 1 });
     await esperarApi(page, "distrito=");
 
-    expect(pedidas, `la página pidió la frecuencia:\n${pedidas.join("\n")}`).toEqual([]);
+    expect(pedidas, `se pidió sin encenderla:\n${pedidas.join("\n")}`).toEqual([]);
+    await expect(page.getByRole("region", { name: /Emergencias registradas/ })).toHaveCount(0);
+
+    // La espera se arranca **antes** del clic: `waitForResponse` solo ve lo que pasa después de
+    // registrarse, y la petición puede resolverse mientras `check()` aún está en vuelo.
+    const respuesta = esperarApi(page, "/api/peligros/frecuencia/provincia/");
+    await page.getByRole("checkbox", { name: "Ver las emergencias" }).check();
+    await respuesta;
+    await expect(page.getByRole("region", { name: /Emergencias registradas/ })).toBeVisible();
+  });
+
+  test("el gráfico de emergencias es de la provincia, y solo la provincia lo mueve", async ({
+    page,
+  }) => {
+    // Es el requisito que evita el problema original: los filtros de exposición no pueden
+    // afectar a un eje con otra taxonomía, así que este panel no depende de ellos ni del
+    // distrito. Depender solo de la provincia lo hace evidente sin explicarlo.
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/territorio/distritos/");
+    await page.getByLabel("Provincia").selectOption({ index: 1 });
+    await esperarApi(page, "provincia=");
+    const respuesta = esperarApi(page, "/api/peligros/frecuencia/provincia/");
+    await page.getByRole("checkbox", { name: "Ver las emergencias" }).check();
+    await respuesta;
+
+    const bloque = page.getByRole("region", { name: /Emergencias registradas/ });
+    const titulo = await bloque.getByRole("heading").textContent();
+    expect(titulo).toMatch(/provincia de/);
+    const total = await bloque.locator(".font-mono").first().textContent();
+
+    // Ni el distrito ni los checklists de exposición lo mueven. Las esperas se arrancan antes
+    // de la acción por lo mismo que arriba.
+    const trasDistrito = esperarApi(page, "distrito=");
+    await page.getByLabel("Distrito").selectOption({ index: 1 });
+    await trasDistrito;
+
+    const trasPeligro = esperarApi(page, "peligros=sismo");
+    await soloPeligro(page, "Sismo");
+    await trasPeligro;
+
+    await expect(bloque.getByRole("heading")).toHaveText(titulo!);
+    await expect(bloque.locator(".font-mono").first()).toHaveText(total!);
+  });
+
+  test("cambiar la agrupación reagrupa sin volver a pedir nada", async ({ page }) => {
+    // Las dos agrupaciones vienen en el mismo payload. Y no suman igual a propósito: los
+    // distritos que declaran subtotales sin desagregar (ADR-D1) cuentan por tipo de evento y no
+    // por evento, así que el total sube al agrupar por tipo y la pantalla lo explica.
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/territorio/distritos/");
+    await page.getByLabel("Provincia").selectOption({ index: 1 });
+    await esperarApi(page, "provincia=");
+    const respuesta = esperarApi(page, "/api/peligros/frecuencia/provincia/");
+    await page.getByRole("checkbox", { name: "Ver las emergencias" }).check();
+    const datos = await (await respuesta).json();
+
+    const barras = page.locator(".recharts-bar-rectangle");
+    await expect(barras).toHaveCount(datos.eventos.length);
+
+    const pedidas: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/api/peligros/frecuencia/")) pedidas.push(r.url());
+    });
+    await page.getByRole("checkbox", { name: "Agrupar por tipo de evento" }).check();
+
+    await expect(barras).toHaveCount(datos.familias.length);
+    expect(pedidas, `reagrupar disparó peticiones:\n${pedidas.join("\n")}`).toEqual([]);
+  });
+
+  test("encender y apagar las emergencias conserva la provincia y el distrito", async ({
+    page,
+  }) => {
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/territorio/distritos/");
+    await page.getByLabel("Provincia").selectOption({ index: 1 });
+    await esperarApi(page, "provincia=");
+    await page.getByLabel("Distrito").selectOption({ index: 1 });
+    await esperarApi(page, "distrito=");
+
+    const provincia = await page.getByLabel("Provincia").inputValue();
+    const distrito = await page.getByLabel("Distrito").inputValue();
+
+    const casilla = page.getByRole("checkbox", { name: "Ver las emergencias" });
+    const respuesta = esperarApi(page, "/api/peligros/frecuencia/provincia/");
+    await casilla.check();
+    await respuesta;
+    await casilla.uncheck();
+
+    await expect(page.getByLabel("Provincia")).toHaveValue(provincia);
+    await expect(page.getByLabel("Distrito")).toHaveValue(distrito);
   });
 
   test("la tabla dice cuántos centros poblados quedan sin clasificación", async ({ page }) => {

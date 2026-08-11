@@ -323,6 +323,67 @@ class FrecuenciaDetalleView(APIView):
         return Response(datos)
 
 
+class FrecuenciaProvinciaView(APIView):
+    """`/api/peligros/frecuencia/provincia/{ubigeo4}/` — el gráfico de emergencias de /peligros.
+
+    La pantalla pregunta por provincia y el eje de ocurrencia solo estaba disponible distrito a
+    distrito. **Nunca 404 si la provincia existe**: sin registros devuelve totales en cero, que
+    es un estado con forma y no un error.
+    """
+
+    @extend_schema(responses={200: dict, 404: dict})
+    def get(self, request, ubigeo: str):
+        provincia = get_object_or_404(Provincia, ubigeo=ubigeo)
+        return Response(consultas.frecuencia_provincia(provincia))
+
+
+class FrecuenciaGeoJSONView(APIView):
+    """`/api/peligros/frecuencia/geojson/` — la capa de emergencias del visor.
+
+    Un punto por distrito **con emergencias registradas**. Los 25 que declaran subtotales en
+    cero (ADR-D1) quedan fuera: un ícono de emergencia sobre ellos afirmaría algo que la fuente
+    no dice, y son justo los distritos de los que no hay información.
+
+    El punto es el centroide de sus centros poblados —ver `consultas.centroides_distritales`—,
+    porque en el proyecto no hay geometría distrital. Es una aproximación, y por eso el popup
+    del visor habla del distrito y no del punto.
+    """
+
+    @extend_schema(
+        parameters=[OpenApiParameter("provincia"), OpenApiParameter("distrito")],
+        responses={200: dict},
+    )
+    def get(self, request):
+        centroides = consultas.centroides_distritales()
+        features = []
+        for distrito in consultas.distritos_con_emergencias(request.query_params):
+            datos = consultas.frecuencia(distrito)
+            if not datos or not datos["total"]:
+                continue
+            punto = centroides.get(distrito.ubigeo)
+            if punto is None:  # distrito sin ningún centro poblado ubicado: no hay dónde pintar
+                continue
+            evento_top = max(
+                (e for c in datos["categorias"] for e in c["eventos"]),
+                key=lambda e: e["conteo"],
+                default=None,
+            )
+            features.append({
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [punto[0], punto[1]]},
+                "properties": {
+                    "ubigeo": datos["ubigeo"],
+                    "distrito": datos["distrito"],
+                    "provincia": datos["provincia"],
+                    "total": datos["total"],
+                    "rango_fecha": datos["rango_fecha"],
+                    # None cuando la fuente declara subtotales sin desagregar (ADR-D1).
+                    "evento_top": evento_top["evento"] if evento_top else None,
+                },
+            })
+        return JsonResponse({"type": "FeatureCollection", "features": features})
+
+
 class FrecuenciaExportView(APIView):
     """`/api/peligros/frecuencia/export.xlsx` — formato largo distrito × evento."""
 

@@ -1,12 +1,13 @@
 import { useMemo, useRef, useState, Suspense, lazy } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, Download, FileText, Filter, RotateCcw } from "lucide-react";
+import { ChevronRight, Download, FileText, Filter, Layers3, RotateCcw, Siren } from "lucide-react";
 import { urlApi, useApi, useApiPaginado } from "@/lib/api";
 import { registrarAyudaMemoria, registrarExport } from "@/lib/metricas";
 import type {
   CapaMapa,
   CentroPoblado,
   Distrito,
+  FrecuenciaProvincia,
   Nivel,
   Provincia,
   ResumenPeligros,
@@ -18,6 +19,7 @@ import GeoSelector from "@/components/GeoSelector";
 import ChecklistFiltro from "@/components/ChecklistFiltro";
 import ResultadosExposicion from "@/components/ResultadosExposicion";
 import ListaPeligrosCcpp from "@/components/ListaPeligrosCcpp";
+import EmergenciasProvincia from "@/components/EmergenciasProvincia";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 import type { MapaPeligrosHandle } from "@/components/MapaPeligros";
@@ -38,11 +40,16 @@ const NIVELES: Nivel[] = [4, 3, 2, 1];
 /**
  * Exposición a peligros: qué centros poblados están expuestos, a qué y en qué nivel.
  *
- * La página responde **una sola pregunta**. La frecuencia histórica de emergencias —el otro eje
- * de la fuente, que cuenta lo que ya ocurrió, por distrito y con otra taxonomía— se retiró de
- * aquí: mezclarlas hacía que los filtros de esta pantalla no afectaran a aquel panel y la
- * pantalla pareciera mal calculada. Sus modelos, endpoints y el PDF siguen intactos, a la
- * espera de dónde reubicarla.
+ * **Los dos ejes de la fuente conviven, pero no se mezclan.** El principal es la exposición
+ * —por centro poblado, 9 peligros—, y es al que responden los filtros de tipo y nivel. La
+ * ocurrencia histórica de emergencias —por distrito, 21 tipos de evento— es el otro, y vive
+ * tras su propia casilla: una capa que se enciende y un gráfico por provincia.
+ *
+ * Esa separación es la corrección de un error real. Cuando el panel de emergencias colgaba del
+ * mapa como una sección más, ajustar «Tipo de peligro» dejaba sus barras quietas y la pantalla
+ * parecía mal calculada. No podían moverse: las taxonomías no se convierten —`INCENDIO
+ * FORESTAL` es «inducido por acción humana» en un eje y «meteorológico» en el otro—. Con un
+ * interruptor propio, nadie espera que lo hagan.
  */
 export default function Peligros() {
   const [provincia, setProvincia] = useState("");
@@ -51,6 +58,15 @@ export default function Peligros() {
   // llega el catálogo: sin esto el primer render filtraría por una lista vacía.
   const [tipos, setTipos] = useState<string[] | null>(null);
   const [niveles, setNiveles] = useState<Nivel[]>(NIVELES);
+  /**
+   * Emergencias: el **otro eje** de la fuente. Vive en su propio interruptor precisamente para
+   * que nadie espere que los filtros de peligro y nivel lo muevan — no pueden: son 21 tipos de
+   * evento por distrito frente a 9 peligros por centro poblado, y las taxonomías no se
+   * convierten. Apagado por defecto.
+   */
+  const [verEmergencias, setVerEmergencias] = useState(false);
+  /** `false` = una barra por evento (Huayco…); `true` = una por tipo de evento (familias). */
+  const [agruparPorTipo, setAgruparPorTipo] = useState(false);
 
   const tablaRef = useRef<HTMLDivElement>(null);
 
@@ -133,6 +149,29 @@ export default function Peligros() {
   // Capas de contexto del catálogo del admin: solo las que tienen tiles listos. Reemplazar una
   // capa o cambiarle el color es editarla ahí, sin desplegar (requisito 1 del TDR).
   const capas = useApi<CapaMapa[]>("/mapas/capas/");
+
+  // --- Emergencias ---------------------------------------------------------------------------
+  // Solo se piden con la casilla encendida, y **la URL depende solo de la provincia**: así
+  // «el cuadro se actualiza únicamente al cambiar de provincia» sale del propio contrato, sin
+  // lógica que mantener. Cambiar de distrito o tocar los checklists no la mueve.
+  const ubigeoProvincia = nombreAUbigeoProvincia.get(provincia) ?? "";
+  const emergencias = useApi<FrecuenciaProvincia>(
+    verEmergencias && ubigeoProvincia
+      ? `/peligros/frecuencia/provincia/${ubigeoProvincia}/`
+      : null
+  );
+  // La capa del visor sí respeta el ámbito geográfico, como el resto de datos de la página.
+  const capaEmergencias = useApi<GeoJSON.FeatureCollection<GeoJSON.Point>>(
+    verEmergencias ? "/peligros/frecuencia/geojson/" : null,
+    { provincia: ubigeoProvincia, distrito: ubigeoDistrito }
+  );
+  const puntosEmergencias = useMemo<GeoJSON.FeatureCollection<GeoJSON.Point>>(
+    () =>
+      capaEmergencias.status === "ok"
+        ? capaEmergencias.data
+        : { type: "FeatureCollection", features: [] },
+    [capaEmergencias.status, capaEmergencias.status === "ok" ? capaEmergencias.data : null]
+  );
 
   const cifras = resumen.status === "ok" ? resumen.data : null;
 
@@ -276,6 +315,44 @@ export default function Peligros() {
                   ),
                 }))}
               />
+
+              {/* Bloque aparte, y separado con una línea: las emergencias son el otro eje de la
+                  fuente y estos controles no interactúan con los de arriba. Marcarlos o
+                  desmarcarlos no toca la provincia ni el distrito elegidos. */}
+              <div className="pt-4 border-t border-ink-300/40">
+                <ChecklistFiltro
+                  titulo="Emergencias"
+                  seleccion={[
+                    ...(verEmergencias ? ["ver"] : []),
+                    ...(agruparPorTipo ? ["tipo"] : []),
+                  ]}
+                  onChange={(valores) => {
+                    setVerEmergencias(valores.includes("ver"));
+                    setAgruparPorTipo(valores.includes("tipo"));
+                  }}
+                  opciones={[
+                    {
+                      valor: "ver",
+                      etiqueta: "Ver las emergencias",
+                      adorno: (
+                        <Siren className="w-4 h-4 shrink-0 text-mountain-900" aria-hidden />
+                      ),
+                    },
+                    {
+                      valor: "tipo",
+                      etiqueta: "Agrupar por tipo de evento",
+                      adorno: (
+                        <Layers3 className="w-4 h-4 shrink-0 text-ink-600" aria-hidden />
+                      ),
+                    },
+                  ]}
+                />
+                <p className="text-[11px] text-ink-300 mt-1 leading-tight">
+                  {agruparPorTipo
+                    ? "Geodinámica externa, interna, meteorológicos e inducidos."
+                    : "Huayco, deslizamiento, helada, incendio…"}
+                </p>
+              </div>
             </div>
           </aside>
 
@@ -318,6 +395,8 @@ export default function Peligros() {
                         capas={capas.status === "ok" ? capas.data : []}
                         puntos={puntosMapa}
                         tipos={peligros}
+                        emergencias={puntosEmergencias}
+                        verEmergencias={verEmergencias}
                         ambitoAcotado={Boolean(provincia || distrito)}
                       />
                     </Suspense>
@@ -328,6 +407,17 @@ export default function Peligros() {
                     />
                   )}
                 </div>
+
+                {/* Emergencias, justo bajo el visor. Va dentro de esta rama solo porque
+                    acompaña al mapa; su contenido no depende de los filtros de exposición. */}
+                {verEmergencias && (
+                  <EmergenciasProvincia
+                    datos={emergencias.status === "ok" ? emergencias.data : null}
+                    provincia={provincia}
+                    cargando={emergencias.status === "loading"}
+                    agrupacion={agruparPorTipo ? "tipo" : "evento"}
+                  />
+                )}
 
                 {/* Relación de centros poblados */}
                 <div ref={tablaRef} className="card mt-4 p-5 scroll-mt-24">
