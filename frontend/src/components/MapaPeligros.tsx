@@ -1019,7 +1019,7 @@ const MapaPeligros = forwardRef<MapaPeligrosHandle, Props>(function MapaPeligros
               Registradas, por distrito
             </div>
             <div className="text-[10px] text-ink-300 mt-0.5 max-w-[9rem] leading-tight">
-              Ocurrencia histórica. Es otro eje: no lo afectan los filtros de peligro ni nivel.
+              Ocurrencia histórica.
             </div>
           </div>
         )}

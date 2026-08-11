@@ -125,7 +125,7 @@ export default function EmergenciasProvincia({ datos, provincia, cargando, agrup
         {cobertura && <TriangleAlert className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />}
         {formatNumber(datos.distritos_con_registro)} de{" "}
         {formatNumber(datos.distritos_en_provincia)} distritos con registro
-        {cobertura && " — la cifra subestima lo ocurrido en la provincia"}
+        {cobertura && " — la cifra puede ser mayor, no se tiene cobertura en todos los distritos de la provincia"}
       </p>
 
       {faltanEventos && (
@@ -197,8 +197,7 @@ function Marco({ provincia, children }: { provincia?: string; children: React.Re
         Emergencias registradas{provincia ? ` — provincia de ${provincia}` : ""}
       </h2>
       <p className="text-xs text-ink-600 mb-3">
-        Ocurrencia histórica por distrito, según SIGRID-CENEPRED. Es un eje distinto de la
-        exposición: no lo afectan los filtros de tipo de peligro ni de nivel.
+        Ocurrencia histórica por distrito, según SIGRID-CENEPRED.
       </p>
       {children}
     </section>
