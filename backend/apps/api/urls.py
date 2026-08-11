@@ -32,6 +32,18 @@ urlpatterns = [
         views.FrecuenciaExportView.as_view(),
         name="frecuencia-export",
     ),
+    # Las dos concretas van **antes** que `<str:ubigeo>`, que si no se las come: «geojson» y
+    # «provincia» encajarían como ubigeo y acabarían en un 404 del detalle.
+    path(
+        "peligros/frecuencia/geojson/",
+        views.FrecuenciaGeoJSONView.as_view(),
+        name="frecuencia-geojson",
+    ),
+    path(
+        "peligros/frecuencia/provincia/<str:ubigeo>/",
+        views.FrecuenciaProvinciaView.as_view(),
+        name="frecuencia-provincia",
+    ),
     path("peligros/frecuencia/", views.FrecuenciaListaView.as_view(), name="frecuencia-lista"),
     path(
         "peligros/frecuencia/<str:ubigeo>/",
@@ -64,6 +76,19 @@ urlpatterns = [
 
     path("sitio/", views.SitioView.as_view(), name="sitio"),
     path("mapas/capas/", views.CapasMapaView.as_view(), name="mapas-capas"),
+    # `export.xlsx` antes de `inversion/`: si no, DRF nunca llegaría a la ruta concreta.
+    path("inversion/export.xlsx", views.InversionExportView.as_view(), name="inversion-export"),
+    path("inversion/mapa/", views.InversionMapaView.as_view(), name="inversion-mapa"),
+    path(
+        "inversion/entidades/",
+        views.InversionEntidadesView.as_view(),
+        name="inversion-entidades",
+    ),
+    path(
+        "inversion/entidades/<str:codigo>/",
+        views.InversionEntidadDetalleView.as_view(),
+        name="inversion-entidad",
+    ),
     path("inversion/", views.InversionView.as_view(), name="inversion"),
     path("metricas/evento/", views.MetricaEventoView.as_view(), name="metricas-evento"),
     # Visor mínimo que el navegador headless captura para el mapa del PDF. Público a

@@ -1,4 +1,4 @@
-"""Sitio, mapas, métricas e Inversión (diferida)."""
+"""Sitio, mapas y métricas."""
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_control
 from drf_spectacular.utils import extend_schema
@@ -61,24 +61,6 @@ class CapasMapaView(APIView):
             estado_tiles=CapaCartografica.EstadoTiles.OK
         ).order_by("orden")
         return Response(serializers.CapaMapaSerializer(capas, many=True).data)
-
-
-class InversionView(APIView):
-    """`/api/inversion/` — diferida (ADR-D3).
-
-    El TDR incluye la ventana y sigue siendo parte del producto, pero el cliente aún no tiene
-    claridad sobre la data: ni el formato del Excel ni el alcance del PPR 0068 están definidos.
-    Modelar contra un formato imaginado se tira a la basura en cuanto llegue el real, así que
-    el endpoint responde con el contrato de "sin datos" y el frontend muestra su estado vacío.
-    Cuando llegue la data se añade la app `inversion` sin tocar el frontend.
-    """
-
-    @extend_schema(responses={200: dict})
-    def get(self, request):
-        return Response({
-            "disponible": False,
-            "motivo": "PREDES está consolidando los datos de inversión del PPR 0068.",
-        })
 
 
 class MetricaEventoView(APIView):

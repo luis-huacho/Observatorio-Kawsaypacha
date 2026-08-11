@@ -202,7 +202,6 @@ def _doc_ccpp(c) -> dict:
         "distrito": c.distrito.nombre,
         "provincia": c.distrito.provincia.nombre,
         "ubigeo_distrito": c.distrito_id,
-        "poblacion": c.poblacion or 0,
         "nivel_max": getattr(c, "nivel_max", None) or 0,
         "lat": c.lat,
         "lon": c.lon,
@@ -274,7 +273,7 @@ INDICES: dict[str, Indice] = {
         modelo="territorio.CentroPoblado",
         searchable=["nombre", "distrito", "provincia"],
         filterable=["provincia", "distrito", "categoria"],
-        sortable=["poblacion"],
+        sortable=[],
         documento=_doc_ccpp,
         # El padrón no es contenido editorial: no tiene estado ni manager `publicados`.
         manager="objects",

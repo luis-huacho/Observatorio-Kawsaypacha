@@ -1,17 +1,24 @@
+import { Suspense, lazy } from "react";
 import { useParams, Link } from "react-router-dom";
 import { MapPin } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { useApi } from "@/lib/api";
-import type { CentroPobladoDetalle } from "@/lib/types";
+import type { CentroPobladoDetalle, TipoPeligroApi } from "@/lib/types";
 import SemaforoChip from "@/components/SemaforoChip";
 import SourceLink from "@/components/SourceLink";
 import EmptyState from "@/components/EmptyState";
-import { formatNumber } from "@/lib/semaforo";
+
+// Diferido como en el visor: el chunk de MapLibre pesa ~840 KB y no se paga hasta abrir una
+// ficha. Quien llega desde /peligros ya lo tiene en caché.
+const MapaPunto = lazy(() => import("@/components/MapaPunto"));
 
 export default function PeligroDetalle() {
   const { codigo } = useParams();
   // La ficha trae sus clasificaciones anidadas: una petición en vez de cruzar dos datasets.
   const detalle = useApi<CentroPobladoDetalle>(codigo ? `/ccpp/${codigo}/` : null);
+  // El catálogo trae el ícono y el orden de cada peligro: el mapa los necesita para dibujar la
+  // corona igual que el visor.
+  const catalogo = useApi<TipoPeligroApi[]>("/peligros/tipos/");
 
   if (detalle.status === "loading") {
     return <div className="container-page py-12 text-ink-600">Cargando…</div>;
@@ -47,16 +54,30 @@ export default function PeligroDetalle() {
         backLabel="Volver al mapa"
       />
       <div className="container-page py-8">
-      <section className="grid sm:grid-cols-3 gap-4">
-        <Card label="Población" value={cp.poblacion != null ? formatNumber(cp.poblacion) : "s/d"} sub="habitantes" />
-        <Card label="Altitud" value={cp.altitud != null ? formatNumber(cp.altitud) : "s/d"} sub="msnm" />
-        <Card
-          label="Coordenadas"
-          value={cp.lat != null && cp.lon != null ? `${cp.lat.toFixed(4)}, ${cp.lon.toFixed(4)}` : "s/d"}
-          sub="lat, lon"
-          mono
-        />
-      </section>
+      {/* Aquí había tres cifras: población, altitud y coordenadas. La primera salió por falta
+          de fuente (ADR-A19) y las otras dos porque el mapa de abajo sitúa el punto mejor que un
+          par de decimales. Altitud y coordenadas **siguen en el API** —el mapa necesita lat/lon—:
+          es una decisión de presentación, no de datos. */}
+
+      {cp.lat != null && cp.lon != null && (
+        <section>
+          <div className="card p-1 h-[320px] overflow-hidden">
+            <Suspense
+              fallback={
+                <div className="h-full grid place-items-center text-ink-600">Cargando mapa…</div>
+              }
+            >
+              <MapaPunto
+                lat={cp.lat}
+                lon={cp.lon}
+                nombre={cp.nombre}
+                clasificaciones={clasifs}
+                tipos={catalogo.status === "ok" ? catalogo.data : []}
+              />
+            </Suspense>
+          </div>
+        </section>
+      )}
 
       <section className="mt-8">
         <h2 className="font-display text-xl font-bold text-mountain-900 mb-3">
@@ -73,7 +94,6 @@ export default function PeligroDetalle() {
               <thead className="bg-mountain-700 text-xs uppercase tracking-wide text-white/90">
                 <tr>
                   <th className="text-left px-4 py-3">Peligro</th>
-                  <th className="text-left px-4 py-3 hidden sm:table-cell">Tipo / Detalle</th>
                   <th className="text-center px-4 py-3">Nivel</th>
                   <th className="text-left px-4 py-3 hidden md:table-cell">Fuente</th>
                 </tr>
@@ -82,7 +102,6 @@ export default function PeligroDetalle() {
                 {clasifs.map((p, i) => (
                   <tr key={i} className="border-t border-ink-300/20">
                     <td className="px-4 py-3 font-medium">{p.peligro}</td>
-                    <td className="px-4 py-3 text-ink-600 hidden sm:table-cell">{p.tipo ?? "—"}</td>
                     <td className="px-4 py-3 text-center">
                       <SemaforoChip nivel={p.nivel} />
                     </td>
@@ -98,17 +117,5 @@ export default function PeligroDetalle() {
       </section>
       </div>
     </>
-  );
-}
-
-function Card({ label, value, sub, mono = false }: { label: string; value: string; sub: string; mono?: boolean }) {
-  return (
-    <div className="card p-5">
-      <div className="text-xs text-ink-600">{label}</div>
-      <div className={`mt-1 font-display font-extrabold text-2xl text-mountain-900 ${mono ? "font-mono text-base" : ""}`}>
-        {value}
-      </div>
-      <div className="text-xs text-ink-600">{sub}</div>
-    </div>
   );
 }

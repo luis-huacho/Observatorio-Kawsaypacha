@@ -9,7 +9,12 @@ from django.utils.text import slugify
 import openpyxl
 import pytest
 
-from tests.rutas import MUESTRA_FRECUENCIA, MUESTRA_NIVEL
+from tests.rutas import (
+    MUESTRA_FRECUENCIA,
+    MUESTRA_INVERSION,
+    MUESTRA_INVERSION_INSTITUCIONAL,
+    MUESTRA_NIVEL,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -359,14 +364,211 @@ def test_frecuencia_sin_la_hoja_esperada_falla_citandola(importar, tmp_path):
     assert "NºEMERGENCIAS" in upload.log["error"]
 
 
-def test_inversion_no_tiene_importador_todavia(importar):
-    """ADR-D3: la opción existe para no migrar cuando llegue la data, el importador no.
+# --- Inversión (PP 0068) ---------------------------------------------------
 
-    El mensaje tiene que ser explícito: un `error` mudo aquí se lee como una avería.
+
+@pytest.fixture
+def importar_inversion(importar, datos_muestra):
+    """Importa una serie de inversión sobre el territorio ya sembrado por las muestras.
+
+    Depende de `datos_muestra` porque el importador resuelve la municipalidad contra el padrón
+    de distritos, y ese padrón lo crea la importación de niveles de peligro.
     """
     from apps.datasets.models import DatasetUpload
 
-    upload = importar(tipo=DatasetUpload.Tipo.INVERSION, archivo=MUESTRA_FRECUENCIA)
+    def _importar(archivo=MUESTRA_INVERSION):
+        return importar(tipo=DatasetUpload.Tipo.INVERSION, archivo=archivo)
+
+    return _importar
+
+
+def test_inversion_importa_las_dos_series(importar_inversion):
+    from apps.datasets.models import DatasetUpload
+    from apps.inversion.models import PresupuestoEntidad
+
+    serie = importar_inversion()
+    institucional = importar_inversion(MUESTRA_INVERSION_INSTITUCIONAL)
+
+    assert serie.estado == DatasetUpload.Estado.ACTIVO
+    assert serie.log["forma"] == "programa"
+    assert institucional.estado == DatasetUpload.Estado.ACTIVO
+    assert institucional.log["forma"] == "institucional"
+
+    cusco = PresupuestoEntidad.objects.get(entidad__codigo="300684", ejercicio__anio=2026)
+    assert cusco.pim == 220000  # 200000 + 20000
+    assert cusco.pim_institucional == 2200000
+
+
+def test_inversion_no_pisa_lo_que_no_trae_el_archivo(importar_inversion):
+    """Cargar los tres archivos en cualquier orden tiene que dejar el mismo resultado.
+
+    La serie de totales institucionales no lleva provincia ni distrito, y escribir `None` desde
+    ahí borraba el territorio que había resuelto la serie del programa: 120 municipalidades se
+    quedaban «sin territorio» solo por el orden de carga. Al revés pasa lo mismo con el PIM.
+    """
+    from apps.inversion.models import EntidadEjecutora, PresupuestoEntidad
+
+    importar_inversion(MUESTRA_INVERSION_INSTITUCIONAL)
+    importar_inversion()
+
+    entidad = EntidadEjecutora.objects.get(codigo="300684")
+    assert entidad.distrito_id is not None, "la serie del programa tiene que resolver el distrito"
+
+    presupuesto = PresupuestoEntidad.objects.get(entidad=entidad, ejercicio__anio=2026)
+    assert presupuesto.pim == 220000
+    assert presupuesto.pim_institucional == 2200000, (
+        "la segunda carga borró el total institucional de la primera"
+    )
+
+
+def test_inversion_reemplaza_el_ejercicio_sin_duplicar(importar_inversion):
+    """La misma carga dos veces deja los mismos números, no el doble."""
+    from apps.inversion.models import PresupuestoActividad, PresupuestoEntidad
+
+    importar_inversion()
+    filas = PresupuestoActividad.objects.count()
+    importar_inversion()
+
+    assert PresupuestoActividad.objects.count() == filas
+    assert PresupuestoEntidad.objects.get(
+        entidad__codigo="300684", ejercicio__anio=2026
+    ).pim == 220000
+
+
+def test_inversion_clasifica_por_actividad_y_deja_ver_lo_que_no_conoce(importar_inversion):
+    """El catálogo se descubre solo, pero un código desconocido no se reparte: se declara."""
+    from apps.inversion.models import ClasificacionActividad
+
+    importar_inversion()
+
+    # Actividad conocida: la semilla ya le dio su proceso.
+    brigadas = ClasificacionActividad.objects.get(codigo="5005561")
+    assert brigadas.proceso.slug == "preparacion"
+
+    # Proyecto: se clasifica por el proyecto, no por su acción de obra (4000122, que se repite
+    # en obras de procesos distintos), y arranca en el proceso propuesto por defecto.
+    proyecto = ClasificacionActividad.objects.get(codigo="2534565")
+    assert proyecto.origen == ClasificacionActividad.Origen.PROYECTO
+    assert proyecto.proceso.slug == "prevencion_reduccion"
+    assert proyecto.automatico is True
+    assert not ClasificacionActividad.objects.filter(codigo="4000122").exists()
+
+    # Actividad desconocida: entra al catálogo sin proceso, para que se vea que falta.
+    desconocida = ClasificacionActividad.objects.get(codigo="5009999")
+    assert desconocida.proceso is None
+
+
+def test_inversion_avisa_de_las_municipalidades_fuera_del_padron(importar_inversion):
+    """Una municipalidad que no casa con el padrón cuenta en los totales, pero se declara.
+
+    Descartarla en silencio restaría presupuesto sin que nada lo dijera; asignarla a un
+    distrito cualquiera contaminaría el cruce con peligros.
+    """
+    from apps.inversion.models import EntidadEjecutora
+
+    upload = importar_inversion()
+
+    fantasma = EntidadEjecutora.objects.get(codigo="309999")
+    assert fantasma.distrito_id is None
+    assert fantasma.sin_territorio is True
+    assert "sin territorio" in _advertencias(upload)
+    assert "PUEBLO INEXISTENTE" in _advertencias(upload)
+
+
+def test_inversion_no_publica_sola(importar_inversion):
+    """Importar no enciende la ventana: publicar es una decisión editorial, y se avisa."""
+    from apps.inversion.models import Ejercicio
+
+    upload = importar_inversion()
+
+    assert not Ejercicio.objects.filter(visible=True).exists()
+    assert "visible" in _advertencias(upload)
+
+
+def test_inversion_marca_el_corte_parcial_y_su_fuente(importar_inversion):
+    """2026 llega a mitad de año y de la base del cliente; 2025, cerrado y del MEF.
+
+    Si la serie se etiqueta entera con una sola fuente, el último punto de la tendencia dice
+    que viene del MEF cuando no es así.
+    """
+    from apps.inversion.models import Ejercicio
+
+    importar_inversion()
+
+    parcial = Ejercicio.objects.get(anio=2026)
+    assert parcial.es_parcial is True
+    assert parcial.corte == "2026-06"
+    assert parcial.fuente == Ejercicio.Fuente.CLIENTE
+
+    cerrado = Ejercicio.objects.get(anio=2025)
+    assert cerrado.es_parcial is False
+    assert cerrado.fuente == Ejercicio.Fuente.MEF
+
+
+def test_inversion_rechaza_un_archivo_que_no_es_ninguna_de_las_series(importar_inversion):
+    """El error tiene que decir qué columnas faltan, no un «no se pudo importar» mudo."""
+    from apps.datasets.models import DatasetUpload
+
+    upload = importar_inversion(MUESTRA_FRECUENCIA)
 
     assert upload.estado == DatasetUpload.Estado.ERROR
-    assert "importador" in upload.log["error"]
+    assert "Base 2026" not in upload.log["error"]
+    assert "hoja" in upload.log["error"].lower()
+
+
+def test_inversion_rechaza_un_devengado_mayor_que_el_pim(importar_inversion, tmp_path):
+    """El SIAF bloquea devengar por encima del PIM, así que un archivo así está mal en origen.
+
+    Sin esta comprobación entraría sin protestar y produciría un avance de ejecución superior al
+    100 % — una cifra que se ve plausible en una tabla y que nadie sabría de dónde salió.
+    """
+    from apps.datasets.models import DatasetUpload
+    from apps.inversion.models import PresupuestoEntidad
+
+    lineas = MUESTRA_INVERSION.read_text(encoding="utf-8").splitlines()
+    # La segunda fila lleva PIA 100000, PIM 120000 y devengado 90000: se le pasa el devengado.
+    lineas[1] = lineas[1].replace(",100000.00,120000.00,90000.00,", ",100000.00,120000.00,130000.00,")
+    roto = tmp_path / "devengado_sobre_pim.csv"
+    roto.write_text("\n".join(lineas), encoding="utf-8")
+
+    upload = importar_inversion(roto)
+
+    assert upload.estado == DatasetUpload.Estado.ERROR
+    assert "devengado" in upload.log["error"].lower()
+    assert "Fila 2" in upload.log["error"]
+    # El reemplazo es atómico: un archivo rechazado no deja nada a medio escribir.
+    assert not PresupuestoEntidad.objects.exists()
+
+
+def test_inversion_rechaza_importes_negativos(importar_inversion, tmp_path):
+    """Un PIM negativo no existe: es un error de extracción, no un recorte presupuestal."""
+    from apps.datasets.models import DatasetUpload
+    from apps.inversion.models import PresupuestoEntidad
+
+    lineas = MUESTRA_INVERSION.read_text(encoding="utf-8").splitlines()
+    lineas[1] = lineas[1].replace(",100000.00,120000.00,90000.00,", ",100000.00,-120000.00,0.00,")
+    roto = tmp_path / "pim_negativo.csv"
+    roto.write_text("\n".join(lineas), encoding="utf-8")
+
+    upload = importar_inversion(roto)
+
+    assert upload.estado == DatasetUpload.Estado.ERROR
+    assert "negativo" in upload.log["error"].lower()
+    assert not PresupuestoEntidad.objects.exists()
+
+
+def test_inversion_enumera_varias_filas_malas_en_un_solo_mensaje(importar_inversion, tmp_path):
+    """Quien sube el archivo lo corrige una vez, no una fila por intento."""
+    from apps.datasets.models import DatasetUpload
+
+    lineas = MUESTRA_INVERSION.read_text(encoding="utf-8").splitlines()
+    lineas[1] = lineas[1].replace(",100000.00,120000.00,90000.00,", ",100000.00,120000.00,130000.00,")
+    lineas[3] = lineas[3].replace(",200000.00,400000.00,100000.00,", ",200000.00,400000.00,500000.00,")
+    roto = tmp_path / "dos_filas_malas.csv"
+    roto.write_text("\n".join(lineas), encoding="utf-8")
+
+    upload = importar_inversion(roto)
+
+    assert upload.estado == DatasetUpload.Estado.ERROR
+    assert "Fila 2" in upload.log["error"]
+    assert "Fila 4" in upload.log["error"]

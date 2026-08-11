@@ -19,7 +19,7 @@ class VisorMapaView(TemplateView):
         params = self.request.GET
         consulta = "&".join(
             f"{clave}={params[clave]}"
-            for clave in ("distrito", "provincia", "peligro", "nivel_min")
+            for clave in ("distrito", "provincia", "peligros", "niveles", "peligro", "nivel_min")
             if params.get(clave)
         )
         # URL **relativas**, sin host. El navegador las resuelve contra el origen de esta página,

@@ -25,11 +25,11 @@ NIVEL_LABEL = {1: "Bajo", 2: "Medio", 3: "Alto", 4: "Muy alto"}
 NIVEL_COLOR = {1: "#5BBB5D", 2: "#EBB320", 3: "#F57C15", 4: "#970A00"}
 
 
-def generar_pdf(distrito, peligro: str = "", nivel_min="", con_mapa: bool = True):
+def generar_pdf(distrito, peligros=(), niveles=(), con_mapa: bool = True):
     """Devuelve `(bytes_pdf, nombre_archivo)`."""
     from weasyprint import HTML
 
-    contexto = reunir_datos(distrito, peligro=peligro, nivel_min=nivel_min)
+    contexto = reunir_datos(distrito, peligros=peligros, niveles=niveles)
 
     if con_mapa:
         from apps.informes.mapa import capturar_mapa
@@ -37,7 +37,7 @@ def generar_pdf(distrito, peligro: str = "", nivel_min="", con_mapa: bool = True
         # Si la captura falla, el PDF sale SIN mapa y con el resto intacto. Un documento sin
         # mapa sigue sirviendo en una reunión; uno que no se genera, no.
         contexto["mapa_png"], contexto["mapa_error"] = capturar_mapa(
-            distrito, peligro=peligro, nivel_min=nivel_min
+            distrito, peligros=peligros, niveles=niveles
         )
     else:
         contexto["mapa_png"], contexto["mapa_error"] = None, None
@@ -55,55 +55,47 @@ def nombre_archivo(distrito, generado_en: datetime) -> str:
     return f"ayuda-memoria-{slug}-{generado_en:%Y%m%d}.pdf"
 
 
-def reunir_datos(distrito, peligro: str = "", nivel_min="") -> dict:
+def reunir_datos(distrito, peligros=(), niveles=()) -> dict:
     """Todo lo que la plantilla necesita, con las mismas cifras que el API."""
     ccpp_ambito = CentroPoblado.objects.filter(distrito=distrito)
-    resumen = consultas.resumen(ccpp_ambito, peligro=peligro, nivel_min=nivel_min)
+    resumen = consultas.resumen(ccpp_ambito, peligros=peligros, niveles=niveles)
     frecuencia = consultas.frecuencia(distrito)
 
-    filas, clasificaciones_contadas, fuentes = _filas_tabla(
-        ccpp_ambito, peligro=peligro, nivel_min=nivel_min
-    )
+    filas, clasificaciones_contadas, fuentes = _filas_tabla(ccpp_ambito, peligros, niveles)
 
     total_ambito = resumen["total_ccpp"]
     total_clasificados = len(filas)
-    niveles = {int(k): v for k, v in resumen["por_ccpp"]["niveles"].items()}
+    niveles_ccpp = {int(k): v for k, v in resumen["por_ccpp"]["niveles"].items()}
 
-    nombre_peligro = ""
-    if peligro:
-        from apps.peligros.models import TipoPeligro
-
-        tipo = TipoPeligro.objects.filter(slug=peligro).first()
-        nombre_peligro = tipo.nombre if tipo else peligro
-
-    try:
-        minimo = int(nivel_min)
-    except (TypeError, ValueError):
-        minimo = 0
-
-    filtros = [f"Peligro: {nombre_peligro}" if nombre_peligro else "Todos los peligros"]
-    if minimo:
-        filtros.append(f"Nivel mínimo: {minimo} ({NIVEL_LABEL[minimo].lower()})")
+    # El documento va a una mesa técnica, así que la línea de filtros tiene que decir
+    # exactamente qué se pidió: con selección múltiple, «nivel mínimo 3» ya no describe una
+    # selección de «Muy alto y Bajo», y un pie que miente sobre su propio recorte es peor que
+    # no llevar pie.
+    nombres = [p["peligro"] for p in resumen["por_peligro"]] if peligros else []
+    filtros = [
+        f"Peligros: {', '.join(nombres)}" if nombres else "Todos los peligros",
+        f"Niveles: {', '.join(NIVEL_LABEL[n].lower() for n in sorted(niveles, reverse=True))}"
+        if niveles
+        else "Todos los niveles",
+    ]
 
     return {
         "distrito": distrito,
         "provincia": distrito.provincia.nombre,
         "generado_en": timezone.localtime(),
-        "nombre_peligro": nombre_peligro,
-        "nivel_min": minimo,
-        "nivel_min_label": NIVEL_LABEL.get(minimo, ""),
+        "nombre_peligro": ", ".join(nombres),
+        "niveles_pedidos": sorted(niveles, reverse=True),
         "filtros": " · ".join(filtros),
         "total_ambito": total_ambito,
         "total_clasificados": total_clasificados,
         "sin_dato": total_ambito - total_clasificados,
-        "poblacion_expuesta": sum(f["poblacion"] or 0 for f in filas),
         "criticos": sum(1 for f in filas if f["nivel_max"] >= 3),
         "niveles": [
             {"nivel": n, "label": NIVEL_LABEL[n], "color": NIVEL_COLOR[n],
-             "conteo": niveles.get(n, 0)}
+             "conteo": niveles_ccpp.get(n, 0)}
             for n in (4, 3, 2, 1)
         ],
-        "total_niveles": sum(niveles.values()),
+        "total_niveles": sum(niveles_ccpp.values()),
         "clasificaciones_contadas": clasificaciones_contadas,
         "frecuencia": frecuencia,
         "evento_mas_frecuente": _evento_mas_frecuente(frecuencia),
@@ -113,25 +105,18 @@ def reunir_datos(distrito, peligro: str = "", nivel_min="") -> dict:
     }
 
 
-def _filas_tabla(ccpp_ambito, peligro: str, nivel_min):
+def _filas_tabla(ccpp_ambito, peligros=(), niveles=()):
     """Una fila por centro poblado **clasificado**, con sus peligros agrupados.
 
     Los "sin dato" quedan fuera de la tabla y se cuentan en el texto: ese vacío de información
     es en sí mismo un argumento de incidencia, y una tabla de 8,968 filas mayoritariamente
     vacías no sirve para una reunión.
     """
-    filtro = {"centro_poblado__in": ccpp_ambito.values("pk")}
-    if peligro:
-        filtro["tipo_peligro__slug"] = peligro
-    try:
-        minimo = int(nivel_min)
-    except (TypeError, ValueError):
-        minimo = 0
-    if minimo:
-        filtro["nivel__gte"] = minimo
+    from apps.api.filters import condicion_clasificacion_local
 
     clasificaciones = (
-        ClasificacionPeligro.objects.filter(**filtro)
+        ClasificacionPeligro.objects.filter(centro_poblado__in=ccpp_ambito.values("pk"))
+        .filter(condicion_clasificacion_local(peligros, niveles))
         .select_related("centro_poblado", "tipo_peligro", "fuente")
         .order_by("-nivel")
     )
@@ -150,8 +135,6 @@ def _filas_tabla(ccpp_ambito, peligro: str, nivel_min):
                 "codigo": ccpp.codigo,
                 "nombre": ccpp.nombre,
                 "categoria": ccpp.categoria or "—",
-                "poblacion": ccpp.poblacion,
-                "altitud": ccpp.altitud,
                 "peligros": [],
                 "nivel_max": c.nivel,
             },

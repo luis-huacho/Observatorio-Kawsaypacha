@@ -39,8 +39,14 @@ class TipoPeligro(TimeStampedMixin):
     )
     orden = models.PositiveSmallIntegerField(default=0)
     descripcion = models.TextField("descripción", blank=True)  # [+] futuro
-    icono = models.CharField(max_length=50, blank=True)  # [+] futuro
-    color = models.CharField(max_length=7, blank=True)  # [+] futuro (hex)
+    icono = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Nombre del ícono lucide en kebab-case (p. ej. `cloud-rain`). Es la FORMA "
+        "del símbolo en el visor; el color lo pone el nivel, no el peligro. Si el nombre no "
+        "existe en la librería, el visor cae en un ícono genérico en vez de romperse.",
+    )
+    color = models.CharField(max_length=7, blank=True)  # chips y gráficos por tipo
 
     class Meta:
         ordering = ["orden", "nombre"]

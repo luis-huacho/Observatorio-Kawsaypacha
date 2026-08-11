@@ -16,9 +16,9 @@ class DatasetUpload(TimeStampedMixin):
     class Tipo(models.TextChoices):
         PELIGROS_CCPP = "peligros_ccpp", "Nivel de peligro por centro poblado"
         FRECUENCIA = "frecuencia_emergencias", "Frecuencia de emergencias por distrito"
-        # Existe como opción para no tener que migrar cuando llegue la data, pero no hay
-        # importador: la ventana Inversión está diferida (ADR-D3).
-        INVERSION = "inversion_mef", "Inversión PPR 0068 (MEF) — pendiente de definir"
+        # Tres formas, una sola carga: el Excel del cliente (un ejercicio con su corte) y las
+        # dos series consolidadas del MEF. El importador las distingue por su cabecera.
+        INVERSION = "inversion_mef", "Presupuesto PP 0068 por municipalidad"
 
     class Estado(models.TextChoices):
         SUBIDO = "subido", "Subido"

@@ -21,7 +21,7 @@ Separar el sitio público del backend deja el admin y el API fuera del dominio q
 | `backend` | build `backend/` | **gunicorn** `:8000`; volúmenes `media` (RW) y `static`; depends_on db+meilisearch healthy |
 | `worker` | misma imagen | `manage.py db_worker` (django-tasks): importaciones, tiles, Gemini, correos, agregación de métricas |
 | `meilisearch` | `getmeili/meilisearch:v1.15` | volumen `meili_data`; `MEILI_MASTER_KEY`; sin puertos publicados |
-| `frontend` | build `frontend/` | compila y copia `dist/` al volumen `web_dist`; termina (perfil build) |
+| `frontend` | build `frontend/` | compila la SPA y copia `dist/` al volumen `web_dist`; **termina al copiar** (`restart: "no"`), no es un servidor. Quien sirve es nginx montando `web_dist`. En el override de desarrollo queda apagado con `profiles: ["prod"]` |
 | `nginx` | `nginx:1.27-alpine` | `:80/:443`; los dos server blocks; ver abajo |
 | `certbot` | `certbot/certbot` | emisión y renovación de certificados (webroot) |
 | `backup` | `prodrigestivill/postgres-backup-local` | `pg_dump` diario, retención 7d/4w/6m, volumen `backups` |
@@ -30,23 +30,53 @@ Volúmenes: `pgdata`, `meili_data`, `media` (incluye `media/tiles/`, `media/data
 
 **ADR-A6bis — nginx en contenedor sustituye a Caddy.** El spec original usaba Caddy por el HTTPS automático. Se cambia a nginx + certbot por decisión del dueño del proyecto: es lo que PREDES y su proveedor de hosting ya saben operar, y el ahorro de Caddy (un fichero de configuración más corto) no compensa introducir una pieza que nadie más en la organización sabe depurar. El coste asumido es explícito: la renovación de certificados deja de ser automática por diseño y pasa a depender del contenedor `certbot` y de su cron.
 
-## Desarrollo local
+## Los tres modos de compose
 
-Un solo comando levanta y baja todo el sitio, backend incluido:
+`compose.yaml` es la base (= producción) y hay **dos** overrides. No son intercambiables y se distinguen por una cosa: **de dónde sale el código que corre**.
+
+| Modo | Comando | Código | Frontend | nginx |
+|---|---|---|---|---|
+| Producción | `docker compose up -d --build` | `COPY` en la imagen | imagen que vuelca `dist/` en `web_dist` | sí, TLS y dos dominios |
+| **Desarrollo** | `-f compose.yaml -f compose.dev.yml` | **montado** (`./backend:/app`) | host, `npm run dev` `:5173` | no |
+| Producción en local | `-f compose.yaml -f compose.local.yml` | `COPY` en la imagen | imagen, `run --rm frontend` | sí, HTTP en el `:80` |
+
+Los tres comparten nombre de proyecto, así que **hay que bajar uno antes de levantar otro**. Al pasar de local a desarrollo, `nginx` no se detiene solo —`profiles: ["prod"]` solo impide arrancarlo— y se queda sirviendo en el `:80` el bundle viejo de `web_dist` contra el backend nuevo.
+
+### Desarrollo (`compose.dev.yml`)
 
 ```bash
 docker compose -f compose.yaml -f compose.dev.yml up -d --build   # arriba
 docker compose -f compose.yaml -f compose.dev.yml down            # abajo
 ```
 
-El override de desarrollo:
-
 - publica `db` (5432), `meilisearch` (7700) y `backend` (8000) en el host;
-- corre `runserver` con el código montado (recarga en caliente);
+- corre `runserver` **con el código montado**, así que edita y recarga: `--build` solo hace falta al cambiar dependencias (`pyproject.toml` / `uv.lock`);
+- construye con `GRUPOS_UV=--group dev` sobre un tag propio (`predes-observatorio-backend-dev`) para que `pytest` viva en el contenedor y las dos imágenes convivan. `/app/.venv` es un **volumen anónimo**: al cambiar `GRUPOS_UV` hace falta `--renew-anon-volumes backend worker`, porque sobrevive a la reconstrucción;
 - deja `nginx`, `certbot`, `backup` y `frontend` fuera (perfil `prod`);
 - fuerza `DEBUG=1` y `EMAIL_BACKEND=console`.
 
-El frontend en desarrollo corre en el host con `npm run dev` (Vite en `:5173`) apuntando a `http://localhost:8000`. Para probar el modo producción completo en local —SPA compilada servida por nginx— se levanta con el perfil `prod` y `SITE_DOMAIN=localhost`.
+El frontend corre en el host con `npm run dev` (Vite en `:5173`) apuntando a `http://localhost:8000`, con HMR. No se puede montar dentro del contenedor `frontend`: ese servicio no es un servidor sino un `alpine` de un solo uso que copia `dist/` y termina.
+
+### Producción en local (`compose.local.yml`)
+
+El sitio entero por el `:80`, sobre HTTP y en un solo host, sin dominios ni TLS. **No es un modo para iterar** —el código va por `COPY`, así que cada cambio pide `--build`—: es el paso de verificación antes de commitear.
+
+```bash
+docker compose -f compose.yaml -f compose.local.yml up -d --build
+docker compose -f compose.yaml -f compose.local.yml run --rm frontend        # publica dist/ en web_dist
+docker compose -f compose.yaml -f compose.local.yml exec backend python manage.py collectstatic --noinput
+```
+
+Qué cambia respecto de la base:
+
+- `backend` y `worker` reciben `BACKEND_URL`, `SITE_URL` y `CORS_ALLOWED_ORIGINS` = `http://localhost`. `BACKEND_URL` es la URL con la que **el navegador del visitante** alcanza el backend —el API la usa para construir las URL absolutas de `/tiles/` y `/media/`—, y aquí el backend no publica el `8000`: apuntarla ahí deja al visor pidiendo tiles a un puerto cerrado. Para lo interno está `RENDER_MAPA_BASE_URL=http://backend:8000`, que es lo que usa el Chromium que renderiza el PDF dentro del contenedor;
+- `nginx` **reemplaza** `conf.d` por `deploy/nginx/local/` —mismo target, así que compose sustituye en vez de acumular— y monta la configuración de producción en `/etc/nginx/comun` para los includes compartidos; publica solo el `80:80`;
+- `certbot` y `backup` van a `profiles: ["nunca"]`;
+- **`DEBUG=False`**, fijado aquí y no heredado de `backend/.env`, por simetría con el override de desarrollo —que fuerza `True`—. Si se hereda, el modo que existe para simular producción acaba sirviendo la traza de depuración de Django en un 404, que es justo una de las cosas que tendría que estar comprobando. Exige que `ALLOWED_HOSTS` incluya el host usado; trae `localhost`.
+
+Sigue exigiendo `SITE_DOMAIN` y `API_DOMAIN` en el `.env` de la raíz —`compose.yaml` las declara con `:?`— aunque la configuración local no las use.
+
+**Para qué existe: verifica lo que el modo de desarrollo no puede ver**, porque en desarrollo no hay nginx y el navegador ataca a Django y a Meilisearch directamente. Solo aquí se comprueba que el bundle de Vite se sirve bien, que las rutas del router resuelven por `try_files`, que los estáticos del admin están donde nginx los busca, que los tiles salen por rangos con sus cabeceras CORS, y que el proxy `/search/` no cae al fallback de DRF. Es la corrida E2E que vale (`E2E_URL=http://localhost npx playwright test`, ver `08-plan-pruebas.md`).
 
 ## nginx (esquema)
 
@@ -184,4 +214,4 @@ Sesión grabada (registro audiovisual = anexo del informe final). El guion desar
 8. Leer el dashboard de métricas.
 9. Dónde están los backups y a quién llamar si algo falla.
 
-Pendientes de PREDES para producción: DNS de los dos dominios, credenciales SMTP, API key de Gemini (o se entrega una), servidor (acceso SSH), data de inversión, capas SIG oficiales, textos definitivos.
+Pendientes de PREDES para producción: DNS de los dos dominios, credenciales SMTP, API key de Gemini (o se entrega una), servidor (acceso SSH), capas SIG oficiales, textos definitivos, y **publicar el ejercicio de inversión** (Inversión → Ejercicios → `visible`), que la importación deja oculto a propósito.

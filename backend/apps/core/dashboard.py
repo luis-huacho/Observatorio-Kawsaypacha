@@ -103,4 +103,22 @@ def _metricas(request) -> dict:
         # forma que tiene PREDES de enterarse de un índice desfasado, que por sí solo no da ningún
         # síntoma más que «el buscador no encuentra algo que sí está publicado».
         "buscador": meili.estado_indices(),
+        # Salud del catálogo de procesos de la GRD. Es silenciosa por la misma razón que el
+        # desfase del índice: los gráficos de /inversion se siguen dibujando con un catálogo a
+        # medias, solo que con una barra «sin clasificar» que nadie va a mirar.
+        "inversion": _estado_inversion(),
     }
+
+
+def _estado_inversion() -> dict | None:
+    """Cuánto PIM visible cuelga de códigos sin proceso. `None` si la ventana no está publicada."""
+    from apps.inversion.consultas import sin_clasificar_pendiente
+    from apps.inversion.models import Ejercicio
+
+    if not Ejercicio.objects.filter(visible=True).exists():
+        return None
+    estado = sin_clasificar_pendiente()
+    estado["ejercicios_visibles"] = list(
+        Ejercicio.objects.filter(visible=True).order_by("-anio").values_list("anio", flat=True)
+    )
+    return estado

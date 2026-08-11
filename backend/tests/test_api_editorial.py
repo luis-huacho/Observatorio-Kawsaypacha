@@ -188,6 +188,93 @@ def test_el_export_de_centros_poblados_respeta_los_filtros(api, datos_muestra, s
     assert len(filas) == esperado
 
 
+def _hoja_ccpp(api, consulta=""):
+    """Descarga el Excel de centros poblados y devuelve `(cabecera, filas)`.
+
+    Las celdas vacías vuelven de openpyxl como `None` —una cadena vacía no se guarda—, y aquí
+    se normalizan a `""` para poder compararlas con lo que escribe el export.
+    """
+    respuesta = api.get(f"/api/ccpp/export.xlsx?clasificados=1{consulta}")
+    libro = openpyxl.load_workbook(io.BytesIO(respuesta.content))
+    filas = [
+        [c if c is not None else "" for c in f]
+        for f in libro.active.iter_rows(values_only=True)
+    ]
+    return filas[0], filas[1:]
+
+
+def _catalogo():
+    from apps.peligros.models import TipoPeligro
+
+    return list(TipoPeligro.objects.all())
+
+
+def test_el_export_de_centros_poblados_no_lleva_altitud_ni_coordenadas(
+    api, datos_muestra, sin_throttling
+):
+    """Salieron de la ficha por ser ruido para quien consulta exposición; el Excel iba detrás.
+
+    En su lugar entra una columna por peligro del catálogo, y salen **del catálogo**: si mañana
+    se clasifica un décimo peligro, el Excel lo lleva sin tocar código.
+    """
+    cabecera, filas = _hoja_ccpp(api)
+
+    assert not [c for c in cabecera if c.startswith(("Altitud", "Latitud", "Longitud"))]
+    esperadas = [f"{t.nombre} (nivel)" for t in _catalogo()]
+    assert cabecera[-len(esperadas):] == esperadas
+    # Una desalineación entre cabecera y fila es el fallo probable de una tabla con columnas
+    # dinámicas, y sin esto pasaría desapercibida: Excel no se queja de una fila más corta.
+    assert {len(f) for f in filas} == {len(cabecera)}
+
+
+def test_cada_peligro_del_export_cae_en_su_columna(api, datos_muestra, sin_throttling):
+    """Un centro poblado promedia 3.4 peligros y el Excel solo llevaba su nivel máximo.
+
+    Se compara contra lo que el API sirve a la tabla, que es lo que el usuario tenía delante.
+    """
+    listado = api.get("/api/ccpp/?clasificados=1&page_size=100").json()["results"]
+    ficha = max(listado, key=lambda c: len(c["peligros"]))
+    assert len(ficha["peligros"]) > 1, "la muestra debería tener algún CCPP con varios peligros"
+
+    cabecera, filas = _hoja_ccpp(api)
+    fila = dict(zip(cabecera, next(f for f in filas if f[0] == ficha["codigo"])))
+    niveles = {p["nombre"]: p["nivel"] for p in ficha["peligros"]}
+
+    for tipo in _catalogo():
+        assert fila[f"{tipo.nombre} (nivel)"] == (niveles.get(tipo.nombre) or "")
+    for nombre, nivel in niveles.items():
+        assert f"{nombre} ({nivel} ·" in fila["Peligros"]
+
+
+def test_los_peligros_del_export_respetan_el_filtro(api, datos_muestra, sin_throttling):
+    """El archivo sale de una consulta filtrada, así que no puede hablar de lo que el mapa oculta.
+
+    Sin esto, un Excel de «solo sismo» listaría también las heladas de esos mismos puntos y
+    contradiría a la pantalla de la que salió.
+    """
+    cabecera, filas = _hoja_ccpp(api, "&peligros=sismo")
+    otros = [
+        cabecera.index(f"{t.nombre} (nivel)") for t in _catalogo() if t.slug != "sismo"
+    ]
+    columna_texto = cabecera.index("Peligros")
+
+    assert filas, "el filtro no debería vaciar la muestra"
+    assert not [f for f in filas if any(f[i] != "" for i in otros)]
+    assert {f[columna_texto].split(" (")[0] for f in filas} == {"Sismo"}
+
+
+def test_el_export_de_centros_poblados_no_consulta_uno_a_uno(
+    api, datos_muestra, sin_throttling, django_assert_max_num_queries
+):
+    """El prefetch es lo que hace viable exportar miles de filas, y perderlo no se ve.
+
+    El export seguiría dando el archivo correcto con una consulta por centro poblado; solo se
+    notaría en producción, con 3,238 filas en vez de las de la muestra.
+    """
+    with django_assert_max_num_queries(10):
+        api.get("/api/ccpp/export.xlsx?clasificados=1")
+
+
 def test_las_descargas_estan_limitadas(api, norma, monkeypatch, settings):
     """30/hora en exports y PDF: son consultas caras y el resto del API va a 1000/hora.
 

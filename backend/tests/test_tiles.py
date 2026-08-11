@@ -98,16 +98,21 @@ def test_cada_feature_lleva_lo_que_el_popup_necesita(datos_muestra, tmp_path):
 
     for feature in features[:50]:
         assert set(feature["properties"]) >= {
-            "codigo", "nombre", "categoria", "distrito", "provincia",
-            "ubigeo_distrito", "poblacion",
+            "codigo", "nombre", "categoria", "distrito", "provincia", "ubigeo_distrito",
         }
 
 
-def test_sin_poblacion_se_escribe_cero_no_nulo(datos_muestra, tmp_path):
-    """El radio del símbolo se interpola sobre `poblacion`; con `null` MapLibre descarta el punto."""
+def test_el_tile_no_lleva_poblacion(datos_muestra, tmp_path):
+    """Aquí había una prueba de que la población se escribía como 0 y no como `null`.
+
+    Existía porque el radio del símbolo se interpolaba sobre ese campo y un `null` hacía que
+    MapLibre descartara el punto. Ya no hay radio por población en ninguna parte (ADR-A17) ni
+    población en el producto (ADR-A19), así que la afirmación útil es la contraria.
+    """
     _, features = _features(tmp_path / "ccpp.geojsonseq")
 
-    assert all(isinstance(f["properties"]["poblacion"], int) for f in features)
+    assert features
+    assert all("poblacion" not in f["properties"] for f in features)
 
 
 def test_las_capas_sin_tiles_no_se_anuncian_como_listas(datos_muestra):

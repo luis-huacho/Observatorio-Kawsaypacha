@@ -56,12 +56,22 @@ mientras el resto del sitio funciona con normalidad.
 
 ```
 data/layers/                    manage.py seed / admin (DatasetUpload)
+
   Base_Nivel Peligro…xlsx   ──▶  importers/nivel_peligro.py  ──▶  CentroPoblado (8,968)
-  Base_Frecuencia…xlsx      ──▶  importers/frecuencia.py     ──▶  ClasificacionPeligro (10,978)
-  rios/lagos/glaciares.geojson ─▶ mapas/pipeline.py          ──▶  FrecuenciaEmergencia (644)
-                                  (ogr2ogr + tippecanoe)          TotalDeclarado… (104)
-                                                             ──▶  media/tiles/*.pmtiles
+                                                             └─▶  ClasificacionPeligro (10,978)
+
+  Base_Frecuencia…xlsx      ──▶  importers/frecuencia.py     ──▶  FrecuenciaEmergencia (644)
+                                                             └─▶  TotalDeclarado… (104)
+
+  rios/lagos/glaciares.geojson ─▶ mapas/pipeline.py          ──▶  media/tiles/*.pmtiles
+                                  (ogr2ogr + tippecanoe)
 ```
+
+Las dos primeras filas son **ejes distintos y no se mezclan**: el de arriba es *exposición*
+(a qué está expuesto cada centro poblado, 9 peligros) y el de abajo *ocurrencia* (qué emergencias
+se registraron en cada distrito, 21 tipos de evento). Sus taxonomías no se convierten entre sí
+—`INCENDIO FORESTAL` es «inducido por acción humana» en una y «meteorológico» en la otra—, y
+`/peligros` publica solo la primera (ADR-A17).
 
 El camino del admin y el del seed son **el mismo código**. Es deliberado: si el seed funciona,
 el camino que recorrerá PREDES al subir su Excel también, y no hay un segundo importador que se
@@ -92,9 +102,12 @@ de incidencia, y colapsarla con «bajo riesgo» sería falsear el dato.
 | `informes` | Ayuda memoria PDF y el visor que se captura para su mapa |
 | `api` | Serializers, filtros y vistas. Sin modelos |
 
-**No hay app `inversion`** (ADR-D3): la ventana está diferida porque el cliente aún no tiene
-claridad sobre la data. `/api/inversion/` responde `{"disponible": false}` y el frontend muestra
-su estado vacío con toda la maqueta lista detrás.
+La app **`inversion`** (ADR-D4) modela el PP 0068 **por entidad ejecutora**, no por distrito: quien
+tiene PIA, PIM y devengado es la municipalidad. Guarda el detalle por actividad y calcula el
+reparto por procesos de la GRD al vuelo, contra un catálogo editable en el admin, de modo que
+corregir una clasificación se ve en la web sin reimportar ni recalcular nada. Mientras ningún
+ejercicio esté marcado `visible`, `/api/inversion/` responde `{"disponible": false}` y el frontend
+muestra su estado vacío.
 
 ## Búsqueda
 

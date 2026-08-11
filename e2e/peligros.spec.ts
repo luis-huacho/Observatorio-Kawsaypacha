@@ -9,6 +9,28 @@ import { expect, test } from "./fixtures";
 
 import { aNumero, esperarApi, esperarMapaPintado, vigilarConsola } from "./apoyo";
 
+import type { Page } from "@playwright/test";
+
+/**
+ * Deja marcada una sola opción de un filtro de checklist.
+ *
+ * Va por el atajo «Ninguno» y luego marca la que interesa: **dos interacciones en vez de nueve**.
+ * Desmarcar una a una parece más natural, pero cada clic cambia el estado y dispara resumen,
+ * tabla y geojson —2 MB este último—, así que dejaba treinta y tantas peticiones en vuelo y la
+ * prueba se caía por timeout de forma intermitente. Con el filtro vacío la página no pide nada
+ * (su estado vacío), de modo que el camino corto además no genera consultas intermedias.
+ */
+async function soloUna(page: Page, filtro: string, opcion: string) {
+  const grupo = page.getByRole("group", { name: filtro });
+  const atajo = grupo.getByRole("button");
+  if ((await atajo.textContent())?.trim() === "Todos") await atajo.click(); // ya había alguna fuera
+  await atajo.click(); // "Ninguno"
+  await grupo.getByRole("checkbox", { name: opcion, exact: true }).check();
+}
+
+const soloPeligro = (page: Page, nombre: string) => soloUna(page, "Tipo de peligro", nombre);
+const soloNivel = (page: Page, nombre: string) => soloUna(page, "Nivel de peligro", nombre);
+
 test.describe("Visor de exposición a peligros", () => {
   test("el mapa carga y dibuja los centros poblados", async ({ page }) => {
     const errores = vigilarConsola(page);
@@ -22,7 +44,7 @@ test.describe("Visor de exposición a peligros", () => {
     expect(errores, `errores en consola:\n${errores.join("\n")}`).toEqual([]);
   });
 
-  test("las cifras de la distribución salen del servidor, no de las filas cargadas", async ({
+  test("las cifras de los resultados salen del servidor, no de las filas cargadas", async ({
     page,
   }) => {
     // Fue un error real: con la tabla paginada de 50 en 50, el panel mostraba «50 CCPP» donde
@@ -39,6 +61,134 @@ test.describe("Visor de exposición a peligros", () => {
     );
     expect(aNumero(await total.textContent())).toBe(clasificados);
     expect(clasificados).toBeGreaterThan(1000);
+  });
+
+  test("los resultados son una grilla por tipo, y cuentan centros poblados", async ({ page }) => {
+    // La grilla es lo que sustituyó al panel «Distribución», que vivía dentro del `aside` de
+    // filtros y se leía como una leyenda del mapa en vez de como la respuesta a la consulta.
+    await page.goto("/peligros");
+    const resumen = await (await esperarApi(page, "/api/peligros/resumen/")).json();
+
+    const bloque = page.getByRole("region", { name: "Resultados" });
+    await expect(bloque).toBeVisible();
+    await expect(bloque.getByRole("columnheader", { name: "Centros poblados" })).toBeVisible();
+
+    // Dentro de una fila, «clasificaciones» y «centros poblados» son la misma cifra: la base
+    // impide dos clasificaciones del mismo peligro en un mismo centro poblado.
+    for (const fila of resumen.por_peligro.slice(0, 3)) {
+      const suma = Object.values<number>(fila.niveles).reduce((a, b) => a + b, 0);
+      expect(fila.centros_poblados).toBe(suma);
+      await expect(bloque.getByRole("row", { name: new RegExp(fila.peligro) })).toBeVisible();
+    }
+  });
+
+  test("las emergencias no se piden hasta que se encienden", async ({ page }) => {
+    // La frecuencia es el otro eje de la fuente —lo que ya ocurrió, por distrito y con otra
+    // taxonomía— y vive tras su propia casilla. Que no se pida sola es lo que mantiene los dos
+    // ejes separados: si volviera a cargarse con la página, volvería a leerse como una sección
+    // más de exposición que ignora sus filtros.
+    const pedidas: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/api/peligros/frecuencia/")) pedidas.push(r.url());
+    });
+
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/territorio/distritos/");
+    await page.getByLabel("Provincia").selectOption({ index: 1 });
+    await esperarApi(page, "provincia=");
+    await page.getByLabel("Distrito").selectOption({ index: 1 });
+    await esperarApi(page, "distrito=");
+
+    expect(pedidas, `se pidió sin encenderla:\n${pedidas.join("\n")}`).toEqual([]);
+    await expect(page.getByRole("region", { name: /Emergencias registradas/ })).toHaveCount(0);
+
+    // La espera se arranca **antes** del clic: `waitForResponse` solo ve lo que pasa después de
+    // registrarse, y la petición puede resolverse mientras `check()` aún está en vuelo.
+    const respuesta = esperarApi(page, "/api/peligros/frecuencia/provincia/");
+    await page.getByRole("checkbox", { name: "Ver las emergencias" }).check();
+    await respuesta;
+    await expect(page.getByRole("region", { name: /Emergencias registradas/ })).toBeVisible();
+  });
+
+  test("el gráfico de emergencias es de la provincia, y solo la provincia lo mueve", async ({
+    page,
+  }) => {
+    // Es el requisito que evita el problema original: los filtros de exposición no pueden
+    // afectar a un eje con otra taxonomía, así que este panel no depende de ellos ni del
+    // distrito. Depender solo de la provincia lo hace evidente sin explicarlo.
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/territorio/distritos/");
+    await page.getByLabel("Provincia").selectOption({ index: 1 });
+    await esperarApi(page, "provincia=");
+    const respuesta = esperarApi(page, "/api/peligros/frecuencia/provincia/");
+    await page.getByRole("checkbox", { name: "Ver las emergencias" }).check();
+    await respuesta;
+
+    const bloque = page.getByRole("region", { name: /Emergencias registradas/ });
+    const titulo = await bloque.getByRole("heading").textContent();
+    expect(titulo).toMatch(/provincia de/);
+    const total = await bloque.locator(".font-mono").first().textContent();
+
+    // Ni el distrito ni los checklists de exposición lo mueven. Las esperas se arrancan antes
+    // de la acción por lo mismo que arriba.
+    const trasDistrito = esperarApi(page, "distrito=");
+    await page.getByLabel("Distrito").selectOption({ index: 1 });
+    await trasDistrito;
+
+    const trasPeligro = esperarApi(page, "peligros=sismo");
+    await soloPeligro(page, "Sismo");
+    await trasPeligro;
+
+    await expect(bloque.getByRole("heading")).toHaveText(titulo!);
+    await expect(bloque.locator(".font-mono").first()).toHaveText(total!);
+  });
+
+  test("cambiar la agrupación reagrupa sin volver a pedir nada", async ({ page }) => {
+    // Las dos agrupaciones vienen en el mismo payload. Y no suman igual a propósito: los
+    // distritos que declaran subtotales sin desagregar (ADR-D1) cuentan por tipo de evento y no
+    // por evento, así que el total sube al agrupar por tipo y la pantalla lo explica.
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/territorio/distritos/");
+    await page.getByLabel("Provincia").selectOption({ index: 1 });
+    await esperarApi(page, "provincia=");
+    const respuesta = esperarApi(page, "/api/peligros/frecuencia/provincia/");
+    await page.getByRole("checkbox", { name: "Ver las emergencias" }).check();
+    const datos = await (await respuesta).json();
+
+    const barras = page.locator(".recharts-bar-rectangle");
+    await expect(barras).toHaveCount(datos.eventos.length);
+
+    const pedidas: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/api/peligros/frecuencia/")) pedidas.push(r.url());
+    });
+    await page.getByRole("checkbox", { name: "Agrupar por tipo de evento" }).check();
+
+    await expect(barras).toHaveCount(datos.familias.length);
+    expect(pedidas, `reagrupar disparó peticiones:\n${pedidas.join("\n")}`).toEqual([]);
+  });
+
+  test("encender y apagar las emergencias conserva la provincia y el distrito", async ({
+    page,
+  }) => {
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/territorio/distritos/");
+    await page.getByLabel("Provincia").selectOption({ index: 1 });
+    await esperarApi(page, "provincia=");
+    await page.getByLabel("Distrito").selectOption({ index: 1 });
+    await esperarApi(page, "distrito=");
+
+    const provincia = await page.getByLabel("Provincia").inputValue();
+    const distrito = await page.getByLabel("Distrito").inputValue();
+
+    const casilla = page.getByRole("checkbox", { name: "Ver las emergencias" });
+    const respuesta = esperarApi(page, "/api/peligros/frecuencia/provincia/");
+    await casilla.check();
+    await respuesta;
+    await casilla.uncheck();
+
+    await expect(page.getByLabel("Provincia")).toHaveValue(provincia);
+    await expect(page.getByLabel("Distrito")).toHaveValue(distrito);
   });
 
   test("la tabla dice cuántos centros poblados quedan sin clasificación", async ({ page }) => {
@@ -58,16 +208,230 @@ test.describe("Visor de exposición a peligros", () => {
     await expect(contador).toBeVisible();
     const antes = aNumero(await contador.textContent());
 
-    await page.getByLabel("Tipo de peligro").selectOption("heladas");
-    await esperarApi(page, "peligro=heladas");
-    await page.getByRole("button", { name: "Nivel mínimo 4" }).click();
-    await esperarApi(page, "nivel_min=4");
+    await soloPeligro(page, "Heladas");
+    await esperarApi(page, "peligros=heladas");
+    await soloNivel(page, "Muy alto");
+    await esperarApi(page, "niveles=4");
 
     await expect
       .poll(async () => aNumero(await contador.textContent()), {
         message: "el filtro no redujo el total de la tabla",
       })
       .toBeLessThan(antes);
+  });
+
+  test("los niveles son una selección, no un umbral", async ({ page }) => {
+    // Con el «nivel mínimo» de antes, pedir «Muy alto y Bajo» sin lo de en medio era
+    // inexpresable. Es la consulta que distingue un checklist de un deslizador.
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/peligros/resumen/");
+
+    await soloPeligro(page, "Sismo");
+    await esperarApi(page, "peligros=sismo");
+    await soloNivel(page, "Muy alto");
+    await page.getByRole("checkbox", { name: "Bajo" }).check();
+
+    // Hay que nombrar el endpoint: la tabla, el mapa y el resumen viajan con el mismo filtro,
+    // así que un `includes("niveles=1,4")` a secas se queda con la primera de las tres.
+    const respuesta = await esperarApi(page, /peligros\/resumen\/.*niveles=1,4/);
+    const resumen = await respuesta.json();
+    const sismo = resumen.por_peligro.find((p: { slug: string }) => p.slug === "sismo");
+    expect(sismo.niveles["2"]).toBe(0);
+    expect(sismo.niveles["3"]).toBe(0);
+    expect(sismo.niveles["1"] + sismo.niveles["4"]).toBe(sismo.centros_poblados);
+  });
+
+  test("desde la grilla se llega a la relación de centros poblados", async ({ page }) => {
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/peligros/resumen/");
+
+    const fila = page.getByRole("row", { name: /Inundación/ });
+    await fila.getByRole("button", { name: /Ver centros poblados/ }).click();
+    await esperarApi(page, "peligros=inundacion");
+
+    // El control visible tiene que reflejar lo que se ve: si el filtro se aplicara solo a la
+    // tabla, el checklist mentiría sobre el recorte y el mapa mostraría otra cosa.
+    await expect(page.getByRole("checkbox", { name: "Inundación" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Sismo" })).not.toBeChecked();
+  });
+
+  test("la tabla lista todos los peligros de cada centro poblado", async ({ page }) => {
+    // El nivel máximo es un resumen: con 3.4 peligros de media por lugar, «Muy alto» no dice a
+    // qué está expuesto, que es lo que decide qué medida le toca.
+    await page.goto("/peligros");
+    const filas = (await (await esperarApi(page, "/api/ccpp/?")).json()).results;
+    const conVarios = filas.findIndex((f: { peligros: unknown[] }) => f.peligros.length > 1);
+    expect(conVarios, "el API no devolvió ninguno con varios peligros").toBeGreaterThanOrEqual(0);
+
+    const tabla = page.locator("table").last();
+    await expect(tabla.getByRole("columnheader", { name: "Distrito" })).toBeVisible();
+    await expect(tabla.getByRole("columnheader", { name: "Peligros" })).toBeVisible();
+
+    // Tantos íconos como peligros trae esa fila del API: si el mapa y la tabla discreparan,
+    // sería justo aquí.
+    const fila = tabla.locator("tbody tr").nth(conVarios);
+    await expect(fila.locator("li")).toHaveCount(filas[conVarios].peligros.length);
+  });
+
+  test("la tabla pagina de 20 en 20 y no repite centros poblados", async ({ page }) => {
+    // Dos fallos se juntaban aquí: el orden del API era parcial —770 nombres se repiten en el
+    // padrón— así que `LIMIT/OFFSET` repetía filas y se saltaba otras; y el cliente archivaba
+    // la respuesta de una página bajo el número de la siguiente. Se veían filas duplicadas; lo
+    // que no se veía, los centros poblados perdidos.
+    const errores = vigilarConsola(page);
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/ccpp/?");
+
+    const filas = page.locator("table").last().locator("tbody tr");
+    await expect(filas).toHaveCount(20);
+
+    const enlaces = () => page.locator("table").last().locator("tbody tr td:nth-child(2) a");
+    for (let i = 0; i < 2; i++) {
+      await page.getByRole("button", { name: /Ver más/ }).click();
+      await esperarApi(page, `page=${i + 2}`);
+    }
+    await expect(filas).toHaveCount(60);
+
+    const codigos = await enlaces().evaluateAll((as) => as.map((a) => a.getAttribute("href")));
+    expect(new Set(codigos).size, `hay repetidos:\n${codigos.join("\n")}`).toBe(codigos.length);
+    expect(errores, `errores en consola:\n${errores.join("\n")}`).toEqual([]);
+  });
+
+  test("«Reiniciar» devuelve los filtros a su estado inicial", async ({ page }) => {
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/peligros/resumen/");
+
+    await soloPeligro(page, "Sismo");
+    await esperarApi(page, "peligros=sismo");
+    await expect(page.getByRole("checkbox", { name: "Heladas" })).not.toBeChecked();
+
+    await page.getByRole("button", { name: "Reiniciar" }).click();
+
+    await expect(page.getByRole("checkbox", { name: "Heladas" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Sismo" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Bajo" })).toBeChecked();
+  });
+
+  test("el mapa recibe una ranura por peligro, no solo el peor", async ({ page }) => {
+    // Antes se dibujaba únicamente el de mayor nivel y el resto quedaba escondido en el popup,
+    // que es lo que motivó la corona. Cada ranura la pinta una capa distinta, así que lo que se
+    // comprueba es que el payload las traiga y que **la consola quede limpia**: una expresión
+    // de estilo inválida tumba la capa entera, y un `icon-image` sin su imagen registrada
+    // escupe un error por punto. Los dos fallos son mudos en la pantalla.
+    const errores = vigilarConsola(page);
+    await page.goto("/peligros");
+    const geojson = await (await esperarApi(page, "/api/ccpp/geojson/")).json();
+    await esperarMapaPintado(page);
+
+    type Props = Record<string, unknown>;
+    const conVarios = geojson.features
+      .map((f: { properties: Props }) => f.properties)
+      .filter((p: Props) => Number(p.clasificaciones) > 1);
+    expect(conVarios.length, "ningún punto con varios peligros").toBeGreaterThan(0);
+
+    for (const p of conVarios.slice(0, 20)) {
+      for (let k = 0; k < Number(p.clasificaciones); k++) {
+        expect(p[`s${k}`], `falta la ranura ${k}`).toBeTruthy();
+        expect(p[`n_${k}`]).toBeGreaterThanOrEqual(1);
+      }
+    }
+    expect(errores, `errores en consola:\n${errores.join("\n")}`).toEqual([]);
+  });
+
+  test("desmarcar todos los peligros no muestra todo, sino nada", async ({ page }) => {
+    // Un checklist vacío significa «ninguno». Interpretarlo como «todos» sorprendería a quien
+    // acaba de desmarcarlo: pediría nada y se le devolvería la región entera.
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/peligros/resumen/");
+
+    await page
+      .getByRole("group", { name: "Tipo de peligro" })
+      .getByRole("button", { name: "Ninguno" })
+      .click();
+
+    await expect(page.getByText(/Sin filtros que aplicar/i)).toBeVisible();
+  });
+
+  test("filtrar reduce también el conteo de peligros clasificados, que es el del mapa", async ({
+    page,
+  }) => {
+    // El número que el visor pinta dentro de cada grupo son clasificaciones, no centros
+    // poblados. Antes salía de `point_count` de MapLibre y era inmune a los filtros: el visor
+    // conserva los que no cumplen para pintarlos en gris, así que el grupo seguía contándolos
+    // mientras la tabla de al lado ya había encogido.
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/peligros/resumen/");
+
+    const contador = page.getByText(/peligros clasificados/);
+    await expect(contador).toBeVisible();
+    const antes = aNumero(await contador.textContent());
+    expect(antes).toBeGreaterThan(0);
+
+    await soloPeligro(page, "Heladas");
+    await esperarApi(page, "peligros=heladas");
+    await soloNivel(page, "Muy alto");
+    await esperarApi(page, "niveles=4");
+
+    await expect
+      .poll(async () => aNumero(await contador.textContent()), {
+        message: "el filtro no redujo el conteo de clasificaciones",
+      })
+      .toBeLessThan(antes);
+  });
+
+  test("los límites administrativos se sirven desde este mismo servidor", async ({ page }) => {
+    // El requisito no es solo que se vean: es que **el visitante no salga al origen**. Los
+    // GeoJSON se descargan una vez y se publican como PMTiles propios, así que si el repo de
+    // origen desapareciera el observatorio seguiría igual. Un copy-paste de la URL original
+    // rompería esto sin que nada se viera mal en pantalla, que es justo lo que se vigila aquí.
+    const externas: string[] = [];
+    page.on("request", (r) => {
+      const url = r.url();
+      if (/githubusercontent|github\.com|geoperu\.gob\.pe/.test(url)) externas.push(url);
+    });
+
+    await page.goto("/peligros");
+    const capas = await (await esperarApi(page, "/api/mapas/capas/")).json();
+    await esperarMapaPintado(page);
+
+    const limites = capas.filter((c: { slug: string }) => c.slug.startsWith("limites-"));
+    expect(limites, "no se publicaron las capas de límites").toHaveLength(2);
+    for (const capa of limites) {
+      expect(capa.url, `la capa ${capa.slug} apunta fuera`).toMatch(/\.pmtiles$/);
+      expect(capa.url).not.toMatch(/github|geoperu/);
+    }
+
+    // Provinciales encendidas, distritales apagadas.
+    expect(limites.find((c: { slug: string }) => c.slug === "limites-provinciales").visible_por_defecto).toBe(true);
+    expect(limites.find((c: { slug: string }) => c.slug === "limites-distritales").visible_por_defecto).toBe(false);
+
+    await page.getByRole("button", { name: /Capas/ }).click();
+    const distritales = page.getByLabel("Límites distritales");
+    await expect(distritales).not.toBeChecked();
+    await expect(page.getByLabel("Límites provinciales")).toBeChecked();
+
+    await distritales.check();
+    await esperarMapaPintado(page);
+    expect(externas, `salieron peticiones al origen:\n${externas.join("\n")}`).toEqual([]);
+  });
+
+  test("los centros poblados sin clasificación se pueden ocultar", async ({ page }) => {
+    const errores = vigilarConsola(page);
+
+    await page.goto("/peligros");
+    await esperarApi(page, "/api/ccpp/geojson/");
+    await esperarMapaPintado(page);
+
+    await page.getByRole("button", { name: /Capas/ }).click();
+    const casilla = page.getByLabel("Mostrar sin clasificación");
+    await expect(casilla).toBeChecked();
+
+    // Se apaga con `setFilter`, no reemplazando los datos: si alguien lo cambiara a `setData`,
+    // el mapa volvería a agrupar y el número de los grupos cambiaría al ocultarlos.
+    await casilla.uncheck();
+    await esperarMapaPintado(page);
+
+    expect(errores, `errores en consola:\n${errores.join("\n")}`).toEqual([]);
   });
 
   test("elegir provincia acota el ámbito y habilita la ayuda memoria por distrito", async ({
@@ -100,6 +464,34 @@ test.describe("Visor de exposición a peligros", () => {
 
     await expect(page).toHaveURL(/\/peligros\/\d{10}$/);
     await expect(page.getByText(nombre).first()).toBeVisible();
+  });
+
+  test("la ficha sitúa el punto en un mapa y no publica lo que no hay", async ({ page }) => {
+    // El mapa de la ficha no es el visor reutilizado —aquel arrastra clustering, buscador y
+    // leyenda— sino uno mínimo que comparte los íconos. Lo que se comprueba es que pinta y que
+    // la consola queda limpia: un `icon-image` sin su imagen registrada escupe un error por
+    // símbolo, y con la corona son varios por punto.
+    const errores = vigilarConsola(page);
+    await page.goto("/peligros");
+    const filas = (await (await esperarApi(page, "/api/ccpp/?")).json()).results;
+    const conVarios = filas.find((f: { peligros: unknown[] }) => f.peligros.length > 1);
+    expect(conVarios, "el API no devolvió ninguno con varios peligros").toBeTruthy();
+
+    await page.goto(`/peligros/${conVarios.codigo}`);
+    await esperarApi(page, `/api/ccpp/${conVarios.codigo}/`);
+    await esperarMapaPintado(page);
+
+    // La población no tiene fuente respaldada; la columna «Tipo / Detalle» mostraba «—» en las
+    // 3,238 fichas porque el API dejó de enviar ese campo; y altitud y coordenadas se ocultan
+    // porque el mapa sitúa el punto mejor que un par de decimales.
+    for (const rotulo of ["Población", "Altitud", "Coordenadas"]) {
+      await expect(page.getByText(rotulo, { exact: true })).toHaveCount(0);
+    }
+    await expect(page.getByRole("columnheader", { name: /Tipo \/ Detalle/ })).toHaveCount(0);
+    await expect(page.getByRole("columnheader", { name: "Peligro" })).toBeVisible();
+    await expect(page.getByRole("row")).toHaveCount(conVarios.peligros.length + 1); // + cabecera
+
+    expect(errores, `errores en consola:\n${errores.join("\n")}`).toEqual([]);
   });
 
   test("la ayuda memoria descarga un PDF de verdad", async ({ page }, testInfo) => {

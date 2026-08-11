@@ -96,19 +96,44 @@ def test_los_filtros_del_visor_llegan_al_pdf(api, datos_muestra, sin_throttling)
 
     distrito = Distrito.objects.get(ubigeo="080101")
     completo = ayuda_memoria.reunir_datos(distrito)
-    filtrado = ayuda_memoria.reunir_datos(distrito, peligro="sismo", nivel_min=4)
+    filtrado = ayuda_memoria.reunir_datos(distrito, peligros=["sismo"], niveles=[4])
     # «Friaje» no está en las hojas de la muestra: el filtro tiene que dejar la tabla vacía, no
     # ignorarse y devolver todo.
-    sin_coincidencias = ayuda_memoria.reunir_datos(distrito, peligro="friaje")
+    sin_coincidencias = ayuda_memoria.reunir_datos(distrito, peligros=["friaje"])
+    # Selección múltiple y no contigua, que es lo que el umbral de antes no podía expresar.
+    dos_peligros = ayuda_memoria.reunir_datos(
+        distrito, peligros=["sismo", "inundacion"], niveles=[1, 4]
+    )
 
     assert filtrado["total_clasificados"] <= completo["total_clasificados"]
     assert sin_coincidencias["total_clasificados"] == 0
     assert sin_coincidencias["total_ambito"] == completo["total_ambito"]
     assert filtrado["nombre_peligro"] == "Sismo"
     # Los filtros aplicados se imprimen en el documento: si no, el papel no dice de qué habla.
+    # Y con selección múltiple tienen que nombrarse todos: un pie que dice «nivel mínimo 1»
+    # donde se pidió «Muy alto y Bajo» describe un recorte que no es el que se hizo.
     assert "Sismo" in filtrado["filtros"]
-    assert "Nivel mínimo: 4" in filtrado["filtros"]
+    assert "muy alto" in filtrado["filtros"]
     assert filtrado["filtros"] != completo["filtros"]
+    assert "Sismo" in dos_peligros["filtros"] and "Inundación" in dos_peligros["filtros"]
+    assert "muy alto" in dos_peligros["filtros"] and "bajo" in dos_peligros["filtros"]
+    # Los intermedios no se cuelan: es la selección literal, no un rango desde el mínimo.
+    assert dos_peligros["niveles_pedidos"] == [4, 1]
+
+
+def test_la_ayuda_memoria_no_publica_la_altitud(api, datos_muestra, sin_throttling):
+    """Se quitó de la ficha, del Excel y del PDF: la altitud no aporta a una mesa de incidencia.
+
+    El dato sigue en la base —lo trae el padrón y es real, a diferencia de la población
+    (ADR-A19)—, así que lo que se comprueba es que **no se publica**, no que no exista.
+    """
+    from apps.informes import ayuda_memoria
+    from apps.territorio.models import Distrito
+
+    datos = ayuda_memoria.reunir_datos(Distrito.objects.get(ubigeo="080101"))
+
+    assert datos["filas"], "la muestra debería traer centros poblados clasificados"
+    assert all("altitud" not in fila for fila in datos["filas"])
 
 
 def test_el_visor_del_mapa_pide_los_datos_a_su_propio_origen(client, settings):
@@ -128,7 +153,8 @@ def test_el_visor_del_mapa_pide_los_datos_a_su_propio_origen(client, settings):
     settings.BACKEND_URL = "http://no-existe.invalid:9999"
 
     respuesta = client.get(
-        "/api/informes/visor-mapa/", {"distrito": "080101", "peligro": "sismo", "nivel_min": "3"}
+        "/api/informes/visor-mapa/",
+        {"distrito": "080101", "peligros": "sismo,inundacion", "niveles": "3,4"},
     )
     contexto = respuesta.context_data
 
@@ -138,8 +164,8 @@ def test_el_visor_del_mapa_pide_los_datos_a_su_propio_origen(client, settings):
         assert "no-existe.invalid" not in contexto[clave]
     # Y los filtros viajan, o el mapa del documento no coincidiría con la pantalla que lo pidió.
     assert "distrito=080101" in contexto["url_geojson"]
-    assert "peligro=sismo" in contexto["url_geojson"]
-    assert "nivel_min=3" in contexto["url_geojson"]
+    assert "peligros=sismo,inundacion" in contexto["url_geojson"]
+    assert "niveles=3,4" in contexto["url_geojson"]
 
 
 def _chromium_disponible() -> bool:

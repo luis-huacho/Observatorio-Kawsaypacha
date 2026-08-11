@@ -47,7 +47,7 @@ Admin de `DatasetUpload`: form de subida (tipo + archivo) → acción **"Validar
 |---|---|---|---|
 | `nivel_peligro.py` | `Base_Nivel Peligro_CCPP_Cusco.xlsx` | 9 hojas esperadas; columnas exactas; codigo 10 díg; nivel ∈ 1-4 o vacío | upsert de Provincia/Distrito/CentroPoblado + reemplazo atómico de ClasificacionPeligro → `generar_tiles_ccpp` + `meili_rebuild ccpp` |
 | `frecuencia.py` | `Base_Frecuencia_Peligro_Cusco.xlsx` | hoja `NºEMERGENCIAS`; resuelve distrito por `nombre_normalizado`; no-matches → log (no aborta) | reemplazo atómico de FrecuenciaEmergencia + TotalDeclaradoEmergencias |
-| `inversion.py` | Excel de inversión (formato por definir **cuando el cliente entregue la data**) | por definir | reemplazo del ejercicio correspondiente |
+| `inversion.py` | Tres formas, distinguidas por su cabecera: Excel del cliente (hoja `Base AAAA`), serie consolidada del programa (CSV) y serie de totales institucionales (CSV) | un solo `Periodo` en el Excel, formato `AAAA-MM`; el CSV tiene que traer las columnas de una de las dos series; el padrón de distritos tiene que existir | reemplazo atómico **por ejercicio y por parte**; descubre códigos nuevos en el catálogo de procesos sin pisar lo editado; **el ejercicio nace oculto** |
 
 Regla de oro: la importación es **todo-o-nada por dataset** (transacción); si falla, los datos activos previos quedan intactos.
 
@@ -69,7 +69,19 @@ Auditado contra los archivos reales; el importador debe reconocer estos casos po
 - `FUENTE` se normaliza (`CENEPRED_SIGRID` → `SIGRID_CENEPRED`) y `TOTAL` se castea desde string.
 - `RANGO FECHA` se guarda como texto tal cual, quitando espacios alrededor del guion.
 
+**`inversion.py`**
+- Municipalidad que no casa con el padrón de distritos (hoy 4, creadas en La Convención después del padrón) → aviso. **Cuenta en los totales** y queda marcada «sin territorio» en el admin: descartarla restaría presupuesto en silencio y asignarla a un distrito cualquiera contaminaría cualquier cruce distrital.
+- Código de actividad o proyecto que el catálogo no conoce → se añade con la clasificación propuesta y se avisa. Si no hay propuesta, entra **sin proceso** y su importe se muestra como «sin clasificar»: nunca se reparte entre los demás.
+- Ejercicio nuevo → se crea **oculto**, con el aviso de dónde se publica. Importar no es publicar.
+- Ningún ejercicio visible al terminar → aviso de que la ruta sigue mostrando «información en preparación».
+
 El `log` del `DatasetUpload` es lo que PREDES lee para saber qué corregir en su Excel, así que los mensajes van en español y citan hoja y fila.
+
+### Catálogo de procesos de la GRD
+
+`ClasificacionActividad` es el único catálogo del proyecto que PREDES edita y que el importador también escribe, así que la regla de precedencia es explícita: **al guardarlo desde el admin se desmarca `automatico`, y a partir de ahí ni la semilla ni ninguna importación vuelven a tocar la fila**. El listado filtra por «asignado automáticamente» y por proceso vacío, y hay una acción para marcar como revisadas sin cambiar nada.
+
+No hay ninguna acción de «reprocesar»: el reparto se calcula al vuelo sobre `PresupuestoActividad`, así que un cambio aquí se ve en la web en el siguiente request. La tarjeta del panel avisa de cuánto PIM publicado sigue sin proceso, porque un catálogo a medias no da ningún síntoma salvo una barra «sin clasificar» que nadie mira.
 
 ## Capas cartográficas
 

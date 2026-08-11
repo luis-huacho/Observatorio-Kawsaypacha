@@ -192,7 +192,6 @@ export type Lugar = {
   distrito: string;
   provincia: string;
   ubigeo_distrito: string;
-  poblacion: number;
   nivel_max: number;
   lat: number | null;
   lon: number | null;

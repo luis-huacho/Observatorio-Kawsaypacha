@@ -10,15 +10,31 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 |---|---|---|
 | `GET /api/territorio/provincias/` | — | sin paginar (13) |
 | `GET /api/territorio/distritos/` | `provincia=<ubigeo4>` | sin paginar (112) |
-| `GET /api/ccpp/` | `provincia`, `distrito` (ubigeo6), `peligro` (slug), `nivel_min` 1-4, `buscar`, `clasificados`, `page` | Padrón con `nivel` anotado (máximo tras los filtros; `null` = sin dato). **`clasificados=1`** deja solo los que tienen clasificación: es lo que usa la tabla del visor, porque el padrón completo la convertiría en una lista de «sin dato» (5,730 de 8,968 en la región). Ordena por nivel descendente con los «sin dato» al final |
+| `GET /api/ccpp/` | `provincia`, `distrito` (ubigeo6), `peligros` (slugs CSV), `niveles` (1-4 CSV), `buscar`, `clasificados`, `page` | Padrón con `nivel` anotado (máximo tras los filtros; `null` = sin dato). **`clasificados=1`** deja solo los que tienen clasificación: es lo que usa la tabla del visor, porque el padrón completo la convertiría en una lista de «sin dato» (5,730 de 8,968 en la región). Cada fila trae **`peligros`**: todos los del centro poblado que pasan los filtros, con `{slug, nombre, nivel}`, no solo el máximo. Ordena por nivel descendente, luego nombre y **`codigo`** — el nombre no es único (770 se repiten, «PUCARA» 21 veces) y sin ese desempate `LIMIT`/`OFFSET` repetía filas entre páginas y se saltaba otras |
 | `GET /api/ccpp/{codigo}/` | — | ficha con clasificaciones anidadas |
-| `GET /api/ccpp/export.xlsx` | mismos filtros que la lista | openpyxl, streaming |
+| `GET /api/ccpp/export.xlsx` | mismos filtros que la lista | openpyxl, streaming. **Una fila por centro poblado**, la unidad de la tabla y del contador de la pantalla — no por clasificación. Lleva sus peligros en dos formas: una columna `Peligros` legible (`Sismo (4 · Muy alto); …`) y **una columna por peligro del catálogo** con su nivel, que es lo que permite filtrar y pivotar en Excel. Las columnas de peligro se generan desde `TipoPeligro`, así que un décimo peligro entra sin tocar código. Sin altitud ni coordenadas (ver 06), y sin población (ADR-A19) |
 | `GET /api/ccpp/geojson/` | mismos filtros que la lista, **sin paginar** | Puntos del visor (ver 05 / ADR-A13). `FeatureCollection` de `Point`; ver el ejemplo y la nota de tamaño más abajo |
-| `GET /api/peligros/tipos/` | — | catálogo (9) con orden y color |
-| `GET /api/peligros/resumen/` | `provincia`, `distrito`, `peligro`, `nivel_min` | agregados para cifras del home/visor. Devuelve **las dos unidades** (por CCPP y por clasificación) rotuladas; ver el ejemplo |
+| `GET /api/peligros/tipos/` | — | catálogo (9) con orden, color e **`icono`** (nombre lucide en kebab-case). Es la fuente del selector y de los símbolos del visor: el frontend no conoce los peligros de antemano |
+| `GET /api/peligros/resumen/` | `provincia`, `distrito`, `peligros`, `niveles` | agregados para cifras del home/visor. Devuelve **las dos unidades** (por CCPP y por clasificación) rotuladas; ver el ejemplo |
 | `GET /api/peligros/frecuencia/` | `distrito`, `provincia`, `categoria` | Lista, sin paginar (90 de 112): una entrada por distrito **con datos de cualquiera de las dos tablas** |
 | `GET /api/peligros/frecuencia/{ubigeo}/` | — | El panel de un distrito. **404** si no tiene fila (ver abajo) |
 | `GET /api/peligros/frecuencia/export.xlsx` | ídem | Incluye los totales declarados marcados, o el Excel dejaría a Cusco en cero |
+| `GET /api/peligros/frecuencia/provincia/<ubigeo4>/` | — | **Agregado provincial** (ADR-A18): lo que pinta el gráfico de /peligros. Nunca 404 si la provincia existe: sin registros devuelve ceros, que es un estado con forma. Ver el ejemplo |
+| `GET /api/peligros/frecuencia/geojson/` | `provincia`, `distrito` | La capa del visor: un `Point` por distrito **con emergencias** (65 de 112). Los 25 que declaran cero (ADR-D1) quedan fuera — un ícono sobre ellos afirmaría lo que la fuente calla. El punto es el **centroide del distrito** (ADR-A20), con repliegue a la mediana de sus centros poblados en el único distrito cuyo centroide cae fuera de sí mismo |
+
+> **Los filtros de exposición son listas, no valores sueltos (ADR-A17).** `peligros=sismo,heladas`
+> y `niveles=1,4`, ambos CSV. Es una **selección**, no un umbral: `niveles=1,4` deja fuera los
+> niveles 2 y 3, consulta que el antiguo `nivel_min` no podía expresar. Reglas del parser, que
+> vive en un solo sitio (`apps/api/filters.py: parametros_exposicion`) porque lo comparten la
+> lista, el geojson, el export, el resumen, la ayuda memoria y el visor headless:
+>
+> - Ausente, vacío, o con solo valores desconocidos → **no restringe nada**.
+> - Se aceptan `peligro` (un slug o nombre) y `nivel_min` (umbral) como **compatibilidad**: hay
+>   ayudas memoria compartidas con esas URL. `nivel_min=3` se traduce a `niveles=3,4`. Si vienen
+>   las dos formas, gana la nueva.
+> - **Tipo y nivel se aplican en una sola condición de join**, nunca en dos pasos. Con listas la
+>   trampa es más fácil de pisar: un centro poblado con sismo en nivel 1 y heladas en nivel 4 no
+>   cumple `peligros=sismo&niveles=4`, pero dos filtros separados encontrarían cada uno su fila.
 
 > **Desviación deliberada respecto de la primera versión de este contrato.** El ejemplo original
 > mostraba `?distrito=…` devolviendo **un objeto** y 404 para Acomayo, pero el mismo endpoint sin
@@ -40,7 +56,7 @@ Las formas de respuesta **espejan los tipos del prototipo** (`prototype/src/lib/
 MapLibre solo agrupa fuentes `geojson` (ADR-A13), así que la capa de centros poblados no sale del tile vectorial. El endpoint devuelve **el padrón que pasa los filtros**, sin paginar, e incluye **también los no clasificados** — el visor los pinta en gris, y ese vacío de información es en sí mismo un dato.
 
 ```jsonc
-// GET /api/ccpp/geojson/?provincia=0803&peligro=sismo&nivel_min=3
+// GET /api/ccpp/geojson/?provincia=0803&peligros=sismo,inundacion&niveles=3,4
 {
   "type": "FeatureCollection",
   "features": [
@@ -48,9 +64,21 @@ MapLibre solo agrupa fuentes `geojson` (ADR-A13), así que la capa de centros po
       "geometry": { "type": "Point", "coordinates": [-71.97675606, -13.51927548] },
       "properties": {
         "codigo": "0801010001", "nombre": "CUSCO", "categoria": "CIUDAD",
-        "distrito": "CUSCO", "provincia": "CUSCO", "poblacion": 111930, "altitud": 3439,
+        "distrito": "CUSCO", "provincia": "CUSCO", "altitud": 3439,
+        // Sin `poblacion` (ADR-A17). `peligro` = el que pinta el ícono: mayor nivel, y a
+        // igualdad el primero del catálogo. `n<k>` y `p_<slug>` son el desglose que suma
+        // `clusterProperties`, y **solo vienen las claves distintas de cero**.
+        "peligro": "sismo", "n4": 1, "p_sismo": 1,
+        // Ranuras de la corona: un peligro por ranura, en orden de nivel descendente. El
+        // visor dibuja **un ícono por cada una**. El nivel va como `n_0` y no `n0` porque
+        // `n1`…`n4` ya son el desglose que suman los grupos.
+        "s0": "sismo", "n_0": 4, "s1": "heladas", "n_1": 3,
         // Máximo de los peligros que sobrevivieron a los filtros. 0 = sin dato.
         "nivel": 4,
+        // Cuántas clasificaciones sobrevivieron a los filtros. 0 en los que no cumplen,
+        // que siguen en la respuesta para pintarse en gris. Es lo que el visor suma para
+        // rotular cada grupo (ADR-A16): la unidad de las 10,978, no la de las 3,238.
+        "clasificaciones": 1,
         // Desglose para el popup, SERIALIZADO: las propiedades de un feature agrupado
         // tienen que ser escalares (ver 05).
         "peligros": "[{\"p\":\"Sismo\",\"n\":4}]"
@@ -67,7 +95,7 @@ Decisión de tamaño: se sirve el `FeatureCollection` completo en vez de agrupar
   "codigo": "0801010001", "nombre": "CUSCO", "categoria": "CIUDAD",
   "departamento": "CUSCO", "provincia": "CUSCO", "distrito": "CUSCO",
   "ubigeo_distrito": "080101", "lat": -13.51927548, "lon": -71.97675606,
-  "altitud": 3439, "poblacion": 111930,
+  "altitud": 3439,
   "clasificaciones": [
     { "peligro": "Sismo", "peligro_slug": "sismo", "categoria_geo": "Geodinamica interna",
       "nivel": 4, "fuente": "SIGRID_CENEPRED", "fuente_url": "https://n9.cl/lic6j" }
@@ -80,16 +108,21 @@ Decisión de tamaño: se sirve el `FeatureCollection` completo en vez de agrupar
 // El payload declara la unidad de cada bloque en un campo `unidades`: las dos lecturas
 // difieren en 3.4× y cualquier cliente que dibuje una de las dos tiene que poder rotularla.
 {
-  "total_ccpp": 123, "poblacion_total": 130000,
-  // [+] Distribución por nivel MÁXIMO de cada centro poblado: es lo que pinta el panel
-  // "Distribución" de /peligros y lo que debe cuadrar con el conteo de la tabla.
+  "total_ccpp": 123,
+  // [+] Distribución por nivel MÁXIMO de cada centro poblado: es lo que debe cuadrar con el
+  // conteo de la tabla de /peligros.
   // NO se puede derivar de `por_peligro` — sumar por peligro cuenta cada CCPP tantas veces
   // como peligros tenga evaluados (ACOMAYO: 75 CCPP → 225 clasificaciones). Tiene que venir
-  // agregado del servidor, y debe respetar los mismos filtros de peligro y nivel mínimo.
+  // agregado del servidor, y debe respetar los mismos filtros de peligro y nivel.
   "por_ccpp": { "niveles": { "1": 0, "2": 0, "3": 26, "4": 49 }, "sin_clasificar": 0 },
   "por_peligro": [
+    // `centros_poblados` coincide siempre con la suma de `niveles`, y no por casualidad: la
+    // constraint `unica_clasificacion_ccpp_peligro` impide dos filas del mismo peligro en un
+    // mismo centro poblado. Por eso la grilla de resultados puede rotular cada FILA como
+    // centros poblados sin ambigüedad; la de 3.4× solo aparece al sumar la COLUMNA.
     { "peligro": "Sismo", "slug": "sismo",
-      "niveles": { "1": 0, "2": 3, "3": 40, "4": 80 }, "sin_dato": 0 }
+      "niveles": { "1": 0, "2": 3, "3": 40, "4": 80 },
+      "centros_poblados": 123, "sin_dato": 0 }
   ]
 }
 
@@ -105,6 +138,30 @@ Decisión de tamaño: se sirve el `FeatureCollection` completo en vez de agrupar
                    { "evento": "Inundación", "slug": "inundacion", "conteo": 4 } ] }
   ],
   "total": 36
+}
+
+// GET /api/peligros/frecuencia/provincia/0801/   (ADR-A18)
+// **Las dos agrupaciones no suman lo mismo, y es correcto.** `familias` incluye los subtotales
+// que la fuente declara sin desagregar (ADR-D1) y `eventos` no puede incluirlos, así que en
+// Cusco `familias` suma 608 y `eventos` 474. `total_sin_desglose` existe para que la pantalla
+// lo explique en vez de dejar que el total cambie al pulsar una casilla.
+//
+// Ojo al vocabulario: la UI llama «evento» a `eventos` (Huayco, Deslizamiento…) y «tipo de
+// evento» a `familias` (Geodinámica externa…), al revés que los modelos.
+{
+  "provincia": "CUSCO", "ubigeo": "0801", "total": 608,
+  // Sin esto la cifra engaña: Espinar declara 77 con 1 de sus 8 distritos registrados y parece
+  // más tranquila que Cusco, cuando lo que le faltan son los datos.
+  "distritos_con_registro": 8, "distritos_en_provincia": 8,
+  // Rango que ABARCA el conjunto, nunca «el periodo»: cada distrito trae el suyo.
+  "periodo": "2003-2025", "periodos_distintos": 6,
+  "eventos": [ { "evento": "Lluvias intensas", "slug": "lluvias_intensas_evento",
+                 "categoria": "Meteorológicos / oceanográficos",
+                 "categoria_slug": "meteorologico", "conteo": 87 } ],
+  "familias": [ { "categoria": "Meteorológicos / oceanográficos",
+                  "slug": "meteorologico", "conteo": 335 } ],
+  "sin_desglose": [ { "distrito": "CUSCO", "total": 134 } ], "total_sin_desglose": 134,
+  "fuente": "SIGRID_CENEPRED", "fuente_url": "https://n9.cl/e9qwr"
 }
 
 // GET /api/peligros/frecuencia/?distrito=080101   (Cusco: la fuente no desagrega — ADR-D1)
@@ -177,43 +234,132 @@ Notas del contrato:
 } ] }
 ```
 
-## Inversión (data pendiente del cliente)
+## Inversión (PP 0068)
 
 | Endpoint | Params |
 |---|---|
-| `GET /api/inversion/` | `anio` (default: último ejercicio visible) |
-| `GET /api/inversion/export.xlsx` | `anio` |
+| `GET /api/inversion/` | `anio` (default: el más reciente visible), `ambito` (`municipal` por defecto \| distrital \| provincial \| regional \| todos), `provincia` (ubigeo o nombre), `comparar_con` |
+| `GET /api/inversion/entidades/` | los mismos + `buscar`, `ordenar`, `page`, `page_size`. **Paginado** |
+| `GET /api/inversion/entidades/{codigo}/` | `anio`. `codigo` = código MEF de la entidad ejecutora |
+| `GET /api/inversion/mapa/` | `anio`, `ambito`, `provincia` + `nivel` (`distrital` por defecto \| `provincial`) |
+| `GET /api/inversion/export.xlsx` | los mismos que el listado, sin paginar |
 
-Sin datos cargados (o ejercicio `visible=False`):
+**El tablero y la tabla van en endpoints distintos, a propósito.** `/api/inversion/` sirve las piezas que se dibujan juntas y hablan del mismo ejercicio (agregados, procesos, tendencia, ejercicios); la tabla se pagina y su orden se resuelve en el servidor, porque ordenar en el cliente ordenaría solo lo ya cargado. Ojo al probarlo: `/api/inversion/entidades/` **contiene** la cadena `/api/inversion/`, y un matcher por subcadena atrapa la respuesta equivocada.
+
+`ordenar` acepta `pim` (por defecto), `ejecucion`, `saldo`, `institucional` y `variacion` (este último solo con `comparar_con`). Todos ordenan **con desempate por código de entidad**: sin un orden total, la paginación repite unas filas y se salta otras sin que nada falle a la vista.
+
+Sin ningún ejercicio `visible`:
 ```json
-{ "disponible": false }
+{ "disponible": false, "motivo": "PREDES está consolidando los datos de inversión del PP 0068." }
 ```
-Con datos — misma forma que `inversion.mock.json`:
+
+Es el **mismo contrato** que servía la ventana cuando estaba diferida, y se conserva a propósito: el cliente no necesita un caso especial para «hay datos pero todavía sin publicar», que es el estado normal entre una importación y la revisión de PREDES.
+
+Un `anio` que no existe o que no está visible **no cae al último**: devuelve `disponible: false`. Servir otro ejercicio se vería perfecto y todas las cifras serían del año equivocado.
+
+Con datos:
 ```jsonc
 {
-  "disponible": true, "anio": 2025,
-  "agregados": { "pim_total": 145000000, "ejecutado": 78000000,
-                 "porcentaje_ejecucion": 0.538, "municipios_con_ppr_0068": 87 },
-  "comparacion_prevencion_respuesta": { "prevencion_total": 52000000, "respuesta_total": 26000000 },
-  "por_distrito": [ { "ubigeo": "080101", "distrito": "Cusco", "provincia": "Cusco",
-                      "pia": 5800000, "pim": 6700000, "devengado": 4200000,
-                      "pct_prevencion": 0.55, "pct_respuesta": 0.45 } ],
-  "tendencia": [ { "anio": 2021, "pim": 98000000, "devengado": 62000000 } ]
+  "disponible": true, "anio": 2026, "corte": "2026-06", "es_parcial": true,
+  "fuente": "Base PP 0068 entregada por PREDES",
+  "ambito": "municipal", "unidad": "municipalidad (entidad ejecutora), no distrito",
+  "agregados": { "pia": 16754644, "pim": 54591255, "devengado": 26064745,
+                 "pct_ejecucion": 0.4775, "saldo": 28526510, "variacion_pia_pim": 37836611,
+                 "entidades_con_presupuesto": 115, "entidades_en_ambito": 116,
+                 "pia_institucional": null, "pim_institucional": 4305815597,
+                 "devengado_institucional": null,
+                 "pct_0068_institucional": 0.0127, "entidades_con_institucional": 114,
+                 "pim_proyectos": 22217511, "pim_actividades": 32373744, "pct_proyectos": 0.407 },
+  "procesos": [ { "slug": "prevencion_reduccion", "nombre": "Prevención y reducción",
+                  "color": "#009257", "pim": 28909461, "devengado": 0, "pct": 0.53 } ],
+  "sin_clasificar": { "pim": 0, "devengado": 0, "pct": 0 },
+  "tendencia": [ { "anio": 2022, "corte": "anual", "es_parcial": false, "fuente": "…",
+                   "pia": 18060834, "pim": 48813109, "devengado": 37260987 } ],
+  "ejercicios": [ { "anio": 2026, "corte": "2026-06", "es_parcial": true } ]
 }
+
+// GET /api/inversion/entidades/?anio=2026&ordenar=saldo  → sobre estándar de DRF
+{ "count": 116, "next": "…?page=2", "previous": null,
+  "results": [ { "codigo": "300684", "entidad": "MUNICIPALIDAD PROVINCIAL DEL CUZCO",
+                 "ambito": "provincial", "ubigeo_distrito": "080101",
+                 "distrito": "CUSCO", "provincia": "CUSCO",
+                 "pia": 54508, "pim": 1278015, "devengado": 371786, "pct_ejecucion": 0.291,
+                 "saldo": 906229, "variacion_pia_pim": 1223507, "pct_variacion_pia_pim": 22.4,
+                 "pia_institucional": 176788063, "pim_institucional": 270220526,
+                 "devengado_institucional": 128401242, "pct_0068_institucional": 0.0047,
+                 "pim_proyectos": 0, "pim_actividades": 1278015, "pct_proyectos": 0.0 } ] }
+
+// Con `comparar_con=2025`, cada fila añade:
+"comparacion": { "anio": 2025, "corte": "anual", "es_parcial": false,
+                 "comparable": false, "sin_presupuesto": false,
+                 "pia": 40000, "pim": 585804, "devengado": 500000, "pct_ejecucion": 0.85,
+                 "delta_pim": 692211, "pct_delta_pim": 1.18,
+                 "delta_devengado": -128214, "delta_pct_ejecucion": -0.56 }
+
+// GET /api/inversion/entidades/300757/  → la ficha de una municipalidad
+{ "disponible": true,
+  "entidad": { "codigo": "300757", "nombre": "…", "ambito": "distrital",
+               "ambito_nombre": "Municipalidad distrital", "ubigeo_distrito": "080910",
+               "distrito": "PICHARI", "provincia": "LA CONVENCION", "sin_territorio": false },
+  "anio": 2026, "corte": "2026-06", "es_parcial": true, "fuente": "…",
+  "serie": [ { "anio": 2022, "corte": "anual", "es_parcial": false, "…": "los mismos derivados" } ],
+  "procesos": [ … ], "sin_clasificar": { … },
+  "actividades": [ { "codigo": "2534780", "nombre": "CREACION DEL SERVICIO…",
+                     "origen": "proyecto", "proceso": "Prevención y reducción",
+                     "proceso_slug": "prevencion_reduccion",
+                     "pia": 0, "pim": 6150969, "devengado": 6150968, "pct_ejecucion": 1.0 } ],
+  "ejercicios": [ … ] }
 ```
+
+La `serie` **omite los ejercicios sin presupuesto** en vez de rellenarlos con ceros: no participar del programa un año no es participar con cero soles. Las `actividades` no se paginan —3 de media por entidad y ejercicio, 50 en el máximo real—, con el mismo criterio por el que no se paginan los 112 distritos.
+
+Cinco reglas del payload que la interfaz no puede reinventar:
+
+- **`es_parcial` y `corte` viajan con el dato**, en la raíz y en cada punto de `tendencia`. Un % de ejecución de medio año se calcula contra un PIM anual: cualquier cliente que lo dibuje tiene que poder advertirlo.
+- **Un porcentaje que no se puede calcular es `null`, no `0`.** Una municipalidad sin total institucional no tiene un 0 % de su presupuesto en el 0068.
+- **Los importes institucionales de `agregados` y su porcentaje salen del mismo universo**: solo las entidades que tienen ese dato. Con el numerador de las 116 y el denominador de las 114 que tienen total, el porcentaje saldría inflado sin que nada lo dijera, y publicar un total institucional que no cuadre con el porcentaje de al lado es el mismo problema por otra vía. Por eso `entidades_con_institucional` viaja junto a las tres cifras: es su rótulo. Sin ninguna entidad con dato, los tres son `null` y no cero.
+- **`comparacion.comparable`** es `false` cuando los dos ejercicios tienen cortes distintos. El Δ de % de ejecución se sirve igual —así se decidió (ADR-D5)— pero nadie debe pintarlo sin la marca: un 47.7 % de medio año contra un 86.4 % de año cerrado no es una caída. Las variaciones de PIA, PIM y devengado sí son comparables.
+- **`comparacion.sin_presupuesto`** distingue «no participó del programa ese año» de «participó con cero». En ese caso los deltas son `null`: aparecer de la nada no es no haber cambiado.
+
+### El mapa — `GET /api/inversion/mapa/`
+
+Alimenta el coroplético de `/inversion`, y su contrato **es ADR-D6**: se pinta lo que se puede atribuir al polígono sin inventarlo, y lo que no se puede ubicar se declara.
+
+```jsonc
+// GET /api/inversion/mapa/?anio=2026&nivel=distrital
+{ "disponible": true, "anio": 2026, "corte": "2026-06", "es_parcial": true,
+  "nivel": "distrital", "ambito": "municipal",
+  "filas": [ { "ubigeo": "080910", "nombre": "PICHARI", "provincia": "LA CONVENCION",
+               "codigo_entidad": "300757", "entidad": "MUNICIPALIDAD DISTRITAL DE PICHARI",
+               "entidades": 1, "pia": 123997, "pim": 9331232, "devengado": 7178924,
+               "saldo": 2152308, "pct_ejecucion": 0.769 } ],
+  "cortes": { "pia": [...4], "pim": [28750, 55000, 94740, 216445], "devengado": [...4] },
+  "no_ubicado": { "pia": …, "pim": 10350637, "devengado": …, "entidades": 17,
+                  "motivo": "No se pinta el presupuesto de 13 municipalidad(es) provincial(es)…" },
+  "poligonos": { "pintados": 99, "sin_dato": 13, "motivo": "Distritos sin municipalidad…" } }
+```
+
+Cuatro cosas que no son detalles de implementación:
+
+- **`ubigeo` casa directamente con el tile**: seis dígitos = `UBIGEO` de `limites-distritales`, cuatro = `IDPROV` de `limites-provinciales`. No hay traducción intermedia.
+- **Las cuatro métricas viajan en cada fila.** Conmutar entre PIA, PIM, devengado y % de ejecución no dispara otra petición, así que dos métricas del mismo mapa no pueden acabar viniendo de ejercicios distintos si alguien cambia la visibilidad entre medias.
+- **`suma(filas) + no_ubicado == el total del ámbito`, siempre.** Es la contabilidad completa del mapa, y hay dos pruebas que la fijan: un mapa al que le falta dinero se ve exactamente igual que uno correcto.
+- **`poligonos.sin_dato`** cuenta los polígonos sin municipalidad —a nivel distrital son las 13 capitales de provincia— y es distinto de una municipalidad con PIM cero, que **sí** aparece en `filas` con sus ceros y su `pct_ejecucion: null`.
+
+Los `cortes` son los cuatro quintiles de lo pintado, así que el color es relativo a la vista: al acotar por provincia, un mismo distrito puede cambiar de tono. Se sirve así a propósito —una rampa lineal sobre una distribución tan sesgada deja un polígono oscuro y todos los demás pálidos— y el precio se paga imprimiendo los rangos en soles en la leyenda. Pueden salir repetidos (con muchos ceros, los tres primeros valen 0): el cliente clasifica recorriendo la lista, así que un tramo vacío se dibuja vacío. Lo que **no** se puede hacer con ellos es un `step` de MapLibre, que exige cortes estrictamente crecientes. El **% de ejecución no tiene cortes en el payload**: son fijos (25/50/75/90) porque es un porcentaje, y con una escala relativa el mismo 90 % se pintaría de verde o de rojo según con quién compartiera pantalla.
 
 ## Productos de incidencia
 
 | Endpoint | Params | Notas |
 |---|---|---|
 | `GET /api/comparador/distritos/` | `ubigeos=080101,080301` (2–4), `anio` | por distrito: población, conteo CCPP por peligro×nivel, frecuencia de emergencias, inversión (si `disponible`), nº medidas publicadas |
-| `GET /api/distritos/{ubigeo}/ayuda-memoria.pdf` | `anio`, `peligro` (slug), `nivel_min` | WeasyPrint; cache en `media/informes/` 24 h, invalidado por imports |
+| `GET /api/distritos/{ubigeo}/ayuda-memoria.pdf` | `anio`, `peligros` (CSV), `niveles` (CSV) | WeasyPrint; cache en `media/informes/` 24 h, invalidado por imports |
 
 **La maqueta de la ayuda memoria ya existe**: `prototype/src/components/ReporteImpresion.tsx`, validada en pantalla y en vista previa de impresión. Es HTML+CSS estándar, que es justo lo que consume WeasyPrint, así que la plantilla del backend parte de ahí en vez de diseñarse de cero. Estructura del documento: membrete PREDES · ámbito y filtros aplicados · fecha de generación · párrafo de presentación redactado con las cifras del propio filtro · mapa · distribución por nivel · emergencias del distrito · tabla de centros poblados clasificados · fuentes y firma institucional.
 
 Notas de contrato heredadas de la maqueta:
 
-- **El alcance es un distrito**, con `peligro` y `nivel_min` como refinamientos opcionales. Un reporte regional o provincial produce decenas de páginas y deja de servir para una mesa técnica.
+- **El alcance es un distrito**, con `peligros` y `niveles` como refinamientos opcionales. Un reporte regional o provincial produce decenas de páginas y deja de servir para una mesa técnica.
 - La tabla lista **solo los centros poblados clasificados**; los "sin dato" se cuentan en el texto como vacío de información, que es en sí mismo un argumento de incidencia.
 - **El mapa se renderiza en el servidor** (decisión del dueño del proyecto). El worker abre una página headless (Playwright + Chromium) con un visor mínimo que consume `/api/ccpp/geojson/` y las capas de contexto, encuadra el distrito y captura el PNG, que WeasyPrint incrusta. Se prefiere esto a que el cliente envíe el canvas de su vista: así el PDF se puede generar **desde el admin y por lotes**, sin depender de que alguien tenga el visor abierto, y el documento es reproducible a partir de sus parámetros. Coste asumido: Chromium en la imagen del backend (~400 MB) y un punto más de fallo — si la captura falla, el PDF sale **sin mapa** y con el resto del contenido intacto, nunca con un hueco roto.
 - Los textos de firma salen de `ConfiguracionSitio` y `BloqueTexto`, no cableados como en el prototipo.

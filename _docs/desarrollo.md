@@ -7,8 +7,23 @@ pruebas.
 
 - Docker y Docker Compose.
 - Node 22 y npm, para el frontend en modo desarrollo.
-- Los **archivos de datos**, que no se versionan (145 MB): `data/layers/data/*.xlsx` y
-  `data/layers/*.geojson`. Los entrega PREDES; sin ellos el seed no tiene qué importar.
+- Los **archivos de datos**, que no se versionan (245 MB): `data/layers/data/*.xlsx` y
+  `data/layers/*.geojson`. Los Excel y las capas de ríos, lagunas y glaciares los entrega
+  PREDES; sin ellos el seed no tiene qué importar.
+- Las **dos capas de límites** salen de un repositorio público con licencia MIT y se descargan
+  una sola vez. A partir de ahí se sirven como PMTiles desde este mismo servidor: **en runtime
+  nadie sale al origen** (ADR-A20).
+
+  ```bash
+  cd data/layers
+  curl -L -o limites-distritales.geojson \
+    https://raw.githubusercontent.com/josedaniel-cb/limites-peru-geojson/main/LIM_DISTRITAL_PERU.json
+  curl -L -o limites-provinciales.geojson \
+    https://raw.githubusercontent.com/josedaniel-cb/limites-peru-geojson/main/LIM_PROVINCIAL_PERU.json
+  ```
+
+  Después de `seed --capas`, **`manage.py calcular_centroides`** guarda el centroide de cada
+  distrito a partir de esa capa; es lo que sitúa el ícono de emergencias en el visor.
 - Opcional: `uv` y Python 3.12+, si quieres correr `manage.py` desde el host.
 
 ## Primera vez
@@ -135,9 +150,10 @@ Todo por el puerto 80: en este modo no queda ningún otro puerto publicado.
 Ojo con `VITE_*`: **Vite las hornea en el bundle durante el build**, no las lee en runtime. Si
 cambias una, hay que reconstruir la imagen del frontend (`--build`), no basta con reiniciar.
 
-Y con dos cosas más de este modo: es fiel solo con `DEBUG=False` en `backend/.env` (en desarrollo,
-`compose.dev.yml` fuerza `True`; aquí no se fuerza nada), y con `DEBUG=False` **`ALLOWED_HOSTS` tiene
-que contener el host que uses** — si abres el sitio desde otra máquina por IP, Django responde 400
+Los dos overrides fijan `DEBUG` y no lo heredan de `backend/.env`: `compose.dev.yml` lo fuerza a
+`True` y `compose.local.yml` a `False`, para que cada modo sea fiel a lo que simula sin depender de
+lo que haya quedado en el `.env`. Con `DEBUG=False`, **`ALLOWED_HOSTS` tiene que contener el host que
+uses** — trae `localhost`, pero si abres el sitio desde otra máquina por IP, Django responde 400
 hasta que la añadas.
 
 ## Pruebas

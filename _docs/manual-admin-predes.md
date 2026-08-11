@@ -140,6 +140,44 @@ Tres cosas importantes:
 Al terminar una carga de peligros, **los puntos del mapa y el buscador se actualizan solos**. No
 hay que hacer nada más.
 
+## Actualizar el presupuesto del PP 0068
+
+Se sube por el mismo sitio —**Datos → Cargas de datos**— eligiendo el tipo **«Presupuesto PP 0068
+por municipalidad»**. El archivo del día a día es el Excel del periodo, el mismo que llega con la
+hoja `Base AAAA`: trae las filas del programa y las de presupuesto institucional, y con eso basta.
+
+Después de importar hay **un paso más que en los otros datos**, y es a propósito:
+
+1. **Inversión → Ejercicios.** El ejercicio nuevo aparece con la casilla **visible** desmarcada.
+   Mientras siga así, la página `/inversion` muestra «información en preparación». Importar no
+   publica: la revisión es de PREDES.
+2. Se revisan las cifras y se marca **visible**. La página aparece al recargar.
+
+**Si el archivo trae un devengado mayor que su PIM, la carga se rechaza entera** y el registro
+enumera las filas. No es una manía del sistema: el PIM es el techo de gasto y el SIAF no deja
+devengar por encima, así que un archivo así viene mal de origen y hay que pedirlo de nuevo. Lo
+mismo con cualquier importe negativo. Nada se escribe hasta que el archivo esté bien.
+
+Dos avisos que conviene leer en el registro de la carga:
+
+- **Municipalidades «sin territorio».** Son las que no casan con el padrón de distritos, hoy cuatro
+  de La Convención creadas después. **Cuentan en los totales**; lo único que no pueden es cruzarse
+  con datos por distrito. Se ven en **Inversión → Entidades ejecutoras**.
+- **Códigos sin proceso asignado.** Si el archivo trae una actividad o un proyecto que el catálogo
+  no conoce, su importe aparece en el gráfico como **«sin clasificar»**, nunca repartido entre los
+  demás. La pantalla de inicio del admin avisa de cuánto dinero está en esa situación.
+
+### El catálogo de procesos de la GRD
+
+**Inversión → Procesos de la GRD.** Es la tabla que decide en qué barra del gráfico cae cada sol:
+cada actividad o proyecto del programa tiene asignado un proceso (estimación, prevención y
+reducción, preparación, respuesta, rehabilitación o gestión transversal).
+
+Las asignaciones que trae el sistema son una **propuesta**, y la lista lo marca en la columna
+«revisado». En cuanto alguien de PREDES guarda una fila, esa asignación pasa a ser suya: **ninguna
+importación futura vuelve a tocarla**. El cambio se ve en el sitio al recargar, sin volver a subir
+nada.
+
 ## Cambiar las capas del mapa
 
 **Mapa → Capas cartográficas.** Cada capa (ríos, lagunas, glaciares) tiene su archivo GeoJSON, su
@@ -170,7 +208,7 @@ cambiar el color de los niveles de peligro desde aquí: eso es parte del diseño
   contenido, así que un slide se retira **archivándolo**, no borrándolo.
 - **Menú** — los enlaces de la cabecera y del pie. Cada uno tiene una casilla **visible**: es la
   forma de ocultar una sección sin perder su configuración. Así está hoy **Prioridades**.
-  **Inversión** sí está visible, y muestra su página en espera de datos.
+  **Inversión** sí está visible.
 
 Un cambio aquí se ve en el sitio en cuanto se recarga la página.
 
@@ -199,7 +237,20 @@ Merece la pena recorrerlo en la capacitación, porque es donde se ve el efecto d
   anunciarla, en **Menú** se marca «visible» en los dos enlaces «Comparar distritos» (el del menú
   principal y el del pie). Es el mismo mecanismo con el que se puede ocultar cualquier sección.
 - **`/buscar`** — busca en todo el contenido publicado, tolera errores de tecleo.
-- **`/inversion`** — hoy vacía, a la espera de los datos.
+- **`/inversion`** — cuánto y cómo ejecuta cada **municipalidad** el presupuesto del PP 0068,
+  con un mapa que colorea el territorio por PIA, PIM, devengado o % de ejecución.
+
+### Por qué el mapa de Inversión tiene trece distritos en blanco
+
+No es un error ni un dato que falte. **El presupuesto lo tiene la municipalidad, no el
+territorio**, y las capitales de provincia no tienen municipalidad distrital: quien gobierna ahí
+es la municipalidad provincial, que gestiona el presupuesto de **toda** su provincia. Pintar ese
+dinero sobre el distrito capital diría que ese distrito recibe lo que en realidad se reparte entre
+todos los de la provincia.
+
+Por eso el mapa hace dos cosas en vez de una: deja esos polígonos en blanco, y **debajo declara
+cuánto dinero no está dibujado y por qué**. Si lo que se quiere es una lámina sin huecos, se
+cambia el selector a **«Provincia»**: a ese nivel entra todo y no queda nada fuera.
 
 ### Dos cifras que no significan lo mismo
 

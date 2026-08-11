@@ -15,10 +15,19 @@ const API_URL: string = import.meta.env.VITE_API_URL ?? "/api";
 
 export type Params = Record<string, string | number | boolean | undefined | null>;
 
+/**
+ * `url` dice **de qué petición** salieron los datos.
+ *
+ * Existe porque el estado y los parámetros que lo pidieron van desacompasados durante al menos
+ * un render: al cambiar de página, `pagina` ya vale lo nuevo mientras `estado` sigue trayendo
+ * lo anterior —y si la URL estaba en caché ni siquiera se pasa por `loading`—. Quien acumule
+ * respuestas tiene que poder distinguirlas; sin esto, `useApiPaginado` archivaba las filas de
+ * una página bajo el número de la siguiente y las repetía.
+ */
 export type Estado<T> =
-  | { status: "loading"; data: null; error: null }
-  | { status: "ok"; data: T; error: null }
-  | { status: "error"; data: null; error: Error };
+  | { status: "loading"; data: null; error: null; url: string | null }
+  | { status: "ok"; data: T; error: null; url: string }
+  | { status: "error"; data: null; error: Error; url: string };
 
 /** Respuesta paginada de DRF. */
 export type Pagina<T> = {
@@ -108,7 +117,12 @@ export function useApi<T>(ruta: string | null, params?: Params): Estado<T> {
     [ruta, JSON.stringify(params ?? {})]
   );
 
-  const [estado, setEstado] = useState<Estado<T>>({ status: "loading", data: null, error: null });
+  const [estado, setEstado] = useState<Estado<T>>({
+    status: "loading",
+    data: null,
+    error: null,
+    url: null,
+  });
 
   useEffect(() => {
     if (url === null) return;
@@ -123,14 +137,14 @@ export function useApi<T>(ruta: string | null, params?: Params): Estado<T> {
     const enCache = cache.get(url);
     if (enCache) {
       enCache
-        .then((data) => vigente && setEstado({ status: "ok", data: data as T, error: null }))
-        .catch((error: Error) => vigente && setEstado({ status: "error", data: null, error }));
+        .then((data) => vigente && setEstado({ status: "ok", data: data as T, error: null, url }))
+        .catch((error: Error) => vigente && setEstado({ status: "error", data: null, error, url }));
       return () => {
         vigente = false;
       };
     }
 
-    setEstado({ status: "loading", data: null, error: null });
+    setEstado({ status: "loading", data: null, error: null, url });
     const promesa = traer<T>(url).catch((err) => {
       // Un fallo no se cachea: el siguiente montaje debe volver a intentarlo.
       cache.delete(url);
@@ -138,8 +152,8 @@ export function useApi<T>(ruta: string | null, params?: Params): Estado<T> {
     });
     cache.set(url, promesa);
     promesa
-      .then((data) => vigente && setEstado({ status: "ok", data, error: null }))
-      .catch((error: Error) => vigente && setEstado({ status: "error", data: null, error }));
+      .then((data) => vigente && setEstado({ status: "ok", data, error: null, url }))
+      .catch((error: Error) => vigente && setEstado({ status: "error", data: null, error, url }));
 
     return () => {
       vigente = false;
@@ -153,8 +167,19 @@ export function useApi<T>(ruta: string | null, params?: Params): Estado<T> {
  * Listado paginado con acumulación de páginas.
  *
  * Devuelve los resultados de todas las páginas cargadas y un `cargarMas()`. Es lo que necesita
- * la tabla del visor, que va de 50 en 50 sobre 8,968 centros poblados: cargar todo de golpe son
+ * la tabla del visor, que va de 20 en 20 sobre 8,968 centros poblados: cargar todo de golpe son
  * varios MB y paginar sin acumular pierde el scroll en cada avance.
+ *
+ * Las páginas se guardan **por número** y no concatenadas. Concatenar no es idempotente: si el
+ * efecto vuelve a correr para la misma página —React monta los efectos dos veces en desarrollo,
+ * y basta con que la respuesta cambie de identidad— sus filas entran otra vez. Se veía como una
+ * tabla con 60 filas de las que solo 40 eran distintas, y React avisando de claves duplicadas.
+ * No se notaba en la primera página porque ahí reemplazaba en vez de acumular.
+ *
+ * Y solo se archiva la respuesta **cuya URL coincide con la página pedida**. Al avanzar hay al
+ * menos un render en que `pagina` ya es la nueva y `estado` todavía trae la anterior —si la URL
+ * estaba en caché ni siquiera se pasa por `loading`—, así que sin esa comprobación las filas de
+ * una página se guardaban bajo el número de la siguiente y aparecían dos veces.
  */
 export function useApiPaginado<T>(ruta: string | null, params?: Params) {
   const clave = useMemo(
@@ -164,7 +189,7 @@ export function useApiPaginado<T>(ruta: string | null, params?: Params) {
   );
 
   const [pagina, setPagina] = useState(1);
-  const [acumulado, setAcumulado] = useState<T[]>([]);
+  const [paginas, setPaginas] = useState<Record<number, T[]>>({});
   const claveAnterior = useRef(clave);
 
   // Al cambiar los filtros se empieza de cero: seguir acumulando mezclaría resultados de dos
@@ -172,15 +197,31 @@ export function useApiPaginado<T>(ruta: string | null, params?: Params) {
   if (claveAnterior.current !== clave) {
     claveAnterior.current = clave;
     if (pagina !== 1) setPagina(1);
-    if (acumulado.length) setAcumulado([]);
+    if (Object.keys(paginas).length) setPaginas({});
   }
 
-  const estado = useApi<Pagina<T>>(ruta, { ...params, page: pagina });
+  const paramsPagina = useMemo(
+    () => ({ ...params, page: pagina }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(params ?? {}), pagina]
+  );
+  const urlEsperada = ruta === null ? null : construirUrl(ruta, paramsPagina);
+  const estado = useApi<Pagina<T>>(ruta, paramsPagina);
 
   useEffect(() => {
-    if (estado.status !== "ok") return;
-    setAcumulado((previo) => (pagina === 1 ? estado.data.results : [...previo, ...estado.data.results]));
-  }, [estado.status, estado.status === "ok" ? estado.data : null, pagina]);
+    if (estado.status !== "ok" || estado.url !== urlEsperada) return;
+    const filas = estado.data.results;
+    setPaginas((previo) => (previo[pagina] === filas ? previo : { ...previo, [pagina]: filas }));
+  }, [estado.status, estado.status === "ok" ? estado.data : null, estado.url, urlEsperada, pagina]);
+
+  const acumulado = useMemo(
+    () =>
+      Object.keys(paginas)
+        .map(Number)
+        .sort((a, b) => a - b)
+        .flatMap((n) => paginas[n]),
+    [paginas]
+  );
 
   const cargarMas = useCallback(() => setPagina((p) => p + 1), []);
 

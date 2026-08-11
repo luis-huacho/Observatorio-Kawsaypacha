@@ -40,7 +40,7 @@ API desde otro dominio hay que pedir que lo añadan a `CORS_ALLOWED_ORIGINS`. De
 | `GET /api/ccpp/` | El padrón de 8,968 centros poblados, paginado |
 | `GET /api/ccpp/{codigo}/` | Ficha de un centro poblado con sus clasificaciones |
 | `GET /api/ccpp/geojson/` | Los mismos, como FeatureCollection para el mapa |
-| `GET /api/ccpp/export.xlsx` | Lo filtrado, en Excel |
+| `GET /api/ccpp/export.xlsx` | Lo filtrado, en Excel: una fila por centro poblado, con sus peligros en una columna legible y una columna por peligro con su nivel |
 | `GET /api/peligros/tipos/` | El catálogo de 9 peligros con slug, color y categoría |
 | `GET /api/peligros/resumen/` | Agregados para las tarjetas y el gráfico de distribución |
 | `GET /api/peligros/frecuencia/` | Frecuencia de emergencias, un registro por distrito |
@@ -210,15 +210,52 @@ día para otro.
 
 ## Inversión
 
-**`GET /api/inversion/`** responde:
+**`GET /api/inversion/`** — el tablero del PP 0068 **por municipalidad**: agregados, procesos,
+tendencia y ejercicios publicados. Acepta `anio`, `ambito` (`municipal` por defecto, `distrital`,
+`provincial`, `regional`, `todos`), `provincia` (ubigeo o nombre) y `comparar_con`.
+
+**`GET /api/inversion/entidades/`** — la tabla, **paginada** (50 por página, techo 200) y ordenada
+en el servidor con `ordenar` (`pim`, `ejecucion`, `saldo`, `institucional`, `variacion`). Acepta
+además `buscar`. Ojo al consumirlo: su ruta **contiene** `/api/inversion/`, así que un matcher por
+subcadena atrapa la respuesta equivocada.
+
+**`GET /api/inversion/entidades/{codigo}/`** — la ficha de una municipalidad por su código MEF:
+serie de todos los ejercicios publicados, reparto por procesos y desglose de actividades.
+
+**`GET /api/inversion/mapa/`** — el coroplético. Acepta los mismos filtros más `nivel`
+(`distrital` por defecto, o `provincial`). Cada fila lleva el `ubigeo` que casa con el tile de
+límites —seis dígitos con `UBIGEO`, cuatro con `IDPROV`— y **las cuatro métricas a la vez** (PIA,
+PIM, devengado y % de ejecución), para que conmutar entre ellas no dispare otra petición.
+
+Lo que hay que leer siempre junto a `filas` es **`no_ubicado`**: el importe que ese nivel no puede
+atribuir a ningún polígono, con su recuento y su motivo ya redactado. A nivel distrital son las 13
+municipalidades provinciales —su presupuesto cubre toda la provincia, no un distrito— más las que
+el padrón no ubica. **La suma de `filas` más `no_ubicado` es exactamente el total del ámbito**: si
+al dibujar el mapa solo se usa `filas`, se está publicando una cifra menor que la del tablero.
+
+**`GET /api/inversion/export.xlsx`** devuelve la misma tabla en Excel, con los mismos filtros y sin
+paginar; con `comparar_con` añade las columnas del otro ejercicio y una de «Comparabilidad».
+
+Mientras PREDES no publique ningún ejercicio, responde:
 
 ```json
-{"disponible": false, "motivo": "PREDES está consolidando los datos de inversión del PPR 0068."}
+{"disponible": false, "motivo": "PREDES está consolidando los datos de inversión del PP 0068."}
 ```
 
-La sección está diferida porque aún no hay claridad sobre la fuente de datos (ADR-D3). El endpoint
-existe para que el frontend muestre su estado vacío sin casos especiales, y para que el día que
-llegue la data se implemente detrás sin tocar el cliente.
+No es un residuo de cuando la sección estaba diferida: es el estado normal entre una importación y
+su revisión, y ahorra al cliente un caso especial. Un `anio` que no esté publicado devuelve lo
+mismo en vez de caer al último visible, que se vería bien con las cifras de otro año.
+
+Con datos, el payload trae `agregados`, `procesos` (más `sin_clasificar`), `tendencia`,
+`por_entidad` y la lista de `ejercicios` publicados. Tres detalles que conviene no perder al
+consumirlo:
+
+- **`es_parcial` y `corte`** viajan en la raíz y en cada punto de la tendencia. El ejercicio en
+  curso llega a mitad de año y su % de ejecución se calcula contra un PIM anual.
+- **Un porcentaje que no se puede calcular es `null`, no `0`** (`pct_ejecucion`,
+  `pct_0068_institucional`, `pct_proyectos`).
+- **`pct_0068_institucional` de `agregados` solo suma entidades comparables**; por eso viene
+  acompañado de `entidades_con_institucional`.
 
 ## Los tiles
 

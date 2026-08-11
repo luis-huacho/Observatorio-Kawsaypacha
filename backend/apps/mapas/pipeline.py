@@ -326,7 +326,6 @@ def escribir_geojsonseq_ccpp(destino: Path) -> int:
                 "distrito": c.distrito.nombre,
                 "provincia": c.distrito.provincia.nombre,
                 "ubigeo_distrito": c.distrito_id,
-                "poblacion": c.poblacion or 0,
                 "altitud": c.altitud,
             }
             if por_peligro := niveles.get(c.pk):

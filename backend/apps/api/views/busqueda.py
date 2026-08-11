@@ -139,10 +139,13 @@ class BusquedaView(APIView):
         ]
 
     def _ccpp(self, q: str, limite: int) -> list:
+        # Ordenaba por población descendente, que ya no se importa (ADR-A19). Alfabético es lo
+        # predecible en un autocompletado: quien escribe «acco» espera las coincidencias en
+        # orden, no en uno derivado de un dato que la pantalla ya no muestra.
         qs = (
             CentroPoblado.objects.filter(nombre__icontains=q)
             .select_related("distrito__provincia")
-            .order_by("-poblacion")[:limite]
+            .order_by("nombre")[:limite]
         )
         return [
             {"titulo": c.nombre,

@@ -16,6 +16,13 @@ from .editorial import (
     VideoViewSet,
 )
 from .incidencia import AyudaMemoriaView, ComparadorView
+from .inversion import (
+    InversionEntidadDetalleView,
+    InversionEntidadesView,
+    InversionExportView,
+    InversionMapaView,
+    InversionView,
+)
 from .salud import SaludView
 from .peligros import (
     CentroPobladoExportView,
@@ -24,12 +31,14 @@ from .peligros import (
     DistritoViewSet,
     FrecuenciaDetalleView,
     FrecuenciaExportView,
+    FrecuenciaGeoJSONView,
     FrecuenciaListaView,
+    FrecuenciaProvinciaView,
     ProvinciaViewSet,
     ResumenPeligrosView,
     TipoPeligroViewSet,
 )
-from .sitio import CapasMapaView, InversionView, MetricaEventoView, SitioView
+from .sitio import CapasMapaView, MetricaEventoView, SitioView
 
 __all__ = [
     "AyudaMemoriaView",
@@ -46,7 +55,13 @@ __all__ = [
     "EventoListaView",
     "FrecuenciaDetalleView",
     "FrecuenciaExportView",
+    "FrecuenciaGeoJSONView",
     "FrecuenciaListaView",
+    "FrecuenciaProvinciaView",
+    "InversionEntidadDetalleView",
+    "InversionEntidadesView",
+    "InversionExportView",
+    "InversionMapaView",
     "InversionView",
     "MedidaViewSet",
     "MetricaEventoView",

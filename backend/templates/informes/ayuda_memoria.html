@@ -84,7 +84,7 @@
     Cusco) registra <strong>{{ total_ambito|miles }}</strong>
     {{ total_ambito|plural_es:"centro poblado,centros poblados" }} en el padrón del Observatorio.
     De ellos, <strong>{{ total_clasificados|miles }}</strong>
-    {{ total_clasificados|plural_es:"cuenta,cuentan" }} con clasificación de nivel de peligro{% if nombre_peligro %} frente a <strong>{{ nombre_peligro|lower }}</strong>{% endif %}{% if nivel_min %} en nivel {{ nivel_min_label|lower }} o superior{% endif %}, según la
+    {{ total_clasificados|plural_es:"cuenta,cuentan" }} con clasificación de nivel de peligro{% if nombre_peligro %} frente a <strong>{{ nombre_peligro|lower }}</strong>{% endif %}{% if niveles_pedidos %} en los niveles seleccionados{% endif %}, según la
     información de {{ fuentes|join:", " }}.
   </p>
   {% if total_clasificados %}
@@ -92,8 +92,6 @@
       {% if criticos %}<strong>{{ criticos|miles }}</strong> de esos centros poblados
       {{ criticos|plural_es:"presenta,presentan" }} al menos un peligro clasificado en nivel
       <strong>alto o muy alto</strong>. {% endif %}
-      La población registrada en los centros poblados clasificados asciende a
-      <strong>{{ poblacion_expuesta|miles }}</strong> habitantes según el padrón vigente.
     </p>
   {% endif %}
   {% if frecuencia and frecuencia.total %}
@@ -197,10 +195,8 @@
     <table class="datos tabla-larga">
       <thead>
         <tr>
-          <th style="width: 38mm">Centro poblado</th>
-          <th style="width: 22mm">Categoría</th>
-          <th style="width: 16mm" class="num">Población</th>
-          <th style="width: 16mm" class="num">Altitud</th>
+          <th style="width: 48mm">Centro poblado</th>
+          <th style="width: 24mm">Categoría</th>
           <th>Peligros clasificados</th>
         </tr>
       </thead>
@@ -209,8 +205,6 @@
           <tr>
             <td>{{ f.nombre }}</td>
             <td>{{ f.categoria }}</td>
-            <td class="num">{% if f.poblacion != None %}{{ f.poblacion|miles }}{% else %}—{% endif %}</td>
-            <td class="num">{% if f.altitud != None %}{{ f.altitud|miles }} m{% else %}—{% endif %}</td>
             <td>{% for p in f.peligros %}{% if not forloop.first %}; {% endif %}<span
                 class="punto" style="background: {{ p.color }}"></span>{{ p.peligro }}:
                 {{ p.label }}{% endfor %}</td>

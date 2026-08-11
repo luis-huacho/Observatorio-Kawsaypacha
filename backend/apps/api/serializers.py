@@ -43,12 +43,37 @@ class CentroPobladoSerializer(serializers.ModelSerializer):
     # Máximo de las clasificaciones que pasan los filtros; null = sin dato con esos filtros.
     # La anotación la pone `filters.anotar_nivel`.
     nivel = serializers.IntegerField(read_only=True, allow_null=True, required=False)
+    peligros = serializers.SerializerMethodField()
 
     class Meta:
         model = CentroPoblado
+        # Sin `poblacion`, en ningún sitio: el Excel la trae, pero no es un padrón entregado
+        # ni respaldado por el cliente (ADR-A19). Salió primero del visor por ilegible —948
+        # centros poblados valen 0 y la mediana es 17 habitantes— y después del producto entero
+        # por falta de fuente.
         fields = [
             "codigo", "nombre", "categoria", "departamento", "provincia",
-            "distrito", "ubigeo_distrito", "lat", "lon", "altitud", "poblacion", "nivel",
+            "distrito", "ubigeo_distrito", "lat", "lon", "altitud", "nivel", "peligros",
+        ]
+
+    def get_peligros(self, obj) -> list[dict]:
+        """Todos los peligros del centro poblado **que pasan los filtros**, no solo el máximo.
+
+        Sale del `Prefetch` con `to_attr="clasificaciones_filtradas"` que arma el viewset, que
+        es quien conoce los filtros de la petición y ya los aplica con la misma condición y el
+        mismo orden que el geojson. Sin prefetch se devuelve vacío en vez de disparar una
+        consulta por fila: el N+1 sería silencioso y solo se notaría en producción.
+        """
+        clasificaciones = getattr(obj, "clasificaciones_filtradas", None)
+        if clasificaciones is None:
+            return []
+        return [
+            {
+                "slug": c.tipo_peligro.slug,
+                "nombre": c.tipo_peligro.nombre,
+                "nivel": c.nivel,
+            }
+            for c in clasificaciones
         ]
 
     def get_departamento(self, obj) -> str:
@@ -79,7 +104,15 @@ class CentroPobladoDetalleSerializer(CentroPobladoSerializer):
     clasificaciones = ClasificacionPeligroSerializer(many=True, read_only=True)
 
     class Meta(CentroPobladoSerializer.Meta):
-        fields = CentroPobladoSerializer.Meta.fields + ["clasificaciones"]
+        # **Sin `peligros`**: aquí está `clasificaciones`, que es lo mismo con fuente y
+        # respaldo documental. Heredarlo devolvería una lista vacía —el prefetch de la ficha
+        # es otro— y un campo que siempre viene vacío se lee como «este lugar no tiene».
+        #
+        # Y sin `poblacion`: el Excel la trae pero no es un padrón entregado ni respaldado por
+        # el cliente, así que el sitio no la publica en ningún sitio (ADR-A19).
+        fields = [c for c in CentroPobladoSerializer.Meta.fields if c != "peligros"] + [
+            "clasificaciones",
+        ]
 
 
 class TipoPeligroSerializer(serializers.ModelSerializer):

@@ -19,6 +19,12 @@ El TDR exige actualización "por carga de archivos sin asistencia técnica": el 
 
 `DEPARTAMEN, PROVINCIA, DISTRITO, CODIGO (10 díg INEI), NOMB_CPOB, CATEGORIA, ALTITUD, LONGITUD, LATITUD, POBLACION, PELIGRO, TIP_PELIG, NIVEL_PELI (1-4), Fuente, Link`
 
+> **`POBLACION` se lee pero NO se importa** (ADR-A19). La columna existe en el archivo y sigue
+> en `COLUMNAS_ESPERADAS` —la validación de estructura compara la cabecera completa y quitarla
+> haría fallar la importación del archivo real— pero su valor se descarta: no es un padrón que
+> el cliente haya entregado ni respaldado. El campo del modelo se conserva vacío para que baste
+> reimportar el día que llegue uno oficial.
+
 **El nombre de la hoja no es el nombre del peligro.** La fuente de verdad es la columna `PELIGRO`, que dentro de cada hoja es constante pero difiere del título en dos casos. El catálogo canónico (hoja → nombre → slug → `TIP_PELIG`) es:
 
 | Hoja | `PELIGRO` | slug | `TIP_PELIG` | Clasificaciones |
@@ -86,8 +92,8 @@ Se aplica a: Medida, Norma, Documento, Noticia, Video, Evento, HeroSlide. Tambi�
 | Modelo | Campos | Claves/índices |
 |---|---|---|
 | `Provincia` | `ubigeo` char(4) unique, `nombre`; [+] `poblacion_censo`, `superficie_km2` | 13 filas |
-| `Distrito` | `ubigeo` char(6) unique, FK `provincia`, `nombre`, `nombre_normalizado` (index; para resolver Excel de frecuencia); [+] `poblacion_censo`, `superficie_km2`, `contacto_gdr` | 112 filas |
-| `CentroPoblado` | `codigo` char(10) INEI unique+index, FK `distrito` (index), `nombre`, `categoria`, `lat`, `lon`, `altitud`, `poblacion` (nullables como en el prototipo); [+] `vigente` bool, `fuente_padron`, `anio_padron` | 8,968 filas; índice `(distrito, nombre)` |
+| `Distrito` | `ubigeo` char(6) unique, FK `provincia`, `nombre`, `nombre_normalizado` (index; para resolver Excel de frecuencia), **`lat`/`lon`** = centroide de su polígono (ADR-A20; lo calcula `manage.py calcular_centroides` desde la capa de límites); [+] `poblacion_censo`, `superficie_km2`, `contacto_gdr` | 112 filas; 111 con centroide |
+| `CentroPoblado` | `codigo` char(10) INEI unique+index, FK `distrito` (index), `nombre`, `categoria`, `lat`, `lon`, `altitud` (nullables como en el prototipo); **`poblacion` se conserva VACÍO** (ADR-A19); [+] `vigente` bool, `fuente_padron`, `anio_padron` | 8,968 filas; índice `(distrito, nombre)` |
 
 ### peligros
 | Modelo | Campos | Claves/índices |
@@ -121,7 +127,7 @@ ausencia de riesgo**.
 ```python
 class DatasetUpload(TimeStampedMixin):
     tipo        # choices: peligros_ccpp | frecuencia_emergencias | inversion_mef  ([+] ccpp_catalogo)
-    archivo     # FileField xlsx → media/datasets/
+    archivo     # FileField xlsx (o csv, para las series de inversión) → media/datasets/
     estado      # subido | validando | procesando | activo | reemplazado | error  (index)
     log         # JSONField: advertencias/errores fila a fila, conteos leídos/importados
     filas_leidas / filas_importadas
@@ -136,6 +142,8 @@ Flujo (tarea django-tasks disparada por acción de admin "Validar e importar"):
 3. Encadena: `generar_tiles_ccpp` (si tipo=peligros_ccpp) y `meili_rebuild ccpp` (ver 04/05).
 
 Los importadores viven en `apps/datasets/importers/` (`nivel_peligro.py`, `frecuencia.py`, `inversion.py`).
+
+> **`inversion_mef` acepta tres formas de archivo y las distingue por su propia cabecera**, no por tipos de carga distintos: el Excel del cliente (un ejercicio con su corte, con las filas del programa y las de `PRESUPUESTO INSTITUCIONAL`), la serie consolidada del programa y la de totales institucionales. El reemplazo es atómico **por ejercicio y por parte**: subir la serie del programa no borra los totales institucionales ya cargados, ni al revés. Sin esa regla, cargar los tres archivos en cualquier orden dejaba siempre alguno a medias —la serie institucional no lleva provincia ni distrito, y escribir `null` desde ahí borraba el territorio resuelto por la otra—.
 
 ### medidas
 `Medida (Workflow)`: `slug` unique, `titulo`, FK `tipo_peligro`, `ambito` (comunal|distrital|provincial|regional), `resultado` (exito|leccion|mal_adaptacion, index), FK `distrito` null (reemplaza el `ubigeo` crudo del mock), `comunidad`, `resumen_corto`, `contenido` (rich text, CKEditor 5 — ver ADR-D2), `video_url` null, `imagen_portada` ImageField null, `imagen_titulo` char null, `palabras_clave` ArrayField(char), `enlaces` JSONField (lista de `{titulo, url}`), modelo hijo **`MedidaImagen`** (galería); [+] FK `centro_poblado` null, `fecha_implementacion`, `actores`, `costo_referencial`, M2M `documentos` (biblioteca), [+] migrar `tipo_peligro` a M2M si una medida atiende varios peligros.
@@ -158,13 +166,28 @@ La ficha y el listado muestran el acceso en **ambos** sitios: quien prepara un e
 
 > En el prototipo los `url_oficial` son **de ejemplo** y apuntan al portal del organismo emisor, no al documento. En la plataforma los carga el editor.
 
-### inversion — **data pendiente del cliente**
+### inversion — PP 0068 por municipalidad (ADR-D4)
+
+**La unidad es la entidad ejecutora, no el distrito.** Los modelos `EjercicioPresupuestal` e `InversionDistrito` que este spec describía antes eran herencia del prototipo y quedan sustituidos: quien tiene PIA, PIM y devengado es la municipalidad, y una provincial gestiona presupuesto de toda su provincia.
+
 | Modelo | Campos |
 |---|---|
-| `EjercicioPresupuestal` | `anio` unique, `pim_total`, `ejecutado`, `porcentaje_ejecucion`, `municipios_con_ppr_0068`, `prevencion_total`, `respuesta_total`, `visible` bool; [+] `fuente` (default "MEF – Consulta Amigable"), `fecha_corte` |
-| `InversionDistrito` | FK `ejercicio`, FK `distrito`, `pia`, `pim`, `devengado`, `pct_prevencion`, `pct_respuesta`; unique `(ejercicio, distrito)`; [+] `monto_prevencion`, `monto_respuesta`, `num_proyectos` |
+| `ProcesoGRD` | `slug` (guion **bajo**) unique, `nombre`, `orden`, `color`, `descripcion`. Seis filas — los cinco procesos de la hoja «Campos» del cliente más `gestion_transversal` |
+| `ClasificacionActividad` | `codigo` unique (actividad `5xxxxxx` o proyecto `2xxxxxx`), `nombre` Text, `origen` (actividad\|proyecto), FK `proceso` **null = sin clasificar**, `automatico` bool |
+| `Ejercicio` | `anio` unique, `corte` ("anual" o "AAAA-MM"), `fuente` (MEF\|BASE_PP0068), `es_parcial` bool, `fecha_corte`, `visible` bool |
+| `EntidadEjecutora` | `codigo` MEF unique (SEC_EJEC para gobiernos locales, PLIEGO para el resto), `nombre`, `ambito` (distrital\|provincial\|mancomunidad\|regional\|nacional), FK `distrito` null (sede, `to_field="ubigeo"`), FK `provincia` null |
+| `PresupuestoEntidad` | FK `ejercicio`, FK `entidad`, `pia`/`pim`/`devengado` del 0068, `pia_institucional`/`pim_institucional`/`devengado_institucional` **nullables**, FK `dataset_upload`; unique `(ejercicio, entidad)` |
+| `PresupuestoActividad` | FK `ejercicio`, FK `entidad`, FK `clasificacion`, `pia`/`pim`/`devengado`; unique `(ejercicio, entidad, clasificacion)`. ~1,900 filas |
 
-La "tendencia" del prototipo = agregación sobre todos los ejercicios. Mientras no haya filas, `GET /api/inversion/` responde `{"disponible": false}` y el frontend muestra estado vacío (ver 06).
+Decisiones que el modelo codifica y que un refactor puede deshacer sin que nada falle a la vista:
+
+- **`PresupuestoActividad` guarda el detalle, no el reparto por proceso.** El reparto es un `GROUP BY clasificacion__proceso` al vuelo, así que corregir el catálogo en el admin cambia los gráficos en el siguiente request. Guardar el agregado obligaría a un «reprocesar» que alguien olvidaría pulsar.
+- **`proceso` nulo es «sin clasificar» y se muestra como tal**, nunca se reparte entre los demás: es la medida de cuánto le falta al catálogo.
+- **Los importes institucionales son nullables.** Nulo = «no se puede calcular el % sobre el institucional», distinto de cero. Solo existen para las entidades que ejecutan desde el departamento (el recorte del MEF es departamental).
+- **`es_parcial` viaja con el dato.** El ejercicio en curso llega a mitad de año y su % de ejecución se calcula contra un PIM anual.
+- **`EntidadEjecutora.distrito` puede quedar vacío** (4 municipalidades de La Convención creadas después del padrón). Cuentan en los totales y se declaran como «sin territorio»; descartarlas restaría presupuesto en silencio y asignarlas a un distrito cualquiera contaminaría cualquier cruce distrital.
+
+Fuente y consolidación: `scripts/consolidar_pp0068.py` (serie 2022-2026, mezclando el comparativo del MEF con la base del cliente) y `scripts/totales_institucionales.py` (el denominador). Mientras ningún `Ejercicio` esté `visible`, `GET /api/inversion/` responde `{"disponible": false, "motivo"}` y el frontend muestra su estado vacío (ver 06).
 
 ### biblioteca
 `CategoriaDocumento`: `nombre`, `slug`, `orden`.
@@ -231,9 +254,14 @@ erDiagram
     CategoriaEvento ||--o{ TotalDeclaradoEmergencias : agrupa
     DatasetUpload ||--o{ ClasificacionPeligro : importa
     DatasetUpload ||--o{ FrecuenciaEmergencia : importa
-    DatasetUpload ||--o{ InversionDistrito : importa
-    EjercicioPresupuestal ||--o{ InversionDistrito : detalla
-    Distrito ||--o{ InversionDistrito : recibe
+    DatasetUpload ||--o{ PresupuestoEntidad : importa
+    Ejercicio ||--o{ PresupuestoEntidad : detalla
+    Ejercicio ||--o{ PresupuestoActividad : detalla
+    EntidadEjecutora ||--o{ PresupuestoEntidad : ejecuta
+    EntidadEjecutora ||--o{ PresupuestoActividad : ejecuta
+    ClasificacionActividad ||--o{ PresupuestoActividad : clasifica
+    ProcesoGRD ||--o{ ClasificacionActividad : agrupa
+    Distrito ||--o{ EntidadEjecutora : "es sede de"
     TipoPeligro ||--o{ Medida : atiende
     Distrito ||--o{ Medida : ubica
     Medida ||--o{ MedidaImagen : "ilustra (galería)"

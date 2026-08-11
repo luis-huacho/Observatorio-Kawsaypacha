@@ -9,14 +9,21 @@ export type CentroPoblado = {
   lat: number | null;
   lon: number | null;
   altitud: number | null;
-  poblacion: number | null;
   /**
    * Máximo de los peligros que sobreviven a los filtros de la petición; `null` = sin dato con
    * esos filtros. Lo anota el API (`/api/ccpp/`), no se calcula en el cliente: es la unidad que
-   * comparten la tabla, el panel de distribución y el mapa.
+   * comparten la tabla, la grilla de resultados y el color de los símbolos del mapa.
    */
   nivel?: Nivel | null;
+  /**
+   * **Todos** los peligros del centro poblado que pasan los filtros, no solo el máximo, y en
+   * el mismo orden con el que el mapa elige el ícono. Es lo que lista la tabla: el nivel
+   * máximo es un resumen, y con 3.4 peligros de media por lugar escondía lo que se consulta.
+   */
+  peligros?: PeligroDeCcpp[];
 };
+
+export type PeligroDeCcpp = { slug: string; nombre: string; nivel: Nivel };
 
 /** Ficha completa: `/api/ccpp/{codigo}/`. */
 export type CentroPobladoDetalle = CentroPoblado & {
@@ -29,7 +36,12 @@ export type ClasificacionPeligro = {
   codigo_ccpp: string;
   peligro: string;
   peligro_slug: string;
-  tipo: string | null;
+  /**
+   * El `TIP_PELIG` de la fuente (Geodinamica interna/externa, Metereologicas). Aquí había un
+   * `tipo` que el API dejó de enviar y que nadie actualizó: la ficha lo pintaba y mostraba «—»
+   * en las 3,238 fichas sin que `tsc` pudiera avisar, porque el tipo lo declaraba.
+   */
+  categoria_geo: string;
   nivel: Nivel;
   fuente: string | null;
   fuente_url: string | null;
@@ -61,6 +73,55 @@ export type FrecuenciaDistrito = {
   desglose_disponible: boolean;
   total: number;
   categorias: CategoriaEmergencia[];
+};
+
+/**
+ * `/api/peligros/frecuencia/provincia/{ubigeo4}/` — lo que pinta el gráfico de /peligros.
+ *
+ * **Ojo con el vocabulario**, que en pantalla va al revés que en el modelo: la UI llama
+ * *evento* a lo que aquí es `eventos` (Huayco, Deslizamiento… 21) y *tipo de evento* a lo que
+ * aquí es `familias` (Geodinámica externa, Meteorológicos… 4). Los rótulos los pone el
+ * frontend; el API conserva los nombres de sus modelos.
+ */
+export type FrecuenciaProvincia = {
+  provincia: string;
+  ubigeo: string;
+  total: number;
+  /** Sin esto la cifra engaña: 77 con 1 de 8 distritos no se compara con 608 con 8 de 8. */
+  distritos_con_registro: number;
+  distritos_en_provincia: number;
+  /** Rango que **abarca** el conjunto, no un periodo común: cada distrito trae el suyo. */
+  periodo: string | null;
+  periodos_distintos: number;
+  eventos: Array<{
+    evento: string;
+    slug: string;
+    categoria: string;
+    /** De aquí sale el color de la barra. */
+    categoria_slug: string;
+    conteo: number;
+  }>;
+  familias: Array<{ categoria: string; slug: string; conteo: number }>;
+  /**
+   * Distritos que declaran subtotales sin desagregar por evento (ADR-D1). Su total entra en
+   * `familias` y **no** en `eventos`, así que las dos agrupaciones no suman igual a propósito
+   * y la pantalla tiene que decirlo.
+   */
+  sin_desglose: Array<{ distrito: string; total: number }>;
+  total_sin_desglose: number;
+  fuente: string | null;
+  fuente_url: string | null;
+};
+
+/** Un distrito con emergencias en la capa del visor (`/api/peligros/frecuencia/geojson/`). */
+export type PuntoEmergencias = {
+  ubigeo: string;
+  distrito: string;
+  provincia: string;
+  total: number;
+  rango_fecha: string | null;
+  /** `null` cuando la fuente declara subtotales sin desagregar. */
+  evento_top: string | null;
 };
 
 /** Una foto de la galería de una medida. Espejo del modelo hijo `MedidaImagen` del spec 01. */
@@ -114,33 +175,241 @@ export type MedidaDetalle = Medida & {
   enlaces: EnlaceExterno[];
 };
 
-export type InversionDistrito = {
-  ubigeo: string;
-  distrito: string;
-  provincia: string;
+/**
+ * La unidad de Inversión es la **municipalidad**, no el distrito: quien tiene PIA, PIM y
+ * devengado es la entidad ejecutora, y una provincial gestiona presupuesto de toda su
+ * provincia. `ubigeo_distrito` es su sede, y puede ser null cuando no casa con el padrón.
+ */
+export type InversionEntidad = {
+  codigo: string;
+  entidad: string;
+  ambito: "distrital" | "provincial" | "mancomunidad" | "regional" | "nacional";
+  ubigeo_distrito: string | null;
+  distrito: string | null;
+  provincia: string | null;
   pia: number;
   pim: number;
   devengado: number;
-  pct_prevencion: number;
-  pct_respuesta: number;
+  /** null = no se puede calcular (PIM cero), que no es lo mismo que 0 %. */
+  pct_ejecucion: number | null;
+  saldo: number;
+  variacion_pia_pim: number;
+  pct_variacion_pia_pim: number | null;
+  /** Presupuesto de la entidad entera. null = no se puede calcular, nunca 0. */
+  pia_institucional: number | null;
+  pim_institucional: number | null;
+  devengado_institucional: number | null;
+  pct_0068_institucional: number | null;
+  pim_proyectos: number;
+  pim_actividades: number;
+  pct_proyectos: number | null;
+  /** Solo con `comparar_con`. Ver `InversionComparacionFila`. */
+  comparacion?: InversionComparacionFila;
+};
+
+/**
+ * Comparación de una municipalidad contra otro ejercicio.
+ *
+ * `comparable` es falso cuando los dos ejercicios tienen cortes distintos: un 47.7 % a junio
+ * contra un 83 % de año cerrado no es una caída de ejecución. El Δ se muestra igual —así se
+ * decidió— pero **siempre marcado**, y la marca viaja aquí para que ningún cliente tenga que
+ * redescubrir la regla.
+ */
+export type InversionComparacionFila = {
+  anio: number;
+  corte: string;
+  es_parcial: boolean;
+  comparable: boolean;
+  /** La municipalidad no tenía presupuesto del 0068 ese año: los deltas son null, no cero. */
+  sin_presupuesto: boolean;
+  pia: number | null;
+  pim: number | null;
+  devengado: number | null;
+  pct_ejecucion: number | null;
+  delta_pim: number | null;
+  pct_delta_pim: number | null;
+  delta_devengado: number | null;
+  delta_pct_ejecucion: number | null;
+};
+
+export type InversionProceso = {
+  slug: string;
+  nombre: string;
+  color: string;
+  pim: number;
+  devengado: number;
+  pct: number | null;
+};
+
+export type InversionPuntoTendencia = {
+  anio: number;
+  corte: string;
+  /** Corte a mitad de año: su % de ejecución no se compara con el de un año cerrado. */
+  es_parcial: boolean;
+  fuente: string;
+  pia: number;
+  pim: number;
+  devengado: number;
 };
 
 export type Inversion = {
-  _mock?: boolean;
   anio: number;
+  corte: string;
+  es_parcial: boolean;
+  fuente: string;
+  ambito: string;
+  unidad: string;
   agregados: {
-    pim_total: number;
-    ejecutado: number;
-    porcentaje_ejecucion: number;
-    municipios_con_ppr_0068: number;
+    pia: number;
+    pim: number;
+    devengado: number;
+    pct_ejecucion: number | null;
+    saldo: number;
+    variacion_pia_pim: number;
+    entidades_con_presupuesto: number;
+    entidades_en_ambito: number;
+    /** Los tres suman solo las entidades con dato, las mismas que el porcentaje de abajo. */
+    pia_institucional: number | null;
+    pim_institucional: number | null;
+    devengado_institucional: number | null;
+    pct_0068_institucional: number | null;
+    entidades_con_institucional: number;
+    pim_proyectos: number;
+    pim_actividades: number;
+    pct_proyectos: number | null;
   };
-  por_distrito: InversionDistrito[];
-  comparacion_prevencion_respuesta: {
-    prevencion_total: number;
-    respuesta_total: number;
-  };
-  tendencia: Array<{ anio: number; pim: number; devengado: number }>;
+  procesos: InversionProceso[];
+  /** Lo que el catálogo aún no imputa a ningún proceso. No se reparte ni se esconde. */
+  sin_clasificar: { pim: number; devengado: number; pct: number | null };
+  tendencia: InversionPuntoTendencia[];
+  ejercicios: InversionEjercicio[];
+  /** Solo con `comparar_con`: los agregados del otro ejercicio y sus deltas. */
+  comparacion?: InversionComparacionAgregada;
 };
+
+export type InversionEjercicio = { anio: number; corte: string; es_parcial: boolean };
+
+export type InversionComparacionAgregada = {
+  anio: number;
+  corte: string;
+  es_parcial: boolean;
+  comparable: boolean;
+  agregados: Inversion["agregados"];
+  deltas: {
+    pia: number;
+    pim: number;
+    devengado: number;
+    pct_pim: number | null;
+    pct_ejecucion: number | null;
+  };
+};
+
+/** Un año de la historia de una municipalidad: `/api/inversion/entidades/{codigo}/`. */
+export type InversionSerieAnio = {
+  anio: number;
+  corte: string;
+  es_parcial: boolean;
+  fuente: string;
+  pia: number;
+  pim: number;
+  devengado: number;
+  pct_ejecucion: number | null;
+  saldo: number;
+  variacion_pia_pim: number;
+  pct_variacion_pia_pim: number | null;
+  pia_institucional: number | null;
+  pim_institucional: number | null;
+  devengado_institucional: number | null;
+  pct_0068_institucional: number | null;
+};
+
+export type InversionActividad = {
+  codigo: string;
+  nombre: string;
+  origen: "actividad" | "proyecto";
+  /** null = el catálogo aún no la imputa a ningún proceso. */
+  proceso: string | null;
+  proceso_slug: string | null;
+  pia: number;
+  pim: number;
+  devengado: number;
+  pct_ejecucion: number | null;
+};
+
+export type InversionEntidadDetalle = {
+  entidad: {
+    codigo: string;
+    nombre: string;
+    ambito: InversionEntidad["ambito"];
+    ambito_nombre: string;
+    ubigeo_distrito: string | null;
+    distrito: string | null;
+    provincia: string | null;
+    /** No casa con el padrón de distritos: cuenta en los totales, pero no se cruza con él. */
+    sin_territorio: boolean;
+  };
+  anio: number;
+  corte: string;
+  es_parcial: boolean;
+  fuente: string;
+  serie: InversionSerieAnio[];
+  procesos: InversionProceso[];
+  sin_clasificar: { pim: number; devengado: number; pct: number | null };
+  actividades: InversionActividad[];
+  ejercicios: InversionEjercicio[];
+};
+
+export type InversionDetalleResponse =
+  | { disponible: false; motivo: string }
+  | ({ disponible: true } & InversionEntidadDetalle);
+
+/** Una fila del coroplético: un distrito o una provincia (`/api/inversion/mapa/`). */
+export type InversionMapaFila = {
+  /** Seis dígitos a nivel distrital, cuatro a nivel provincial. Casa con `UBIGEO`/`IDPROV`. */
+  ubigeo: string;
+  nombre: string;
+  provincia: string | null;
+  /** Solo a nivel distrital: el polígono enlaza con la ficha de su municipalidad. */
+  codigo_entidad: string | null;
+  entidad: string | null;
+  entidades: number;
+  pia: number;
+  pim: number;
+  devengado: number;
+  saldo: number;
+  /** null = PIM cero: no hay avance que calcular, y no es un 0 %. */
+  pct_ejecucion: number | null;
+};
+
+/** Las métricas que se pueden pintar. Las tres de dinero llevan cortes; el % los tiene fijos. */
+export type MetricaMapa = "pia" | "pim" | "devengado" | "pct_ejecucion";
+
+export type InversionMapa = {
+  anio: number;
+  corte: string;
+  es_parcial: boolean;
+  nivel: "distrital" | "provincial";
+  ambito: string;
+  filas: InversionMapaFila[];
+  /** Cuatro quintiles por métrica de dinero. Pueden repetirse: la leyenda dibuja el tramo vacío. */
+  cortes: Record<"pia" | "pim" | "devengado", number[]>;
+  /**
+   * Lo que este nivel no puede atribuir a ningún polígono (ADR-D6). No se reparte: se declara.
+   * `motivo` viene redactado del backend para que la advertencia viaje con el dato.
+   */
+  no_ubicado: {
+    pia: number;
+    pim: number;
+    devengado: number;
+    entidades: number;
+    motivo: string;
+  };
+  poligonos: { pintados: number; sin_dato: number; motivo: string };
+};
+
+export type InversionMapaResponse =
+  | { disponible: false; motivo: string }
+  | ({ disponible: true } & InversionMapa);
 
 export type PrioridadDistrito = {
   ubigeo: string;
@@ -267,7 +536,6 @@ export type Distrito = {
  */
 export type ResumenPeligros = {
   total_ccpp: number;
-  poblacion_total: number;
   por_ccpp: {
     niveles: Record<"1" | "2" | "3" | "4", number>;
     sin_clasificar: number;
@@ -276,6 +544,14 @@ export type ResumenPeligros = {
     peligro: string;
     slug: string;
     niveles: Record<"1" | "2" | "3" | "4", number>;
+    /**
+     * Centros poblados con ESTE peligro tras los filtros. Coincide con la suma de `niveles`
+     * y no por casualidad: la base impide dos clasificaciones del mismo peligro en un mismo
+     * centro poblado, así que **dentro de una fila las dos unidades son la misma**. Por eso la
+     * grilla de resultados puede rotular «centros poblados» sin ambigüedad; la de 3.4× solo
+     * aparece al sumar la columna entre tipos.
+     */
+    centros_poblados: number;
     sin_dato: number;
   }>;
   unidades: { por_ccpp: string; por_peligro: string };
@@ -377,7 +653,6 @@ export type ComparadorDistrito = {
   ubigeo: string;
   distrito: string;
   provincia: string;
-  poblacion: number;
   total_ccpp: number;
   por_ccpp: ResumenPeligros["por_ccpp"];
   por_peligro: ResumenPeligros["por_peligro"];
@@ -392,7 +667,9 @@ export type ComparadorRespuesta = {
   inversion_disponible: boolean;
 };
 
-// --- Inversión (diferida, ADR-D3) ------------------------------------------
+// --- Inversión (PP 0068) ---------------------------------------------------
+// El estado «sin datos» sigue siendo un modo válido: mientras ningún ejercicio esté publicado,
+// el endpoint responde `disponible: false` y la ruta muestra su estado vacío.
 export type InversionResponse =
   | { disponible: false; motivo: string }
   | ({ disponible: true } & Inversion);
@@ -405,12 +682,33 @@ export type PuntoCcpp = {
   distrito: string;
   provincia: string;
   ubigeo_distrito: string;
-  poblacion: number;
   altitud: number | null;
   /** 0 = sin dato. Categoría propia, no "nivel bajo". */
   nivel: number;
+  /**
+   * Slug del peligro que gana (mayor nivel; a igualdad, el primero del catálogo). Es la FORMA
+   * del ícono en el mapa. Lo decide el servidor para que el símbolo y el popup no discrepen.
+   * `""` = sin dato.
+   */
+  peligro: string;
+  /**
+   * Clasificaciones que este punto aporta con los filtros puestos; 0 si no cumple ninguno.
+   * Es lo que el visor suma para rotular cada grupo — la unidad de las 10,978, no la de 3,238.
+   */
+  clasificaciones: number;
   /** Desglose serializado: las propiedades de un feature agrupado deben ser escalares. */
   peligros: string;
+} & {
+  /**
+   * Tres familias de claves numeradas, todas escalares porque una fuente agrupada no admite
+   * otra cosa, y **solo se emiten las ocupadas** para no inflar un payload de 2 MB:
+   *
+   * - `n1`…`n4` — cuántas clasificaciones de ese nivel tiene el punto. Lo suman los grupos.
+   * - `p_<slug>` — presencia de ese tipo (0/1). También lo suman los grupos.
+   * - `s0`…`s8` y `n_0`…`n_8` — **las ranuras de la corona**: un peligro por ranura, en orden
+   *   de nivel descendente. El nivel lleva guion bajo justo para no chocar con `n1`…`n4`.
+   */
+  [clave: string]: string | number | null;
 };
 
 /** Catálogo de peligros tal como lo devuelve `/api/peligros/tipos/`. */

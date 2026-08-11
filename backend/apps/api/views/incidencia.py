@@ -14,6 +14,7 @@ from apps.medidas.models import Medida
 from apps.peligros import consultas
 from apps.territorio.models import CentroPoblado, Distrito
 
+from ..filters import parametros_exposicion
 from ..throttling import DescargaThrottle
 
 MAX_DISTRITOS = 4
@@ -79,7 +80,6 @@ class ComparadorView(APIView):
             "ubigeo": distrito.ubigeo,
             "distrito": distrito.nombre,
             "provincia": distrito.provincia.nombre,
-            "poblacion": resumen["poblacion_total"],
             "total_ccpp": resumen["total_ccpp"],
             "por_ccpp": resumen["por_ccpp"],
             "por_peligro": resumen["por_peligro"],
@@ -118,10 +118,11 @@ class AyudaMemoriaView(APIView):
         if distrito is None:
             raise Http404(f"No existe el distrito con ubigeo {ubigeo}.")
 
+        peligros, niveles = parametros_exposicion(request.query_params)
         pdf, nombre = generar_pdf(
             distrito,
-            peligro=request.query_params.get("peligro", ""),
-            nivel_min=request.query_params.get("nivel_min", ""),
+            peligros=peligros,
+            niveles=niveles,
             con_mapa=request.query_params.get("sin_mapa") not in {"1", "true", "True"},
         )
         respuesta = HttpResponse(pdf, content_type="application/pdf")
