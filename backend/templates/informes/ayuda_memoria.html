@@ -195,9 +195,8 @@
     <table class="datos tabla-larga">
       <thead>
         <tr>
-          <th style="width: 44mm">Centro poblado</th>
-          <th style="width: 22mm">Categoría</th>
-          <th style="width: 16mm" class="num">Altitud</th>
+          <th style="width: 48mm">Centro poblado</th>
+          <th style="width: 24mm">Categoría</th>
           <th>Peligros clasificados</th>
         </tr>
       </thead>
@@ -206,7 +205,6 @@
           <tr>
             <td>{{ f.nombre }}</td>
             <td>{{ f.categoria }}</td>
-            <td class="num">{% if f.altitud != None %}{{ f.altitud|miles }} m{% else %}—{% endif %}</td>
             <td>{% for p in f.peligros %}{% if not forloop.first %}; {% endif %}<span
                 class="punto" style="background: {{ p.color }}"></span>{{ p.peligro }}:
                 {{ p.label }}{% endfor %}</td>

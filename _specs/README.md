@@ -41,6 +41,12 @@ columnas, que **el nivel de cada peligro cae en su columna** —la desalineació
 probable de una tabla con columnas dinámicas, y Excel no se queja de una fila más corta—, que un
 Excel filtrado no habla de lo que el mapa oculta, y que el export no consulta uno a uno.
 
+**La altitud sale también de la ayuda memoria en PDF**, que era el último documento que la
+publicaba. No es el caso de la población (ADR-A19): la altitud es un dato real del padrón y
+**sigue en la base**, solo que no aporta a una mesa de incidencia. La tabla se queda en tres
+columnas y los 16 mm liberados van a «Peligros clasificados», que es la que se quedaba corta.
+Queda en el popup del visor, donde sí orienta sobre el terreno.
+
 ### Actualización 11/08/2026 — el visor gana los límites, y los distritos su centroide
 
 El visor no dibujaba ninguna división política, y la falta de geometría distrital arrastraba una

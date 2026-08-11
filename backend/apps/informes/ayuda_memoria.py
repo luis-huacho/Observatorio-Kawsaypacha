@@ -135,7 +135,6 @@ def _filas_tabla(ccpp_ambito, peligros=(), niveles=()):
                 "codigo": ccpp.codigo,
                 "nombre": ccpp.nombre,
                 "categoria": ccpp.categoria or "—",
-                "altitud": ccpp.altitud,
                 "peligros": [],
                 "nivel_max": c.nivel,
             },

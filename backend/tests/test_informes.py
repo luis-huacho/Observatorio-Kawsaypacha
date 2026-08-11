@@ -121,6 +121,21 @@ def test_los_filtros_del_visor_llegan_al_pdf(api, datos_muestra, sin_throttling)
     assert dos_peligros["niveles_pedidos"] == [4, 1]
 
 
+def test_la_ayuda_memoria_no_publica_la_altitud(api, datos_muestra, sin_throttling):
+    """Se quitó de la ficha, del Excel y del PDF: la altitud no aporta a una mesa de incidencia.
+
+    El dato sigue en la base —lo trae el padrón y es real, a diferencia de la población
+    (ADR-A19)—, así que lo que se comprueba es que **no se publica**, no que no exista.
+    """
+    from apps.informes import ayuda_memoria
+    from apps.territorio.models import Distrito
+
+    datos = ayuda_memoria.reunir_datos(Distrito.objects.get(ubigeo="080101"))
+
+    assert datos["filas"], "la muestra debería traer centros poblados clasificados"
+    assert all("altitud" not in fila for fila in datos["filas"])
+
+
 def test_el_visor_del_mapa_pide_los_datos_a_su_propio_origen(client, settings):
     """La prueba que faltaba, y sin la que el PDF salía sin mapa en producción.
 
