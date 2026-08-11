@@ -236,9 +236,21 @@ una entrega nueva.
 | Peligros por centro poblado | **Se limpia solo.** El importador hace `ClasificacionPeligro…delete()` antes de escribir |
 | Frecuencia de emergencias | **Se limpia solo.** Borra `FrecuenciaEmergencia` y `TotalDeclaradoEmergencias` |
 | Inversión (PP 0068) | **No del todo.** Solo reemplaza los años que trae el archivo, y `PresupuestoEntidad` va por *upsert*: una entidad o un ejercicio que desaparezca del archivo nuevo sobrevive |
+| Capas cartográficas (GeoJSON) | **No.** `seed --capas` **salta toda capa que ya tenga archivo adjunto** y lo dice como si fuera un éxito («ya tiene archivo adjunto»). Para reimportar un GeoJSON hay que soltarlo antes |
+| El padrón: provincias, distritos y centros poblados | **Nunca**, y no debe forzarse. Ver el aviso de abajo |
 
-Es decir: para peligros y frecuencia basta con volver a correr `seed`. Solo la inversión necesita
-borrado explícito, y solo si ya hubo una carga antes.
+Es decir: en una **carga inicial** basta con `seed`. En una **recarga** hay dos cosas que el seed
+no hace por su cuenta —la inversión y el GeoJSON de las capas— y ambas necesitan un paso previo.
+
+> **No borres `Provincia`, `Distrito` ni `CentroPoblado`.** Es la trampa más cara de esta
+> operación, porque no falla: `Medida.distrito`, `GaleriaMedida.centro_poblado` y
+> `EntidadEjecutora.distrito`/`provincia` son `SET_NULL`, así que borrar el padrón deja **en
+> silencio** las medidas publicadas sin distrito y todas las municipalidades «sin territorio»; y
+> `ClasificacionPeligro`, `FrecuenciaEmergencia` y `TotalDeclaradoEmergencias` caen por cascada.
+> El importador nunca lo borra a propósito (ver `_sincronizar_territorio` en
+> `importers/nivel_peligro.py`): un centro poblado que desaparezca del Excel se marcaría como no
+> vigente, no se elimina. Si el padrón nuevo difiere del cargado, eso se resuelve hablando con
+> PREDES, no con un `delete()`.
 
 ```bash
 # 0. Los archivos, en las carpetas montadas del anfitrión:
@@ -249,6 +261,7 @@ borrado explícito, y solo si ya hubo una carga antes.
 docker compose exec backend sh -c 'ls /datos/data /datos-inversion'
 
 # 1. SOLO si ya hubo una carga de inversión. En una base nueva, saltar este paso.
+#    Peligros y frecuencia NO necesitan esto: sus importadores borran antes de escribir.
 #    El orden importa: `PresupuestoActividad` protege a `ClasificacionActividad` con PROTECT.
 #    NO se borran `ClasificacionActividad` ni `ProcesoGRD`: son el catálogo que PREDES edita,
 #    y `automatico=False` marca sus decisiones, que ninguna importación debe deshacer.
@@ -262,14 +275,33 @@ Ejercicio.objects.all().delete()
 print("inversión limpia")
 EOF
 
-# 2. Catálogos, territorio, peligros, frecuencia, capas y tiles. Reemplazo total y síncrono.
+# 2. SOLO en una recarga: soltar el GeoJSON de las capas. `seed --capas` salta las que ya
+#    tienen archivo, así que sin esto se quedarían con el GeoJSON viejo y el seed no avisaría.
+#    En una base nueva no hay nada adjunto y este paso no hace falta.
+docker compose exec -T backend python manage.py shell <<'EOF'
+from apps.mapas.models import CapaCartografica
+for capa in CapaCartografica.objects.all():
+    if capa.archivo_geojson:
+        capa.archivo_geojson.delete(save=False)   # borra también el archivo de media
+    capa.estado_tiles = CapaCartografica.EstadoTiles.PENDIENTE
+    capa.log_error = ""
+    capa.features_generados = 0
+    capa.save()
+    print("suelta:", capa.slug)
+EOF
+
+# 3. Catálogos, territorio, peligros, frecuencia, capas y tiles. Reemplazo total y síncrono.
 #    NUNCA con --demo en producción: siembra el contenido editorial de demostración.
+#    En la salida, las capas tienen que decir «adjuntado …», no «ya tiene archivo adjunto»:
+#    lo segundo significa que el paso 2 no surtió efecto.
+#    `--tiles` sí regenera TODAS las capas con archivo, al contrario que el comando
+#    `generar_tiles`, que se salta las que están en «ok» salvo con `--rehacer`.
 docker compose exec backend python manage.py seed --capas --tiles
 
-# 3. Centroides distritales. Después de --capas: lee la capa de límites ya adjunta.
+# 4. Centroides distritales. Después de --capas: lee la capa de límites ya adjunta.
 docker compose exec backend python manage.py calcular_centroides
 
-# 4. Inversión, por `DatasetUpload` — el único camino de importación del proyecto.
+# 5. Inversión, por `DatasetUpload` — el único camino de importación del proyecto.
 #    El orden de los dos archivos da igual: ninguno pisa lo que no trae.
 docker compose exec -T backend python manage.py shell <<'EOF'
 from pathlib import Path
@@ -289,12 +321,12 @@ for ruta in ["/datos-inversion/pp0068_cusco_2022_2026_largo.csv",
     assert up.estado == "activo", (up.log or {}).get("error")
 EOF
 
-# 5. Buscador
+# 6. Buscador
 docker compose exec backend python manage.py meili_setup
 docker compose exec backend python manage.py meili_rebuild
 ```
 
-**6. Publicar los ejercicios.** Importar **no publica**: los `Ejercicio` nacen ocultos y
+**7. Publicar los ejercicios.** Importar **no publica**: los `Ejercicio` nacen ocultos y
 `/inversion` muestra «información en preparación» hasta que alguien los marque. Es deliberado —la
 revisión es de PREDES— así que lo normal es hacerlo desde el **admin → Inversión → Ejercicios
 presupuestales → casilla «visible»**. Para la carga inicial vale el atajo:
@@ -417,6 +449,7 @@ E2E_URL=https://$SITE_DOMAIN npx playwright test
 | Desplegar una actualización | `git pull && docker compose build backend frontend && docker compose up -d && docker compose run --rm frontend` |
 | Migraciones (normalmente automáticas) | `docker compose exec backend python manage.py migrate` |
 | Sembrar o resembrar peligros y frecuencia | `docker compose exec backend python manage.py seed` — reemplazo total, se limpia solo |
+| Reimportar un GeoJSON de capa | Ver [Cargar los datos](#cargar-los-datos): hay que soltar el archivo antes, o `seed --capas` la salta |
 | Cargar o reemplazar la inversión | Ver [Cargar los datos](#cargar-los-datos): el seed no la toca, y solo reemplaza los años del archivo |
 | **Comprobar el buscador** (servicio + índices al día) | `docker compose exec backend python manage.py meili_estado` |
 | **Comprobar la cola** (¿avanza el worker?) | `docker compose exec backend python manage.py cola_estado` |
