@@ -20,7 +20,7 @@ const SECCIONES = [
   {
     to: "/medidas",
     icon: Lightbulb,
-    titulo: "Medidas",
+    titulo: "Buenas prácticas",
     pregunta: "¿Qué medidas están funcionando?",
     color: "from-mountain-700 to-mountain-500",
   },
@@ -28,7 +28,7 @@ const SECCIONES = [
     to: "/inversion",
     icon: Coins,
     titulo: "Inversión",
-    pregunta: "¿Cuánto y cómo se invierte (PPR 0068)?",
+    pregunta: "Cuánto y en qué se invirte el PP0068",
     color: "from-sky-700 to-sky-500",
   },
 ];
@@ -129,10 +129,10 @@ export default function Home() {
       <section className="container-page -mt-10 relative z-10">
         <Reveal>
           <div className="card grid grid-cols-2 md:grid-cols-4 divide-x divide-ink-300/30 overflow-hidden">
-            <Stat label="Centros poblados monitoreados" value={totalCcpp != null ? formatNumber(totalCcpp) : "…"} />
             <Stat label="Distritos cubiertos" value={distritos != null ? String(distritos) : "…"} />
-            <Stat label="Clasificaciones de peligro" value={totalClasif != null ? formatNumber(totalClasif) : "…"} />
             <Stat label="CCPP con peligro alto/muy alto" value={ccppAltos != null ? formatNumber(ccppAltos) : "…"} accent />
+            <Stat label="Centros poblados monitoreados" value={totalCcpp != null ? formatNumber(totalCcpp) : "…"} />
+            <Stat label="Clasificaciones de peligro" value={totalClasif != null ? formatNumber(totalClasif) : "…"} />
           </div>
         </Reveal>
       </section>
