@@ -14,6 +14,7 @@ export default function Header() {
   // El menú lo controla `EnlaceMenu` desde el admin: PREDES reordena y oculta sin tocar código,
   // y Prioridades vive ahí con visible=false (ADR-P1).
   const { sitio } = useSitio();
+  const top = sitio.menu.top;
   const nav = sitio.menu.header;
 
   function onSubmit(e: React.FormEvent) {
@@ -28,14 +29,27 @@ export default function Header() {
     <header className="sticky top-0 z-40">
       <div className="bg-mountain-500 text-white">
         <div className="container-page flex items-center justify-end gap-5 h-8 text-xs font-medium">
-          <a
-            href="https://predes.org.pe/"
-            target="_blank"
-            rel="noreferrer"
-            className="text-white/90 hover:text-white no-underline"
-          >
-            predes.org.pe
-          </a>
+          {top.map((item) =>
+            item.url.startsWith("http") ? (
+              <a
+                key={item.url}
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-white/90 hover:text-white no-underline"
+              >
+                {item.texto}
+              </a>
+            ) : (
+              <Link
+                key={item.url}
+                to={item.url}
+                className="text-white/90 hover:text-white no-underline"
+              >
+                {item.texto}
+              </Link>
+            )
+          )}
           {sitio.config.email_contacto ? (
             <a
               href={`mailto:${sitio.config.email_contacto}`}

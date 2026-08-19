@@ -13,9 +13,13 @@ configuracion:
   redes:
     web: https://predes.org.pe/
 
-# --- Menú principal --------------------------------------------------------
+# --- Barra superior ---------------------------------------------------------
 menu:
-  - {zona: header, texto: Exposición a peligros, url: /peligros, orden: 1}
+  - {zona: top, texto: predes.org.pe, url: 'https://predes.org.pe/', orden: 1}
+  - {zona: top, texto: Sobre el observatorio, url: /sobre, orden: 2}
+
+  # --- Menú principal --------------------------------------------------------
+  - {zona: header, texto: Peligros, url: /peligros, orden: 1}
   - {zona: header, texto: Medidas, url: /medidas, orden: 2}
   - {zona: header, texto: Inversión, url: /inversion, orden: 3}
   - {zona: header, texto: Normativa, url: /normativa, orden: 4}
@@ -23,12 +27,11 @@ menu:
   # siguen vivos y se llega por URL, pero no se anuncia. Se oculta, no se borra: volver a mostrarlo
   # es marcar la casilla «visible» en el admin.
   - {zona: header, texto: Comparar distritos, url: /comparar, orden: 5, visible: false}
-  - {zona: header, texto: Sobre, url: /sobre, orden: 6}
   # Prioridades existe con visible=false y NO se borra (ADR-P1): la decisión fue desactivar la
   # ventana para este proyecto, no descartarla.
   - {zona: header, texto: Prioridades, url: /prioridades, orden: 7, visible: false}
 
-  - {zona: footer, grupo: Secciones, texto: Exposición a peligros, url: /peligros, orden: 1}
+  - {zona: footer, grupo: Secciones, texto: Peligros, url: /peligros, orden: 1}
   - {zona: footer, grupo: Secciones, texto: Medidas, url: /medidas, orden: 2}
   - {zona: footer, grupo: Secciones, texto: Inversión, url: /inversion, orden: 3}
   - {zona: footer, grupo: Secciones, texto: Comparar distritos, url: /comparar, orden: 4, visible: false}

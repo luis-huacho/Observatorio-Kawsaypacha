@@ -585,7 +585,7 @@ export type SitioPayload = {
   };
   /** Indexado por clave (`home.hero.titulo`, `sobre.mision`…). */
   bloques: Record<string, BloqueTexto>;
-  menu: { header: EnlaceMenu[]; footer: EnlaceMenu[] };
+  menu: { top: EnlaceMenu[]; header: EnlaceMenu[]; footer: EnlaceMenu[] };
   hero: HeroSlide[];
 };
 

@@ -17,7 +17,7 @@ def test_sitio_trae_todo_el_cascaron_en_una_peticion(api):
     datos = api.get("/api/sitio/").json()
 
     assert set(datos) == {"config", "bloques", "menu", "hero"}
-    assert set(datos["menu"]) == {"header", "footer"}
+    assert set(datos["menu"]) == {"top", "header", "footer"}
     assert datos["bloques"], "el seed no dejó bloques de texto"
 
 

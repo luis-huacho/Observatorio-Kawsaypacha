@@ -40,7 +40,7 @@ class SitioView(APIView):
                 zona: serializers.EnlaceMenuSerializer(
                     [e for e in menu if e.zona == zona], many=True
                 ).data
-                for zona in ("header", "footer")
+                for zona in ("top", "header", "footer")
             },
             "hero": serializers.HeroSlideSerializer(
                 HeroSlide.publicados.order_by("orden"), many=True
