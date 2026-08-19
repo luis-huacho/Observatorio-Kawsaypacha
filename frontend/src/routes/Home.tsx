@@ -66,12 +66,12 @@ export default function Home() {
   // como respaldo mientras carga.
   const heroTitulo = useBloque(
     "home.hero.titulo",
-    "<p>Observatorio del riesgo y la adaptación climática en Cusco.</p>"
+    "<p>Observatorio para la Gestión del riesgo de desastres y la adaptación al cambio climático.</p>"
   );
   const heroSubtitulo = useBloque(
     "home.hero.subtitulo",
-    "<p>Monitoreamos peligros, prácticas que funcionan, inversión pública y prioridades de los " +
-      "gobiernos locales y regionales para reducir el riesgo de desastres.</p>"
+    "<p>Monitoreamos y facilitamos información sobre los peligros, inversión, normativa, medidas " +
+      "y buenas prácticas para la gestión del riesgo y la adaptación climática.</p>"
   );
 
   return (
@@ -105,11 +105,11 @@ export default function Home() {
               dangerouslySetInnerHTML={{ __html: heroSubtitulo }}
             />
             <div className="mt-8 flex flex-wrap gap-3 animate-fade-up" style={{ animationDelay: "240ms" }}>
-              <Link to="/peligros" className="btn-primary bg-white text-mountain-900 hover:bg-paper">
-                Explorar mi distrito <ArrowRight className="w-4 h-4" />
-              </Link>
               <Link to="/sobre" className="btn-ghost text-white hover:bg-white/10">
                 Sobre el observatorio
+              </Link>
+              <Link to="/peligros" className="btn-primary bg-white text-mountain-900 hover:bg-paper">
+                Explorar mi distrito <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>

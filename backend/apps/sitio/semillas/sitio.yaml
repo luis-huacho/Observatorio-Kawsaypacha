@@ -49,14 +49,14 @@ bloques:
   - clave: home.hero.titulo
     pagina: home
     titulo: Título del hero
-    cuerpo: <p>Observatorio del riesgo y la adaptación climática en Cusco.</p>
+    cuerpo: <p>Observatorio para la Gestión del riesgo de desastres y la adaptación al cambio climático.</p>
 
   - clave: home.hero.subtitulo
     pagina: home
     titulo: Subtítulo del hero
     cuerpo: >-
-      <p>Monitoreamos peligros, prácticas que funcionan, inversión pública y prioridades de los
-      gobiernos locales y regionales para reducir el riesgo de desastres.</p>
+      <p>Monitoreamos y facilitamos información sobre los peligros, inversión, normativa, medidas
+      y buenas prácticas para la gestión del riesgo y la adaptación climática.</p>
 
   - clave: footer.fuentes
     pagina: footer
