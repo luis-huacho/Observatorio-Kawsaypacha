@@ -5,7 +5,7 @@ import {
 import { useApi, type Pagina } from "@/lib/api";
 import { useBloque } from "@/lib/sitio";
 import Reveal from "@/components/Reveal";
-import type { Distrito, Noticia, Norma, ResumenPeligros } from "@/lib/types";
+import type { Distrito, Noticia, Norma, ResumenPeligros, InversionResponse } from "@/lib/types";
 import { formatNumber, formatFecha } from "@/lib/semaforo";
 import { TarjetaNoticiaCompacta } from "@/routes/Noticias";
 
@@ -38,16 +38,18 @@ export default function Home() {
   // 10,978 clasificaciones solo para contar (spec 06).
   const resumen = useApi<ResumenPeligros>("/peligros/resumen/");
   const distritosApi = useApi<Distrito[]>("/territorio/distritos/");
+  const medidasExito = useApi<Pagina<unknown>>("/medidas/", { resultado: "exito", page_size: 1 });
+  const inversion = useApi<InversionResponse>("/inversion/");
 
   const cifras = resumen.status === "ok" ? resumen.data : null;
-  const totalCcpp = cifras?.total_ccpp ?? null;
   const distritos = distritosApi.status === "ok" ? distritosApi.data.length : null;
-  const totalClasif = cifras
-    ? cifras.por_peligro.reduce(
-        (suma, p) => suma + Object.values(p.niveles).reduce((a, b) => a + b, 0),
-        0
-      )
-    : null;
+  const experienciasExitosas = medidasExito.status === "ok" ? medidasExito.data.count : null;
+  // Sin ejercicio visible el tablero responde `disponible: false` (ADR-D3): la cifra se queda en
+  // `null` y la tarjeta muestra "…", igual que mientras carga.
+  const municipiosConEjecucion =
+    inversion.status === "ok" && inversion.data.disponible
+      ? inversion.data.agregados.entidades_con_devengado
+      : null;
   // Centros poblados, no clasificaciones: es la unidad de `por_ccpp` y la que cuadra con la
   // tabla del visor. Sumar por peligro contaría cada CCPP tantas veces como peligros tenga.
   const ccppAltos = cifras
@@ -131,8 +133,8 @@ export default function Home() {
           <div className="card grid grid-cols-2 md:grid-cols-4 divide-x divide-ink-300/30 overflow-hidden">
             <Stat label="Distritos cubiertos" value={distritos != null ? String(distritos) : "…"} />
             <Stat label="CCPP con peligro alto/muy alto" value={ccppAltos != null ? formatNumber(ccppAltos) : "…"} accent />
-            <Stat label="Centros poblados monitoreados" value={totalCcpp != null ? formatNumber(totalCcpp) : "…"} />
-            <Stat label="Clasificaciones de peligro" value={totalClasif != null ? formatNumber(totalClasif) : "…"} />
+            <Stat label="Nº de experiencias exitosas" value={experienciasExitosas != null ? formatNumber(experienciasExitosas) : "…"} />
+            <Stat label="Nº de municipios con presupuesto ejecutado" value={municipiosConEjecucion != null ? formatNumber(municipiosConEjecucion) : "…"} />
           </div>
         </Reveal>
       </section>

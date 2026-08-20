@@ -267,6 +267,7 @@ export type Inversion = {
     saldo: number;
     variacion_pia_pim: number;
     entidades_con_presupuesto: number;
+    entidades_con_devengado: number;
     entidades_en_ambito: number;
     /** Los tres suman solo las entidades con dato, las mismas que el porcentaje de abajo. */
     pia_institucional: number | null;
