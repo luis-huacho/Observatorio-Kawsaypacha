@@ -95,10 +95,10 @@ export default function Sobre() {
             por <strong>Pan para el Mundo</strong> (Brot für die Welt) en comunidades altoandinas
             de Cusco, orientados a fortalecer la resiliencia frente al cambio climático con
             soluciones basadas en la naturaleza, recuperación de saberes ancestrales y
-            fortalecimiento de capacidades locales. En ese trabajo se hizo evidente la necesidad
-            de un espacio que sistematice, actualice y comparta información confiable sobre los
-            peligros, la inversión pública, la normativa vigente y las experiencias que reducen la
-            vulnerabilidad del territorio. El observatorio responde a esa necesidad.
+            fortalecimiento de capacidades locales. De estos pilotos surge la necesidad de que los funcionarios, 
+            tomadores de decisiones y población tengan acceso a la información sintetizada, actualizada y confiable 
+            sobre los peligros, la inversión pública, la normativa vigente y las experiencias que reducen la
+            vulnerabilidad del territorio.
           </p>
         </section>
 
