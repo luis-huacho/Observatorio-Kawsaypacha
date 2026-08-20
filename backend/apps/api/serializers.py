@@ -172,7 +172,7 @@ class MedidaListaSerializer(PortadaMixin, serializers.ModelSerializer):
         fields = [
             "slug", "titulo", "peligro", "peligro_slug", "ambito", "resultado",
             "distrito", "comunidad", "resumen_corto", "imagen_portada", "imagen_titulo",
-            "palabras_clave", "destacada", "publicado_en",
+            "palabras_clave", "destacada", "publicado_en", "fecha_implementacion",
         ]
 
     def _clave_portada(self, obj) -> str:

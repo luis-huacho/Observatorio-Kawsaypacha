@@ -228,6 +228,9 @@ class MedidaFilter(TemaFilterMixin):
     peligro = django_filters.CharFilter(field_name="tipo_peligro__slug")
     distrito = django_filters.CharFilter(method="filtrar_distrito")
     provincia = django_filters.CharFilter(method="filtrar_provincia")
+    # Único campo ordenable hoy: lo pide la portada para sus casos destacados. El resto del
+    # listado sigue con el orden por defecto del modelo (`-publicado_en, -creado_en`).
+    ordering = django_filters.OrderingFilter(fields=(("fecha_implementacion", "fecha_implementacion"),))
 
     class Meta:
         model = Medida

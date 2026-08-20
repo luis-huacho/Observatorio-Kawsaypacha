@@ -164,6 +164,7 @@ export type Medida = {
   palabras_clave: string[];
   destacada: boolean;
   publicado_en: string | null;
+  fecha_implementacion: string | null;
 };
 
 /** Espejo de `MedidaDetalleSerializer`: `/api/medidas/{slug}/`. */

@@ -5,7 +5,7 @@ import {
 import { useApi, type Pagina } from "@/lib/api";
 import { useBloque } from "@/lib/sitio";
 import Reveal from "@/components/Reveal";
-import type { Distrito, Noticia, Norma, ResumenPeligros, InversionResponse } from "@/lib/types";
+import type { Distrito, Medida, Noticia, Norma, ResumenPeligros, InversionResponse } from "@/lib/types";
 import { formatNumber, formatFecha } from "@/lib/semaforo";
 import { TarjetaNoticiaCompacta } from "@/routes/Noticias";
 
@@ -63,6 +63,14 @@ export default function Home() {
 
   const ultimasNoticias = noticias.status === "ok" ? noticias.data.results : [];
   const ultimasNormas = normas.status === "ok" ? normas.data.results : [];
+
+  // Casos: las medidas marcadas como destacadas en el admin, las más recientes primero.
+  const casosDestacados = useApi<Pagina<Medida>>("/medidas/", {
+    destacada: true,
+    ordering: "-fecha_implementacion",
+    page_size: 3,
+  });
+  const casos = casosDestacados.status === "ok" ? casosDestacados.data.results : [];
 
   // Hero administrable: el título y el subtítulo salen de `BloqueTexto`, con los del prototipo
   // como respaldo mientras carga.
@@ -185,22 +193,18 @@ export default function Home() {
 
       {/* Casos */}
       <section className="container-page mt-16">
-        <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Casos recientes</h2>
-        <p className="text-ink-600 mt-1 text-center">Prácticas comunales y distritales con resultados.</p>
+        <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Medidas y buenas prácticas</h2>
+        <p className="text-ink-600 mt-1 text-center">Qué hacer ante las sequías e incendios forestales</p>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {/* Cada tarjeta lleva a su ficha, no al listado genérico. */}
-          {[
-            { slug: "qochas-pampallacta", img: "/img/caso-qochas.jpg", titulo: "Qochas comunales en Pampallacta", peligro: "Sequía" },
-            { slug: "viviendas-heladas-chahuaytiri", img: "/img/caso-chahuaytiri.jpg", titulo: "Acondicionamiento térmico en Chahuaytiri", peligro: "Heladas" },
-            { slug: "brigadas-incendios-calca", img: "/img/caso-calca.jpg", titulo: "Brigadas contra incendios en Calca", peligro: "Incendios forestales" },
-          ].map((c, i) => (
-            <Reveal key={c.slug} delay={i * 80}>
-              <CasoPreview slug={c.slug} img={c.img} titulo={c.titulo} peligro={c.peligro} />
+          {casos.map((m, i) => (
+            <Reveal key={m.slug} delay={i * 80}>
+              <CasoPreview slug={m.slug} img={m.imagen_portada} titulo={m.titulo} peligro={m.peligro} />
             </Reveal>
           ))}
         </div>
         <div className="mt-8 text-center">
-          <Link to="/medidas" className="btn-primary">Ver todas las medidas</Link>
+          <Link to="/medidas" className="btn-primary">Ver todas</Link>
         </div>
       </section>
 
@@ -212,7 +216,7 @@ export default function Home() {
           <div>
             <div className="flex items-baseline justify-between gap-4 mb-1">
               <h2 className="font-display text-2xl font-bold text-mountain-700">
-                Últimas noticias
+                Últimas novedades
               </h2>
               <Link
                 to="/noticias"
