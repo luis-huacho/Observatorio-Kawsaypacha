@@ -112,7 +112,7 @@ export default function Sobre() {
                 <div className="w-11 h-11 rounded-full bg-mountain-100 text-mountain-700 grid place-items-center mb-3">
                   <p.icon className="w-5 h-5" />
                 </div>
-                <div className="font-display font-bold text-mountain-900">{p.titulo}</div>
+                <div className="font-display font-medium text-mountain-900">{p.titulo}</div>
                 <p className="text-sm text-ink-600 mt-1">{p.texto}</p>
               </div>
               </Reveal>
@@ -184,7 +184,7 @@ export default function Sobre() {
                 <div className="card h-full p-5">
                   <div className="flex items-center gap-2 text-mountain-700">
                     <p.icon className="w-5 h-5" />
-                    <span className="font-display font-bold text-mountain-900">{p.titulo}</span>
+                    <span className="font-display font-medium text-mountain-900">{p.titulo}</span>
                   </div>
                   <p className="text-sm text-ink-600 mt-2">{p.texto}</p>
                 </div>
