@@ -141,8 +141,8 @@ export default function Home() {
           <div className="card grid grid-cols-2 md:grid-cols-4 divide-x divide-ink-300/30 overflow-hidden">
             <Stat label="Distritos cubiertos" value={distritos != null ? String(distritos) : "…"} />
             <Stat label="CCPP con peligro alto/muy alto" value={ccppAltos != null ? formatNumber(ccppAltos) : "…"} accent />
-            <Stat label="Nº de experiencias exitosas" value={experienciasExitosas != null ? formatNumber(experienciasExitosas) : "…"} />
-            <Stat label="Nº de municipios con presupuesto ejecutado" value={municipiosConEjecucion != null ? formatNumber(municipiosConEjecucion) : "…"} />
+            <Stat label="de experiencias exitosas" value={experienciasExitosas != null ? formatNumber(experienciasExitosas) : "…"} />
+            <Stat label="de municipios con presupuesto ejecutado" value={municipiosConEjecucion != null ? formatNumber(municipiosConEjecucion) : "…"} />
           </div>
         </Reveal>
       </section>
