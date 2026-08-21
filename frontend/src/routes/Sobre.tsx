@@ -128,7 +128,7 @@ export default function Sobre() {
           <div className="grid sm:grid-cols-2 gap-3">
             {AUDIENCIAS.map((a, i) => (
               <Reveal key={a.label} delay={(i % 2) * 70}>
-                <div className="flex items-center gap-3 card h-full p-4">
+                <div className="flex items-center gap-3 p-4">
                   <div className="w-9 h-9 rounded-full bg-mountain-100 text-mountain-700 grid place-items-center shrink-0">
                     <a.icon className="w-4 h-4" />
                   </div>
