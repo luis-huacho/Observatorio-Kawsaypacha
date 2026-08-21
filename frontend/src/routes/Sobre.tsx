@@ -91,14 +91,12 @@ export default function Sobre() {
         <section className="mt-8 callout">
           <h2 className="font-display text-xl font-bold text-mountain-700">¿Por qué nace?</h2>
           <p className="text-ink-600 mt-2">
-            Es una iniciativa de <strong>PREDES</strong> en el marco de los proyectos financiados
-            por <strong>Pan para el Mundo</strong> (Brot für die Welt) en comunidades altoandinas
-            de Cusco, orientados a fortalecer la resiliencia frente al cambio climático con
-            soluciones basadas en la naturaleza, recuperación de saberes ancestrales y
-            fortalecimiento de capacidades locales. De estos pilotos surge la necesidad de que los funcionarios, 
-            tomadores de decisiones y población tengan acceso a la información sintetizada, actualizada y confiable 
-            sobre los peligros, la inversión pública, la normativa vigente y las experiencias que reducen la
-            vulnerabilidad del territorio.
+            Es una iniciativa de <strong>PREDES</strong> en el marco de los proyectos financiados 
+            por <strong>Pan para el Mundo</strong> (Brot für die Welt) que busca fortalecer 
+            la resiliencia de la región Cusco frente al cambio climático. 
+            El observatorio nace para <strong>actualizar y compartir información confiable</strong> 
+            sobre peligros, inversión pública, normativa y experiencias que contribuyen a reducir 
+            la vulnerabilidad del territorio.
           </p>
         </section>
 
