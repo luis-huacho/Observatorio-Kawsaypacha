@@ -30,7 +30,7 @@ class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
     tipo_peligro = models.ForeignKey(
         "peligros.TipoPeligro", on_delete=models.PROTECT, related_name="medidas"
     )
-    ambito = models.CharField("ámbito", max_length=12, choices=Ambito.choices)
+    ambito = models.CharField("Alcance de la experiencia", max_length=12, choices=Ambito.choices)
     resultado = models.CharField(max_length=16, choices=Resultado.choices, db_index=True)
     distrito = models.ForeignKey(
         "territorio.Distrito",
