@@ -115,10 +115,10 @@ export default function Home() {
               dangerouslySetInnerHTML={{ __html: heroSubtitulo }}
             />
             <div className="mt-8 flex flex-wrap gap-3 animate-fade-up" style={{ animationDelay: "240ms" }}>
-              <Link to="/sobre" className="btn-ghost text-white hover:bg-white/10">
+              <Link to="/sobre" className="btn-primary bg-white text-mountain-900 hover:bg-paper">
                 Sobre el observatorio
               </Link>
-              <Link to="/peligros" className="btn-primary bg-white text-mountain-900 hover:bg-paper">
+              <Link to="/peligros" className="btn-ghost text-white hover:bg-white/10">
                 Explorar mi distrito <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
