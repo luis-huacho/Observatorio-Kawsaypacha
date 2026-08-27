@@ -28,7 +28,7 @@ const SECCIONES = [
     to: "/inversion",
     icon: Coins,
     titulo: "Inversión",
-    pregunta: "¿Cuánto y en qué se invirte el PP0068?",
+    pregunta: "¿Cuánto y en qué se invierte el PP0068?",
     color: "from-sky-700 to-sky-500",
   },
 ];
