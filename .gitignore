@@ -58,6 +58,9 @@ frontend/vite.config.d.ts
 # Anclados a la raíz: sin la barra inicial, "data/" también ignora prototype/public/data/,
 # donde sí viven los JSON que consume la app.
 /data/
+# Copia anterior de data/, del 05/08/2026. Se ignora en vez de borrarla: son 144 MB de fuentes
+# y no estorba, pero sin esta línea sale en cada `git status` del servidor de despliegue.
+/data.old/
 
 # `/_docs/*` y no `/_docs/`: excluir el directorio impide que git descienda en él, y entonces
 # ninguna negación posterior puede volver a incluir un archivo de dentro.

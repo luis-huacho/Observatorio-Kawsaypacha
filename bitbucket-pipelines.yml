@@ -1,0 +1,56 @@
+# Bitbucket Pipelines — CI/CD del Observatorio Kallpachakuy.
+#
+# Qué hace: en cada push a master comprueba los tipos del frontend y, si pasan, se conecta por SSH
+# al servidor de QA y lanza `deploy/desplegar.sh`. Nada más.
+#
+# POR QUÉ ASÍ. El build sigue ocurriendo EN EL SERVIDOR, no aquí: la imagen del backend compila
+# tippecanoe desde el código fuente e instala Chromium, así que construirla en Pipelines sin caché
+# de capas costaría mucho más de lo que ahorra, y obligaría además a montar un registry. Este
+# pipeline gasta ~1 min por despliegue y no necesita registry ninguno. Si algún día el build en el
+# servidor molesta, la salida es Pipelines + registry — y `deploy/desplegar.sh` no cambia.
+#
+# El pipeline NO es el procedimiento de despliegue: solo es quien lo llama. El procedimiento entero
+# vive en `deploy/desplegar.sh`, versionado, y se puede lanzar a mano en el servidor con el mismo
+# resultado. Esa es la razón de que aquí no haya lógica.
+#
+# Lo que hace falta configurar UNA VEZ (no se puede versionar, ver _docs/despliegue-entorno-desarrollo.md):
+#   · Repository settings → SSH keys: generar el par y registrar el known host del servidor.
+#   · En el servidor: la clave pública en ~/.ssh/authorized_keys **restringida con `command=`**,
+#     para que esa clave pueda redesplegar master y nada más — no dar shell.
+#   · Repository variables: DESPLIEGUE_HOST y DESPLIEGUE_USUARIO.
+#
+# No corre pytest ni Playwright a propósito: la suite se sigue lanzando a mano (spec 08).
+
+image: node:22
+
+definitions:
+  steps:
+    - step: &tipos
+        name: Tipos del frontend
+        caches:
+          - node
+        script:
+          # `lint` es `tsc --noEmit`. Corre sin Docker y corta los errores de tipos antes de que
+          # lleguen al bundle, que es lo único que se puede comprobar barato desde aquí.
+          - cd frontend
+          - npm ci
+          - npm run lint
+
+    - step: &desplegar-qa
+        name: Desplegar en QA
+        deployment: qa
+        script:
+          # El comando real lo fija el servidor en authorized_keys (`command=`), así que lo que se
+          # mande aquí da igual: es solo el disparador. Se manda `desplegar` para que el registro
+          # de auth diga algo legible.
+          - ssh -o StrictHostKeyChecking=yes "$DESPLIEGUE_USUARIO@$DESPLIEGUE_HOST" desplegar
+
+pipelines:
+  branches:
+    master:
+      - step: *tipos
+      - step: *desplegar-qa
+
+  pull-requests:
+    '**':
+      - step: *tipos

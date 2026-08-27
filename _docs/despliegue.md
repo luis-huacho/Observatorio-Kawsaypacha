@@ -442,11 +442,46 @@ E2E_URL=https://$SITE_DOMAIN npx playwright test
 > navegador, y termina arrancándolo para comprobar que va. Se ejecuta como tu usuario, **no con
 > sudo** (Node viene de nvm y los navegadores van a `~/.cache/ms-playwright`).
 
+<a id="despliegue-automatico"></a>
+## Despliegue automático
+
+`./deploy/desplegar.sh` hace el despliegue entero: trae `origin/master`, construye, publica el
+`dist/` en el volumen que sirve nginx, recarga nginx, espera a que el backend esté sano y
+**verifica desde fuera, por HTTPS, que el sitio sirve el commit que se acaba de desplegar**.
+En `master` lo lanza Bitbucket Pipelines por SSH en cada push (`bitbucket-pipelines.yml`), pero
+vale igual lanzado a mano: el CI solo es quien llama.
+
+**Por qué existe, y por qué verifica.** El 27/08/2026 el sitio estuvo sirviendo el bundle del 11/08
+sin que nada fallara. El despliegue se había hecho con `docker compose up -d` **sin `--build`**:
+como el servicio `frontend` es de un solo disparo y su `CMD` vuelve a copiar su `dist` al volumen,
+el sitio se «refrescó» —`index.html` con fecha de ese día— con el bundle de dieciséis días antes.
+Códigos 200, contenedores `healthy`, cero errores en los logs. **Un despliegue a medias se ve
+idéntico a uno correcto**, y por eso no basta con automatizar los pasos: hay que poder comprobar
+el resultado.
+
+De ahí el sello. El script escribe el SHA desplegado en `/version.txt`, **dentro del propio `dist`**,
+y luego lo pide por HTTPS y lo compara. Si el `dist` publicado no es el de ese commit, el archivo
+delata el que sí es y el despliegue falla. Se comprueba desde cualquier máquina:
+
+```bash
+curl -s https://observatorio.somosiadigital.com/version.txt   # el SHA que está realmente arriba
+```
+
+`deploy/comprobar-sitio.sh` acepta ese SHA como cuarto argumento y lo contrasta; sin él se limita a
+informar el que sirve, que es lo que quiere un cron desde fuera —no sabe qué commit debería estar—.
+
+**El script aborta antes de tocar nada** si el árbol tiene cambios locales sin commitear, si está en
+otra rama, o si el `pull` no es *fast-forward*. Un merge hecho en el servidor no está en Bitbucket
+y nadie lo vería nunca.
+
+Lo que hace falta configurar una vez para que Pipelines pueda entrar está en
+[`despliegue-entorno-desarrollo.md`](./despliegue-entorno-desarrollo.md).
+
 ## Runbook
 
 | Operación | Comando |
 |---|---|
-| Desplegar una actualización | `git pull && docker compose build backend frontend && docker compose up -d && docker compose run --rm frontend && docker compose exec nginx nginx -s reload` |
+| **Desplegar una actualización** | `./deploy/desplegar.sh` — en `master` lo lanza Bitbucket solo (ver [Despliegue automático](#despliegue-automatico)) |
 | Migraciones (normalmente automáticas) | `docker compose exec backend python manage.py migrate` |
 | Sembrar o resembrar peligros y frecuencia | `docker compose exec backend python manage.py seed` — reemplazo total, se limpia solo |
 | Reimportar un GeoJSON de capa | Ver [Cargar los datos](#cargar-los-datos): hay que soltar el archivo antes, o `seed --capas` la salta |
@@ -525,6 +560,7 @@ la imagen de desarrollo con `pytest`: recuperarla cuesta recompilar tippecanoe.
 
 **Al desplegar, `docker compose run --rm frontend` no es opcional**: es lo que copia el `dist/`
 nuevo al volumen que sirve nginx. Sin ese paso el backend se actualiza y el frontend no.
+`deploy/desplegar.sh` lo hace por ti; esto queda escrito por si algún día se despliega a mano.
 
 **Y `nginx -s reload` tampoco**, si el `git pull` tocó `deploy/nginx/conf.d/`. `up -d` solo recrea lo
 que cambió en compose, y la definición de nginx casi nunca cambia: el archivo nuevo está montado, pero

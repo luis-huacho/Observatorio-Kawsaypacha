@@ -94,6 +94,7 @@ todo lo de abajo son variables de entorno y un comando.
 | `GEMINI_API_KEY` | vacío: el resumen automático de PDF queda deshabilitado con aviso | la llave real |
 | Cuentas | `adminpredes` y `userobs` | las que PREDES decida |
 | `ADMIN_URL` | `loginseguro/` | `loginseguro/`, salvo que PREDES quiera otro |
+| Despliegue automático | Pipelines entra por SSH a este servidor | mismo pipeline, otro `DESPLIEGUE_HOST` y otra clave |
 
 **Lo que NO cambia**: `deploy/nginx/`, `compose.yaml` y el resto del repositorio. Los dominios ya no
 están escritos en ninguna parte del código — nginx los toma de `SITE_DOMAIN` y `API_DOMAIN` al
@@ -188,6 +189,49 @@ seis corregidas; el detalle está en la bitácora de `_specs/README.md`.
 Tres quedaron abiertos y **no corregidos** por estar fuera del encargo: E-006, E-007 y E-008. Su
 ficha completa está en el tracker, que es el único sitio donde su estado se mantiene al día; el ciclo
 está en `_specs/09-errores.md`.
+
+## Despliegue automático desde Bitbucket
+
+Desde el **27/08/2026**, cada push a `master` en Bitbucket redespliega este entorno. El pipeline
+(`bitbucket-pipelines.yml`) comprueba los tipos del frontend y, si pasan, entra por SSH y lanza
+`deploy/desplegar.sh`. **El build sigue ocurriendo aquí**, no en la nube de Atlassian: la imagen del
+backend compila tippecanoe desde el código fuente, así que construirla sin caché de capas costaría
+más de lo que ahorra y obligaría a montar un registry. El pipeline gasta ~1 min por despliegue.
+
+Se montó porque ese mismo día el sitio estuvo sirviendo el bundle del 11/08 sin que nada fallara —el
+detalle, y por qué el script verifica el resultado en vez de limitarse a ejecutar los pasos, está en
+[`despliegue.md`](./despliegue.md#despliegue-automatico)—.
+
+**Este servidor deja de usarse como copia de trabajo.** El script aborta si encuentra cambios locales
+sin commitear, así que lo que se edite aquí bloquea el siguiente despliegue en vez de perderse.
+
+### Lo que hubo que configurar a mano
+
+No es versionable, y es lo que habría que repetir para PREDES:
+
+1. **Bitbucket** → *Repository settings → SSH keys*: generar el par y registrar el known host del
+   servidor. La clave pública es la que se copia al paso siguiente.
+2. **Aquí**, en `~/.ssh/authorized_keys`, la clave **restringida con `command=`**:
+
+   ```
+   command="/home/appdevuser/observatorio-kallpachakuy/deploy/desplegar.sh",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ssh-ed25519 AAAA… bitbucket-pipelines
+   ```
+
+   Esto es lo que hace aceptable la superficie nueva que abre el pipeline: una clave SSH viva en la
+   nube de Atlassian con acceso a la máquina. Con `command=`, esa clave **no da shell** — lo único
+   que puede hacer es redesplegar `master`. El comando que manda el pipeline es solo un disparador;
+   el que se ejecuta lo fija este archivo. Sin `command=`, quien tuviera la clave tendría el
+   servidor, y con él la base, los certificados y el `.env`.
+3. **Repository variables**: `DESPLIEGUE_HOST` = `46.62.239.44` y `DESPLIEGUE_USUARIO` = `appdevuser`.
+
+### Comprobar qué está desplegado
+
+```bash
+curl -s https://observatorio.somosiadigital.com/version.txt
+```
+
+Devuelve el SHA que el sitio está sirviendo de verdad. Los despliegues quedan en
+`~/observatorio-registros/despliegue.log`, junto a `vigilancia.log` y `metricas.log`.
 
 ## Además de la plataforma, este servidor lleva el tracker
 

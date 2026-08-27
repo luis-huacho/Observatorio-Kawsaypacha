@@ -2,7 +2,7 @@
 #
 # comprobar-sitio.sh — comprueba el Observatorio DESDE FUERA, con solo curl.
 #
-# Uso:  ./deploy/comprobar-sitio.sh <dominio-spa> <dominio-api> [llave-de-busqueda]
+# Uso:  ./deploy/comprobar-sitio.sh <dominio-spa> <dominio-api> [llave-de-busqueda] [sha-esperado]
 #       ./deploy/comprobar-sitio.sh observatorio.predes.org.pe obs.predes.org.pe
 #
 # Cron en OTRA máquina:
@@ -23,6 +23,11 @@
 #
 # La llave de búsqueda es opcional: sin ella se omite esa comprobación. Es la
 # `VITE_MEILI_SEARCH_KEY` del `.env` de la raíz, y es de solo búsqueda —puede viajar—.
+#
+# El SHA esperado también es opcional, y es lo que convierte «nginx contesta» en «nginx sirve LA
+# VERSIÓN QUE CREO». Sin él se informa el SHA servido sin juzgarlo, que es lo que quiere un cron
+# desde fuera: no sabe qué commit debería estar arriba. Con él —así lo llama
+# `deploy/desplegar.sh`— falla si no coinciden.
 
 set -Eeuo pipefail
 IFS=$'\n\t'
@@ -33,6 +38,7 @@ DIAS_AVISO_CERT=21        # certbot renueva a los 30 días; por debajo de esto, 
 SPA="${1:-}"
 API="${2:-}"
 LLAVE="${3:-${VITE_MEILI_SEARCH_KEY:-}}"
+SHA_ESPERADO="${4:-}"
 
 if [[ -z "$SPA" || -z "$API" || "$SPA" == "-h" || "$SPA" == "--help" ]]; then
     cat <<EOF
@@ -44,6 +50,7 @@ Uso: ./deploy/comprobar-sitio.sh <dominio-spa> <dominio-api> [llave-de-busqueda]
   <dominio-api>   el del API, admin, media y tiles (API_DOMAIN)
   [llave]         VITE_MEILI_SEARCH_KEY; si falta, se omite esa comprobación
                   (también se toma de la variable de entorno del mismo nombre)
+  [sha-esperado]  commit que debería estar desplegado; si falta, solo se informa el servido
 
 Sale con código != 0 si algo falla, para colgarlo de un «|| mail» en otra máquina.
 EOF
@@ -70,6 +77,28 @@ printf '\nObservatorio Kallpachakuy — comprobación externa  (%s)\n\n' "$(date
 codigo="$(pedir -o /dev/null -w '%{http_code}' "https://$SPA/" || echo 000)"
 if [[ "$codigo" == "200" ]]; then ok "SPA" "200"
 else mal "SPA" "$codigo  ← https://$SPA/ no responde como debe"; fi
+
+# --- La versión desplegada ------------------------------------------------
+# El punto ciego de más arriba: «que nginx conteste pero sirva el bundle equivocado». Pasó el
+# 27/08/2026 y ninguna de las demás comprobaciones lo habría visto —todas daban 200—. El sello lo
+# escribe `deploy/desplegar.sh` dentro del dist, así que solo existe si el despliegue llegó entero.
+codigo="$(pedir -o /dev/null -w '%{http_code}' "https://$SPA/version.txt" || echo 000)"
+servido=""
+[[ "$codigo" == "200" ]] && servido="$(pedir "https://$SPA/version.txt" | tr -d '[:space:]' || true)"
+
+if [[ ! "$servido" =~ ^[0-9a-f]{7,40}$ ]]; then
+    if [[ -n "$SHA_ESPERADO" ]]; then
+        mal "versión" "sin /version.txt ($codigo)  ← ¿se desplegó con deploy/desplegar.sh?"
+    else
+        omite "versión" "(el sitio no publica /version.txt)"
+    fi
+elif [[ -z "$SHA_ESPERADO" ]]; then
+    ok "versión" "${servido:0:12}"
+elif [[ "$servido" == "$SHA_ESPERADO" ]]; then
+    ok "versión" "${servido:0:12}"
+else
+    mal "versión" "sirve ${servido:0:12}, se esperaba ${SHA_ESPERADO:0:12}  ← el bundle no es el de ese commit"
+fi
 
 # --- Redirección a HTTPS --------------------------------------------------
 codigo="$(pedir -o /dev/null -w '%{http_code}' "http://$SPA/" || echo 000)"
