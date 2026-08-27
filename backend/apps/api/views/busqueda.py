@@ -47,7 +47,7 @@ class BusquedaView(APIView):
             return Response({"q": "", "grupos": [], "total": 0, "motor": "drf"})
 
         grupos = [
-            self._grupo("medidas", "Medidas", self._medidas(consulta, limite)),
+            self._grupo("medidas", "Buenas prácticas", self._medidas(consulta, limite)),
             self._grupo("normativa", "Normativa", self._normas(consulta, limite)),
             self._grupo("noticias", "Noticias", self._noticias(consulta, limite)),
             self._grupo("documentos", "Documentos", self._documentos(consulta, limite)),

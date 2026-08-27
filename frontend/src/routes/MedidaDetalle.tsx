@@ -25,7 +25,7 @@ export default function MedidaDetalle() {
         <EmptyState
           title="Caso no encontrado"
           message="La experiencia que buscas no existe o fue retirada."
-          action={<Link to="/medidas" className="btn-primary">Ver todas las medidas</Link>}
+          action={<Link to="/medidas" className="btn-primary">Ver todas las buenas prácticas</Link>}
         />
       </div>
     );
@@ -39,7 +39,7 @@ export default function MedidaDetalle() {
         eyebrow="Experiencia documentada"
         titulo={m.titulo}
         backTo="/medidas"
-        backLabel="Volver a medidas"
+        backLabel="Volver a buenas prácticas"
       />
       <article className="container-page py-8 max-w-3xl">
         {/* El resultado es la clasificación que define la sección; hasta ahora la ficha no lo

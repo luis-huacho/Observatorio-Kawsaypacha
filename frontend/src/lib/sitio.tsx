@@ -38,7 +38,7 @@ const POR_DEFECTO: SitioPayload = {
     header: [
       { texto: "Sobre el observatorio", url: "/sobre", grupo: "", orden: 1 },
       { texto: "Peligros", url: "/peligros", grupo: "", orden: 2 },
-      { texto: "Medidas", url: "/medidas", grupo: "", orden: 3 },
+      { texto: "Buenas prácticas", url: "/medidas", grupo: "", orden: 3 },
       { texto: "Inversión", url: "/inversion", grupo: "", orden: 4 },
       { texto: "Normativa", url: "/normativa", grupo: "", orden: 5 },
       // «Comparar distritos» no va en el menú (ADR-P2). La ruta sigue viva y se llega por URL,
@@ -47,7 +47,7 @@ const POR_DEFECTO: SitioPayload = {
     ],
     footer: [
       { texto: "Peligros", url: "/peligros", grupo: "Secciones", orden: 1 },
-      { texto: "Medidas", url: "/medidas", grupo: "Secciones", orden: 2 },
+      { texto: "Buenas prácticas", url: "/medidas", grupo: "Secciones", orden: 2 },
       { texto: "Inversión", url: "/inversion", grupo: "Secciones", orden: 3 },
       { texto: "Normativa", url: "/normativa", grupo: "Más", orden: 5 },
       { texto: "Noticias", url: "/noticias", grupo: "Más", orden: 6 },

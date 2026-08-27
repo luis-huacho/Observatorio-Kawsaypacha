@@ -23,7 +23,7 @@
 | Ventana | Estado | Fuente de datos |
 |---|---|---|
 | Exposición a peligros naturales | Activa | Excel `Base_Nivel Peligro_CCPP_Cusco.xlsx` (10,978 clasificaciones sobre 8,968 CCPP) + `Base_Frecuencia_Peligro_Cusco.xlsx` (111 distritos) — ver 01 |
-| Medidas (buenas prácticas) | Activa | Contenido editorial (admin) |
+| Buenas prácticas | Activa | Contenido editorial (admin). La ruta, el API y el índice de búsqueda siguen diciéndose `medidas`: lo que cambió es la etiqueta de cara al público |
 | Inversión (PP 0068) | Activa (ADR-D4, supera a ADR-D3) | `Base_Prespuesto_PP0068_cusco_final.xlsx` (corte 2026-06, 119 pliegos) + serie 2022-2025 del comparativo del MEF, consolidadas por `scripts/consolidar_pp0068.py` y `scripts/totales_institucionales.py` — ver 01 |
 | Normativa | Activa | Contenido editorial (admin) |
 | Prioridades | **Desactivada** | — |

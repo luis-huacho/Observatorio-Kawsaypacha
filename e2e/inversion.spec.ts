@@ -12,7 +12,7 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
 
-import { esperarApi, vigilarConsola } from "./apoyo";
+import { esperarApi, irEsperando, vigilarConsola } from "./apoyo";
 import { abrirMenu } from "./fixtures";
 
 /**
@@ -218,8 +218,7 @@ test.describe("Inversión (PP 0068)", () => {
     test.skip(!cuerpo.disponible || cuerpo.ejercicios.length < 2, "hace falta más de un ejercicio");
 
     const otro = cuerpo.ejercicios.find((e: { anio: number }) => e.anio !== cuerpo.anio)!;
-    await page.goto(`/inversion?vista=comparar&comparar_con=${otro.anio}`);
-    await esperarApi(page, /comparar_con/);
+    await irEsperando(page, `/inversion?vista=comparar&comparar_con=${otro.anio}`, /comparar_con/);
 
     await expect(page.getByRole("heading", { name: new RegExp(`frente a ${otro.anio}`) })).toBeVisible();
     if (cuerpo.es_parcial !== otro.es_parcial) {
@@ -250,8 +249,7 @@ test.describe("Inversión (PP 0068)", () => {
   });
 
   test("la sección sigue anunciada en el menú", async ({ page }) => {
-    await page.goto("/");
-    await esperarApi(page, "/api/sitio/");
+    await irEsperando(page, "/", "/api/sitio/");
     // En móvil la navegación vive detrás del botón de hamburguesa.
     await abrirMenu(page);
 

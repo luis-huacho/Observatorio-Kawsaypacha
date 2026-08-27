@@ -7,15 +7,14 @@
  */
 import { expect, test } from "./fixtures";
 
-import { aNumero, esperarApi, vigilarConsola } from "./apoyo";
+import { aNumero, irEsperando, vigilarConsola } from "./apoyo";
 import { abrirMenu } from "./fixtures";
 
 test.describe("Portada", () => {
   test("las cifras salen del API y coinciden con el resumen", async ({ page }) => {
     const errores = vigilarConsola(page);
 
-    await page.goto("/");
-    const resumen = await (await esperarApi(page, "/api/peligros/resumen/")).json();
+    const resumen = await (await irEsperando(page, "/", "/api/peligros/resumen/")).json();
 
     const tarjeta = page.getByText("Centros poblados monitoreados");
     await expect(tarjeta).toBeVisible();
@@ -34,15 +33,13 @@ test.describe("Portada", () => {
   test("no queda ninguna cifra en el marcador de carga", async ({ page }) => {
     // Las tarjetas muestran «…» mientras cargan: si una se queda así, la petición se perdió y
     // la página no lo dice de ninguna otra forma.
-    await page.goto("/");
-    await esperarApi(page, "/api/peligros/resumen/");
+    await irEsperando(page, "/", "/api/peligros/resumen/");
 
     await expect(page.getByText("…", { exact: true })).toHaveCount(0);
   });
 
   test("el cascarón del sitio viene de /api/sitio/", async ({ page }) => {
-    await page.goto("/");
-    const sitio = await (await esperarApi(page, "/api/sitio/")).json();
+    const sitio = await (await irEsperando(page, "/", "/api/sitio/")).json();
 
     const enlacesHeader = sitio.menu.header as Array<{ texto: string; url: string }>;
     expect(enlacesHeader.length).toBeGreaterThan(2);
@@ -60,15 +57,13 @@ test.describe("Portada", () => {
   test("prioridades no aparece en la navegación", async ({ page }) => {
     // ADR-P1: se retira con `visible=False`, no se borra. Si el menú la mostrara, ocultar algo
     // dejaría de ser una decisión de PREDES.
-    await page.goto("/");
-    await esperarApi(page, "/api/sitio/");
+    await irEsperando(page, "/", "/api/sitio/");
 
     await expect(page.locator('a[href="/prioridades"]')).toHaveCount(0);
   });
 
   test("el bloque de actualidad enlaza a contenido real", async ({ page }) => {
-    await page.goto("/");
-    await esperarApi(page, "/api/noticias/");
+    await irEsperando(page, "/", "/api/noticias/");
 
     const enlaces = page.locator('a[href^="/noticias/"], a[href^="/normativa/"]');
     if ((await enlaces.count()) === 0) {

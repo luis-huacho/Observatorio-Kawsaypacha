@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, Search, X } from "lucide-react";
 
 import { registrarBusqueda } from "@/lib/metricas";
 import { useSitio } from "@/lib/sitio";
@@ -102,8 +102,14 @@ export default function Header() {
           {/* El buscador es el que cede el espacio: `min-w-0` aquí y en el input —un `<input>` trae
               ancho mínimo intrínseco y sin eso no bajaría de `w-56`, comprimiendo el menú. Las
               clases visuales de la caja viven en el tono «cabecera» de `CajaBusqueda`; este `form`
-              solo la coloca. */}
-          <form onSubmit={onSubmit} className="hidden md:flex ml-auto min-w-0">
+              solo la coloca.
+
+              Pero ceder tiene un límite: entre `lg` y `xl` el menú y el campo ya no caben juntos
+              —con las etiquetas actuales el `nav` mide 555 px a 1024 px y al campo le quedaban
+              63 px, que no dan para escribir—, así que ahí el campo se retira y deja una lupa. De
+              `md` a `lg` sí se muestra, porque el menú está detrás de la hamburguesa y sobra
+              sitio; desde `xl` vuelve entero. */}
+          <form onSubmit={onSubmit} className="hidden md:flex lg:hidden xl:flex ml-auto min-w-0">
             <CajaBusqueda
               value={q}
               onChange={setQ}
@@ -112,6 +118,16 @@ export default function Header() {
               tono="cabecera"
             />
           </form>
+
+          {/* `aria-label` de «ir al buscador» y no de «buscar»: esto navega, no busca en sitio.
+              Además evita chocar con el `input[aria-label="Buscar"]` que localizan las pruebas. */}
+          <Link
+            to="/buscar"
+            aria-label="Ir al buscador"
+            className="hidden lg:flex xl:hidden ml-auto items-center justify-center p-2 rounded-md text-white hover:bg-white/10 no-underline"
+          >
+            <Search className="w-5 h-5" />
+          </Link>
 
           <button
             aria-label="Menú"

@@ -23,7 +23,7 @@ menu:
   # así que al tocar el menú hay que volver a medir que entre en una línea (`e2e/header.spec.ts`).
   - {zona: header, texto: Sobre el observatorio, url: /sobre, orden: 1}
   - {zona: header, texto: Peligros, url: /peligros, orden: 2}
-  - {zona: header, texto: Medidas, url: /medidas, orden: 3}
+  - {zona: header, texto: Buenas prácticas, url: /medidas, orden: 3}
   - {zona: header, texto: Inversión, url: /inversion, orden: 4}
   - {zona: header, texto: Normativa, url: /normativa, orden: 5}
   # El comparador sale de la navegación (ADR-P2): la ruta del SPA y `/api/comparador/distritos/`
@@ -35,7 +35,7 @@ menu:
   - {zona: header, texto: Prioridades, url: /prioridades, orden: 7, visible: false}
 
   - {zona: footer, grupo: Secciones, texto: Peligros, url: /peligros, orden: 1}
-  - {zona: footer, grupo: Secciones, texto: Medidas, url: /medidas, orden: 2}
+  - {zona: footer, grupo: Secciones, texto: Buenas prácticas, url: /medidas, orden: 2}
   - {zona: footer, grupo: Secciones, texto: Inversión, url: /inversion, orden: 3}
   - {zona: footer, grupo: Secciones, texto: Comparar distritos, url: /comparar, orden: 4, visible: false}
   - {zona: footer, grupo: Más, texto: Normativa, url: /normativa, orden: 5}
