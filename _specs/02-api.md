@@ -419,6 +419,28 @@ Va **exenta de throttling** por la misma razón: con `interval: 10s` son 360 pet
 el techo anónimo de 1000/hora, y un 429 provocaría reinicios sin que pasara nada en el sitio. Es
 también el motivo de no reutilizar `/api/docs/` ni `/api/schema/`, que sí están sujetas.
 
+### Las tasas se configuran por entorno
+
+`THROTTLE_PRODUCCION` en `settings.py` es la fuente de verdad de los valores del servicio —1000/hora
+anónimas, 30/hora de descargas, 600/min de beacon— y hay una prueba que los fija. Cada uno se puede
+sustituir por su variable (`API_THROTTLE_ANON`, `API_THROTTLE_DESCARGA`, `API_THROTTLE_BEACON`), y
+**vaciarla desactiva ese límite**; `compose.dev.yml` las vacía las tres.
+
+Hizo falta porque **el throttling se aplicaba igual en desarrollo que en producción**, y la suite
+E2E no cabe en la cuota: 56 casos × 2 proyectos = 112 corridas, cada una con caché de navegador
+fría —Playwright abre un contexto nuevo por prueba— y la portada sola pide 8 veces. Son ~1.100
+peticiones contra 1.000, así que a media suite el API empezaba a responder 429 y **fallaba en bloque
+lo que no tenía nada roto**: `peligros`, `inversion`, `medidas` y `buscar`. Lo caro de depurar es que
+**un 429 no se parece a un límite sino a un sitio caído**: la prueba solo ve que los datos no llegan
+y agota su espera igual que si el backend estuviera muerto.
+
+La caché no era la salida, y conviene dejarlo escrito para no volver a proponerla: cada prueba parte
+de un contexto de navegador nuevo, así que no hay nada cacheado que reutilizar.
+
+Que el techo de **producción** va corto es harina de otro costal y está en
+[`_docs/deuda-tecnica.md`](../_docs/deuda-tecnica.md): 1000/hora ÷ 8 peticiones por portada son 125
+vistas de página por hora **y por IP**, y una oficina tras un NAT comparte una sola.
+
 El cuerpo es escueto a propósito —sin versiones, sin nombres de host, sin rutas—: es público.
 | `GET /api/mapas/capas/` | — | capas con `estado_tiles=ok` y `visible_por_defecto`/orden: `[{ slug, nombre, url: "/tiles/rios.pmtiles", tipo_geometria, estilo, min_zoom, max_zoom, atribucion }]` |
 | `POST /api/metricas/evento/` | body `form-encoded` `tipo=busqueda&ruta=/buscar&detalle=heladas` | beacon (`navigator.sendBeacon`); throttle **600/min por IP**; respuesta 204 |

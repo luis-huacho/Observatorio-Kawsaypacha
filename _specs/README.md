@@ -13,6 +13,37 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 27/08/2026 — la suite E2E no cabía en su propia cuota (429)
+
+La suite completa fallaba en bloque —`peligros`, `inversion`, `medidas`, `buscar`— y parecía una
+regresión de los cambios del día. No lo era: **el API respondía 429 a media corrida**.
+
+- **La aritmética.** `AnonRateThrottle` a `anon: 1000/hour` por IP se aplicaba **igual en desarrollo
+  que en producción**: no estaba dentro de ningún `if DEBUG`. La suite son 56 casos × 2 proyectos =
+  112 corridas, **cada una con caché de navegador fría** —Playwright abre un contexto nuevo por
+  prueba, no hay `storageState`— y la portada sola dispara 8 peticiones. ~1.100 contra 1.000: **la
+  suite no cabe en la cuota**, y una vez agotada todo responde 429 durante el resto de la hora.
+- **Por qué costó verlo.** *Un 429 no se parece a un límite, se parece a un sitio caído.* La prueba
+  solo ve que los datos no llegan y agota sus 30 s igual que con el backend muerto. Lo delató que
+  las corridas **sueltas** pasaban siempre: el fallo dependía del volumen, no del código. Se
+  confirmó recargando la portada a mano mientras la suite corría — la consola pasó de 0 a 8 errores,
+  los ocho `429`.
+- **La caché no era la salida.** Era la hipótesis natural («que no repita las peticiones»), y no
+  sirve: cada prueba parte de un contexto nuevo, así que no hay nada que reutilizar.
+- **El arreglo.** `THROTTLE_PRODUCCION` en `settings.py` conserva los valores del servicio, y cada
+  uno se puede sustituir por su variable de entorno; **vaciarla desactiva ese límite**.
+  `compose.dev.yml` las vacía las tres. Producción no cambia: sin variables definidas rigen los
+  mismos 1000/hora, 30/hora y 600/min, comprobado en un contenedor sin ellas.
+- **Las tres, no solo `anon`.** `descarga: 30/hour` es aún más justa, y `inversion.spec.ts` pide el
+  PDF en los dos proyectos.
+- **La prueba que lo cazó bien.** `test_las_descargas_estan_limitadas` afirmaba sobre la tasa
+  *efectiva* y se puso roja al vaciarla — tenía razón en existir, pero el anclaje ya no valía: ahora
+  afirma sobre `THROTTLE_PRODUCCION`, que no depende de dónde se corra. Una prueba de configuración
+  debe fijar **la decisión**, no el valor que resulte del entorno.
+- El techo de **producción** sí va corto (125 vistas/hora por IP, y una oficina tras NAT comparte
+  IP), pero es otra decisión: queda con la caché en `_docs/deuda-tecnica.md`, archivo nuevo porque
+  el tracker estaba inaccesible ese día.
+
 ### Actualización 27/08/2026 — los textos de la portada, «Buenas prácticas» y la lupa
 
 Encargo de contenido con dos consecuencias técnicas que solo salieron al medirlo.

@@ -140,6 +140,40 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- DRF -------------------------------------------------------------------
+# Tasas del throttling del API.
+#
+# `THROTTLE_PRODUCCION` es la fuente de verdad de los valores del servicio, y hay una prueba que
+# los fija (`test_las_descargas_estan_limitadas`): son un ajuste de producto, no un detalle de
+# despliegue, y cambiarlos a la ligera es cómo se abre un agujero o se corta a los visitantes.
+#
+# Cada tasa se puede sustituir por su variable de entorno, y **vaciarla la desactiva** (cadena
+# vacía -> `None`, que es como DRF entiende «sin límite»). Eso es cosa de desarrollo:
+# `compose.dev.yml` las vacía las tres. En producción no se define nada y rige lo de aquí abajo.
+#
+# Hizo falta porque el throttling se aplicaba **igual en desarrollo que en producción**, y la
+# suite E2E no cabe en la cuota: 56 casos x 2 proyectos = 112 corridas, cada una con caché de
+# navegador fría —Playwright abre un contexto nuevo por prueba— y la portada sola pide 8 veces.
+# Son ~1.100 peticiones contra 1.000, así que a mitad de suite todo empezaba a responder 429. Y
+# un 429 no se parece a un límite: se parece a un sitio caído, porque la prueba solo ve que los
+# datos no llegan y agota su espera igual que si el backend estuviera muerto.
+THROTTLE_PRODUCCION = {
+    "anon": "1000/hour",
+    # Los exports y el PDF cuestan mucho más que una lectura: un bucle de descargas
+    # tumbaría el worker antes que el API.
+    "descarga": "30/hour",
+    # 60/min era demasiado poco: **toda una oficina detrás de un NAT comparte IP**, y un
+    # taller con treinta personas navegando pasa de 60 vistas por minuto sin esfuerzo. Lo
+    # descubrieron las pruebas E2E, que desde una sola IP empezaron a recibir 429 en la
+    # consola del navegador. Cada beacon es un INSERT, así que el techo puede ser alto y
+    # seguir sirviendo para lo que es: cortar a un cliente roto o a quien infle las cifras.
+    "beacon": "600/min",
+}
+
+THROTTLE_RATES = {
+    ambito: env(f"API_THROTTLE_{ambito.upper()}", default=defecto) or None
+    for ambito, defecto in THROTTLE_PRODUCCION.items()
+}
+
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
@@ -147,18 +181,7 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 50,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {
-        "anon": "1000/hour",
-        # Los exports y el PDF cuestan mucho más que una lectura: un bucle de descargas
-        # tumbaría el worker antes que el API.
-        "descarga": "30/hour",
-        # 60/min era demasiado poco: **toda una oficina detrás de un NAT comparte IP**, y un
-        # taller con treinta personas navegando pasa de 60 vistas por minuto sin esfuerzo. Lo
-        # descubrieron las pruebas E2E, que desde una sola IP empezaron a recibir 429 en la
-        # consola del navegador. Cada beacon es un INSERT, así que el techo puede ser alto y
-        # seguir sirviendo para lo que es: cortar a un cliente roto o a quien infle las cifras.
-        "beacon": "600/min",
-    },
+    "DEFAULT_THROTTLE_RATES": THROTTLE_RATES,
 }
 
 SPECTACULAR_SETTINGS = {

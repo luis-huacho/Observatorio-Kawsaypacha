@@ -52,6 +52,17 @@ services:
       DEBUG: "True"
       # Sin SMTP configurado los correos del flujo editorial van a la consola del contenedor.
       EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+      # Sin throttling en desarrollo. Vacío = sin límite; en producción no se define nada y
+      # rigen los defectos de settings.py (1000/hora, 30/hora, 600/min).
+      #
+      # La suite E2E no cabe en la cuota anónima: 112 corridas con caché de navegador fría, a 8
+      # peticiones por portada, son ~1.100 contra un techo de 1.000. A mitad de suite todo pasaba
+      # a responder 429, y eso en una prueba **no se lee como un límite sino como un sitio caído**.
+      API_THROTTLE_ANON: ""
+      # También la de descargas, y es la más justa de las tres: `inversion.spec.ts` pide el PDF
+      # en los dos proyectos contra un techo de 30/hora.
+      API_THROTTLE_DESCARGA: ""
+      API_THROTTLE_BEACON: ""
     ports:
       - "8000:8000"
     volumes:

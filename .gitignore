@@ -77,6 +77,7 @@ frontend/vite.config.d.ts
 !/_docs/despliegue-entorno-desarrollo.md
 !/_docs/manual-admin-predes.md
 !/_docs/api.md
+!/_docs/deuda-tecnica.md
 
 # _specs/ SÍ se versiona: acumula los ADR, el modelo de datos y los contratos de API con los que
 # se construye el backend. Tenerlo en un solo disco, sin historial, era un riesgo innecesario.

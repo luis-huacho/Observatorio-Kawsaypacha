@@ -167,6 +167,23 @@ cd frontend && npm run build           # el build es parte de la verificación
 npx playwright test                    # 56 E2E en escritorio y móvil
 ```
 
+### El throttling está apagado en desarrollo, y no es un descuido
+
+`compose.dev.yml` vacía `API_THROTTLE_ANON`, `API_THROTTLE_DESCARGA` y `API_THROTTLE_BEACON`, lo que
+desactiva los límites del API **solo en el stack de desarrollo**. En producción no se define nada y
+rigen los valores de `THROTTLE_PRODUCCION` (1000/hora, 30/hora, 600/min).
+
+Hace falta porque **la suite no cabe en la cuota anónima**: 56 casos × 2 proyectos = 112 corridas,
+cada una con caché de navegador fría —Playwright abre un contexto nuevo por prueba— y la portada
+sola pide 8 veces. Son ~1.100 peticiones contra un techo de 1.000, así que a media suite el API
+empezaba a responder 429 y fallaba en bloque lo que no tenía nada roto.
+
+**Si ves fallos masivos y sin sentido en las E2E, sospecha de esto antes que del código**: un 429 no
+se parece a un límite, se parece a un sitio caído — la prueba solo ve que los datos no llegan. Se
+comprueba recargando cualquier página a mano y mirando la consola del navegador. Y como el contador
+del throttle vive en `LocMemCache`, es decir en la memoria del proceso, **reiniciar el backend borra
+los 429 al instante**.
+
 ### Preparar la máquina para las E2E
 
 `e2e/instalar-dependencias.sh` hace **tres** cosas, y hasta el 04/08/2026 aquí solo se documentaban
