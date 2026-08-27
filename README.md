@@ -230,7 +230,7 @@ En el servidor esto se automatiza con un techo en `/etc/docker/daemon.json` y un
 
 ## 5. Revisar que el sistema está bien
 
-Ocho comprobaciones, elegidas porque cada una cubre algo que **falla en silencio**: la página carga,
+Nueve comprobaciones, elegidas porque cada una cubre algo que **falla en silencio**: la página carga,
 el API responde 200 y la cifra que se publica es otra.
 
 | Qué | Cómo | Qué confirma |

@@ -203,7 +203,7 @@ Automatizarlas no sale a cuenta, pero omitirlas sí:
 
 ## Lo que encontró esta suite
 
-Se anota porque es el argumento de por qué la fase existe. Ninguno de estos fallos rompía nada a la vista: en los cinco casos el sistema respondía 200 y la pantalla se veía bien.
+Se anota porque es el argumento de por qué la fase existe. Ninguno de estos fallos rompía nada a la vista: en los seis casos el sistema respondía 200 y la pantalla se veía bien.
 
 | Hallazgo | Cómo se manifestaba |
 |---|---|
