@@ -128,14 +128,15 @@ de dominio, es que se rompió esa propiedad.
 Los 17 fallos son **todos** por la ausencia de datos, y ninguno del despliegue: las siete pruebas
 de `peligros.spec.ts` en sus dos perfiles, la cifra de la portada (`home.spec.ts:14` exige
 `total_ccpp > 1000`) y el buscador de lugares del visor. Cuando entren los Excel, se vuelve a
-correr la suite y tienen que pasar las 56.
+correr la suite y tiene que pasar entera.
 
 > Para correr Playwright en este servidor hizo falta instalar a mano las librerías de sistema de
-> Chromium: sin ellas, las 62 pruebas fallan con `libatk-1.0.so.0: cannot open shared object file`,
+> Chromium: sin ellas, la suite entera falla con `libatk-1.0.so.0: cannot open shared object file`,
 > que se lee como si el sitio estuviera caído y no lo está. De ahí salió
 > **`e2e/instalar-dependencias.sh`**, que ya lo hace por su cuenta —librerías, `npm install`,
-> navegador y una comprobación de que arranca—. La provisión del servidor
-> (`install-rocky-10.sh`) deja Docker y Node 22; este script cubre lo que falta encima.
+> navegador y una comprobación de que arranca—. La provisión del servidor —un `install-rocky-10.sh`
+> que **no vive en este repositorio**, porque es de la máquina y no del proyecto— deja Docker y
+> Node 22; este script cubre lo que falta encima.
 
 ## Tareas de cron instaladas
 

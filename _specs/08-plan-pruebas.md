@@ -15,8 +15,9 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (144 pruebas, ~30 s)
-$DC exec backend pytest -m lento        # los Excel completos y el PDF con mapa (~35 s más)
+$DC exec backend pytest                 # suite backend (259 pruebas, ~30 s)
+                                        # la cifra sale de `pytest --collect-only -q`, no de la memoria
+$DC exec backend pytest -m lento        # 7 más: los Excel completos y el PDF con mapa (~35 s)
 cd frontend && npm run lint && npm run build    # tipos + build
 ./e2e/instalar-dependencias.sh                  # una sola vez por máquina (ver abajo)
 npx playwright test                             # E2E contra el stack levantado
@@ -154,9 +155,18 @@ de la carpeta; y un archivo que no es imagen **no rompe la subida**.
 - `nivel_max` es el máximo de los niveles presentes.
 - Cada feature lleva lo que el popup necesita —se pinta **desde el tile**, sin pedir nada al API— y `poblacion` va como entero: con `null`, MapLibre descarta el punto al interpolar el radio.
 
+### Las cuatro que vigilan lo que no da síntomas
+
+Estos cuatro archivos existían sin figurar aquí, y son justo los que encajan con la regla del documento: cada uno cubre un fallo que no se ve.
+
+- **`test_api_salud.py`** — la garantía es **negativa**: `/api/salud/` no puede fallar porque falle una dependencia. Si respondiera error con PostgreSQL caído, el healthcheck marcaría el contenedor «unhealthy», `deploy/vigilar-contenedores.sh` lo reiniciaría, y el bucle de reinicios borraría el rastro del fallo real sin arreglarlo —reiniciar el backend no levanta la base—. Fija también su exención de throttling: con `interval: 10s` son 360 peticiones/hora contra un techo anónimo de 1000, y un 429 provocaría reinicios sin que pasara nada.
+- **`test_cola_estado.py`** — que exista respuesta a «¿está atascada la cola?». Un worker colgado **no da ningún síntoma**: el sitio sirve y el admin guarda; lo que se rompe es lo que nadie mira —un Excel que no entra, un correo que no sale, el índice que se queda atrás—. Se comprueba por código de salida, para poder colgarlo de un cron. La cola se llena escribiendo filas en `DBTaskResult`, porque lo que se fija es **la interpretación de los tiempos**, no que django-tasks sepa encolar.
+- **`test_meili_llave.py`** — la llave search-only **va dentro del bundle compilado**, así que si Meilisearch deja de reconocerla no falla nada visible: el buscador cae al fallback con su aviso, pero las facetas de `/medidas` se quedan sin conteos y el autocompletado de lugares sin resultados, **las dos en silencio**. Pasó de verdad: la llave se creaba con uid aleatorio y un `down -v` la cambió. Fija que se identifique por **uid fijo**, que es lo que la hace determinista.
+- **`test_señales_meili.py`** — que guardar contenido en el admin **encole** su reindexado. Es la mitad del doble mecanismo de `apps/core/signals.py` que no se nota cuando falta: lo publicado se ve en su página y simplemente no aparece al buscarlo. Estuvo rota desde el principio y se descubrió el 04/08/2026 contra un servidor real, con los tres índices editoriales a cero tras sembrar: `@receiver` conecta con **referencia débil**, y los manejadores eran funciones locales que el recolector se llevaba al retornar.
+
 ## Casos obligatorios — E2E (Playwright)
 
-Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. 56 pruebas, ~1.4 min.
+Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. **56 casos, que Playwright ejecuta 112 veces** —uno por proyecto—, ~1.4 min. `npx playwright test --list` cuenta lo segundo: al escribir una cifra aquí hay que decir cuál de las dos es, o la siguiente persona la «corrige» a la otra.
 
 | Spec | Comprueba |
 |---|---|
@@ -202,7 +212,7 @@ Automatizarlas no sale a cuenta, pero omitirlas sí:
 
 ## Lo que encontró esta suite
 
-Se anota porque es el argumento de por qué la fase existe. Ninguno de estos fallos rompía nada a la vista: en los cinco casos el sistema respondía 200 y la pantalla se veía bien.
+Se anota porque es el argumento de por qué la fase existe. Ninguno de estos fallos rompía nada a la vista: en los seis casos el sistema respondía 200 y la pantalla se veía bien.
 
 | Hallazgo | Cómo se manifestaba |
 |---|---|
@@ -217,7 +227,7 @@ Y dos cosas que las pruebas mismas enseñaron: que las dos muestras de Excel tie
 
 ## Criterio de "listo para entregar"
 
-- `pytest` completo (incluido `-m lento`) en verde: 112 + 4 pruebas.
+- `pytest` completo (incluido `-m lento`) en verde: 259 + 7 pruebas.
 - `npm run lint && npm run build` sin errores.
 - `npx playwright test` en verde **dos veces**: contra el dev server y contra el bundle servido por nginx (`E2E_URL=http://localhost`). La segunda es la que vale.
 - Las cinco comprobaciones manuales hechas y documentadas.

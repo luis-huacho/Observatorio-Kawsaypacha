@@ -48,7 +48,7 @@ def test_el_menu_omite_los_enlaces_ocultos(api):
 
 
 def test_inversion_sigue_visible_en_el_menu_con_su_pagina_en_espera(api):
-    """Diferida no es oculta (ADR-D3): la sección se anuncia y explica que faltan los datos."""
+    """Sin datos publicados no es oculta (ADR-D4): la sección se anuncia y explica que faltan."""
     datos = api.get("/api/sitio/").json()
     urls = {e["url"] for e in datos["menu"]["header"]}
 
@@ -148,7 +148,7 @@ def test_el_comparador_declara_que_inversion_no_esta_disponible(api, datos_muest
     assert datos["inversion_disponible"] is False
 
 
-# --- Inversión (ADR-D3) -----------------------------------------------------
+# --- Inversión (ADR-D4) -----------------------------------------------------
 
 
 def test_inversion_responde_no_disponible_con_motivo(api):

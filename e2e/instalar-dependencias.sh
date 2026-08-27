@@ -54,7 +54,8 @@ PAQUETES_RHEL=(
 NODE_MINIMO=22
 
 # ---------------------------------------------------------------------------
-# Salida (mismos helpers que install-rocky-10.sh, para que los dos scripts se lean igual)
+# Salida (mismos helpers que el script de provisión del servidor, que no está en este repositorio,
+# para que los dos se lean igual)
 # ---------------------------------------------------------------------------
 if [[ -t 1 ]]; then
   C_RESET=$'\033[0m'; C_BLUE=$'\033[1;34m'; C_GREEN=$'\033[1;32m'
@@ -222,7 +223,7 @@ comprobar_navegador() {
     return 0
   fi
 
-  # Sin esto, la única forma de saber si falta una librería es correr 62 pruebas y leer mal el
+  # Sin esto, la única forma de saber si falta una librería es correr la suite entera y leer mal el
   # resultado: el fallo aparece como «browser has been closed», que suena a que el sitio no
   # responde. Aquí sale en dos segundos y dice exactamente qué pasa.
   local salida

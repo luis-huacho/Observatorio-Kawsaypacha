@@ -13,6 +13,59 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 27/08/2026 — el pipeline llega a los specs, y la documentación deja de mentir
+
+El despliegue automático de la entrada de abajo quedó bien contado en `_docs` y en esta bitácora,
+pero **no en `_specs/`**. Y este proyecto tiene escrito que para operar sirve `_docs/` y **para
+implementar manda `_specs/`**, así que quien fuera a tocar el despliegue leyendo los specs se
+encontraba el mundo anterior. Nuevo **[10-pipeline-cicd.md](10-pipeline-cicd.md)** y **ADR-A21**.
+
+El spec no repite el procedimiento —eso ya está en `_docs/despliegue.md`— sino el orden, las
+invariantes de cada etapa y tres cosas que no estaban escritas en ninguna parte: que un check verde
+de Pipelines significa que **el frontend compila**, no que las pruebas pasaran —el CI no corre
+`pytest` ni Playwright, a propósito—; que solo despliega **QA** y no producción; y que el pipeline
+vive en **`drinux`**, de modo que un `git push` a secas, que solo alcanza `origin`, deja el entorno
+sin desplegar y nada avisa.
+
+Lo que obligó a mirar el resto fue el runbook de **07**, que seguía mandando desplegar con
+`git pull && build && up -d` —la cadena sin `run --rm frontend` que causó justo el incidente de la
+entrada siguiente— y ofrecía un `docker compose run --rm certbot renew` que **no renueva nada**: el
+servicio tiene `entrypoint` propio con un bucle, así que el argumento se ignora y el comando se
+queda en primer plano. Se quitó la tabla entera en vez de corregir esas dos filas. Las diez estaban
+cubiertas, y mejor, en `_docs/despliegue.md`; mantener la segunda copia fue lo que produjo la
+divergencia, y corregirla sin quitarla solo aplazaba la siguiente.
+
+De ahí salió un barrido de todo lo que la documentación decía y ya no era cierto:
+
+- **Las cifras de pruebas.** «144 pruebas» en tres sitios y «112 + 4» en un cuarto, cuando
+  `--collect-only` da **259**, más **7** marcadas `lento`. Las E2E eran otro caso: «56» no estaba
+  mal, estaba sin declarar qué contaba —son 56 casos que Playwright ejecuta 112 veces, uno por
+  proyecto— y sin decir cuál es, la siguiente persona lo «corrige» al otro. Donde la cifra se
+  conserva queda al lado **el comando que la reproduce**; donde solo era el síntoma de una `.so`
+  ausente, se quita.
+- **Dos párrafos que anunciaban un número distinto al de su propia tabla**: ocho comprobaciones
+  sobre nueve, cinco fallos silenciosos sobre seis.
+- **Una tabla partida en dos** en `_docs/despliegue.md`: el aviso del tracker estaba dentro del
+  runbook y dejaba once filas huérfanas bajo una cabecera falsa. No lo encuentra ningún `grep`.
+- **Cuatro archivos de prueba sin declarar** en 08 —`test_api_salud`, `test_cola_estado`,
+  `test_meili_llave` y `test_señales_meili`—, que son precisamente los que cumplen la regla del
+  documento: cada uno cubre un fallo que no da síntomas.
+- **Cinco comentarios que citaban ADR-D3 en presente**, superado por D4 el 10/08. Decir la razón
+  vieja invita a «arreglarlo» añadiendo el bloque de inversión cuando lleguen los datos, y los datos
+  ya llegaron: la razón vigente es que su unidad es la municipalidad y no el distrito.
+- **Una referencia colgante** a `install-rocky-10.sh`, citado dos veces como si bastara con buscarlo.
+  No está y no debe estar: es provisión de la máquina.
+
+Y un documento nuevo fuera de los specs: **`_docs/deuda-tecnica.md`**. Este repositorio no tiene ni
+un `TODO` ni un `FIXME` —cada decisión está donde toca, con su comentario—, y el efecto secundario es
+que la deuda es invisible desde el código: quien llega no distingue una decisión de un olvido. El
+documento **no guarda estado**; cada entrada apunta a su ADR, a su spec o a su archivo, y dice qué la
+salda con un disparador en vez de una fecha. Lo roto sigue solo en el tracker: un inventario que
+además listara defectos sería un segundo tracker, y de eso este proyecto ya salió una vez.
+
+`pytest` 259/259 (7 deseleccionadas por `lento`) y `npm run lint` sin errores tras tocar los
+comentarios de `incidencia.py`, `Comparar.tsx`, `Home.tsx` y `test_api_sitio.py`.
+
 ### Actualización 27/08/2026 — el sitio servía el bundle de hace dieciséis días, en verde
 
 Los últimos commits no se veían en el entorno de desarrollo. La causa: el despliegue se había hecho
@@ -1056,6 +1109,7 @@ comprobar nada.
 | [07-despliegue-ops.md](07-despliegue-ops.md) | compose.yaml, nginx + gunicorn, los dos dominios, .env, HTTPS, backups, runbook, capacitación |
 | [08-plan-pruebas.md](08-plan-pruebas.md) | Qué se prueba y con qué; casos obligatorios derivados de la auditoría de datos; criterio de entrega |
 | [09-errores.md](09-errores.md) | **Ciclo de errores**: severidades, la regla de «nace con una prueba que falla», y dónde está el tracker que guarda los abiertos |
+| [10-pipeline-cicd.md](10-pipeline-cicd.md) | Cómo llega el código al servidor: Bitbucket Pipelines, `desplegar.sh`, el sello de `/version.txt`, qué comprueba el CI y qué sigue siendo manual |
 
 ## Archivo histórico
 
