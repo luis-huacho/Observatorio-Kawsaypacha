@@ -205,8 +205,8 @@ export default function Peligros() {
   return (
     <>
       <PageHeader
-        titulo="Exposición a peligros naturales"
-        descripcion="Mapa de exposición a peligros climáticos y geodinámicos en los centros poblados de Cusco. Datos provenientes de SIGRID-CENEPRED. Activa o desactiva las capas geográficas (límites provinciales y distritales, lagunas, ríos, glaciares) desde el control superior derecho del mapa."
+        titulo="Nivel de exposición ante peligros naturales"
+        descripcion="Explora el mapa e identifica el nivel de exposición de los centros poblados ante peligros climáticos y geodinámicos en Cusco, basado en datos provenientes del SIGRID – CENEPRED."
         badge={
           <div className="flex flex-wrap gap-2">
             {urlAyudaMemoria ? (

@@ -164,6 +164,7 @@ export type Medida = {
   palabras_clave: string[];
   destacada: boolean;
   publicado_en: string | null;
+  fecha_implementacion: string | null;
 };
 
 /** Espejo de `MedidaDetalleSerializer`: `/api/medidas/{slug}/`. */
@@ -267,6 +268,7 @@ export type Inversion = {
     saldo: number;
     variacion_pia_pim: number;
     entidades_con_presupuesto: number;
+    entidades_con_devengado: number;
     entidades_en_ambito: number;
     /** Los tres suman solo las entidades con dato, las mismas que el porcentaje de abajo. */
     pia_institucional: number | null;
@@ -585,7 +587,7 @@ export type SitioPayload = {
   };
   /** Indexado por clave (`home.hero.titulo`, `sobre.mision`…). */
   bloques: Record<string, BloqueTexto>;
-  menu: { header: EnlaceMenu[]; footer: EnlaceMenu[] };
+  menu: { top: EnlaceMenu[]; header: EnlaceMenu[]; footer: EnlaceMenu[] };
   hero: HeroSlide[];
 };
 

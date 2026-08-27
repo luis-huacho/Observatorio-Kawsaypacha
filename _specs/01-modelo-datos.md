@@ -223,7 +223,7 @@ Reglas que conviene no perder al implementarlo:
 | `ConfiguracionSitio` (singleton, patrón get_solo) | `nombre_sitio`, `descripcion_footer`, `email_contacto`, `telefono`, `direccion`, `redes` JSONField; [+] `mensaje_banner`, `logo`, `logo_footer` | Footer/marca |
 | `BloqueTexto` | `clave` slug unique (`home.hero.titulo`, `sobre.mision`, `footer.creditos`…), `titulo`, `cuerpo` rich, `pagina` choices (agrupación en admin) | Header, Footer, Home, Sobre, Recursos — sin un modelo por página |
 | `HeroSlide (Workflow)` | `titulo`, `subtitulo`, `imagen`, `cta_texto`, `cta_url`, `orden`; [+] `vigente_desde/hasta` | Hero de portada |
-| `EnlaceMenu` | `zona` (header|footer), `texto`, `url`, `orden`, `visible` bool | Nav controlado por datos; Prioridades = `visible=False` |
+| `EnlaceMenu` | `zona` (top|header|footer), `texto`, `url`, `orden`, `visible` bool | Nav controlado por datos; Prioridades = `visible=False` |
 
 ### mapas
 `CapaCartografica`: `slug` unique (= nombre de layer en el tile: `rios`, `lagunas`, `glaciares`…), `nombre`, `descripcion`, `archivo_geojson` FileField, `tipo_geometria` (auto-detectado), `estilo` JSONField (color/grosor/opacidad → paint MapLibre), `min_zoom`/`max_zoom`, `filtro_atributo` char null (p.ej. `DN99=CUSCO`; ver 05), `visible_por_defecto`, `orden`, `estado_tiles` (pendiente|generando|ok|error, readonly), `pmtiles` (ruta readonly → `media/tiles/{slug}.pmtiles`), `log_error` Text readonly; [+] `atribucion`, `fuente`, `simplificacion`.

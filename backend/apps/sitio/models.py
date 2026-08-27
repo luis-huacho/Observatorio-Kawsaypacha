@@ -105,6 +105,7 @@ class EnlaceMenu(TimeStampedMixin):
     """
 
     class Zona(models.TextChoices):
+        TOP = "top", "Barra superior"
         HEADER = "header", "Menú principal"
         FOOTER = "footer", "Pie de página"
 
@@ -114,7 +115,7 @@ class EnlaceMenu(TimeStampedMixin):
     grupo = models.CharField(
         max_length=60,
         blank=True,
-        help_text="Columna del pie en la que se agrupa (p. ej. «Más»). Vacío en el header.",
+        help_text="Columna del pie en la que se agrupa (p. ej. «Más»). Vacío en top y header.",
     )
     orden = models.PositiveSmallIntegerField(default=0)
     visible = models.BooleanField(default=True)

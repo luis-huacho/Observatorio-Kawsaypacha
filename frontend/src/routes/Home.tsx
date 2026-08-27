@@ -5,7 +5,7 @@ import {
 import { useApi, type Pagina } from "@/lib/api";
 import { useBloque } from "@/lib/sitio";
 import Reveal from "@/components/Reveal";
-import type { Distrito, Noticia, Norma, ResumenPeligros } from "@/lib/types";
+import type { Distrito, Medida, Noticia, Norma, ResumenPeligros, InversionResponse } from "@/lib/types";
 import { formatNumber, formatFecha } from "@/lib/semaforo";
 import { TarjetaNoticiaCompacta } from "@/routes/Noticias";
 
@@ -20,7 +20,7 @@ const SECCIONES = [
   {
     to: "/medidas",
     icon: Lightbulb,
-    titulo: "Medidas",
+    titulo: "Buenas prácticas",
     pregunta: "¿Qué medidas están funcionando?",
     color: "from-mountain-700 to-mountain-500",
   },
@@ -28,7 +28,7 @@ const SECCIONES = [
     to: "/inversion",
     icon: Coins,
     titulo: "Inversión",
-    pregunta: "¿Cuánto y cómo se invierte (PPR 0068)?",
+    pregunta: "Cuánto y en qué se invirte el PP0068",
     color: "from-sky-700 to-sky-500",
   },
 ];
@@ -38,16 +38,18 @@ export default function Home() {
   // 10,978 clasificaciones solo para contar (spec 06).
   const resumen = useApi<ResumenPeligros>("/peligros/resumen/");
   const distritosApi = useApi<Distrito[]>("/territorio/distritos/");
+  const medidasExito = useApi<Pagina<unknown>>("/medidas/", { resultado: "exito", page_size: 1 });
+  const inversion = useApi<InversionResponse>("/inversion/");
 
   const cifras = resumen.status === "ok" ? resumen.data : null;
-  const totalCcpp = cifras?.total_ccpp ?? null;
   const distritos = distritosApi.status === "ok" ? distritosApi.data.length : null;
-  const totalClasif = cifras
-    ? cifras.por_peligro.reduce(
-        (suma, p) => suma + Object.values(p.niveles).reduce((a, b) => a + b, 0),
-        0
-      )
-    : null;
+  const experienciasExitosas = medidasExito.status === "ok" ? medidasExito.data.count : null;
+  // Sin ejercicio visible el tablero responde `disponible: false` (ADR-D3): la cifra se queda en
+  // `null` y la tarjeta muestra "…", igual que mientras carga.
+  const municipiosConEjecucion =
+    inversion.status === "ok" && inversion.data.disponible
+      ? inversion.data.agregados.entidades_con_devengado
+      : null;
   // Centros poblados, no clasificaciones: es la unidad de `por_ccpp` y la que cuadra con la
   // tabla del visor. Sumar por peligro contaría cada CCPP tantas veces como peligros tenga.
   const ccppAltos = cifras
@@ -62,16 +64,24 @@ export default function Home() {
   const ultimasNoticias = noticias.status === "ok" ? noticias.data.results : [];
   const ultimasNormas = normas.status === "ok" ? normas.data.results : [];
 
+  // Casos: las medidas marcadas como destacadas en el admin, las más recientes primero.
+  const casosDestacados = useApi<Pagina<Medida>>("/medidas/", {
+    destacada: true,
+    ordering: "-fecha_implementacion",
+    page_size: 3,
+  });
+  const casos = casosDestacados.status === "ok" ? casosDestacados.data.results : [];
+
   // Hero administrable: el título y el subtítulo salen de `BloqueTexto`, con los del prototipo
   // como respaldo mientras carga.
   const heroTitulo = useBloque(
     "home.hero.titulo",
-    "<p>Observatorio del riesgo y la adaptación climática en Cusco.</p>"
+    "<p>Observatorio para la Gestión del riesgo de desastres y la adaptación al cambio climático.</p>"
   );
   const heroSubtitulo = useBloque(
     "home.hero.subtitulo",
-    "<p>Monitoreamos peligros, prácticas que funcionan, inversión pública y prioridades de los " +
-      "gobiernos locales y regionales para reducir el riesgo de desastres.</p>"
+    "<p>Monitoreamos y facilitamos información sobre los peligros, inversión, normativa, medidas " +
+      "y buenas prácticas para la gestión del riesgo y la adaptación climática.</p>"
   );
 
   return (
@@ -105,11 +115,11 @@ export default function Home() {
               dangerouslySetInnerHTML={{ __html: heroSubtitulo }}
             />
             <div className="mt-8 flex flex-wrap gap-3 animate-fade-up" style={{ animationDelay: "240ms" }}>
-              <Link to="/peligros" className="btn-primary bg-white text-mountain-900 hover:bg-paper">
-                Explorar mi distrito <ArrowRight className="w-4 h-4" />
-              </Link>
               <Link to="/sobre" className="btn-ghost text-white hover:bg-white/10">
                 Sobre el observatorio
+              </Link>
+              <Link to="/peligros" className="btn-primary bg-white text-mountain-900 hover:bg-paper">
+                Explorar mi distrito <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>
@@ -129,10 +139,10 @@ export default function Home() {
       <section className="container-page -mt-10 relative z-10">
         <Reveal>
           <div className="card grid grid-cols-2 md:grid-cols-4 divide-x divide-ink-300/30 overflow-hidden">
-            <Stat label="Centros poblados monitoreados" value={totalCcpp != null ? formatNumber(totalCcpp) : "…"} />
             <Stat label="Distritos cubiertos" value={distritos != null ? String(distritos) : "…"} />
-            <Stat label="Clasificaciones de peligro" value={totalClasif != null ? formatNumber(totalClasif) : "…"} />
             <Stat label="CCPP con peligro alto/muy alto" value={ccppAltos != null ? formatNumber(ccppAltos) : "…"} accent />
+            <Stat label="de experiencias exitosas" value={experienciasExitosas != null ? formatNumber(experienciasExitosas) : "…"} />
+            <Stat label="de municipios con presupuesto ejecutado" value={municipiosConEjecucion != null ? formatNumber(municipiosConEjecucion) : "…"} />
           </div>
         </Reveal>
       </section>
@@ -183,22 +193,18 @@ export default function Home() {
 
       {/* Casos */}
       <section className="container-page mt-16">
-        <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Casos recientes</h2>
-        <p className="text-ink-600 mt-1 text-center">Prácticas comunales y distritales con resultados.</p>
+        <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Medidas y buenas prácticas</h2>
+        <p className="text-ink-600 mt-1 text-center">Qué hacer ante las sequías e incendios forestales</p>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {/* Cada tarjeta lleva a su ficha, no al listado genérico. */}
-          {[
-            { slug: "qochas-pampallacta", img: "/img/caso-qochas.jpg", titulo: "Qochas comunales en Pampallacta", peligro: "Sequía" },
-            { slug: "viviendas-heladas-chahuaytiri", img: "/img/caso-chahuaytiri.jpg", titulo: "Acondicionamiento térmico en Chahuaytiri", peligro: "Heladas" },
-            { slug: "brigadas-incendios-calca", img: "/img/caso-calca.jpg", titulo: "Brigadas contra incendios en Calca", peligro: "Incendios forestales" },
-          ].map((c, i) => (
-            <Reveal key={c.slug} delay={i * 80}>
-              <CasoPreview slug={c.slug} img={c.img} titulo={c.titulo} peligro={c.peligro} />
+          {casos.map((m, i) => (
+            <Reveal key={m.slug} delay={i * 80}>
+              <CasoPreview slug={m.slug} img={m.imagen_portada} titulo={m.titulo} peligro={m.peligro} />
             </Reveal>
           ))}
         </div>
         <div className="mt-8 text-center">
-          <Link to="/medidas" className="btn-primary">Ver todas las medidas</Link>
+          <Link to="/medidas" className="btn-primary">Ver todas</Link>
         </div>
       </section>
 
@@ -210,7 +216,7 @@ export default function Home() {
           <div>
             <div className="flex items-baseline justify-between gap-4 mb-1">
               <h2 className="font-display text-2xl font-bold text-mountain-700">
-                Últimas noticias
+                Últimas novedades
               </h2>
               <Link
                 to="/noticias"

@@ -375,6 +375,7 @@ def agregados(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="") -> dict:
         "saldo": float(totales["pim"] - totales["devengado"]),
         "variacion_pia_pim": float(totales["pim"] - totales["pia"]),
         "entidades_con_presupuesto": base.filter(pim__gt=0).count(),
+        "entidades_con_devengado": base.filter(devengado__gt=0).count(),
         "entidades_en_ambito": queryset_entidades.count(),
         # Sin ninguna entidad con dato, los tres son `None` y no cero: la suma de un conjunto
         # vacío se leería como «estas municipalidades no tienen presupuesto».

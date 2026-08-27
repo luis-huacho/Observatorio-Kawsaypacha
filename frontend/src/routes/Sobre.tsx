@@ -91,14 +91,12 @@ export default function Sobre() {
         <section className="mt-8 callout">
           <h2 className="font-display text-xl font-bold text-mountain-700">¿Por qué nace?</h2>
           <p className="text-ink-600 mt-2">
-            Es una iniciativa de <strong>PREDES</strong> en el marco de los proyectos financiados
-            por <strong>Pan para el Mundo</strong> (Brot für die Welt) en comunidades altoandinas
-            de Cusco, orientados a fortalecer la resiliencia frente al cambio climático con
-            soluciones basadas en la naturaleza, recuperación de saberes ancestrales y
-            fortalecimiento de capacidades locales. En ese trabajo se hizo evidente la necesidad
-            de un espacio que sistematice, actualice y comparta información confiable sobre los
-            peligros, la inversión pública, la normativa vigente y las experiencias que reducen la
-            vulnerabilidad del territorio. El observatorio responde a esa necesidad.
+            Es una iniciativa de <strong>PREDES</strong> en el marco de los proyectos financiados 
+            por <strong>Pan para el Mundo</strong> (Brot für die Welt) que busca fortalecer 
+            la resiliencia de la región Cusco frente al cambio climático. 
+            El observatorio nace para <strong>actualizar y compartir información confiable</strong> 
+            sobre peligros, inversión pública, normativa y experiencias que contribuyen a reducir 
+            la vulnerabilidad del territorio.
           </p>
         </section>
 
@@ -114,7 +112,7 @@ export default function Sobre() {
                 <div className="w-11 h-11 rounded-full bg-mountain-100 text-mountain-700 grid place-items-center mb-3">
                   <p.icon className="w-5 h-5" />
                 </div>
-                <div className="font-display font-bold text-mountain-900">{p.titulo}</div>
+                <div className="font-display font-medium text-mountain-900">{p.titulo}</div>
                 <p className="text-sm text-ink-600 mt-1">{p.texto}</p>
               </div>
               </Reveal>
@@ -130,7 +128,7 @@ export default function Sobre() {
           <div className="grid sm:grid-cols-2 gap-3">
             {AUDIENCIAS.map((a, i) => (
               <Reveal key={a.label} delay={(i % 2) * 70}>
-                <div className="flex items-center gap-3 card h-full p-4">
+                <div className="flex items-center gap-3 p-4">
                   <div className="w-9 h-9 rounded-full bg-mountain-100 text-mountain-700 grid place-items-center shrink-0">
                     <a.icon className="w-4 h-4" />
                   </div>
@@ -186,7 +184,7 @@ export default function Sobre() {
                 <div className="card h-full p-5">
                   <div className="flex items-center gap-2 text-mountain-700">
                     <p.icon className="w-5 h-5" />
-                    <span className="font-display font-bold text-mountain-900">{p.titulo}</span>
+                    <span className="font-display font-medium text-mountain-900">{p.titulo}</span>
                   </div>
                   <p className="text-sm text-ink-600 mt-2">{p.texto}</p>
                 </div>

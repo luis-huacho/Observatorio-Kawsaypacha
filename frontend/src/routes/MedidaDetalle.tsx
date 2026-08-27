@@ -56,7 +56,7 @@ export default function MedidaDetalle() {
             <MapPin className="w-3.5 h-3.5" />
             {m.comunidad}
           </span>
-          <span className="capitalize">Ámbito {m.ambito}</span>
+          <span className="">Alcance de la experiencia {m.ambito}</span>
         </div>
 
         <Portada
