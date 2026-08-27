@@ -13,6 +13,63 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 27/08/2026 — el sitio servía el bundle de hace dieciséis días, en verde
+
+Los últimos commits no se veían en el entorno de desarrollo. La causa: el despliegue se había hecho
+con `docker compose up -d` **sin `--build`**. Como el servicio `frontend` es de un solo disparo y su
+`CMD` empieza por `rm -rf /out/*` y vuelve a copiar su `dist` al volumen que sirve nginx, el sitio se
+«refrescó» —`index.html` con fecha de ese día, `last-modified` nuevo— con el bundle del 11/08. El
+backend, igual, con la imagen del 11: los cambios de `filters.py`, `serializers.py`, `consultas.py` y
+`medidas/models.py` no estaban corriendo.
+
+**Lo que hace grave a este fallo no es la causa, que es trivial, sino que es indistinguible del
+éxito.** Todo lo que uno miraría daba bien: la SPA 200, el API 200, los siete contenedores `healthy`,
+`last-modified` de hoy, cero errores en los logs de nginx, del backend y del worker. La única forma de
+verlo era abrir el bundle y buscar dentro un texto que se había cambiado. `deploy/comprobar-sitio.sh`
+ya declaraba este punto ciego en su cabecera desde que se escribió —«que nginx conteste pero sirva el
+bundle equivocado»— y no lo cubría.
+
+Recompilar no es evitable: **Vite hornea el bundle y las `VITE_*` en tiempo de build**, no hay nada
+que leer en runtime. La pregunta no era si se construye, sino quién se acuerda y cómo se sabe que
+llegó. Son dos problemas distintos y se arreglan por separado:
+
+- **Quién se acuerda** → `deploy/desplegar.sh`, el despliegue entero en un comando, que sustituye a
+  la cadena de cinco del runbook. Olvidar uno de los cinco es exactamente lo que pasó, y ya había
+  pasado antes por otro eslabón: la entrada del 05/08 de más abajo corrigió esa misma cadena porque
+  no recargaba nginx. Un procedimiento que se arregla añadiéndole pasos es un procedimiento que
+  volverá a fallar.
+- **Cómo se sabe que llegó** → el script **sella** el SHA desplegado en `/version.txt`, dentro del
+  propio `dist`, y luego lo pide por HTTPS y lo compara. Si el `dist` publicado no es el de ese
+  commit, el archivo delata el que sí es y el despliegue **falla** en vez de terminar en verde.
+  `comprobar-sitio.sh` acepta ese SHA como cuarto argumento; sin él informa el servido sin juzgarlo,
+  que es lo que quiere un cron desde fuera —no sabe qué commit debería estar arriba—.
+
+En `master` lo lanza **Bitbucket Pipelines** por SSH (`bitbucket-pipelines.yml`), tras comprobar los
+tipos del frontend. El pipeline no lleva lógica ninguna a propósito: el procedimiento vive en el
+script versionado y **vale igual lanzado a mano**. El CI no es un procedimiento paralelo, solo es
+quien llama — si el script no sirve desde una terminal, no sirve.
+
+El build sigue ocurriendo **en el servidor**, no en la nube de Atlassian: la imagen del backend
+compila tippecanoe desde el código fuente e instala Chromium, así que construirla allí sin caché de
+capas costaría más de lo que ahorra y obligaría a montar un registry. Si algún día molesta, la salida
+es Pipelines + registry y el script no cambia.
+
+Dos gotchas que el script trata y la cadena manual no:
+
+- **`nginx -s reload` devuelve 0 aunque la configuración esté rota.** Solo manda la señal; el maestro
+  rechaza la recarga por su cuenta y escribe el error en *su* log. Sin un `nginx -t` delante, un error
+  de sintaxis en `conf.d/` pasaría el despliegue en verde dejando nginx con la configuración
+  anterior — la misma familia de fallo silencioso que originó esta entrada.
+- **`git pull --ff-only`**, para que una historia divergida falle en vez de fabricar en el servidor un
+  merge que no está en Bitbucket y que nadie vería nunca.
+
+La clave SSH de Pipelines vive en `~/.ssh/authorized_keys` del servidor **restringida con `command=`**:
+no da shell, ni túneles, ni agente; lo único que puede hacer es redesplegar `master`. Una clave con
+acceso a esa máquina que se guarda en un tercero tiene que poder hacer una sola cosa.
+
+Sin issue en el tracker: se encontró y se cerró en el acto. El detalle operativo está en
+`_docs/despliegue.md` y en `_docs/despliegue-entorno-desarrollo.md`.
+
 ### Actualización 05/08/2026 — el tracker publicado en `/gitea`, y el nginx que no se enteró
 
 El tracker pasó a modo **publicado** en el servidor de desarrollo: se levanta con
