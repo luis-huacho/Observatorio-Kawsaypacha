@@ -222,7 +222,7 @@ comprobar_navegador() {
     return 0
   fi
 
-  # Sin esto, la única forma de saber si falta una librería es correr 62 pruebas y leer mal el
+  # Sin esto, la única forma de saber si falta una librería es correr la suite entera y leer mal el
   # resultado: el fallo aparece como «browser has been closed», que suena a que el sitio no
   # responde. Aquí sale en dos segundos y dice exactamente qué pasa.
   local salida

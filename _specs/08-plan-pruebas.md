@@ -15,8 +15,9 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (144 pruebas, ~30 s)
-$DC exec backend pytest -m lento        # los Excel completos y el PDF con mapa (~35 s más)
+$DC exec backend pytest                 # suite backend (259 pruebas, ~30 s)
+                                        # la cifra sale de `pytest --collect-only -q`, no de la memoria
+$DC exec backend pytest -m lento        # 7 más: los Excel completos y el PDF con mapa (~35 s)
 cd frontend && npm run lint && npm run build    # tipos + build
 ./e2e/instalar-dependencias.sh                  # una sola vez por máquina (ver abajo)
 npx playwright test                             # E2E contra el stack levantado
@@ -156,7 +157,7 @@ de la carpeta; y un archivo que no es imagen **no rompe la subida**.
 
 ## Casos obligatorios — E2E (Playwright)
 
-Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. 56 pruebas, ~1.4 min.
+Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. **56 casos, que Playwright ejecuta 112 veces** —uno por proyecto—, ~1.4 min. `npx playwright test --list` cuenta lo segundo: al escribir una cifra aquí hay que decir cuál de las dos es, o la siguiente persona la «corrige» a la otra.
 
 | Spec | Comprueba |
 |---|---|
@@ -217,7 +218,7 @@ Y dos cosas que las pruebas mismas enseñaron: que las dos muestras de Excel tie
 
 ## Criterio de "listo para entregar"
 
-- `pytest` completo (incluido `-m lento`) en verde: 112 + 4 pruebas.
+- `pytest` completo (incluido `-m lento`) en verde: 259 + 7 pruebas.
 - `npm run lint && npm run build` sin errores.
 - `npx playwright test` en verde **dos veces**: contra el dev server y contra el bundle servido por nginx (`E2E_URL=http://localhost`). La segunda es la que vale.
 - Las cinco comprobaciones manuales hechas y documentadas.

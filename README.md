@@ -251,14 +251,14 @@ Las cinco comprobaciones **manuales previas a la entrega** —más exigentes que
 ## 6. Probar
 
 ```bash
-dc exec backend pytest                 # 144 pruebas, ~30 s
-dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
+dc exec backend pytest                 # 259 pruebas, ~30 s
+dc exec backend pytest -m lento        # 7 más: los Excel completos y el PDF con mapa
 
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
 
 ./e2e/instalar-dependencias.sh         # una sola vez, en la raíz
-npx playwright test                    # 56 E2E en escritorio y móvil
+npx playwright test                    # 56 casos E2E, ejecutados 112 veces (escritorio y móvil)
 ```
 
 `pytest` corre **dentro del contenedor**, con las mismas versiones de GDAL, tippecanoe y WeasyPrint
@@ -267,7 +267,7 @@ que producción. Si responde `executable file not found`, ver §9.
 **`instalar-dependencias.sh` sustituye al `npm install && npx playwright install chromium` que
 había aquí**, porque ese par se dejaba fuera el paso que rompe: las librerías de sistema de
 Chromium. En Debian/Ubuntu no se nota —`playwright install --with-deps` las instala solo—, pero en
-RHEL/Rocky/Fedora **Playwright solo sabe de apt** y no instala nada, así que las 62 pruebas fallan
+RHEL/Rocky/Fedora **Playwright solo sabe de apt** y no instala nada, así que la suite entera falla
 con `browserType.launch: Target page, context or browser has been closed`, que parece el sitio
 caído y es una `.so` ausente. El script cubre los tres pasos y termina arrancando el navegador
 para comprobarlo. Se ejecuta **como tu usuario, no con sudo**; da por hecho un servidor ya
