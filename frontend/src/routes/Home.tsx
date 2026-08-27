@@ -28,7 +28,7 @@ const SECCIONES = [
     to: "/inversion",
     icon: Coins,
     titulo: "Inversión",
-    pregunta: "Cuánto y en qué se invirte el PP0068",
+    pregunta: "¿Cuánto y en qué se invirte el PP0068?",
     color: "from-sky-700 to-sky-500",
   },
 ];
@@ -194,7 +194,7 @@ export default function Home() {
       {/* Casos */}
       <section className="container-page mt-16">
         <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Buenas prácticas</h2>
-        <p className="text-ink-600 mt-1 text-center">Qué hacer ante las sequías e incendios forestales</p>
+        <p className="text-ink-600 mt-1 text-center">¿Qué hacer ante las sequías e incendios forestales?</p>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {/* Cada tarjeta lleva a su ficha, no al listado genérico. */}
           {casos.map((m, i) => (
