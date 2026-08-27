@@ -38,7 +38,13 @@ definitions:
 
     - step: &desplegar-qa
         name: Desplegar en QA
-        deployment: qa
+        # SIN `deployment:`. Ese campo alimenta la pestaña «Deployments» de Bitbucket, pero exige un
+        # entorno declarado con ese nombre exacto en la configuración del repositorio, y si no
+        # coincide Bitbucket **rechaza el YAML entero antes de ejecutar nada** — el fallo no se
+        # parece a lo que es: sale como error del primer paso. No se declara porque no aporta nada
+        # que no dé ya `/version.txt`, que además dice lo que el sitio sirve DE VERDAD y no lo que
+        # el pipeline cree haber desplegado. Si algún día se quiere esa pestaña, primero se crea el
+        # entorno en Repository settings → Deployments y luego se añade aquí, con el mismo nombre.
         script:
           # El comando real lo fija el servidor en authorized_keys (`command=`), así que lo que se
           # mande aquí da igual: es solo el disparador. Se manda `desplegar` para que el registro
