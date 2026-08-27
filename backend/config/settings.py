@@ -213,6 +213,8 @@ UNFOLD = {
                 "items": [
                     {"title": "Medidas", "icon": "eco",
                      "link": lambda r: reverse_lazy("admin:medidas_medida_changelist")},
+                    {"title": "Medidas - Fichas ACC", "icon": "fact_check",
+                     "link": lambda r: reverse_lazy("admin:medidas_medidafichaacc_changelist")},
                     {"title": "Normativa", "icon": "gavel",
                      "link": lambda r: reverse_lazy("admin:normativa_norma_changelist")},
                     {"title": "Noticias", "icon": "feed",
