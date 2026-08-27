@@ -26,7 +26,9 @@ class ComparadorView(APIView):
     Entre 2 y 4 distritos. El techo no es arbitrario: son tarjetas lado a lado, y a partir de
     cinco dejan de caber en pantalla y de leerse en una reunión.
 
-    No lleva bloque de inversión: la ventana está diferida (ADR-D3).
+    No lleva bloque de inversión: su unidad es la municipalidad ejecutora y no el distrito
+    (ADR-D4), así que no hay cifra distrital que poner sin repartirla, que es justo lo que
+    ese ADR prohíbe.
     """
 
     @extend_schema(
