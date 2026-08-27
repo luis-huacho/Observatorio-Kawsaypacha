@@ -1,0 +1,25 @@
+"verbose_name","help_text","blank"
+"Nombre de la experiencia, práctica proyecto o programa",,1
+"Ubicación","Indicar: Departamento / Provincia / Distrito / Comunidad 
+Donde se implementó o implementa ",0
+"Institución u organización responsable de la ejecución","vacio",1
+"Persona de contacto: nombre, cargo, teléfono y correo
+","Se considera a la persona que puede aclarar dudas 
+Respecto a la experiencia. ",0
+"Periodo de tiempo de la implementación","Indicar la fecha de inicio y cierre de la practica",1
+"¿Qué peligros o amenazas naturales atiende esta práctica?","Marcar una o más opciones
+
+",1
+"Descripción del problema","Describa brevemente la problemática en relación con la  Manifestación de los impactos del peligro que atiende Esta práctica (máx. 5 líneas)
+
+",1
+"Descripción de la práctica, experiencia, programa o proyecto","Describa brevemente en qué consiste la práctica, cómo funciona y qué medidas se han implementado (máx. 10 líneas)",0
+"Enfoque de la práctica, experiencia, programa o proyecto","Indique con qué enfoque se relaciona con mayor cercanía. Puede marcar más de una opción",1
+"La práctica incorpora saberes ancestrales y enfoque de género? ¿Cuáles?","indique hasta 3 saberes ancestrales y 3 prácticas de enfoque de género",1
+"Resultados cuantitativos o beneficios logrados con la práctica, experiencia, programa o proyecto","Describe los resultados clave, de preferencia utilizando cifras: Nº de personas / familias beneficiadas, hectáreas, litros de agua almacenada, etc. ",1
+"Resultados cualitativos o beneficios logrados con la práctica, experiencia, programa o proyecto","Describe brevemente los cambios positivos que ha generado el proyecto: en el comportamiento de sus beneficiarios, actitudes, prácticas, conocimientos, etc.",1
+"Costo aproximado de la implementación y fuente de financiamiento","Indicar el monto aproximado en soles y fuente (institución, programa, otro)",1
+"Principales factores de éxito","Indica al menos 3 factores que han contribuido a que la práctica se desarrolle con éxito (por ejemplo: participación activa de las comunidades, articulación con gobiernos locales y otras organizaciones, etc)",1
+"Principales lecciones aprendidas","Indica al menos 3 lecciones aprendidas claves a resaltar y tener en cuenta al replicar este tipo de intervención",1
+"¿Quién se encarga de mantener o gestionar actualmente la práctica?","Describir brevemente si es una persona, entidad o comunidad, e indicar el rol que cumplen. ",1
+"¿Es replicable en otras comunidades? ¿Qué se necesitaría para replicarla? ","Indicar brevemente por qué es replicable y qué necesitaría par serlo. Por ejemplo: Costos accesibles, participación comunitaria, resultados demostrados. ",1
