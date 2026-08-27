@@ -99,7 +99,7 @@ y fija el filtro de provincia a nivel provincial. Lo que **no** es negociable en
   resultados anteriores se quedan en pantalla hasta que se envíe la nueva búsqueda — es «borrar para
   escribir», no «cancelar la búsqueda». En `/recursos` el filtro es en vivo y por eso ahí sí amplía
   el listado al instante.
-- **El menú de escritorio va en una sola línea** (desde `lg`). La barra tiene altura fija, así que un enlace que parte su texto en dos se sale por arriba y por abajo: los enlaces llevan `whitespace-nowrap`, logo y `nav` van con `shrink-0`, y el que cede espacio cuando falta es el buscador (`min-w-0` en el `form` y en el `input`, `w-40` hasta `xl` y `w-56` desde ahí). Medido a 1024, 1280 y 1440 px en `e2e/header.spec.ts`.
+- **El menú de escritorio va en una sola línea** (desde `lg`). La barra tiene altura fija, así que un enlace que parte su texto en dos se sale por arriba y por abajo: los enlaces llevan `whitespace-nowrap`, logo y `nav` van con `shrink-0`, y el que cede espacio cuando falta es el buscador (`min-w-0` en el `form` y en el `input`, `w-40` hasta `xl` y `w-56` desde ahí). Medido a 1024, 1280 y 1440 px en `e2e/header.spec.ts`. La etiqueta más larga es **«Sobre el observatorio»**, que abre el menú: con ella el nav mide 495 px a 1024 px y el buscador cede hasta 184 px (campo de 134 px). Queda holgura, pero es la que hay: añadir otra entrada al menú obliga a volver a medir, y si no cupiera, el orden para recuperar espacio es apretar el `px` de los enlaces por debajo de `xl`, luego colapsar el buscador a un botón-lupa entre `lg` y `xl`.
 - Hero de portada: carrusel/slide único según nº de `HeroSlide` publicados.
 
 ## Métricas (beacon)

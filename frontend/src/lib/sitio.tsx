@@ -34,13 +34,13 @@ const POR_DEFECTO: SitioPayload = {
   menu: {
     top: [
       { texto: "predes.org.pe", url: "https://predes.org.pe/", grupo: "", orden: 1 },
-      { texto: "Sobre el observatorio", url: "/sobre", grupo: "", orden: 2 },
     ],
     header: [
-      { texto: "Peligros", url: "/peligros", grupo: "", orden: 1 },
-      { texto: "Medidas", url: "/medidas", grupo: "", orden: 2 },
-      { texto: "Inversión", url: "/inversion", grupo: "", orden: 3 },
-      { texto: "Normativa", url: "/normativa", grupo: "", orden: 4 },
+      { texto: "Sobre el observatorio", url: "/sobre", grupo: "", orden: 1 },
+      { texto: "Peligros", url: "/peligros", grupo: "", orden: 2 },
+      { texto: "Medidas", url: "/medidas", grupo: "", orden: 3 },
+      { texto: "Inversión", url: "/inversion", grupo: "", orden: 4 },
+      { texto: "Normativa", url: "/normativa", grupo: "", orden: 5 },
       // «Comparar distritos» no va en el menú (ADR-P2). La ruta sigue viva y se llega por URL,
       // pero tampoco se anuncia aquí: este respaldo se pinta mientras carga `/api/sitio/` y si el
       // API no responde, así que dejarla haría parpadear el enlace en cada carga.

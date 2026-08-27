@@ -434,7 +434,8 @@ El cuerpo es escueto a propósito —sin versiones, sin nombres de host, sin rut
   "config": { "nombre_sitio": "Observatorio Kallpachakuy", "descripcion_footer": "…",
               "email_contacto": "…", "redes": { "facebook": "…" } },
   "bloques": { "home.hero.titulo": "…", "sobre.mision": "…", "footer.creditos": "…" },
-  "menu": { "header": [ { "texto": "Exposición a peligros", "url": "/peligros", "orden": 1 } ],
+  "menu": { "top": [ { "texto": "predes.org.pe", "url": "https://predes.org.pe/", "orden": 1 } ],
+            "header": [ { "texto": "Sobre el observatorio", "url": "/sobre", "orden": 1 } ],
             "footer": [ … ] },
   "hero": [ { "titulo": "…", "subtitulo": "…", "imagen": "/media/hero/1.webp",
               "cta_texto": "Explorar el visor", "cta_url": "/peligros", "orden": 1 } ]

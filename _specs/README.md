@@ -13,6 +13,33 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 27/08/2026 — el menú abre con «Sobre el observatorio»
+
+Cambio pedido sobre el menú principal: «Exposición a peligros» pasa a llamarse **«Peligros»**,
+«Sobre» pasa a **«Sobre el observatorio»**, y esta última **abre el menú** en lugar de cerrarlo. El
+nav queda `Sobre el observatorio · Peligros · Medidas · Inversión · Normativa`, y la barra superior
+gris se queda con `predes.org.pe` y `Contacto`.
+
+- **La mitad del cambio ya estaba en el código y no se veía.** El commit `51a9795` había renombrado
+  las etiquetas en la semilla y en el respaldo del frontend, pero **sin migración de datos**: como
+  `semilla.sembrar` crea lo que falta y no pisa lo que existe, la base ya sembrada seguía sirviendo
+  las etiquetas viejas y el cambio solo se habría visto en instalaciones nuevas. Que la zona `top`
+  estuviera **vacía** en la BD fue la prueba de que `seed` no había vuelto a correr desde entonces.
+- **La trampa que cerró la migración `sitio.0004`.** El seed casa las filas por
+  `(zona, url, texto)`, así que cambiar solo la etiqueta del YAML **no actualiza** la fila: crea una
+  segunda, y el menú habría mostrado «Exposición a peligros» *y* «Peligros». La migración opera por
+  `(zona, url)` —lo estable— y desduplica antes de renombrar, por si algún entorno ya había sembrado
+  con el YAML nuevo. Se comprueba con una prueba que corre `seed` **dos veces** y exige que ningún
+  `(zona, url)` tenga más de una fila; y tras aplicarla, `seed` reporta *1 enlace nuevo* (el
+  `predes.org.pe` de la barra superior, que nunca llegó a sembrarse) y *17 ya existían*.
+- **El menú sigue entrando en una línea, y esta vez se midió.** «Sobre el observatorio» tiene los
+  mismos 21 caracteres que «Exposición a peligros», la etiqueta que en su día partía el nav en dos a
+  1024 px. Ahora no se parte porque aquel arreglo dejó los enlaces con `whitespace-nowrap` y al
+  buscador como el que cede: a 1024 px el nav mide 495 px y el buscador baja a 184 px (campo de
+  134 px, con el marcador de posición recortado). Pasa, pero sin margen para otra entrada.
+- Los tres sitios tocados, como manda la regla: la semilla, la base sembrada (migración) y el menú
+  de respaldo de `frontend/src/lib/sitio.tsx`. Se corrigieron además 02 y 06.
+
 ### Actualización 27/08/2026 — el sitio servía el bundle de hace dieciséis días, en verde
 
 Los últimos commits no se veían en el entorno de desarrollo. La causa: el despliegue se había hecho

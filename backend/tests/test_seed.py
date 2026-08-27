@@ -145,6 +145,50 @@ def test_comparar_se_siembra_fuera_del_menu(db):
     assert not comparar.filter(visible=True).exists()
 
 
+def test_el_menu_principal_lleva_el_orden_y_las_etiquetas_acordadas(db):
+    """El nav abre con «Sobre el observatorio» y la ventana se llama «Peligros».
+
+    Se comprueba la lista **completa y en orden**, no que cada enlace exista: el orden es la mitad
+    del pedido, y una prueba de pertenencia lo daría por bueno con «Sobre» al final.
+    """
+    from apps.sitio.models import EnlaceMenu
+
+    _seed("--solo-catalogos")
+    header = EnlaceMenu.objects.filter(zona="header", visible=True).order_by("orden")
+
+    assert [e.url for e in header] == [
+        "/sobre",
+        "/peligros",
+        "/medidas",
+        "/inversion",
+        "/normativa",
+    ]
+    assert [e.texto for e in header][:2] == ["Sobre el observatorio", "Peligros"]
+
+
+def test_el_seed_no_duplica_enlaces_del_menu(db):
+    """Un `(zona, url)` repetido es la forma en que un renombrado se rompe en silencio.
+
+    `semilla.sembrar` casa las filas por `(zona, url, texto)`, así que cambiar una etiqueta en el
+    YAML **no actualiza** la fila sembrada: crea una segunda y el menú muestra las dos. Correr el
+    seed dos veces es lo que destapa que la migración de datos hizo su trabajo.
+    """
+    from django.db.models import Count
+
+    from apps.sitio.models import EnlaceMenu
+
+    _seed("--solo-catalogos")
+    _seed("--solo-catalogos")
+
+    repetidos = (
+        EnlaceMenu.objects.values("zona", "url")
+        .annotate(n=Count("id"))
+        .filter(n__gt=1)
+    )
+
+    assert not list(repetidos), f"enlaces duplicados en el menú: {list(repetidos)}"
+
+
 # --- Conteos canónicos sobre los Excel reales -------------------------------
 
 
