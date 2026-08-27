@@ -155,6 +155,15 @@ de la carpeta; y un archivo que no es imagen **no rompe la subida**.
 - `nivel_max` es el máximo de los niveles presentes.
 - Cada feature lleva lo que el popup necesita —se pinta **desde el tile**, sin pedir nada al API— y `poblacion` va como entero: con `null`, MapLibre descarta el punto al interpolar el radio.
 
+### Las cuatro que vigilan lo que no da síntomas
+
+Estos cuatro archivos existían sin figurar aquí, y son justo los que encajan con la regla del documento: cada uno cubre un fallo que no se ve.
+
+- **`test_api_salud.py`** — la garantía es **negativa**: `/api/salud/` no puede fallar porque falle una dependencia. Si respondiera error con PostgreSQL caído, el healthcheck marcaría el contenedor «unhealthy», `deploy/vigilar-contenedores.sh` lo reiniciaría, y el bucle de reinicios borraría el rastro del fallo real sin arreglarlo —reiniciar el backend no levanta la base—. Fija también su exención de throttling: con `interval: 10s` son 360 peticiones/hora contra un techo anónimo de 1000, y un 429 provocaría reinicios sin que pasara nada.
+- **`test_cola_estado.py`** — que exista respuesta a «¿está atascada la cola?». Un worker colgado **no da ningún síntoma**: el sitio sirve y el admin guarda; lo que se rompe es lo que nadie mira —un Excel que no entra, un correo que no sale, el índice que se queda atrás—. Se comprueba por código de salida, para poder colgarlo de un cron. La cola se llena escribiendo filas en `DBTaskResult`, porque lo que se fija es **la interpretación de los tiempos**, no que django-tasks sepa encolar.
+- **`test_meili_llave.py`** — la llave search-only **va dentro del bundle compilado**, así que si Meilisearch deja de reconocerla no falla nada visible: el buscador cae al fallback con su aviso, pero las facetas de `/medidas` se quedan sin conteos y el autocompletado de lugares sin resultados, **las dos en silencio**. Pasó de verdad: la llave se creaba con uid aleatorio y un `down -v` la cambió. Fija que se identifique por **uid fijo**, que es lo que la hace determinista.
+- **`test_señales_meili.py`** — que guardar contenido en el admin **encole** su reindexado. Es la mitad del doble mecanismo de `apps/core/signals.py` que no se nota cuando falta: lo publicado se ve en su página y simplemente no aparece al buscarlo. Estuvo rota desde el principio y se descubrió el 04/08/2026 contra un servidor real, con los tres índices editoriales a cero tras sembrar: `@receiver` conecta con **referencia débil**, y los manejadores eran funciones locales que el recolector se llevaba al retornar.
+
 ## Casos obligatorios — E2E (Playwright)
 
 Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. **56 casos, que Playwright ejecuta 112 veces** —uno por proyecto—, ~1.4 min. `npx playwright test --list` cuenta lo segundo: al escribir una cifra aquí hay que decir cuál de las dos es, o la siguiente persona la «corrige» a la otra.
