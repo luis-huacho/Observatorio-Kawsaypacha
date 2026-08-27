@@ -88,10 +88,13 @@ reintentar en el mismo montaje.
 `e2e/home.spec.ts:19` — la prueba «las cifras salen del API y coinciden con el resumen» localiza
 `page.getByText("Centros poblados monitoreados")` y comprueba que su número sea `resumen.total_ccpp`.
 
-Esa tarjeta **no existe**. Las cuatro de la portada son «Distritos cubiertos», «CCPP con peligro
-alto/muy alto», «de experiencias exitosas» y «de municipios con presupuesto ejecutado»
+Esa tarjeta **no existe**. Las cuatro de la portada son «Distritos cubiertos», «Centros poblados
+con peligro alto/muy alto», «Experiencias exitosas» y «Municipios con presupuesto ejecutado»
 (`frontend/src/routes/Home.tsx:142-145`). El commit `0e216c3` (18/08/2026, «pagina02: completado»)
 rehízo las cifras y la prueba se quedó con las viejas.
+
+Ojo con el parecido: «Centros poblados con peligro alto/muy alto» **no** satisface al localizador,
+que busca «Centros poblados monitoreados» como subcadena. Sigue en rojo.
 
 Lleva rota desde entonces sin que se notara, tapada primero por la carrera de `esperarApi` —que la
 hacía morir antes de llegar a esta línea— y después por los 429. Es **el único fallo real** que
