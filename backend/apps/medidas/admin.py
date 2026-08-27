@@ -5,7 +5,11 @@ from unfold.admin import ModelAdmin, TabularInline
 
 from apps.core.admin_workflow import WorkflowAdmin
 
-from .models import Medida, MedidaImagen
+from .models import Medida, MedidaFichaACC, MedidaImagen
+
+
+def _extracto(texto: str, limite: int = 80) -> str:
+    return texto[:limite] + ("…" if len(texto) > limite else "")
 
 
 class MedidaImagenInline(TabularInline):
@@ -62,3 +66,35 @@ class MedidaAdmin(WorkflowAdmin, ModelAdmin):
         if db_field.name in self.campos_rich:
             kwargs["widget"] = CKEditor5Widget(config_name="default")
         return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+
+@admin.register(MedidaFichaACC)
+class MedidaFichaACCAdmin(ModelAdmin):
+    """Separado de Medida (no inline): la ficha tiene 17 preguntas y mezclarla en el
+    formulario de Medida lo haría inmanejable."""
+
+    list_display = ("medida", "columna_001", "columna_002", "columna_003", "columna_004",
+                     "columna_005")
+    list_select_related = ("medida",)
+    search_fields = ("medida__titulo", "medida__slug")
+    autocomplete_fields = ("medida",)
+
+    @admin.display(description=MedidaFichaACC._meta.get_field("value_001").verbose_name)
+    def columna_001(self, obj):
+        return _extracto(obj.value_001)
+
+    @admin.display(description=MedidaFichaACC._meta.get_field("value_002").verbose_name)
+    def columna_002(self, obj):
+        return _extracto(obj.value_002)
+
+    @admin.display(description=MedidaFichaACC._meta.get_field("value_003").verbose_name)
+    def columna_003(self, obj):
+        return _extracto(obj.value_003)
+
+    @admin.display(description=MedidaFichaACC._meta.get_field("value_004").verbose_name)
+    def columna_004(self, obj):
+        return _extracto(obj.value_004)
+
+    @admin.display(description=MedidaFichaACC._meta.get_field("value_005").verbose_name)
+    def columna_005(self, obj):
+        return _extracto(obj.value_005)

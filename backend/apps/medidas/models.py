@@ -115,3 +115,109 @@ class MedidaImagen(TimeStampedMixin):
 
     def __str__(self) -> str:
         return f"{self.medida.slug} #{self.orden}"
+
+
+class MedidaFichaACC(TimeStampedMixin):
+    """Ficha de Adaptación al Cambio Climático (formulario docs/medida_fichas_acc.csv).
+
+    Cada value_NNN corresponde, en el mismo orden, a la pregunta NNN de
+    docs/medida_fichas_acc_fields.csv.
+    """
+
+    medida = models.ForeignKey(Medida, on_delete=models.CASCADE, related_name="fichas_acc")
+
+    value_001 = models.TextField("Nombre de la experiencia, práctica proyecto o programa")
+    value_002 = models.TextField(
+        "Ubicación",
+        help_text="Indicar: Departamento / Provincia / Distrito / Comunidad Donde se "
+        "implementó o implementa",
+        blank=True,
+        default="",
+    )
+    value_003 = models.TextField(
+        "Institución u organización responsable de la ejecución",
+        help_text="",
+    )
+    value_004 = models.TextField(
+        "Persona de contacto: nombre, cargo, teléfono y correo",
+        help_text="Se considera a la persona que puede aclarar dudas Respecto a la "
+        "experiencia.",
+        blank=True,
+        default="",
+    )
+    value_005 = models.TextField(
+        "Periodo de tiempo de la implementación",
+        help_text="Indicar la fecha de inicio y cierre de la practica",
+    )
+    value_006 = models.TextField(
+        "¿Qué peligros o amenazas naturales atiende esta práctica?",
+        help_text="Marcar una o más opciones",
+    )
+    value_007 = models.TextField(
+        "Descripción del problema",
+        help_text="Describa brevemente la problemática en relación con la Manifestación "
+        "de los impactos del peligro que atiende Esta práctica (máx. 5 líneas)",
+    )
+    value_008 = models.TextField(
+        "Descripción de la práctica, experiencia, programa o proyecto",
+        help_text="Describa brevemente en qué consiste la práctica, cómo funciona y qué "
+        "medidas se han implementado (máx. 10 líneas)",
+        blank=True,
+        default="",
+    )
+    value_009 = models.TextField(
+        "Enfoque de la práctica, experiencia, programa o proyecto",
+        help_text="Indique con qué enfoque se relaciona con mayor cercanía. Puede marcar "
+        "más de una opción",
+    )
+    value_010 = models.TextField(
+        "La práctica incorpora saberes ancestrales y enfoque de género? ¿Cuáles?",
+        help_text="indique hasta 3 saberes ancestrales y 3 prácticas de enfoque de género",
+    )
+    value_011 = models.TextField(
+        "Resultados cuantitativos o beneficios logrados con la práctica, experiencia, "
+        "programa o proyecto",
+        help_text="Describe los resultados clave, de preferencia utilizando cifras: Nº de "
+        "personas / familias beneficiadas, hectáreas, litros de agua almacenada, etc.",
+    )
+    value_012 = models.TextField(
+        "Resultados cualitativos o beneficios logrados con la práctica, experiencia, "
+        "programa o proyecto",
+        help_text="Describe brevemente los cambios positivos que ha generado el proyecto: "
+        "en el comportamiento de sus beneficiarios, actitudes, prácticas, conocimientos, "
+        "etc.",
+    )
+    value_013 = models.TextField(
+        "Costo aproximado de la implementación y fuente de financiamiento",
+        help_text="Indicar el monto aproximado en soles y fuente (institución, programa, "
+        "otro)",
+    )
+    value_014 = models.TextField(
+        "Principales factores de éxito",
+        help_text="Indica al menos 3 factores que han contribuido a que la práctica se "
+        "desarrolle con éxito (por ejemplo: participación activa de las comunidades, "
+        "articulación con gobiernos locales y otras organizaciones, etc)",
+    )
+    value_015 = models.TextField(
+        "Principales lecciones aprendidas",
+        help_text="Indica al menos 3 lecciones aprendidas claves a resaltar y tener en "
+        "cuenta al replicar este tipo de intervención",
+    )
+    value_016 = models.TextField(
+        "¿Quién se encarga de mantener o gestionar actualmente la práctica?",
+        help_text="Describir brevemente si es una persona, entidad o comunidad, e indicar "
+        "el rol que cumplen.",
+    )
+    value_017 = models.TextField(
+        "¿Es replicable en otras comunidades? ¿Qué se necesitaría para replicarla?",
+        help_text="Indicar brevemente por qué es replicable y qué necesitaría par serlo. "
+        "Por ejemplo: Costos accesibles, participación comunitaria, resultados "
+        "demostrados.",
+    )
+
+    class Meta:
+        verbose_name = "Ficha de Adaptación al Cambio Climático"
+        verbose_name_plural = "fichas de Adaptación al Cambio Climático"
+
+    def __str__(self) -> str:
+        return f"Ficha ACC · {self.medida.slug}"
