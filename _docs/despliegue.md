@@ -449,7 +449,8 @@ E2E_URL=https://$SITE_DOMAIN npx playwright test
 `dist/` en el volumen que sirve nginx, recarga nginx, espera a que el backend esté sano y
 **verifica desde fuera, por HTTPS, que el sitio sirve el commit que se acaba de desplegar**.
 En `master` lo lanza Bitbucket Pipelines por SSH en cada push (`bitbucket-pipelines.yml`), pero
-vale igual lanzado a mano: el CI solo es quien llama.
+vale igual lanzado a mano: el CI solo es quien llama. El orden de las etapas, sus invariantes y
+qué comprueba el CI —y qué no— están en [`_specs/10-pipeline-cicd.md`](../_specs/10-pipeline-cicd.md).
 
 **Por qué existe, y por qué verifica.** El 27/08/2026 el sitio estuvo sirviendo el bundle del 11/08
 sin que nada fallara. El despliegue se había hecho con `docker compose up -d` **sin `--build`**:

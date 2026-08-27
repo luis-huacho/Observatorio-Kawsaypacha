@@ -1056,6 +1056,7 @@ comprobar nada.
 | [07-despliegue-ops.md](07-despliegue-ops.md) | compose.yaml, nginx + gunicorn, los dos dominios, .env, HTTPS, backups, runbook, capacitación |
 | [08-plan-pruebas.md](08-plan-pruebas.md) | Qué se prueba y con qué; casos obligatorios derivados de la auditoría de datos; criterio de entrega |
 | [09-errores.md](09-errores.md) | **Ciclo de errores**: severidades, la regla de «nace con una prueba que falla», y dónde está el tracker que guarda los abiertos |
+| [10-pipeline-cicd.md](10-pipeline-cicd.md) | Cómo llega el código al servidor: Bitbucket Pipelines, `desplegar.sh`, el sello de `/version.txt`, qué comprueba el CI y qué sigue siendo manual |
 
 ## Archivo histórico
 

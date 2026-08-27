@@ -217,6 +217,13 @@ git pull && docker compose build backend frontend && docker compose up -d \
   && docker compose exec nginx nginx -s reload
 ```
 
+**En el servidor esta cadena ya no se teclea: es `./deploy/desplegar.sh`.** Queda escrita porque
+explica lo que el script hace por dentro, y porque los dos avisos de arriba son la razón de que el
+script exista — un procedimiento que se arregla añadiéndole pasos volverá a fallar. El script hace
+además dos cosas que la cadena no: `nginx -t` antes de recargar, y **sella y verifica** el commit
+desplegado. La secuencia entera y sus reglas, en
+[`_specs/10-pipeline-cicd.md`](./_specs/10-pipeline-cicd.md).
+
 Y la contrapartida de reconstruir tanto: cada `build` del backend deja atrás una imagen de ~2.8 GB
 sin tag, y BuildKit guarda las capas intermedias. Se limpia con
 
@@ -588,6 +595,9 @@ por una fuente de mapa base con licencia apta para producción.
 | Levantarlo y trabajar en él | [`_docs/desarrollo.md`](./_docs/desarrollo.md) |
 | Desplegarlo con Docker y operarlo | [`_docs/despliegue.md`](./_docs/despliegue.md) |
 | Desplegarlo sin Docker | [`_docs/despliegue-sin-docker.md`](./_docs/despliegue-sin-docker.md) |
+| **Entender cómo se despliega solo** | [`_specs/10-pipeline-cicd.md`](./_specs/10-pipeline-cicd.md) — Bitbucket Pipelines, `deploy/desplegar.sh` y qué **no** comprueba el CI |
+| Ver cómo está montado el entorno de QA | [`_docs/despliegue-entorno-desarrollo.md`](./_docs/despliegue-entorno-desarrollo.md) |
+| **Saber qué deuda arrastra el proyecto** | [`_docs/deuda-tecnica.md`](./_docs/deuda-tecnica.md) — lo decidido a sabiendas, no lo roto |
 | Usar el API | [`_docs/api.md`](./_docs/api.md) |
 | Administrar contenido (para PREDES) | [`_docs/manual-admin-predes.md`](./_docs/manual-admin-predes.md) |
 | **Implementar algo** | [`_specs/`](./_specs/) — modelo de datos, contrato de API, ADR |

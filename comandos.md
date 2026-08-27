@@ -201,8 +201,13 @@ dcl build frontend && dcl run --rm frontend
 # Levantar producción
 docker compose up -d --build
 
-# Desplegar una actualización
-git pull && docker compose build backend frontend && docker compose up -d && docker compose run --rm frontend
+# Desplegar una actualización: trae, construye, publica el dist, recarga nginx,
+# espera al backend y verifica por HTTPS que el sitio sirve ese commit.
+# En master lo lanza Bitbucket solo. El orden y sus reglas, en _specs/10-pipeline-cicd.md
+./deploy/desplegar.sh
+
+# Qué SHA está sirviendo el sitio de verdad
+curl -s https://$SITE_DOMAIN/version.txt
 
 # Recargar nginx tras tocar conf.d/*.conf o *.inc
 docker compose exec nginx nginx -s reload
