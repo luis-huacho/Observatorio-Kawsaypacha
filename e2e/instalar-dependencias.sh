@@ -54,7 +54,8 @@ PAQUETES_RHEL=(
 NODE_MINIMO=22
 
 # ---------------------------------------------------------------------------
-# Salida (mismos helpers que install-rocky-10.sh, para que los dos scripts se lean igual)
+# Salida (mismos helpers que el script de provisión del servidor, que no está en este repositorio,
+# para que los dos se lean igual)
 # ---------------------------------------------------------------------------
 if [[ -t 1 ]]; then
   C_RESET=$'\033[0m'; C_BLUE=$'\033[1;34m'; C_GREEN=$'\033[1;32m'

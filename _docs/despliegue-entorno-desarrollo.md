@@ -134,8 +134,9 @@ correr la suite y tiene que pasar entera.
 > Chromium: sin ellas, la suite entera falla con `libatk-1.0.so.0: cannot open shared object file`,
 > que se lee como si el sitio estuviera caído y no lo está. De ahí salió
 > **`e2e/instalar-dependencias.sh`**, que ya lo hace por su cuenta —librerías, `npm install`,
-> navegador y una comprobación de que arranca—. La provisión del servidor
-> (`install-rocky-10.sh`) deja Docker y Node 22; este script cubre lo que falta encima.
+> navegador y una comprobación de que arranca—. La provisión del servidor —un `install-rocky-10.sh`
+> que **no vive en este repositorio**, porque es de la máquina y no del proyecto— deja Docker y
+> Node 22; este script cubre lo que falta encima.
 
 ## Tareas de cron instaladas
 
