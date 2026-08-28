@@ -61,8 +61,9 @@ export default function Home() {
     ? Number(cifras.por_ccpp.niveles["3"]) + Number(cifras.por_ccpp.niveles["4"])
     : null;
 
-  // Bloque de actualidad: lo más reciente de cada sección editorial. El API ya ordena por fecha
-  // descendente, así que basta pedir la primera página con tres elementos.
+  // Bloque de actualidad: lo último de cada sección editorial. El orden lo pone el API —las
+  // noticias destacadas encabezan y dentro de cada grupo manda la fecha—, así que basta pedir la
+  // primera página con tres elementos.
   const noticias = useApi<Pagina<Noticia>>("/noticias/", { page_size: 3 });
   const normas = useApi<Pagina<Norma>>("/normativa/", { page_size: 3 });
 

@@ -13,6 +13,35 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — noticias: destacadas primero, y el cuerpo que se leía en HTML
+
+Dos restos de la fase prototipo en la misma sección.
+
+- **El orden.** `Noticia.Meta.ordering` era `["-fecha"]`: el campo `destacada` existía, era
+  filtrable y no ordenaba nada. Pasa a **`["-destacada", "-fecha", "-id"]`** por decisión del
+  usuario, aplicado **en todo el API** para que lo sirvan igual la portada y `/noticias`. Sin
+  distintivo visual en las tarjetas, también por decisión explícita: una destacada antigua puede
+  quedar por encima de otras más nuevas sin que nada en pantalla lo explique.
+- **El remate único no es cosmético.** `fecha` es un `DateField` y `/noticias` acumula páginas con
+  `useApiPaginado`: `["-fecha"]` ya era un **orden parcial**, el mismo fallo silencioso que costó
+  filas repetidas en `/api/ccpp/`. Anteponer `-destacada` lo habría agravado —crea un bloque
+  enorme de empates—, así que el `-id` entra en el mismo cambio. Lo fija
+  `test_el_listado_de_noticias_no_repite_ni_se_salta_filas_al_paginar`.
+- **El índice sigue al orden.** `(estado, -fecha)` dejaba de cubrir el `ORDER BY`; se sustituye por
+  `(estado, -destacada, -fecha)` en la migración `contenidos.0002`.
+- **El admin se queda cronológico** (`ordering = ("-fecha",)` en `NoticiaAdmin`). La lista del
+  admin es una cola de trabajo, no la portada, y `destacada` ya es columna ordenable ahí.
+- **El cuerpo se pintaba como texto.** `NoticiaDetalle.tsx` seguía con el
+  `whitespace-pre-line` del prototipo, cuando `cuerpo` venía de un JSON en texto plano; hoy es
+  HTML de CKEditor y en `/noticias/mesa-tecnica-quispicanchi` se leían las etiquetas. Pasa por
+  **`ContenidoRico`**, que es lo que ya usaban `NormaDetalle` y `MedidaDetalle` — noticias fue la
+  única que se quedó atrás. Además de pintarlo, el componente devuelve tamaño a los encabezados y
+  viñetas a las listas (el Preflight de Tailwind los resetea) y convierte el `<oembed>` del editor
+  en un iframe: sin él, **un video incrustado en una noticia no se vería**.
+- **Ninguna de las dos tenía prueba.** Ahora: dos de backend en `test_api_editorial.py` y
+  `e2e/noticias.spec.ts`, el primer spec e2e que cubre el HTML rico en cualquier ficha. Las dos
+  del e2e se comprobaron en rojo antes de arreglar.
+
 ### Actualización 28/08/2026 — la portada decía 4 y `/medidas` listaba 6
 
 La banda de cifras mostraba **4** experiencias mientras la sección enseñaba **6** filas. No era un

@@ -196,7 +196,7 @@ Fuente y consolidación: `scripts/consolidar_pp0068.py` (serie 2022-2026, mezcla
 ### contenidos
 | Modelo | Campos |
 |---|---|
-| `Noticia (Workflow)` | `slug` unique, `titulo`, `bajada`, `cuerpo` rich, `imagen_portada` ImageField **null**, `imagen_titulo` char null (pie de imagen), `palabras_clave` ArrayField(char), `fecha` (index desc); [+] `destacada` bool (home), `tipo` (noticia\|articulo\|opinion), `autor` |
+| `Noticia (Workflow)` | `slug` unique, `titulo`, `bajada`, `cuerpo` rich, `imagen_portada` ImageField **null**, `imagen_titulo` char null (pie de imagen), `palabras_clave` ArrayField(char), `fecha` (index desc); [+] `destacada` bool (home), `tipo` (noticia\|articulo\|opinion), `autor`. Orden `-destacada, -fecha, -id` —el remate único lo exige la paginación— e índice `(estado, -destacada, -fecha)` |
 | `Video (Workflow)` | `titulo`, `descripcion`, `url` (YouTube/Vimeo), `fecha`; [+] `thumbnail_override`, `duracion`, FK `tema` (TipoPeligro) null |
 | `Evento (Workflow)` | `titulo`, `descripcion`, `inicio` datetime (index), `fin` null, `lugar`; [+] `modalidad` (presencial|virtual|mixta), `url_inscripcion`, `organizador`, `imagen` |
 

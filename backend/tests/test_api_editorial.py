@@ -318,6 +318,58 @@ def test_noticias_videos_eventos_y_biblioteca_responden_vacios_sin_contenido(api
         assert api.get(ruta).status_code == 200
 
 
+def _noticia(slug, fecha, destacada=False):
+    """Una noticia publicada con lo mínimo obligatorio, para las pruebas de orden."""
+    import datetime
+
+    from apps.contenidos.models import Noticia
+
+    return Noticia.objects.create(
+        slug=slug,
+        titulo=slug.replace("-", " ").capitalize(),
+        tipo=Noticia.Tipo.NOTICIA,
+        fecha=datetime.date(*fecha),
+        bajada="…",
+        destacada=destacada,
+        estado=Noticia.Estado.PUBLICADO,
+    )
+
+
+def test_las_noticias_destacadas_encabezan_el_listado(api):
+    """Destacadas primero y, dentro de cada grupo, lo más reciente arriba.
+
+    La corriente del medio es la que da valor a la prueba: con el orden viejo —solo `-fecha`—
+    se colaría entre las dos destacadas, que es justo lo que la portada no debe mostrar.
+    """
+    _noticia("destacada-antigua", (2026, 2, 17), destacada=True)
+    _noticia("corriente-reciente", (2026, 6, 12))
+    _noticia("destacada-reciente", (2026, 7, 28), destacada=True)
+
+    slugs = [n["slug"] for n in api.get("/api/noticias/").json()["results"]]
+
+    assert slugs == ["destacada-reciente", "destacada-antigua", "corriente-reciente"]
+
+
+def test_el_listado_de_noticias_no_repite_ni_se_salta_filas_al_paginar(api):
+    """El orden tiene que ser TOTAL: `fecha` es un DateField y los empates son la norma.
+
+    Con `LIMIT`/`OFFSET` sobre un orden parcial PostgreSQL puede devolver la misma fila en dos
+    páginas y omitir otra, sin error de por medio. `/noticias` acumula páginas con
+    `useApiPaginado`, así que el visitante lo vería como noticias duplicadas al pulsar «Ver más».
+    """
+    esperados = {f"misma-fecha-{i}" for i in range(5)}
+    for i in range(5):
+        _noticia(f"misma-fecha-{i}", (2026, 5, 20))
+
+    vistos = []
+    for pagina in (1, 2, 3):
+        datos = api.get(f"/api/noticias/?page_size=2&page={pagina}").json()
+        vistos += [n["slug"] for n in datos["results"]]
+
+    assert len(vistos) == len(set(vistos)), f"filas repetidas entre páginas: {vistos}"
+    assert set(vistos) == esperados
+
+
 def test_una_noticia_publicada_sale_en_el_listado_y_en_su_ficha(api):
     import datetime
 
