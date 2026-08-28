@@ -13,6 +13,61 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — noticias: destacadas primero, y el cuerpo que se leía en HTML
+
+Dos restos de la fase prototipo en la misma sección.
+
+- **El orden.** `Noticia.Meta.ordering` era `["-fecha"]`: el campo `destacada` existía, era
+  filtrable y no ordenaba nada. Pasa a **`["-destacada", "-fecha", "-id"]`** por decisión del
+  usuario, aplicado **en todo el API** para que lo sirvan igual la portada y `/noticias`. Sin
+  distintivo visual en las tarjetas, también por decisión explícita: una destacada antigua puede
+  quedar por encima de otras más nuevas sin que nada en pantalla lo explique.
+- **El remate único no es cosmético.** `fecha` es un `DateField` y `/noticias` acumula páginas con
+  `useApiPaginado`: `["-fecha"]` ya era un **orden parcial**, el mismo fallo silencioso que costó
+  filas repetidas en `/api/ccpp/`. Anteponer `-destacada` lo habría agravado —crea un bloque
+  enorme de empates—, así que el `-id` entra en el mismo cambio. Lo fija
+  `test_el_listado_de_noticias_no_repite_ni_se_salta_filas_al_paginar`.
+- **El índice sigue al orden.** `(estado, -fecha)` dejaba de cubrir el `ORDER BY`; se sustituye por
+  `(estado, -destacada, -fecha)` en la migración `contenidos.0002`.
+- **El admin se queda cronológico** (`ordering = ("-fecha",)` en `NoticiaAdmin`). La lista del
+  admin es una cola de trabajo, no la portada, y `destacada` ya es columna ordenable ahí.
+- **El cuerpo se pintaba como texto.** `NoticiaDetalle.tsx` seguía con el
+  `whitespace-pre-line` del prototipo, cuando `cuerpo` venía de un JSON en texto plano; hoy es
+  HTML de CKEditor y en `/noticias/mesa-tecnica-quispicanchi` se leían las etiquetas. Pasa por
+  **`ContenidoRico`**, que es lo que ya usaban `NormaDetalle` y `MedidaDetalle` — noticias fue la
+  única que se quedó atrás. Además de pintarlo, el componente devuelve tamaño a los encabezados y
+  viñetas a las listas (el Preflight de Tailwind los resetea) y convierte el `<oembed>` del editor
+  en un iframe: sin él, **un video incrustado en una noticia no se vería**.
+- **Ninguna de las dos tenía prueba.** Ahora: dos de backend en `test_api_editorial.py` y
+  `e2e/noticias.spec.ts`, el primer spec e2e que cubre el HTML rico en cualquier ficha. Las dos
+  del e2e se comprobaron en rojo antes de arreglar.
+
+### Actualización 28/08/2026 — la portada decía 4 y `/medidas` listaba 6
+
+La banda de cifras mostraba **4** experiencias mientras la sección enseñaba **6** filas. No era un
+error de cálculo: `Home.tsx` pedía `/api/medidas/?resultado=exito`, y el listado de `/medidas` no
+filtra por resultado al cargar. Las dos que faltaban son precisamente las que **no** son casos de
+éxito — una «lección aprendida» (EVAR desactualizado, Quispicanchi) y una «mal-adaptación»
+(reservorio sin operación, Paucartambo).
+
+- **El problema no era la cifra, era el par.** Cada número describía bien lo suyo, pero puestos a un
+  clic de distancia el visitante solo ve un descuadre, y la pantalla no ofrece nada que lo explique.
+- **La decisión (usuario, 28/08/2026): la tarjeta cuenta el total publicado en Medidas**, sin filtro
+  de resultado, y **el texto de la tarjeta no se toca**. Queda registrado que la etiqueta sigue
+  diciendo «Experiencias exitosas» mientras cuenta también la lección y la mal-adaptación; es una
+  decisión explícita, no un descuido.
+- **El arreglo.** Se quita `resultado: "exito"` de la llamada y se renombran los locales
+  (`medidasPublicadas` / `totalMedidas`), que si no mentirían sobre lo que contienen. Se conserva el
+  `page_size: 1`: solo se usa `count`, que es el total de la queryset y no el de la página.
+- **La prueba.** `e2e/home.spec.ts` compara la tarjeta contra el `count` de `/api/medidas/`. Espera
+  la petición **sin filtros** por expresión regular (`/medidas/?page_size=1$`) porque la portada
+  hace una segunda a `/medidas/?destacada=true…` para el carrusel de casos, y por subcadena se
+  quedaría con la que llegue primero. Antes no había ninguna prueba sobre esta cifra.
+- **Hallazgo aparte, sin cerrar.** El primer caso de `home.spec.ts` busca «Centros poblados
+  monitoreados», etiqueta que ya no existe en la portada (solo sobrevive en `prototype/`), y falla
+  por una causa previa y ajena. El tracker estaba apagado al detectarlo, así que queda pendiente de
+  issue.
+
 ### Actualización 27/08/2026 — la suite E2E no cabía en su propia cuota (429)
 
 La suite completa fallaba en bloque —`peligros`, `inversion`, `medidas`, `buscar`— y parecía una

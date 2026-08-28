@@ -14,6 +14,10 @@ class NoticiaAdmin(WorkflowAdmin, ModelAdmin):
     list_display = ("titulo", "tipo", "fecha", "autor", "destacada")
     list_filter = ("estado", "tipo", "destacada")
     search_fields = ("titulo", "bajada", "slug")
+    # El modelo ordena por `-destacada` para el sitio público; aquí la lista es una cola de
+    # trabajo y se queda cronológica. `destacada` ya es columna ordenable, así que el otro orden
+    # está a un clic.
+    ordering = ("-fecha",)
     prepopulated_fields = {"slug": ("titulo",)}
     date_hierarchy = "fecha"
 

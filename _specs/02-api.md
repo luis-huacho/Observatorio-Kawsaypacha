@@ -192,7 +192,7 @@ Notas del contrato:
 | `GET /api/normativa/` | `tipo`, `ambito`, `anio`, `tema`, `page` | |
 | `GET /api/normativa/{slug}/` | — | ficha con `contenido` desarrollado |
 | `GET /api/normativa/export.xlsx` | ídem que el listado | |
-| `GET /api/noticias/` | `tipo`, `destacada`, `tema`, `page` | orden -fecha |
+| `GET /api/noticias/` | `tipo`, `destacada`, `tema`, `page` | orden `-destacada, -fecha, -id`: las destacadas encabezan y dentro de cada grupo manda la fecha. El remate por `id` no es cosmético — `fecha` es un `DateField` y el listado se pagina |
 | `GET /api/noticias/{slug}/` | — | |
 
 `tema` filtra por coincidencia exacta en `palabras_clave`; es lo que alimenta los chips navegables de las fichas (`?tema=…` en el frontend).

@@ -38,12 +38,17 @@ export default function Home() {
   // 10,978 clasificaciones solo para contar (spec 06).
   const resumen = useApi<ResumenPeligros>("/peligros/resumen/");
   const distritosApi = useApi<Distrito[]>("/territorio/distritos/");
-  const medidasExito = useApi<Pagina<unknown>>("/medidas/", { resultado: "exito", page_size: 1 });
+  // Sin filtro de resultado: la cifra es el total publicado en Medidas, que es exactamente lo que
+  // lista /medidas. Con `resultado=exito` la portada mostraba un número menor que las filas de la
+  // sección, y el sitio no explicaba en ninguna parte la diferencia (las que faltaban eran las de
+  // «lección aprendida» y «mal-adaptación»). `page_size: 1` pide una sola fila porque solo se usa
+  // `count`, que es el total de la queryset y no el de la página.
+  const medidasPublicadas = useApi<Pagina<unknown>>("/medidas/", { page_size: 1 });
   const inversion = useApi<InversionResponse>("/inversion/");
 
   const cifras = resumen.status === "ok" ? resumen.data : null;
   const distritos = distritosApi.status === "ok" ? distritosApi.data.length : null;
-  const experienciasExitosas = medidasExito.status === "ok" ? medidasExito.data.count : null;
+  const totalMedidas = medidasPublicadas.status === "ok" ? medidasPublicadas.data.count : null;
   // Sin ejercicio visible el tablero responde `disponible: false` (ADR-D4): la cifra se queda en
   // `null` y la tarjeta muestra "…", igual que mientras carga.
   const municipiosConEjecucion =
@@ -56,8 +61,9 @@ export default function Home() {
     ? Number(cifras.por_ccpp.niveles["3"]) + Number(cifras.por_ccpp.niveles["4"])
     : null;
 
-  // Bloque de actualidad: lo más reciente de cada sección editorial. El API ya ordena por fecha
-  // descendente, así que basta pedir la primera página con tres elementos.
+  // Bloque de actualidad: lo último de cada sección editorial. El orden lo pone el API —las
+  // noticias destacadas encabezan y dentro de cada grupo manda la fecha—, así que basta pedir la
+  // primera página con tres elementos.
   const noticias = useApi<Pagina<Noticia>>("/noticias/", { page_size: 3 });
   const normas = useApi<Pagina<Norma>>("/normativa/", { page_size: 3 });
 
@@ -141,7 +147,7 @@ export default function Home() {
           <div className="card grid grid-cols-2 md:grid-cols-4 divide-x divide-ink-300/30 overflow-hidden">
             <Stat label="Distritos cubiertos" value={distritos != null ? String(distritos) : "…"} />
             <Stat label="Centros poblados con peligro alto/muy alto" value={ccppAltos != null ? formatNumber(ccppAltos) : "…"} accent />
-            <Stat label="Experiencias exitosas" value={experienciasExitosas != null ? formatNumber(experienciasExitosas) : "…"} />
+            <Stat label="Experiencias exitosas" value={totalMedidas != null ? formatNumber(totalMedidas) : "…"} />
             <Stat label="Municipios con presupuesto ejecutado" value={municipiosConEjecucion != null ? formatNumber(municipiosConEjecucion) : "…"} />
           </div>
         </Reveal>

@@ -7,6 +7,7 @@ import { TIPOS_NOTICIA } from "@/lib/types";
 import { formatFecha } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
 import Portada from "@/components/Portada";
+import ContenidoRico from "@/components/ContenidoRico";
 import PalabrasClave from "@/components/PalabrasClave";
 
 export default function NoticiaDetalle() {
@@ -56,8 +57,11 @@ export default function NoticiaDetalle() {
         <Portada imagen={n.imagen_portada} pie={n.imagen_titulo} alt={n.titulo} />
 
         <p className="mt-6 text-lg text-ink-900 leading-relaxed">{n.bajada}</p>
-        {/* whitespace-pre-line respeta los saltos de párrafo del JSON sin necesidad de rich text. */}
-        <div className="mt-4 text-ink-600 leading-relaxed whitespace-pre-line">{n.cuerpo}</div>
+        {/* `cuerpo` es el HTML de CKEditor, ya saneado en el servidor (ADR-D2). Va por
+            ContenidoRico como en las fichas de norma y de medida: además de pintarlo, devuelve
+            tamaño a los encabezados y viñetas a las listas —que el Preflight de Tailwind
+            resetea— y convierte el `<oembed>` del editor en un iframe. */}
+        <ContenidoRico html={n.cuerpo} className="mt-4" />
 
         <PalabrasClave palabras={n.palabras_clave} base="/noticias" />
       </article>

@@ -30,6 +30,27 @@ test.describe("Portada", () => {
     expect(errores, `errores en consola:\n${errores.join("\n")}`).toEqual([]);
   });
 
+  test("la tarjeta de medidas cuenta TODO lo publicado, no solo los casos de éxito", async ({ page }) => {
+    // La cifra sale de `/api/medidas/` sin filtro de resultado: tiene que cuadrar con las filas
+    // que lista /medidas. Cuando pedía `resultado=exito` mostraba 4 junto a un listado de 6, y
+    // nada en la pantalla explicaba la diferencia. Se espera la petición SIN filtros: la portada
+    // hace una segunda a `/medidas/?destacada=true…` para el carrusel de casos, y por subcadena
+    // se cogería la que llegue primero.
+    const medidas = await (
+      await irEsperando(page, "/", /\/medidas\/\?page_size=1$/)
+    ).json();
+
+    const tarjeta = page.getByText("Experiencias exitosas");
+    await expect(tarjeta).toBeVisible();
+
+    const bloque = tarjeta.locator("xpath=..");
+    await expect
+      .poll(async () => aNumero(await bloque.textContent()), {
+        message: "la cifra de la portada no llegó a cuadrar con /api/medidas/",
+      })
+      .toBe(medidas.count);
+  });
+
   test("no queda ninguna cifra en el marcador de carga", async ({ page }) => {
     // Las tarjetas muestran «…» mientras cargan: si una se queda así, la petición se perdió y
     // la página no lo dice de ninguna otra forma.

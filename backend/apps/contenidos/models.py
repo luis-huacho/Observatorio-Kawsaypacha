@@ -42,10 +42,14 @@ class Noticia(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
     destacada = models.BooleanField(default=False, help_text="Aparece en la portada.")
 
     class Meta:
-        ordering = ["-fecha"]
+        # Destacadas primero y, dentro de cada grupo, lo más reciente. `-id` remata el orden y no
+        # es decorativo: `fecha` es un DateField, los empates del mismo día son la norma y el
+        # listado se pagina, así que sobre un orden parcial `LIMIT`/`OFFSET` repetiría filas entre
+        # páginas y se saltaría otras, en silencio.
+        ordering = ["-destacada", "-fecha", "-id"]
         verbose_name = "noticia"
         permissions = permiso_publicar("noticias")
-        indexes = [models.Index(fields=["estado", "-fecha"])]
+        indexes = [models.Index(fields=["estado", "-destacada", "-fecha"])]
 
     def __str__(self) -> str:
         return self.titulo
