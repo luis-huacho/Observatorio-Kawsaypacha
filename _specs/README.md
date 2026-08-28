@@ -13,6 +13,32 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — la portada decía 4 y `/medidas` listaba 6
+
+La banda de cifras mostraba **4** experiencias mientras la sección enseñaba **6** filas. No era un
+error de cálculo: `Home.tsx` pedía `/api/medidas/?resultado=exito`, y el listado de `/medidas` no
+filtra por resultado al cargar. Las dos que faltaban son precisamente las que **no** son casos de
+éxito — una «lección aprendida» (EVAR desactualizado, Quispicanchi) y una «mal-adaptación»
+(reservorio sin operación, Paucartambo).
+
+- **El problema no era la cifra, era el par.** Cada número describía bien lo suyo, pero puestos a un
+  clic de distancia el visitante solo ve un descuadre, y la pantalla no ofrece nada que lo explique.
+- **La decisión (usuario, 28/08/2026): la tarjeta cuenta el total publicado en Medidas**, sin filtro
+  de resultado, y **el texto de la tarjeta no se toca**. Queda registrado que la etiqueta sigue
+  diciendo «Experiencias exitosas» mientras cuenta también la lección y la mal-adaptación; es una
+  decisión explícita, no un descuido.
+- **El arreglo.** Se quita `resultado: "exito"` de la llamada y se renombran los locales
+  (`medidasPublicadas` / `totalMedidas`), que si no mentirían sobre lo que contienen. Se conserva el
+  `page_size: 1`: solo se usa `count`, que es el total de la queryset y no el de la página.
+- **La prueba.** `e2e/home.spec.ts` compara la tarjeta contra el `count` de `/api/medidas/`. Espera
+  la petición **sin filtros** por expresión regular (`/medidas/?page_size=1$`) porque la portada
+  hace una segunda a `/medidas/?destacada=true…` para el carrusel de casos, y por subcadena se
+  quedaría con la que llegue primero. Antes no había ninguna prueba sobre esta cifra.
+- **Hallazgo aparte, sin cerrar.** El primer caso de `home.spec.ts` busca «Centros poblados
+  monitoreados», etiqueta que ya no existe en la portada (solo sobrevive en `prototype/`), y falla
+  por una causa previa y ajena. El tracker estaba apagado al detectarlo, así que queda pendiente de
+  issue.
+
 ### Actualización 27/08/2026 — la suite E2E no cabía en su propia cuota (429)
 
 La suite completa fallaba en bloque —`peligros`, `inversion`, `medidas`, `buscar`— y parecía una
