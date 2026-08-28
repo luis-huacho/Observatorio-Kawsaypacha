@@ -28,7 +28,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--sin-razonamiento",
             action="store_true",
-            help="No pide razonamiento. Útil con modelos que no lo soportan.",
+            help="Desactiva el razonamiento. Útil con modelos que no lo soportan.",
         )
 
     def handle(self, *args, **opciones):
@@ -46,7 +46,9 @@ class Command(BaseCommand):
             respuesta = openrouter.completar(
                 [{"role": "user", "content": opciones["pregunta"]}],
                 modelo=opciones["modelo"],
-                razonamiento=None if opciones["sin_razonamiento"] else True,
+                # `False`, no `None`: `None` deja mandar al default del proveedor, y hay modelos
+                # —el de por defecto, sin ir más lejos— que razonan salvo que se les diga que no.
+                razonamiento=not opciones["sin_razonamiento"],
             )
         except Exception as exc:  # noqa: BLE001 — el detalle es justo lo que se viene a ver
             raise CommandError(f"La llamada falló: {exc}") from exc

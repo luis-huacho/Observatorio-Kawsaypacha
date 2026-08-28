@@ -46,6 +46,18 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 - **Coste que queda escrito por primera vez**: la llave viaja también a los contenedores `db`,
   `meilisearch` y `backup`, que comparten `env_file: backend/.env`. Ya ocurría con
   `GEMINI_API_KEY` y no constaba en ninguna parte.
+- **Dos cosas que solo salieron al probar contra el API real**, con la llave puesta:
+  - **`razonamiento=None` no significa «sin razonamiento».** El modelo configurado razona por
+    defecto, así que `None` —que deja mandar al proveedor— sigue pagando esos tokens. La bandera
+    `--sin-razonamiento` de `ia_probar` mapeaba a `None` y **quedaba sin efecto**, sin que nada lo
+    delatara: la respuesta era correcta y la factura, la misma. Ahora manda `False` (44 tokens de
+    salida contra 3) y hay una prueba que lo fija. `{"exclude": True}` es otra cosa distinta: el
+    modelo razona igual y **se cobra igual**, solo que no devuelve los bloques.
+  - **OpenRouter enruta cada petición por separado**: en la misma conversación el turno 1 salió por
+    CoreWeave y el 2 por DigitalOcean. La continuidad del razonamiento aguanta el salto, pero **los
+    tokens de entrada no son comparables entre turnos** —cada upstream cuenta a su manera; el
+    segundo turno, con más historial, informó menos entrada que el primero—. Si alguna vez hace
+    falta un conteo estable, hay que fijar el proveedor con `extra_body={"provider": …}`.
 
 ### Actualización 28/08/2026 — noticias: destacadas primero, y el cuerpo que se leía en HTML
 

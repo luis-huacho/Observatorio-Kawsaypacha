@@ -96,6 +96,11 @@ def completar(
     cual, que es como se piden `effort`, `max_tokens` o `exclude`. Inventar aquí un vocabulario
     propio solo añadiría una capa que traducir mal.
 
+    **`None` no significa «sin razonamiento»**, y la diferencia se paga: hay modelos que razonan
+    por defecto —el `deepseek-v4-flash` que viene configurado, sin ir más lejos—, así que para no
+    pagar esos tokens hay que pasar `False`. `{"exclude": True}` es otra cosa: el modelo razona
+    igual y **se cobra igual**, solo que no devuelve los bloques.
+
     `**opciones` pasa directo al SDK (`temperature`, `max_tokens`, `response_format`…).
     """
     if not mensajes:

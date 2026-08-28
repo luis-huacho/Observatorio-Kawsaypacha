@@ -9,6 +9,8 @@ visible en la respuesta.
 El cliente es falso y no hay red: lo que se fija aquí es **con qué se llama al SDK** y **qué se
 hace con lo que devuelve**, no que OpenRouter sepa responder.
 """
+from io import StringIO
+
 import pytest
 
 from apps.core.services import openrouter
@@ -229,6 +231,28 @@ def test_las_opciones_pasan_al_sdk_y_un_extra_body_propio_se_respeta(openrouter_
         "provider": {"sort": "throughput"},
         "reasoning": {"enabled": True},
     }
+
+
+@pytest.mark.parametrize(
+    ("bandera", "esperado"),
+    [([], {"enabled": True}), (["--sin-razonamiento"], {"enabled": False})],
+)
+def test_la_bandera_de_ia_probar_apaga_el_razonamiento_de_verdad(
+    openrouter_falso, bandera, esperado
+):
+    """`--sin-razonamiento` tiene que mandar `enabled: False`, no dejar de mandar nada.
+
+    Mapearla a `None` es lo que parece correcto y no lo es: `None` deja mandar al default del
+    proveedor, y el modelo configurado razona por defecto. La bandera quedaba sin efecto y el
+    comando seguía pagando los tokens de razonamiento sin que nada lo delatara.
+    """
+    from django.core.management import call_command
+
+    falso = openrouter_falso(respuesta_falsa("LISTO"))
+
+    call_command("ia_probar", *bandera, stdout=StringIO())
+
+    assert falso.llamadas[0]["extra_body"]["reasoning"] == esperado
 
 
 def test_una_conversacion_vacia_se_rechaza_antes_de_gastar(openrouter_falso):
