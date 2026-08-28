@@ -88,15 +88,41 @@ No hay ninguna acción de «reprocesar»: el reparto se calcula al vuelo sobre `
 
 Admin de `CapaCartografica`: subir/reemplazar GeoJSON → acción **"(Re)generar tiles"** → pipeline del spec 05 (recorte a Cusco + tippecanoe). `estado_tiles` como badge; `log_error` visible. El campo `estilo` (JSON) permite cambiar color/grosor sin tocar código: el frontend lo aplica al vuelo. Reemplazar una capa = subir nuevo archivo y regenerar; swap atómico garantiza que el mapa público nunca vea tiles corruptos.
 
-## Redacción de noticias desde una URL (ADR-D7)
+## Redacción asistida desde una URL (ADR-D7 en noticias, ADR-D8 en normativa)
 
-- **Dónde**: bloque «Origen», arriba del todo del formulario de Noticias — `url_origen`, casilla
+Un mismo mecanismo para **`contenidos.Noticia`** y **`normativa.Norma`**. Lo compartido vive en
+`core.RedaccionIAMixin` (los cuatro campos), `core.RedaccionIAAdminMixin` (insignia, campos de
+solo lectura, provisionales y encolado), `core.forms.RedaccionIAFormMixin` (la casilla y el
+relajado de obligatorios) y `core.lectura_web` (descarga, guarda anti-SSRF, texto, `og:image`).
+Lo propio de cada dominio —esquema JSON, instrucciones y normalización— vive en el
+`redaccion.py` de su app. **No duplicar ninguna de esas piezas**: el endpoint que refresca la
+ficha es uno solo para los dos, y depende de que el estado y el candado se llamen igual.
+
+- **Dónde**: bloque «Origen», arriba del todo del formulario — `url_origen`, casilla
   **«Procesar con IA»**, insignia de estado y registro.
-- **Qué hace**: con la casilla marcada, `titulo`, `slug`, `bajada` y `fecha` dejan de ser
-  obligatorios y el registro se guarda al instante con valores provisionales —el `slug` lleva sufijo
-  aleatorio para no chocar contra su índice único—. La tarea `redactar_noticia_desde_url` lee la
-  página y rellena título, bajada, cuerpo (HTML), tipo, autor, fecha, palabras clave y **la portada**
-  desde la `og:image`, reducida al mismo ancho que las del editor.
+- **Qué hace**: con la casilla marcada, los obligatorios dejan de serlo y el registro se guarda al
+  instante con valores provisionales —el `slug` lleva sufijo aleatorio para no chocar contra su
+  índice único—. Luego el worker rellena la ficha:
+  - **Noticia** (`redactar_noticia_desde_url`): título, bajada, cuerpo (HTML), tipo, autor, fecha,
+    palabras clave y **la portada** desde la `og:image`, reducida al mismo ancho que las del editor.
+    Obligatorios que se relajan: `titulo`, `slug`, `bajada`, `fecha`.
+  - **Norma** (`redactar_norma_desde_url`): título, número, tipo, ámbito, fecha, resumen, contenido
+    (HTML), palabras clave, estado de vigencia y la portada. Obligatorios que se relajan: `titulo`,
+    `slug`, `tipo`, `ambito`, `fecha`, `resumen`.
+- **Dos campos de Norma que la IA NO escribe, y no por olvido**: `analisis_predes` es la voz
+  institucional que firma la organización en el listado, y `url_oficial` presenta un enlace como
+  publicación oficial — no puede acabar apuntando a lo que el editor pegó arriba. El `log_ia` se lo
+  recuerda al editor.
+- **Una norma suele venir en PDF** (El Peruano, gob.pe), y por la rama de HTML el extractor le
+  pasaría al modelo basura binaria. Se detecta por el `Content-Type` **o** por los bytes `%PDF-`
+  —hay servidores del Estado que sirven PDF declarando `application/octet-stream`— y el archivo
+  viaja en base64 dentro del mismo mensaje, parseado por el plugin `file-parser` de OpenRouter con
+  el motor de `OPENROUTER_PDF_ENGINE`. **Sigue siendo una sola petición.** Dos consecuencias:
+  `pdf-text` (el default, gratuito) **no lee un PDF escaneado** y devuelve una ficha en blanco, así
+  que un título vacío se trata como fallo con el motivo a la vista en vez de guardarse vacío con el
+  candado cerrado; y ese base64 **no puede acabar en el registro en disco** —son megabytes por
+  llamada sobre un archivo diario sin rotación—, así que `openrouter.registrar` lo elide y conserva
+  el prompt.
 - **Una sola llamada**, con `response_format` de tipo `json_schema` y todos los campos a la vez.
   Encadenar una llamada por campo multiplicaría por nada el coste del texto de entrada, que es lo
   caro.
@@ -107,12 +133,16 @@ Admin de `CapaCartografica`: subir/reemplazar GeoJSON → acción **"(Re)generar
   fallo deja `ia_estado=error` con el motivo y permite reintentar. En la ficha ya redactada la
   casilla llega `disabled`, así que tampoco se salta por POST.
 - **Nunca pisa una edición humana**: la tarea recarga desde la base justo antes de escribir. Cuidado
-  con los campos que tienen default (`tipo`, `fecha`): ahí «¿está lleno?» no distingue elección de
-  default y hay que decidirlo campo a campo.
-- **La ficha se refresca sola**: un JS sondea `<ADMIN_URL>contenidos/noticia/<pk>/estado-ia/` cada
-  2 s mientras el estado es «procesando» y recarga al terminar, con corte a los 3 minutos. Esa ruta
-  va **antes** de `admin.site.urls` en `config/urls.py`, o el `catch_all_view` del AdminSite
-  responde 404 y el refresco deja de funcionar sin que nada más falle.
+  con los campos que tienen default: ahí «¿está lleno?» no distingue elección de default y hay que
+  decidirlo campo a campo. Le pasa a `Noticia.tipo`, cuyo default «noticia» hacía que la
+  clasificación de la IA no se aplicara nunca; **`Norma` no tiene ningún campo con default**, así
+  que ahí la comprobación simple basta.
+- **La ficha se refresca sola**: un JS (`admin/js/redaccion_ia.js`, uno para ambos modelos) sondea
+  `<ADMIN_URL><app>/<modelo>/<pk>/estado-ia/` cada 2 s mientras el estado es «procesando» y recarga
+  al terminar, con corte a los 3 minutos. La ruta es genérica y **qué modelos acepta lo decide la
+  lista blanca `MODELOS_CON_IA` de la vista**, no el patrón — sin ella serviría para leer el
+  `log_ia` de cualquier modelo. Va **antes** de `admin.site.urls` en `config/urls.py`, o el
+  `catch_all_view` del AdminSite responde 404 y el refresco deja de funcionar sin que nada más falle.
 - **Seguridad de la descarga**: solo `http`/`https`, y se resuelve el nombre para rechazar destinos
   internos. La URL la escribe un editor y la petición la hace el servidor.
 - **Registro**: cada intercambio (entrada y salida) va a un `.txt` diario en `IA_LOGS_DIR`, **fuera
@@ -122,7 +152,13 @@ Admin de `CapaCartografica`: subir/reemplazar GeoJSON → acción **"(Re)generar
 
 ## Integración Gemini (resúmenes de PDF)
 
-- Modelos con soporte: `biblioteca.Documento` y `normativa.Norma` (vía su documento adjunto).
+- Modelos con soporte: **`biblioteca.Documento`, y solo ése**. Este spec prometió durante un
+  tiempo que también `normativa.Norma` «vía su documento adjunto», y nunca se implementó:
+  `generar_resumen_ia` asume los campos de `Documento` (`archivo`, `url_externa`,
+  `resumen_generado_por_ia`) y no funcionaría sobre `Norma`. Una norma se redacta hoy por la
+  vía de arriba (ADR-D8), que además lee la publicación oficial entera y no solo su PDF
+  adjunto. Si algún día se quiere el resumen de Gemini sobre el PDF alojado de una norma,
+  hay que escribirlo; no está.
 - UI: botón **"Generar resumen con IA"** en el change form (Unfold action) + auto-encolado al guardar si hay PDF (archivo o `url_externa`) y `resumen` vacío.
 - Tarea `generar_resumen(model, pk)` en `core/services/gemini.py`:
   1. Obtiene bytes del PDF: FileField directo, o descarga la URL (timeout 30 s, límite 50 MB). Inline si <20 MB; Files API de Gemini si más.

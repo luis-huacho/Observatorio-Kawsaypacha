@@ -3,14 +3,22 @@ from django.db import models
 
 from apps.core.models import (
     HtmlRicoMixin,
+    RedaccionIAMixin,
     TimeStampedMixin,
     WorkflowMixin,
     permiso_publicar,
 )
 
 
-class Norma(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
-    """Norma del marco GRD/ACC, con ficha propia en /normativa/{slug}."""
+class Norma(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, RedaccionIAMixin):
+    """Norma del marco GRD/ACC, con ficha propia en /normativa/{slug}.
+
+    Puede nacer de una URL: `RedaccionIAMixin` trae `url_origen` y el candado con los que la
+    IA redacta la ficha desde la publicación oficial, sea página web o PDF (ADR-D8). Lo que
+    **no** escribe la IA es `analisis_predes` —es la voz institucional, y es justo lo que
+    aporta la persona— ni `url_oficial`, que no puede acabar presentando un enlace cualquiera
+    como publicación oficial.
+    """
 
     campos_html = ("contenido",)
 

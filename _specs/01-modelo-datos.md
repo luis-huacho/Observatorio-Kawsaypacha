@@ -154,7 +154,7 @@ Los importadores viven en `apps/datasets/importers/` (`nivel_peligro.py`, `frecu
 `imagen`/`tags` pasan a `imagen_portada`/`palabras_clave` para que las tres entidades editoriales —Medida, Noticia y Norma— compartan nombres. La galería sale del MVP de "futuro" y entra al alcance: la sección documenta experiencias de campo y sin fotos no cumple su función.
 
 ### normativa
-`Norma (Workflow)`: **`slug` unique**, `titulo`, `tipo` (Ley|DS|RM|RJ|Ordenanza), `ambito` (nacional|regional|local, index), `fecha` date (index), `resumen`, **`contenido` rich** (el análisis desarrollado de la ficha; `analisis_predes` sigue siendo la nota breve del listado), `url_oficial` null, `analisis_predes` Text null, `imagen_portada` ImageField null, `imagen_titulo` char null, `palabras_clave` ArrayField(char); [+] FK `documento` (biblioteca; habilita resumen Gemini), `numero` (p.ej. "DS 048-2011-PCM"), `estado_vigencia` (vigente|derogada|modificada).
+`Norma (Workflow)`: **`slug` unique**, `titulo`, `tipo` (Ley|DS|RM|RJ|Ordenanza), `ambito` (nacional|regional|local, index), `fecha` date (index), `resumen`, **`contenido` rich** (el análisis desarrollado de la ficha; `analisis_predes` sigue siendo la nota breve del listado), `url_oficial` null, `analisis_predes` Text null, `imagen_portada` ImageField null, `imagen_titulo` char null, `palabras_clave` ArrayField(char); [+] FK `documento` (biblioteca, el PDF alojado por PREDES), `numero` (p.ej. "DS 048-2011-PCM"), `estado_vigencia` (vigente|derogada|modificada). Hereda además `core.RedaccionIAMixin` — `url_origen`, `ia_estado`, `log_ia` y el candado `redactada_por_ia`— con el que la ficha puede nacer de una URL (ADR-D8); son los mismos cuatro campos que `Noticia`, y por eso viven en un mixin.
 
 `slug` y `contenido` son nuevos: la norma no tenía ficha propia y ahora sí (`/normativa/{slug}`, ver 02 y 06). `palabras_clave` sustituye al `[+] temas` que figuraba antes — el mismo concepto existe en `Noticia`, y dos nombres para una cosa se pagan en el serializer, en el índice de Meili y en el admin.
 
@@ -162,6 +162,8 @@ Los importadores viven en `apps/datasets/importers/` (`nivel_peligro.py`, `frecu
 
 1. **`[+] FK documento`** (biblioteca) — el PDF alojado por PREDES. Es la vía preferente: los portales del Estado reorganizan sus URL con frecuencia y un enlace roto en un repositorio normativo lo inutiliza.
 2. **`url_oficial`** — enlace a la publicación del organismo emisor (Gobierno Nacional, Regional o Local, según `ambito`). Es lo que hay cuando no se ha alojado copia.
+
+**`url_origen` no es `url_oficial`, y la diferencia importa.** El primero es la procedencia: la página o el PDF que leyó la IA, que puede ser una nota de prensa o un repositorio de terceros. El segundo es lo que el sitio público presenta como publicación oficial. La IA **nunca** escribe `url_oficial` — copiarlo es una decisión del editor, y el registro de la IA se lo recuerda.
 
 La ficha y el listado muestran el acceso en **ambos** sitios: quien prepara un expediente entra al repositorio a por el documento, y obligarle a abrir la ficha añade un paso. Los tres estados —PDF, página del portal, y sin enlace— tienen que estar resueltos en la UI; el tercero es real, porque se cargan normas antes de tener a mano su publicación.
 
@@ -197,7 +199,7 @@ Fuente y consolidación: `scripts/consolidar_pp0068.py` (serie 2022-2026, mezcla
 ### contenidos
 | Modelo | Campos |
 |---|---|
-| `Noticia (Workflow)` | `slug` unique, `titulo`, `bajada`, `cuerpo` rich, `imagen_portada` ImageField **null**, `imagen_titulo` char null (pie de imagen), `palabras_clave` ArrayField(char), `fecha` (index desc); [+] `destacada` bool (home), `tipo` (noticia\|articulo\|opinion), `autor`. Redacción asistida (ADR-D7): `url_origen` URLField(500) blank, `ia_estado` (pendiente\|procesando\|ok\|error), `log_ia` Text, `redactada_por_ia` bool **= el candado, una sola vez por registro**. Orden `-destacada, -fecha, -id` —el remate único lo exige la paginación— e índice `(estado, -destacada, -fecha)` |
+| `Noticia (Workflow)` | `slug` unique, `titulo`, `bajada`, `cuerpo` rich, `imagen_portada` ImageField **null**, `imagen_titulo` char null (pie de imagen), `palabras_clave` ArrayField(char), `fecha` (index desc); [+] `destacada` bool (home), `tipo` (noticia\|articulo\|opinion), `autor`. Redacción asistida (ADR-D7): los cuatro campos vienen de `core.RedaccionIAMixin` —`url_origen` URLField(500) blank, `ia_estado` (pendiente\|procesando\|ok\|error), `log_ia` Text, `redactada_por_ia` bool **= el candado, una sola vez por registro**—, compartido con `Norma` desde ADR-D8. Orden `-destacada, -fecha, -id` —el remate único lo exige la paginación— e índice `(estado, -destacada, -fecha)` |
 | `Video (Workflow)` | `titulo`, `descripcion`, `url` (YouTube/Vimeo), `fecha`; [+] `thumbnail_override`, `duracion`, FK `tema` (TipoPeligro) null |
 | `Evento (Workflow)` | `titulo`, `descripcion`, `inicio` datetime (index), `fin` null, `lugar`; [+] `modalidad` (presencial|virtual|mixta), `url_inscripcion`, `organizador`, `imagen` |
 

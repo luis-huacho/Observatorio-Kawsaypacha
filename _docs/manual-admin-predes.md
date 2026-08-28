@@ -234,6 +234,32 @@ Tres cosas que conviene decir en la capacitación:
   tenga permiso para publicarla. Antes de publicar hay que comprobar de quién es o sustituirla; sin
   imagen, el sitio usa la ilustración institucional y se ve perfectamente.
 
+## Registrar una norma desde su enlace
+
+En **Normativa** funciona igual que en Noticias, y con una ventaja: **el enlace puede ser un PDF**.
+Pega en **URL de origen** la dirección de la publicación oficial —la página de El Peruano o de
+gob.pe, o directamente el PDF—, marca **«Procesar con IA»** y guarda dejando el resto en blanco. Se
+rellenarán el título, el número, el tipo, el ámbito, la fecha, el resumen, el análisis desarrollado,
+las palabras clave y el estado de vigencia. La pantalla se actualiza sola al terminar.
+
+Lo mismo que en Noticias —una sola vez por norma, es una propuesta y no un resultado, y ojo con los
+derechos de la imagen— más cuatro cosas propias de aquí:
+
+- **El «análisis de PREDES» lo escribes tú.** La IA no lo toca a propósito: es la nota que firma la
+  organización en el listado, y ponerle un texto de máquina sería atribuirle a PREDES algo que no
+  ha dicho.
+- **La «URL oficial» tampoco se rellena sola.** «URL de origen» es de dónde se leyó la norma, que
+  puede ser cualquier sitio; «URL oficial» es el enlace que ve el público como publicación oficial.
+  Si son el mismo, cópialo tú.
+- **Revisa siempre el tipo, el ámbito y la fecha.** Si la IA no pudo deducir el tipo o el ámbito los
+  deja **vacíos** —a propósito: prefiere no clasificar a clasificar mal— y tendrás que elegirlos
+  antes de guardar. Y cuando el documento no trae fecha visible, se pone la de hoy: casi nunca es la
+  correcta.
+- **Si el PDF está escaneado, no se puede leer.** Un PDF escaneado es una foto de un texto, y el
+  lector configurado solo entiende texto de verdad. Aparecerá un aviso diciéndolo. Salidas: pegar el
+  enlace a la versión web de la norma, o pedirle al administrador de la plataforma que cambie el
+  lector a uno que reconozca imágenes (tiene coste por página, por eso no está puesto por defecto).
+
 ## Resúmenes con inteligencia artificial
 
 En **Biblioteca**, la acción **«Generar resumen con IA»** propone un resumen del documento. Al

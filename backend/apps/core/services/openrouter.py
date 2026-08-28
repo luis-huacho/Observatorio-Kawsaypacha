@@ -29,6 +29,7 @@ pone quien llama (ver `apps/core/tasks.py`), que es la frontera que permite que 
 tumbe nunca la operación que lo disparó.
 """
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -170,8 +171,11 @@ def registrar(
     Va aquí y no en cada llamador porque **éste es el único punto por el que pasan las dos
     mitades**: lo que se mandó y lo que volvió. Un archivo por día, en modo añadir.
 
-    Dos cosas deliberadas:
+    Tres cosas deliberadas:
 
+    - **Los adjuntos se eliden, el prompt no.** Un PDF viaja en base64 dentro del propio mensaje
+      (ADR-D8) y son megabytes por llamada; el texto del prompt, en cambio, es justo lo que hay que
+      poder leer. Lo hace `_aligerar()`.
     - **La llave nunca se escribe.** Solo se vuelca lo que el llamador compuso; el secreto vive en
       el cliente, que no se toca aquí. Hay una prueba que lo comprueba.
     - **Fallar escribiendo no puede tumbar la llamada.** El registro es para depurar después; si el
@@ -191,7 +195,8 @@ def registrar(
         ]
         if opciones:
             lineas.append(f"opciones      : {json.dumps(opciones, ensure_ascii=False, default=str)}")
-        lineas += ["", "--- ENTRADA ---", json.dumps(mensajes, ensure_ascii=False, indent=2)]
+        lineas += ["", "--- ENTRADA ---",
+                  json.dumps(_aligerar(mensajes), ensure_ascii=False, indent=2)]
 
         if error is not None:
             lineas += ["", "--- ERROR ---", f"{type(error).__name__}: {error}"]
@@ -221,3 +226,42 @@ def registrar(
         import logging
 
         logging.getLogger(__name__).warning("No se pudo escribir el registro de IA", exc_info=True)
+
+
+# --- Internos ---------------------------------------------------------------
+
+#: Prefijo de un `data:` URI, que es como viajan los adjuntos en la API de chat.
+_ADJUNTO = re.compile(r"^(data:[^;,]*(?:;[^;,]+)*,)")
+
+
+def _aligerar(mensajes: list[Mensaje]) -> list:
+    """Copia de los mensajes con los **adjuntos elididos**, lista para volcar al registro.
+
+    Un PDF viaja como `file_data` en base64: son megabytes por llamada, y el registro es un archivo
+    diario en modo añadir y **sin rotación**. Sin esto, una tanda de normas llena el disco del
+    servidor con datos que además ya están en el PDF original.
+
+    Se elide **solo** el adjunto, nunca el texto del prompt: el registro existe para poder leer
+    entrada y salida, y recortar la entrada lo vaciaría de sentido.
+    """
+    return _recorrer(mensajes)
+
+
+def _recorrer(valor):
+    if isinstance(valor, dict):
+        return {
+            clave: (_resumir_adjunto(dentro) if clave == "file_data" and isinstance(dentro, str)
+                    else _recorrer(dentro))
+            for clave, dentro in valor.items()
+        }
+    if isinstance(valor, list):
+        return [_recorrer(dentro) for dentro in valor]
+    return valor
+
+
+def _resumir_adjunto(dato: str) -> str:
+    """`data:application/pdf;base64,JVBER…` → `data:application/pdf;base64,«N KB omitidos»`."""
+    encontrado = _ADJUNTO.match(dato)
+    cabecera = encontrado.group(1) if encontrado else ""
+    kb = max(1, round(len(dato[len(cabecera):]) / 1024))
+    return f"{cabecera}«{kb} KB omitidos»"

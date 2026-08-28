@@ -155,6 +155,45 @@ de la carpeta; y un archivo que no es imagen **no rompe la subida**.
 - `nivel_max` es el máximo de los niveles presentes.
 - Cada feature lleva lo que el popup necesita —se pinta **desde el tile**, sin pedir nada al API— y `poblacion` va como entero: con `null`, MapLibre descarta el punto al interpolar el radio.
 
+### `test_noticias_ia.py`, `test_normativa_ia.py`, `test_lectura_web.py` y `test_openrouter.py`
+
+La redacción asistida desde una URL (ADR-D7 en noticias, ADR-D8 en normas). **La red no se toca**:
+el cliente de OpenRouter y la descarga son falsos, así que la suite no gasta dinero ni depende de
+que un portal del Estado esté en pie.
+
+Los dos archivos por modelo cubren lo mismo —formulario, candado, tarea, forma de la llamada,
+normalización y el endpoint de sondeo—, y **eso es deliberado**: son dos modelos distintos con
+obligatorios distintos, y una regresión en uno no la ve la prueba del otro. Lo que **no** se
+duplica es lo compartido, que se prueba una vez:
+
+- **`test_lectura_web.py`** — la extracción de texto y la **guarda anti-SSRF**. Duplicar la prueba
+  de un control de seguridad garantiza que una de las dos copias se quede atrás. Fija también que
+  un PDF se reconozca por los bytes `%PDF-` **además** de por la cabecera: hay servidores del
+  Estado que lo sirven declarando `application/octet-stream`.
+- **`test_openrouter.py`** — que el registro en disco lleve entrada y salida, que **nunca** lleve la
+  llave, que una llamada fallida también se registre, que un registro roto no tumbe la llamada, y
+  que **el base64 de un PDF adjunto se elida conservando el prompt**: son megabytes por llamada
+  sobre un archivo diario sin rotación.
+
+Los cinco fallos que estos archivos vigilan, y ninguno da síntoma:
+
+1. Que la casilla deje de eximir de los obligatorios —y el editor no pueda guardar— o al revés, que
+   los exima siempre y se cuelen fichas sin título.
+2. Que el candado se cierre cuando no debía. Un timeout no puede inutilizar un registro para
+   siempre, así que un fallo deja `ia_estado=error` y **el candado abierto**.
+3. Que la tarea pise lo que un editor escribió mientras estaba en cola. Cuidado con los campos que
+   tienen default: `Noticia.tipo` hacía que la clasificación de la IA no se aplicara **nunca**, y
+   el propio registro lo delató diciendo que había conservado algo que nadie escribió.
+4. Que la llamada deje de ser **una** o pierda `provider.require_parameters`: sin él OpenRouter
+   enruta a un proveedor sin salida estructurada y falla una de cada tantas veces.
+5. Que un PDF entre por la rama de HTML —la IA redactaría a partir de basura binaria— o que un PDF
+   escaneado se guarde en blanco **con el candado cerrado**.
+
+Y dos de admin que no se ven hasta que se usan: que los **dos** admin declaren el JS que refresca
+la ficha (el `class Media` vive en un mixin, y que Django lo recoja desde ahí es lo que puede
+romperse al reorganizar las bases), y que el endpoint genérico de sondeo **rechace un modelo fuera
+de su lista blanca**.
+
 ### Las cuatro que vigilan lo que no da síntomas
 
 Estos cuatro archivos existían sin figurar aquí, y son justo los que encajan con la regla del documento: cada uno cubre un fallo que no se ve.

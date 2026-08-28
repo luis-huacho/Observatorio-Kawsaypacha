@@ -1,5 +1,5 @@
 /*
- * Refresco de la ficha de noticia mientras la IA redacta (ADR-D7).
+ * Refresco de la ficha mientras la IA redacta (ADR-D7 para noticias, ADR-D8 para normas).
  *
  * La redacción corre en el worker, así que el POST de guardar vuelve al instante y el editor se
  * queda sin saber cuándo terminó. Esto sondea el estado y **recarga la página** en cuanto cambia,
@@ -23,9 +23,11 @@
       return;
     }
 
-    // La URL de la ficha es …/contenidos/noticia/<pk>/change/ y el prefijo del admin es
-    // configurable, así que el pk y la base se derivan de aquí en vez de escribirse a mano.
-    var partes = window.location.pathname.match(/^(.*\/contenidos\/noticia\/)(\d+)\/change\//);
+    // La URL de la ficha es …/<app>/<modelo>/<pk>/change/ y el prefijo del admin es configurable,
+    // así que la base y el pk se derivan de aquí en vez de escribirse a mano. Genérico a
+    // propósito: el mismo archivo sirve a noticias y a normas, y el endpoint que consulta también
+    // es uno solo. Qué modelos se aceptan lo decide el servidor, no esta expresión.
+    var partes = window.location.pathname.match(/^(.*\/[a-z_]+\/[a-z_]+\/)(\d+)\/change\//);
     if (!partes) {
       return;
     }

@@ -1,8 +1,8 @@
 """Acciones y consultas del panel del admin que no cuelgan de un modelo.
 
-Dos: reindexar la búsqueda —para que PREDES no dependa de que alguien entre al servidor a correr
-`manage.py meili_rebuild`— y el estado de la redacción con IA de una noticia, que es lo que permite
-a la ficha refrescarse sola cuando el worker termina.
+Dos: reindexar la búsqueda —para que PREDES no dependa de que alguien entre al servidor a
+correr `manage.py meili_rebuild`— y el estado de la redacción con IA de una ficha, que es lo
+que permite que se refresque sola cuando el worker termina.
 """
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -34,10 +34,16 @@ def reindexar_busqueda(request):
     return redirect("admin:index")
 
 
+#: Qué modelos puede consultar el sondeo. Sin lista blanca, la ruta serviría para leer el estado
+#: —y el `log_ia`— de cualquier modelo del proyecto que casara con el patrón. Los dos que hay son
+#: los que heredan `core.RedaccionIAMixin`.
+MODELOS_CON_IA = {"contenidos.noticia", "normativa.norma"}
+
+
 @staff_member_required
 @require_GET
-def estado_ia_noticia(request, pk):
-    """Estado de la redacción con IA de una noticia, para el sondeo de la ficha.
+def estado_ia(request, app_label, modelo, pk):
+    """Estado de la redacción con IA de una ficha, para el sondeo que la refresca sola.
 
     Existe porque la redacción corre en el worker: sin esto el editor guarda y no tiene forma de
     saber si ya terminó salvo recargar a ciegas. Devuelve lo justo —estado, si quedó bloqueada y el
@@ -45,16 +51,25 @@ def estado_ia_noticia(request, pk):
 
     Va bajo `ADMIN_URL` y con `staff_member_required`: el `log_ia` puede llevar la URL de origen y
     el detalle de un error del servidor, y eso no es público.
-    """
-    from apps.contenidos.models import Noticia
 
-    noticia = Noticia.objects.filter(pk=pk).values("ia_estado", "redactada_por_ia", "log_ia").first()
-    if noticia is None:
+    Es **uno solo para noticias y normas** (ADR-D8). Por eso los cuatro campos viven en un mixin
+    compartido: si cada app hubiera bautizado a su manera el estado o el candado, esta vista
+    tendría que saber de las dos.
+    """
+    from django.apps import apps
+
+    clave = f"{app_label}.{modelo}".lower()
+    if clave not in MODELOS_CON_IA:
+        return JsonResponse({"error": "no existe"}, status=404)
+
+    Modelo = apps.get_model(app_label, modelo)
+    ficha = Modelo.objects.filter(pk=pk).values("ia_estado", "redactada_por_ia", "log_ia").first()
+    if ficha is None:
         return JsonResponse({"error": "no existe"}, status=404)
     return JsonResponse(
         {
-            "estado": noticia["ia_estado"],
-            "redactada": noticia["redactada_por_ia"],
-            "log": noticia["log_ia"],
+            "estado": ficha["ia_estado"],
+            "redactada": ficha["redactada_por_ia"],
+            "log": ficha["log_ia"],
         }
     )

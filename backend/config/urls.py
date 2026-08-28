@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-from apps.core.vistas_admin import estado_ia_noticia, reindexar_busqueda
+from apps.core.vistas_admin import estado_ia, reindexar_busqueda
 from apps.mapas.vistas_tiles import servir_tile
 
 urlpatterns = [
@@ -22,13 +22,14 @@ urlpatterns = [
         reindexar_busqueda,
         name="reindexar-busqueda",
     ),
-    # Sondeo de la ficha de noticia mientras la IA redacta en el worker. También aquí
-    # arriba: colgado detrás de `admin.site.urls` devolvería 404 y el refresco automático
-    # no funcionaría sin que nada más fallara.
+    # Sondeo de la ficha mientras la IA redacta en el worker. Una sola ruta para noticias y
+    # normas (ADR-D8); qué modelos acepta lo decide la lista blanca de la vista, no el patrón.
+    # También aquí arriba: colgada detrás de `admin.site.urls` devolvería 404 y el refresco
+    # automático no funcionaría sin que nada más fallara.
     path(
-        f"{settings.ADMIN_URL}contenidos/noticia/<int:pk>/estado-ia/",
-        estado_ia_noticia,
-        name="estado-ia-noticia",
+        f"{settings.ADMIN_URL}<slug:app_label>/<slug:modelo>/<int:pk>/estado-ia/",
+        estado_ia,
+        name="estado-ia",
     ),
     path(settings.ADMIN_URL, admin.site.urls),
     path("api/", include("apps.api.urls")),

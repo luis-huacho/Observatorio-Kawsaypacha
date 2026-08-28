@@ -1,22 +1,23 @@
-from datetime import date
-from urllib.parse import urlparse
-from uuid import uuid4
-
-from django.conf import settings
-from django.contrib import admin, messages
-from django.utils.text import slugify
+from django.contrib import admin
 from django_ckeditor_5.widgets import CKEditor5Widget
 from unfold.admin import ModelAdmin
 
-from apps.core.admin_workflow import WorkflowAdmin, badge
-from apps.core.models import EstadoIA
+from apps.core.admin_ia import RedaccionIAAdminMixin
+from apps.core.admin_workflow import WorkflowAdmin
 
 from .forms import NoticiaForm
 from .models import Evento, Noticia, Video
 
 
 @admin.register(Noticia)
-class NoticiaAdmin(WorkflowAdmin, ModelAdmin):
+class NoticiaAdmin(RedaccionIAAdminMixin, WorkflowAdmin, ModelAdmin):
+    """La noticia puede nacer de una URL (ADR-D7).
+
+    El mecanismo entero —insignia, campos de solo lectura, provisionales, encolado y el JS que
+    refresca la ficha— vive en `RedaccionIAAdminMixin`, compartido con normativa. Va **primero**
+    en las bases para que su `save_model` envuelva al de `WorkflowAdmin`.
+    """
+
     campos_rich = ["cuerpo"]
     form = NoticiaForm
 
@@ -50,94 +51,15 @@ class NoticiaAdmin(WorkflowAdmin, ModelAdmin):
         }),
     )
 
-    class Media:
-        # Solo hace algo cuando el estado es «procesando»: sondea y recarga al terminar. Es lo que
-        # responde a «¿cómo sé cuándo acabó?» sin dejar al editor pulsando F5 a ciegas.
-        js = ("admin/js/noticia_ia.js",)
-
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         if db_field.name in self.campos_rich:
             kwargs["widget"] = CKEditor5Widget(config_name="default")
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
-    def get_readonly_fields(self, request, obj=None):
-        return tuple(super().get_readonly_fields(request, obj)) + ("ia_badge_ficha", "log_ia")
-
-    def get_prepopulated_fields(self, request, obj=None):
-        """Sin título no hay slug que derivar.
-
-        `prepopulated_fields` es JS: copia lo que se teclea en `titulo`. Con la casilla marcada el
-        editor no teclea nada, así que el slug saldría vacío y el segundo registro así creado
-        chocaría contra el índice único. El provisional lo pone `save_model`.
-        """
-        if obj is None or not obj.redactada_por_ia:
-            return {}
-        return super().get_prepopulated_fields(request, obj)
-
-    @admin.display(description="IA")
-    def ia_badge(self, obj):
-        estilos = {
-            EstadoIA.PENDIENTE: ("#6B7280", "#F3F4F6"),
-            EstadoIA.PROCESANDO: ("#1D4ED8", "#EFF6FF"),
-            EstadoIA.OK: ("#0B3B26", "#E7F0EA"),
-            EstadoIA.ERROR: ("#7C2D12", "#FEF2F2"),
-        }
-        color, fondo = estilos.get(obj.ia_estado, ("#1F2937", "#F3F4F6"))
-        return badge(obj.get_ia_estado_display(), color, fondo)
-
-    @admin.display(description="estado de la IA")
-    def ia_badge_ficha(self, obj):
-        return self.ia_badge(obj) if obj and obj.pk else "—"
-
-    def save_model(self, request, obj, form, change):
-        """Rellena los provisionales y encola, si el editor pidió la IA.
-
-        Los provisionales no son cosmética: `fecha` y `slug` son `NOT NULL` en la base y `slug`
-        además `unique`, así que relajarlos en el formulario no basta para poder guardar.
-        """
-        pedida = form.cleaned_data.get("procesar_con_ia") and not obj.redactada_por_ia
-
-        if pedida:
-            host = urlparse(obj.url_origen).hostname or "origen"
-            if not obj.titulo:
-                # Con este prefijo el listado se lee mientras tanto, y la tarea sabe que el título
-                # lo puso la máquina y puede sustituirlo.
-                obj.titulo = f"(redactando) {host}"[:250]
-            if not obj.slug:
-                # El sufijo aleatorio no es adorno: sin él, dos noticias creadas seguidas desde el
-                # mismo medio chocan contra el índice único.
-                obj.slug = f"{slugify(host)[:80]}-{uuid4().hex[:8]}"
-            if not obj.fecha:
-                obj.fecha = date.today()
-            obj.ia_estado = EstadoIA.PROCESANDO
-
-        super().save_model(request, obj, form, change)
-
-        if not pedida:
-            return
-
-        if not settings.OPENROUTER_API_KEY:
-            # Se avisa aquí y no en el worker: allí el editor no vería nunca por qué no pasó nada.
-            obj.ia_estado = EstadoIA.PENDIENTE
-            obj.save(update_fields=["ia_estado"])
-            self.message_user(
-                request,
-                "La redacción con IA está deshabilitada: falta OPENROUTER_API_KEY en la "
-                "configuración del servidor. Pídesela al administrador de la plataforma; mientras "
-                "tanto, redacta la noticia a mano.",
-                messages.ERROR,
-            )
-            return
-
+    def encolar_ia(self, obj) -> None:
         from apps.contenidos.tasks import redactar_noticia_desde_url
 
         redactar_noticia_desde_url.enqueue(pk=obj.pk)
-        self.message_user(
-            request,
-            "Se está redactando con IA en segundo plano. La página se actualizará sola en cuanto "
-            "termine. Revisa el resultado antes de publicar.",
-            messages.INFO,
-        )
 
 
 @admin.register(Video)
