@@ -164,6 +164,20 @@ Complementan a las ventanas: portada (hero administrable), buscador global, noti
 >
 > **Se descartó reusar `url_oficial` como campo de entrada.** Habría evitado dos URL que en la mayoría de los casos guardan lo mismo, pero convierte cualquier enlace que el editor pruebe en el enlace que ve el público. **Riesgos aceptados por el dueño del proyecto**, los mismos de ADR-D7 y ADR-A10: derechos del texto y de la imagen, y calidad de lo redactado. La mitigación es la misma — **es una propuesta, no un resultado**, y ninguna publicación depende de ella. Decisión del dueño del proyecto.
 
+> **ADR-D9 — La ficha ACC es un registro autónomo y se carga en lote, con la lista de omitidas a la vista antes de escribir.** Dos decisiones que van juntas.
+>
+> **La ficha deja de colgar de una `Medida`.** La FK obligatoria a `Medida` se elimina del modelo. El formulario que PREDES reparte es autónomo —17 preguntas que se responden solas— y exigir una medida ya publicada a la cual colgarlo bloqueaba la carga sin aportar nada: **nadie leía esa relación** (ni serializer, ni endpoint, ni frontend, ni semilla; solo el diagrama ER). Quien identifica la ficha es `value_001`, el nombre de la experiencia. **La migración es irreversible**: se pierde qué ficha pertenecía a qué medida en los registros ya cargados, y se aceptó a sabiendas.
+>
+> **Su importador no pasa por `DatasetUpload`, y eso acota la regla en vez de romperla.** `DatasetUpload` se diseñó para los datasets de reemplazo total —peligros, frecuencia, inversión—: subida, acción masiva, worker, `log` en JSON, «todo o nada por dataset». Las fichas ACC son lo contrario en las tres dimensiones: la carga es **aditiva** (no toca las fichas que ya están), **parcial por diseño** (importa lo válido y omite lo demás diciendo por qué) y **síncrona**, porque la pantalla de confirmación tiene que responder en el momento. Meterla en el worker daría una confirmación que espera a una tarea encolada. La regla queda así: **`DatasetUpload` manda para los datasets de reemplazo; el contenido editorial aditivo puede tener su importador propio en el admin.**
+>
+> Consecuencias que no son opcionales:
+>
+> 1. **La cabecera aborta el archivo entero; una fila mala, no.** Con las columnas corridas cada texto se guardaría en el campo de al lado y la ficha quedaría plausible y mal, sin que nada lo delatara después. Por eso la fila 1 se compara contra los 17 `verbose_name` —tolerando solo espacios sobrantes y tildes perdidas, porque son preguntas largas que el usuario copia y pega— y si no casa no se escribe nada. Una fila incompleta o repetida, en cambio, se omite con su motivo y las demás entran.
+> 2. **El nombre repetido se compara recortado y en mayúsculas, y eso es SOLO para comparar.** Lo que se guarda es el texto tal como vino en el Excel; normalizarlo al guardar destrozaría el nombre que PREDES publica. El duplicado se detecta contra la base **y dentro del propio archivo**.
+> 3. **La regla de nombre único vive en el importador, no en el esquema.** No se añade `UniqueConstraint` sobre `value_001`: hay datos ya cargados que podrían violarla y la migración fallaría en producción sin un mensaje útil. El alta manual sigue admitiendo un nombre repetido — es una asimetría deliberada.
+> 4. **Los `verbose_name` son la única fuente de las 17 columnas.** La plantilla que se descarga y el validador que la lee salen los dos del modelo, así que solo pueden separarse por accidente; hay una prueba redonda que descarga la plantilla, la rellena y la importa.
+> 5. **El Excel a medio importar vive fuera de `MEDIA_ROOT`** (`IMPORTACIONES_TMP_DIR`), por lo mismo que `IA_LOGS_DIR`: nginx sirve `/media/` entero como estático público y son datos del cliente sin publicar. Se barre solo a las seis horas y se borra al confirmar.
+
 ## Fuera de alcance (esta fase)
 
 - Ventana Prioridades (ADR-P1).

@@ -13,6 +13,42 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — la ficha ACC se suelta de la medida y se carga en lote (ADR-D9)
+
+- **La ficha ACC deja de colgar de una `Medida`.** La FK obligatoria se elimina del modelo: el
+  formulario que PREDES reparte es autónomo, y exigir una medida ya publicada a la cual colgarlo
+  bloqueaba la carga sin aportar nada. **Nadie leía esa relación** —ni serializer, ni endpoint, ni
+  frontend, ni semilla, ni una sola prueba; solo el diagrama ER—, así que el radio de impacto se
+  agotó en `admin.py`. **La migración es irreversible** y se aceptó a sabiendas: se pierde qué
+  ficha pertenecía a qué medida en lo ya cargado. Quien identifica la ficha pasa a ser `value_001`.
+- **Su importador no pasa por `DatasetUpload`, y eso acota la regla en vez de romperla.** Esa vía
+  se diseñó para datasets de reemplazo total, asíncronos y todo-o-nada; las fichas son lo contrario
+  en las tres dimensiones —aditivas, parciales por diseño y síncronas, porque la confirmación tiene
+  que responder en el momento—. La regla queda escrita como dos vías que no se mezclan, y el import
+  ad-hoc sigue prohibido.
+- **La cabecera aborta el archivo entero; una fila mala, no.** Es la asimetría que sostiene todo lo
+  demás: con las columnas corridas cada texto se guardaría en el campo de al lado y la ficha
+  quedaría **plausible y mal**, que es justo lo que no da síntomas. Una fila incompleta o repetida
+  se omite con su motivo y las demás entran. La cabecera sí tolera espacios de más y tildes
+  perdidas, porque son preguntas largas que el usuario copia y pega.
+- **El nombre repetido se compara recortado y en mayúsculas, y solo para comparar.** Se guarda el
+  texto tal como vino: normalizarlo al guardar destrozaría el nombre que PREDES publica. Se detecta
+  contra la base y dentro del propio archivo. **No hay `UniqueConstraint`**: los datos ya cargados
+  podrían violarla y la migración fallaría en producción sin un mensaje útil, así que la regla vive
+  en el importador. El alta manual sigue admitiendo un repetido — asimetría deliberada.
+- **Los 17 `verbose_name` son la única fuente**: de ahí salen la plantilla descargable, el
+  validador de la cabecera y la lista que se pinta en pantalla, así que solo pueden separarse por
+  accidente. Hay una prueba redonda que descarga la plantilla, la rellena y la importa.
+- **Dos hallazgos de camino.** El Excel a medio importar necesitaba un sitio, y el primero elegido
+  cayó **dentro del repositorio**: la suite dejaba ahí un `.xlsx` por prueba y el barrido solo se
+  lleva los de más de seis horas. Ahora es `IMPORTACIONES_TMP_DIR`, fuera de `MEDIA_ROOT` por lo
+  mismo que `IA_LOGS_DIR`, ignorado en git, y una fixture `autouse` lo manda a `tmp_path`. Y el
+  **CSS de Unfold viene precompilado**: `sm:grid-cols-2`, `tabular-nums`, `list-decimal` y varias
+  más no existen, y una clase ausente **no da error, simplemente no hace nada** — las dos tarjetas
+  del resumen salían apiladas por eso. Queda anotado en CLAUDE.md; `templates/admin/index.html` ya
+  tenía tres clases muertas de antes.
+- Quince pruebas nuevas en `backend/tests/test_fichas_acc.py`; la suite pasa de 340 a 355.
+
 ### Actualización 28/08/2026 — el flujo editorial pierde el paso de revisión (ADR-P3)
 
 - **ADR-P3**: los estados pasan a ser **`borrador → publicado`**, con `archivado` para retirar sin

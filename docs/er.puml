@@ -185,9 +185,9 @@ package medidas {
   entity MedidaFichaACC {
     + id
     --
-    # medida
     value_001 .. value_017
-    
+    ..
+    autónoma: no cuelga de Medida
   }
 }
 
@@ -415,7 +415,6 @@ Medida }o--o| Distrito : distrito
 Medida }o--o| CentroPoblado : centro_poblado
 Medida }o--o{ Documento : documentos (M2M)
 MedidaImagen }o--|| Medida : medida
-MedidaFichaACC }o--|| Medida : medida
 
 ' ============================== relaciones: contenidos ==============================
 Video }o--o| TipoPeligro : tema

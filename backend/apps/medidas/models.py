@@ -9,6 +9,12 @@ from apps.core.models import (
 )
 
 
+def extracto(texto: str, limite: int = 80) -> str:
+    """Recorte para identificar un texto largo de un vistazo (columnas del admin, `__str__`)."""
+    texto = (texto or "").strip()
+    return texto[:limite] + ("…" if len(texto) > limite else "")
+
+
 class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
     """Buena práctica o experiencia de campo documentada por PREDES."""
 
@@ -122,9 +128,12 @@ class MedidaFichaACC(TimeStampedMixin):
 
     Cada value_NNN corresponde, en el mismo orden, a la pregunta NNN de
     docs/medida_fichas_acc_fields.csv.
-    """
 
-    medida = models.ForeignKey(Medida, on_delete=models.CASCADE, related_name="fichas_acc")
+    **No cuelga de una Medida.** El formulario que PREDES reparte es autónomo y llega en lote
+    por Excel, así que exigir una medida ya publicada a la cual colgarla bloqueaba la carga sin
+    aportar nada: nadie leía la relación (no hay serializer, API ni frontend que la use). Quien
+    identifica la ficha es `value_001`, el nombre de la experiencia.
+    """
 
     value_001 = models.TextField("Nombre de la experiencia, práctica proyecto o programa")
     value_002 = models.TextField(
@@ -218,6 +227,9 @@ class MedidaFichaACC(TimeStampedMixin):
     class Meta:
         verbose_name = "Ficha de Adaptación al Cambio Climático"
         verbose_name_plural = "fichas de Adaptación al Cambio Climático"
+        # Orden TOTAL: `creado_en` empata en las filas de una misma importación —entran todas en
+        # el mismo `bulk_create`— y un orden parcial paginado repite y se salta filas en silencio.
+        ordering = ["-creado_en", "id"]
 
     def __str__(self) -> str:
-        return f"Ficha ACC · {self.medida.slug}"
+        return f"Ficha ACC · {extracto(self.value_001)}"

@@ -40,7 +40,20 @@ Estados: `borrador → publicado`, con `archivado` para retirar sin borrar (ADR-
 
 SMTP de PREDES por `.env` (`EMAIL_HOST…`); en dev, `console.EmailBackend`. Plantillas en `backend/apps/core/templates/emails/` con marca PREDES.
 
-## Importadores (DatasetUpload)
+## Importadores
+
+Hay **dos vías, y no son intercambiables** (ADR-D9):
+
+| | `DatasetUpload` | Importador propio en el admin |
+|---|---|---|
+| Para qué | datasets de **reemplazo total** (peligros, frecuencia, inversión) | contenido editorial **aditivo** (hoy, fichas ACC) |
+| Cuándo escribe | en el worker, en diferido | en la petición, tras confirmar |
+| Si una fila está mal | el dataset entra o no entra: todo-o-nada | se omite esa fila y las demás entran |
+| Qué ve el usuario | el `log` cuando el worker termina | la lista de omitidas **antes** de escribir |
+
+La regla sigue siendo que **no se escriben imports ad-hoc**: o una vía o la otra, nunca un script suelto.
+
+### `DatasetUpload`
 
 Admin de `DatasetUpload`: form de subida (tipo + archivo) → acción **"Validar e importar"** → tarea en worker. El change list muestra `estado` como badge (subido/validando/procesando/**activo**/reemplazado/error) y el `log` legible (advertencias fila a fila, conteos). Ver contrato de datos en `01-modelo-datos.md`.
 
@@ -51,6 +64,20 @@ Admin de `DatasetUpload`: form de subida (tipo + archivo) → acción **"Validar
 | `inversion.py` | Tres formas, distinguidas por su cabecera: Excel del cliente (hoja `Base AAAA`), serie consolidada del programa (CSV) y serie de totales institucionales (CSV) | un solo `Periodo` en el Excel, formato `AAAA-MM`; el CSV tiene que traer las columnas de una de las dos series; el padrón de distritos tiene que existir | reemplazo atómico **por ejercicio y por parte**; descubre códigos nuevos en el catálogo de procesos sin pisar lo editado; **el ejercicio nace oculto** |
 
 Regla de oro: la importación es **todo-o-nada por dataset** (transacción); si falla, los datos activos previos quedan intactos.
+
+### Fichas ACC — importación aditiva con confirmación (ADR-D9)
+
+El listado de `MedidaFichaACC` lleva dos botones (`actions_list` de Unfold, que rutea sus URL solo — no hace falta `get_urls` ni `change_list_template`): **«Importar desde Excel»** y **«Descargar plantilla»**. Ambos exigen el permiso de alta del modelo.
+
+El importe son tres pasos sobre **una sola URL**, porque comparten estado:
+
+1. **Subir** el `.xlsx`. Las 17 columnas y sus ayudas salen de los `verbose_name`/`help_text` del modelo, y la plantilla descargable se genera de ahí mismo — así no pueden separarse.
+2. **Confirmar.** Se lee el archivo y se reparten sus filas: cuántas entran, y cuáles se omiten con el motivo redactado (fila, nombre y por qué). **Todavía no se ha escrito nada.** El Excel queda en `IMPORTACIONES_TMP_DIR` —fuera de `MEDIA_ROOT`, que nginx sirve público— con el identificador en la sesión.
+3. **Importar.** Se **vuelve a leer y revalidar** el temporal (entre pantalla y pantalla pueden haber entrado fichas nuevas), se crean las válidas en un `bulk_create` transaccional, se borra el temporal y se vuelve al listado con el conteo.
+
+Motivos de omisión, todos en español y citando la fila: falta algún campo obligatorio —los 17 menos Ubicación, Persona de contacto y Descripción de la práctica—, o el **nombre de la experiencia está repetido**, contra la base o dentro del propio archivo. El nombre se compara **recortado y en mayúsculas**, y solo para comparar: se guarda tal como vino.
+
+Lo único que aborta el archivo entero es la **cabecera**: con las columnas corridas cada texto caería en el campo de al lado y la ficha se vería llena estando mal. El mensaje muestra qué se esperaba y qué se encontró.
 
 ### Qué va al log sin abortar
 

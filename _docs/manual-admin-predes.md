@@ -260,6 +260,41 @@ derechos de la imagen— más cuatro cosas propias de aquí:
   enlace a la versión web de la norma, o pedirle al administrador de la plataforma que cambie el
   lector a uno que reconozca imágenes (tiene coste por página, por eso no está puesto por defecto).
 
+## Cargar fichas ACC desde un Excel
+
+Las **Fichas de Adaptación al Cambio Climático** son las 17 preguntas del formulario que se
+reparte en campo. Se pueden llenar de a una desde el admin, o cargarlas todas juntas desde un
+Excel. Una ficha **no depende de ninguna medida**: es un registro por su cuenta.
+
+En **Medidas - Fichas ACC** hay dos botones arriba a la derecha:
+
+1. **Descargar plantilla.** Baja un Excel con las 17 columnas ya puestas y en el orden correcto.
+   Cada título trae un comentario con la indicación de cómo llenarlo, y hay una segunda hoja
+   **Instrucciones** con lo mismo en texto. Empieza siempre por aquí: ahorra el ida y vuelta de
+   «¿qué columnas van?».
+2. **Importar desde Excel.** Sube el archivo lleno. **No se guarda nada todavía**: primero
+   aparece una pantalla que dice cuántas fichas van a entrar y **cuáles no, con el motivo de cada
+   una**. Recién al pulsar «Importar» se guardan.
+
+Una fila no se carga por dos motivos, y los dos se ven en esa pantalla:
+
+- **Le falta algún dato obligatorio.** El aviso nombra la columna vacía. Los únicos tres que
+  pueden ir en blanco son *Ubicación*, *Persona de contacto* y *Descripción de la práctica*.
+- **El nombre de la experiencia está repetido.** El *«Nombre de la experiencia, práctica proyecto
+  o programa»* tiene que ser distinto en cada ficha. Al comparar no se distinguen mayúsculas ni
+  espacios de más, así que «Cosecha de agua en Ccatca» y «  cosecha DE AGUA en Ccatca » cuentan
+  como la misma. Se comprueba contra lo que ya está cargado **y dentro del propio archivo**.
+
+Las fichas que sí están bien se cargan igual: no hace falta corregir el Excel entero para
+aprovechar lo que ya está listo. Corrige lo que la pantalla te señaló y vuelve a subir solo esas.
+
+**Lo único que detiene el archivo completo es la cabecera.** Si la fila 1 no trae las 17 columnas
+esperadas no se carga nada, y el aviso muestra qué esperaba y qué encontró. Es a propósito: con
+las columnas cambiadas de sitio, cada respuesta se guardaría en la pregunta equivocada y las
+fichas se verían bien estando mal. Si te pasa, descarga la plantilla y copia tus datos ahí.
+
+Lo importado se edita después como cualquier otra ficha.
+
 ## Resúmenes con inteligencia artificial
 
 En **Biblioteca**, la acción **«Generar resumen con IA»** propone un resumen del documento. Al

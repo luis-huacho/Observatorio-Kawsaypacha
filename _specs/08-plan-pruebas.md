@@ -194,6 +194,21 @@ la ficha (el `class Media` vive en un mixin, y que Django lo recoja desde ahí e
 romperse al reorganizar las bases), y que el endpoint genérico de sondeo **rechace un modelo fuera
 de su lista blanca**.
 
+### `test_fichas_acc.py`
+
+La ficha autónoma y su importación por Excel (ADR-D9). Quince pruebas, y las que importan son las que vigilan lo que no se ve:
+
+1. **La previsualización no escribe.** Se comprueba el conteo después del primer POST, no solo después del segundo: si el paso 2 guardara, nadie lo notaría hasta tener fichas que nadie confirmó.
+2. **El duplicado se detecta con el criterio que se le anuncia al usuario** —recorte y mayúsculas—, contra la base y dentro del mismo archivo; y la otra fila del archivo **sí** entra.
+3. **El texto se guarda tal como vino.** Normalizar al guardar destrozaría el nombre que PREDES publica, y la prueba pasa igual si solo se mira el conteo.
+4. **Una fila incompleta no arrastra al archivo, y el motivo nombra la columna.** Con los tres campos opcionales comprobados aparte: exigirlos al importar sería inventar una regla que el formulario del admin no aplica.
+5. **Una cabecera distinta no importa nada** y dice qué esperaba y qué encontró; pero **tolera espacios de más y tildes perdidas**, porque son preguntas largas que el usuario copia y pega.
+6. **El temporal se consume una sola vez**: recargar la confirmación no puede duplicar la carga.
+7. **La prueba redonda**: se descarga la plantilla, se rellena y se importa. Es lo que detecta que la plantilla y el validador se hayan separado.
+8. Un archivo que no es un Excel da mensaje, no un 500; y sin el permiso de alta no se llega ni a la vista ni a la plantilla.
+
+Una fixture `autouse` manda `IMPORTACIONES_TMP_DIR` a `tmp_path`. Sin ella la suite deja Excel dentro del repositorio: el barrido del admin solo se lleva los de más de seis horas, así que se acumulan entre corridas sin que nadie los mire.
+
 ### Las cuatro que vigilan lo que no da síntomas
 
 Estos cuatro archivos existían sin figurar aquí, y son justo los que encajan con la regla del documento: cada uno cubre un fallo que no se ve.

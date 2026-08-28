@@ -151,6 +151,8 @@ Los importadores viven en `apps/datasets/importers/` (`nivel_peligro.py`, `frecu
 
 `MedidaImagen`: FK `medida` (related_name `galeria`), `imagen` ImageField, `pie` char (obligatorio: una foto sin pie no se puede citar ni describir a un lector con lector de pantalla), `orden` PositiveSmallInt. `unique (medida, orden)`. Hasta ahora figuraba como un nombre suelto entre los `[+]`, sin campos, sin ER y sin serializer.
 
+**`MedidaFichaACC`**: la Ficha de Adaptación al Cambio Climático, 17 `TextField` (`value_001` … `value_017`) cuyos `verbose_name` y `help_text` son literalmente las preguntas del formulario que PREDES reparte (`docs/medida_fichas_acc*.csv`). **No cuelga de `Medida`** (ADR-D9): es un registro autónomo que se identifica por `value_001`, el nombre de la experiencia. Solo 002, 004 y 008 admiten vacío. `ordering = ["-creado_en", "id"]` — orden **total**, porque las fichas de una misma importación entran en el mismo `bulk_create` y empatan en `creado_en`. Sin restricción de unicidad en la base: la regla de nombre único se aplica al importar, no en el esquema.
+
 `imagen`/`tags` pasan a `imagen_portada`/`palabras_clave` para que las tres entidades editoriales —Medida, Noticia y Norma— compartan nombres. La galería sale del MVP de "futuro" y entra al alcance: la sección documenta experiencias de campo y sin fotos no cumple su función.
 
 ### normativa

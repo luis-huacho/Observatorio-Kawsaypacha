@@ -397,6 +397,11 @@ OPENROUTER_PDF_ENGINE = env("OPENROUTER_PDF_ENGINE", default="pdf-text")
 # `desplegar.sh` y `vigilar-contenedores.sh`, que es donde mira quien opera.
 IA_LOGS_DIR = Path(env("IA_LOGS_DIR", default=str(BASE_DIR / "logs")))
 
+# Dónde espera el Excel de fichas ACC entre la pantalla de confirmación y el «Importar». También
+# **fuera de MEDIA_ROOT**, y por lo mismo: son datos del cliente sin publicar, y /media/ es
+# público. Se barre solo, pero es un directorio de paso: nada de aquí debe versionarse.
+IMPORTACIONES_TMP_DIR = Path(env("IMPORTACIONES_TMP_DIR", default=str(BASE_DIR / "importaciones")))
+
 # --- Datos y pipeline geoespacial ------------------------------------------
 # Excel y GeoJSON canónicos que alimentan `manage.py seed`. Fuera de la imagen: son 145 MB
 # que no se versionan (ver _docs/desarrollo.md).
