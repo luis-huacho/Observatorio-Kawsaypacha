@@ -164,20 +164,15 @@ DJANGO_SUPERUSER_USERNAME= DJANGO_SUPERUSER_EMAIL= DJANGO_SUPERUSER_PASSWORD=   
 
 ## Runbook
 
-| Operación | Comando |
-|---|---|
-| Desplegar actualización | `git pull && docker compose build backend frontend && docker compose up -d` |
-| Migraciones | `docker compose exec backend python manage.py migrate` |
-| Sembrar datos iniciales | `docker compose exec backend python manage.py seed` |
-| Reindexar búsqueda | `docker compose exec backend python manage.py meili_rebuild` |
-| Regenerar tiles CCPP | `docker compose exec backend python manage.py generar_tiles_ccpp` |
-| Recargar nginx | `docker compose exec nginx nginx -s reload` |
-| Renovar certificados | `docker compose run --rm certbot renew` |
-| Logs | `docker compose logs -f backend worker` |
-| Backup manual | `docker compose exec backup /backup.sh` |
-| Restaurar BD | ver procedimiento en `_docs/despliegue.md` |
+**Aquí había una copia del runbook, y se ha quitado.** Los comandos de operación viven en un solo sitio, `_docs/despliegue.md` §Runbook, y el orden del despliegue con sus reglas en [10-pipeline-cicd.md](10-pipeline-cicd.md).
 
-Seguridad: `DEBUG=0`, admin en `ADMIN_URL` no-default, throttling DRF, `SECURE_*` headers de Django, contenedores sin puertos publicados salvo nginx, actualizaciones de imágenes mensuales.
+No es una preferencia de estilo: esta copia **divergió y llegó a hacer daño**. Mandaba desplegar con `git pull && docker compose build backend frontend && docker compose up -d`, que es la cadena manual —sin `run --rm frontend`— que el 27/08/2026 dejó el sitio sirviendo el bundle del 11/08 con todo en verde. Y ofrecía `docker compose run --rm certbot renew`, que **no renueva nada**: el servicio `certbot` tiene `entrypoint` propio (un bucle `while :; do certbot renew --webroot …; sleep 12h; done`), así que ese comando ignora el argumento y arranca el bucle en primer plano.
+
+Un procedimiento escrito dos veces se convierte en dos procedimientos distintos, y el que está en el spec es el que nadie corre y nadie corrige.
+
+## Seguridad
+
+`DEBUG=0`, admin en `ADMIN_URL` no-default, throttling DRF, `SECURE_*` headers de Django, contenedores sin puertos publicados salvo nginx, actualizaciones de imágenes mensuales.
 
 ## Vigilancia y recuperación
 

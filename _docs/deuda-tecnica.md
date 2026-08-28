@@ -1,131 +1,137 @@
 # Deuda técnica
 
-Cosas que sabemos que hay que hacer y que **no** están rotas hoy: el sitio funciona con ellas
-pendientes. No es el registro de errores — eso vive en el tracker y su ciclo está en
+Lo que este proyecto decidió **a sabiendas** y sigue costando. No es la lista de lo que está roto
+—eso vive en el tracker— ni la de lo que falta por hacer: es la de las decisiones cuyo precio se
+paga a plazos, reunidas en un sitio para que se vean juntas.
+
+Existe porque en este repositorio la deuda es **invisible desde el código**. No hay un solo `TODO`
+ni un `FIXME`: cada cosa está donde tiene que estar, con su comentario explicando por qué. El efecto
+secundario es que alguien que llega no puede distinguir una decisión de un olvido, y «arregla» lo
+que estaba bien.
+
+## Cómo se lee
+
+**Ninguna entrada de aquí es la fuente de verdad de su propio estado.** Cada una apunta al ADR que
+la decidió, al spec que la describe o al archivo y la línea donde vive. Si una entrada se puede leer
+entera sin seguir su puntero, está mal escrita: se ha copiado algo que ya existía en otro sitio, y
+las dos copias empezarán a divergir hoy mismo.
+
+Es la lección de [`_specs/09-errores.md`](../_specs/09-errores.md) aplicada a otra cosa. Allí se
+eliminó una tabla de errores abiertos porque el estado se duplicaba a mano en tres documentos y no
+siempre cuadraba. Aquí se evita por construcción: **este documento no contiene estado**.
+
+Cada entrada dice cuatro cosas: **qué es · dónde está declarado · qué cuesta hoy · qué la salda**. Lo
+último es un disparador, no una fecha: «cuando llegue el polígono del INEI», no «revisar en
+septiembre». Una deuda con disparador no necesita que nadie la revise — se salda cuando pasa lo que
+dice, y entonces **se borra de aquí**. No se tacha ni se archiva: el historial son los ADR y la
+bitácora, no esta lista.
+
+## Lo que no está aquí
+
+| Qué | Dónde va |
+|---|---|
+| Algo roto, pendiente de corregir | El **tracker**. Un solo sitio para lo pendiente (09) |
+| Algo aún no decidido | Un **ADR** en `_specs/00`. Este documento no decide nada |
+| Una mejora, una idea, un deseo | En ningún sitio de este repositorio |
+| Lo ya corregido | La **bitácora** de `_specs/README.md` |
+
+## Automatización que falta
+
+| Qué es | Declarado en | Qué cuesta hoy | Qué lo salda |
+|---|---|---|---|
+| **El CI no corre las pruebas.** Bitbucket Pipelines solo comprueba tipos (`tsc --noEmit`) | ADR-A21, [`_specs/10-pipeline-cicd.md`](../_specs/10-pipeline-cicd.md) | 261 pruebas de backend y 56 casos E2E que **nadie dispara automáticamente**. Un check verde no dice que pasaran; dice que el frontend compila. La puerta previa al despliegue es una regla de conducta | Un runner con GDAL, tippecanoe, WeasyPrint y Chromium, o el stack levantado en CI. Hoy no compensa: por eso el ADR |
+| **`ruff` está configurado y no instalado** | `backend/pyproject.toml` (`[tool.ruff]`, línea 56) | Un bloque de configuración que no gobierna nada. Quien lo lea supondrá que el código pasa por un linter, y no pasa | Añadir `ruff` al grupo `dev` y correrlo, o borrar el bloque. Las dos salidas son mejores que la actual |
+| **No hay ESLint**: `npm run lint` es `tsc --noEmit` | `frontend/package.json` | Los tipos se comprueban; las reglas de estilo y los errores que el compilador no ve, no | Cuando el frontend lo pida. No es urgente con un solo desarrollador |
+| **No hay ningún script que corra la suite completa** | — | La secuencia entera está en `comandos.md` y en 08, y se teclea a mano cada vez, en el orden correcto | Un script, el día que el orden se recuerde mal — que es exactamente lo que pasó con el despliegue el 27/08 |
+| **Las ramas `process.env.CI` de Playwright no se ejecutan nunca** | `playwright.config.ts` (retries, workers, reporter `github`) | Código preparado para un CI que no corre E2E. Se lee como un CI a medio terminar | Que el CI corra Playwright, o quitarlas |
+| **Seis tareas de cron se instalan a mano en cada servidor, y nada comprueba que estén puestas** | [`despliegue.md`](./despliegue.md) §7 | Si falta la de métricas, el panel del admin sale en blanco y la tabla de eventos crece sin límite. En silencio | Que la provisión del servidor las ponga, o una comprobación que avise de su ausencia |
+| **El certificado dejó de renovarse solo por diseño** | ADR-A6bis | Depende del contenedor `certbot` y de su bucle; la recarga de nginx va por un cron aparte cada 6 h | Nada previsto: fue el precio explícito de que PREDES pueda operar nginx |
+| **El worker nunca se reinicia solo** | [`_specs/07`](../_specs/07-despliegue-ops.md) §Vigilancia | Un worker colgado a mitad de una importación necesita una persona. Es deliberado: matarlo puede dejar el dato peor que parado | Nada. Es la decisión, no su efecto colateral |
+
+## Código vivo que no se usa
+
+| Qué es | Declarado en | Qué cuesta hoy | Qué lo salda |
+|---|---|---|---|
+| **`Prioridades.tsx` sin ruta registrada**, con su import comentado en `App.tsx` | ADR-P1 | Un componente completo que no se renderiza nunca y que hay que mantener compilando | Que PREDES pida la ventana, o que se decida borrarla. **No reactivar sin pedido explícito** |
+| **`/comparar` fuera del menú**, con ruta y endpoint vivos y probados | ADR-P2 | Una migración de datos (`sitio.0002`) existe solo para ocultar un enlace, porque el seed no pisa lo que ya está sembrado | Igual que la anterior |
+| **Los campos `[+]` del modelo**: 25 líneas de `01-modelo-datos.md` los declaran | [`_specs/01`](../_specs/01-modelo-datos.md) (la convención, en su primer párrafo) | Columnas nullables que ninguna vista usa. Coste real bajo —se crearon a coste cero— pero engordan el ER y el admin | Que una funcionalidad los estrene, o una limpieza deliberada. No se listan aquí: la lista es el spec |
+| **`prototype/`, 100 archivos versionados y congelados** | `CLAUDE.md`, `_specs/archive/` | Peso en el repositorio y confusión al buscar: un `grep` devuelve resultados de código que no corre | Nada previsto. Es referencia aprobada por el cliente y borrarla pierde el original |
+
+## Datos provisionales y lo que falta
+
+| Qué es | Declarado en | Qué cuesta hoy | Qué lo salda |
+|---|---|---|---|
+| **El polígono de Cusco es de geoBoundaries, no del INEI** | [`_specs/05`](../_specs/05-mapas-tiles.md) | El recorte de todas las capas depende de un límite no oficial. Funciona; no es la fuente que un organismo público citaría | Que PREDES entregue el polígono del INEI. Entra por el mismo pipeline |
+| **Ocho observaciones de calidad de datos, abiertas con el cliente** | [`_specs/00`](../_specs/00-alcance-decisiones.md) §Observaciones | Filas sin nivel, un distrito sin fila de frecuencia, subtotales sin desagregar, dos grafías de la misma fuente. El sitio publica lo que hay y lo declara | Que PREDES corrija en origen. **No se copian aquí**: eran seis y ya son ocho, y una copia se habría quedado en seis |
+| **Dependencias del cliente aún abiertas** | [`_specs/00`](../_specs/00-alcance-decisiones.md) §Dependencias | Las funciones afectadas se degradan con aviso, no fallan | Cada una, cuando llegue lo suyo |
+
+## Rendimiento y límites del API
+
+Todo esto salió de una misma investigación (27/08/2026): la suite E2E no cabía en la cuota anónima
+del API y fallaba en bloque con 429. El límite en desarrollo ya está resuelto —las tasas se leen del
+entorno y `compose.dev.yml` las vacía—; lo que queda aquí es lo que sigue costando en producción.
+
+| Qué es | Declarado en | Qué cuesta hoy | Qué lo salda |
+|---|---|---|---|
+| **El techo anónimo va corto para una oficina.** `anon: 1000/hour` por IP, y la portada pide 8 veces por carga | `THROTTLE_PRODUCCION` en `backend/config/settings.py`, [`_specs/02`](../_specs/02-api.md) §Las tasas se configuran por entorno | **125 vistas de página por hora y por IP**, y una oficina entera tras un NAT comparte una sola: treinta personas tienen ~4 vistas cada una antes del 429. Es el mismo escenario que ya obligó a subir el beacon a 600/min, resuelto allí y no aquí | Decidir la cifra. **Ya no hace falta tocar código**: basta `API_THROTTLE_ANON` en el `.env` del servidor. Ojo también con `descarga: 30/hour`, la más justa de las tres |
+| **Cinco de los siete endpoints de la portada no mandan `Cache-Control`**: `/peligros/resumen/`, `/territorio/distritos/`, `/medidas/`, `/noticias/`, `/normativa/` | Las cabeceras que sí existen, en `backend/apps/api/views/sitio.py:24` e `inversion.py:84` y `:210` | El más caro está entre los descubiertos: `/peligros/resumen/` hace **dos pasadas completas sobre los 8.968 centros poblados** (`backend/apps/peligros/consultas.py:57-97`), con un bucle en Python, en cada carga. `/territorio/distritos/` sirve los 112 distritos enteros para un catálogo que no cambia nunca | Añadir `cache_control` donde toque, que es una línea por vista. El criterio de cuánto dura cada uno es la decisión, no el código |
+| **No hay caché de servidor en ningún nivel**: `CACHES` sin configurar, sin `cache_page`, y la zona `proxy_cache_path` de nginx **declarada y nunca usada** | `deploy/nginx/conf.d/observatorio.conf:23` | Cada petición recalcula. Y una consecuencia poco intuitiva: **el contador del throttle vive en esa caché**, así que con `LocMemCache` es por proceso — con N workers de gunicorn el límite efectivo es N × la tasa, e inconsistente entre ellos | Configurar `CACHES`, o usar la zona de nginx que ya está declarada. Mientras tanto, reiniciar el backend borra los 429 al instante |
+| **La portada pide 8 veces lo que cabría en 2** | `frontend/src/routes/Home.tsx:39-68` | Tres de las cuatro cifras bajan un payload entero para leer un número: los 112 distritos para hacer `.length`, un `COUNT(*)` para leer `.count`, un agregado caro para un solo campo. Y `/medidas/` se pide dos veces | Un `/api/portada/` con `cache_control`. El patrón ya existe y está bendecido: el docstring de `backend/apps/api/views/sitio.py:17-22` explica por qué el cascarón va en una sola petición |
+
+## Documentación como deuda
+
+| Qué es | Qué cuesta hoy | Qué lo salda |
+|---|---|---|
+| **El procedimiento de despliegue vivía en cinco documentos** (`README`, `comandos.md`, `_docs/despliegue.md`, `_specs/07` y ahora el 10) | Divergieron, y no de forma inocua: `_specs/07` acabó mandando la cadena que causó el incidente del 27/08 y un `certbot renew` que no renueva. Se corrigió quitando la copia del spec | Que ningún documento nuevo vuelva a copiar la secuencia. El 10 lleva una tabla de «qué no está aquí» justo para eso |
+| **`comandos.md` está versionado y no lo cita ni el README ni CLAUDE.md** | Un documento sin dueño declarado envejece sin que nadie lo note | Darle una fila en la tabla de documentación, o fundirlo con el README |
+| **Toda cifra escrita a mano en la documentación** | «144 pruebas» sobrevivió a que fueran 259; «ocho comprobaciones» a que fueran nueve. Una cifra desfasada no da ningún síntoma | Escribir al lado el comando que la reproduce. Es lo que se hizo con los conteos de pruebas |
+
+## Residuos del árbol de trabajo, que no del repositorio
+
+En la máquina de desarrollo hay `inversion_cusco.sqlite3` (0 bytes), `pp0068_cusco.sqlite3`
+(795 KB), `test-results/` y algún `__pycache__` con `.pyc` de Python 3.14 —mientras el proyecto pide
+`>=3.12,<3.14`—.
+
+**Git no versiona ninguno**: los tapan las reglas `__pycache__/`, `/*.sqlite3` y `/test-results/` de
+`.gitignore`, y un clon limpio no los tiene. Se anotan aquí precisamente para que nadie los confunda con deuda del proyecto y «arregle»
+un `.gitignore` que ya funciona. Se saldan borrándolos, o no saldándolos.
+
+## Pendientes de pasar al tracker
+
+> **Esta sección viola a propósito la regla de arriba, y es temporal.** Son defectos, no deuda, y su
+> sitio es el tracker; se anotan aquí porque el 27/08/2026 el MCP de Gitea no conectaba y perder el
+> hallazgo era peor que ensuciar el documento. **Al abrir cada issue, se borra su entrada.** Si esta
+> sección sigue aquí dentro de unas semanas, el problema ya no son los defectos sino ella.
+
+- **Un 429 se reintenta en bucle y realimenta el propio límite.** `frontend/src/lib/api.ts` borra de
+  la caché las peticiones fallidas a propósito (líneas 98-99 y 149-151), para poder reintentar. Pero
+  no distingue el 429 ni aplica backoff: `ErrorApi.status` se guarda y **nadie lo consulta** — cero
+  apariciones de `429` o `Retry-After` en todo `frontend/src`. Una vez agotada la cuota, cada vuelta
+  a la portada relanza las 8 peticiones contra el límite que la está bloqueando.
+
+- **`home.spec.ts:19` busca una tarjeta que la portada ya no tiene.** La prueba «las cifras salen del
+  API y coinciden con el resumen» localiza `getByText("Centros poblados monitoreados")`; esa tarjeta
+  no existe desde el commit `0e216c3` (18/08/2026), que rehízo las cifras. Lleva rota desde entonces,
+  tapada primero por una carrera en `esperarApi` y después por los 429. **No basta con renombrar el
+  texto**: la portada dejó de publicar el total de centros poblados, así que hay que decidir qué debe
+  demostrar. Lo más fiel a su intención es cuadrar «Centros poblados con peligro alto/muy alto»
+  contra la suma de los niveles 3 y 4 de `/api/peligros/resumen/`, que es lo que calcula
+  `Home.tsx:55-57`.
+
+- **Once E2E del visor agotan el tiempo en el proyecto móvil, sin atribuir.** Primera corrida
+  completa sin 429 (27/08/2026, contra el dev server de Vite): 93 pasan, 13 fallan, 6 se saltan, y
+  **cero respuestas 429**. Dos de los fallos son la prueba de arriba; los otros once se concentran en
+  `movil` —diez de `peligros.spec.ts`, uno de `buscar.spec.ts`— y nueve agotan exactamente los 60 s.
+  La sospecha razonable es la que advierte el propio `playwright.config.ts` —contra el dev server,
+  Vite compila cada módulo la primera vez y con varios navegadores en paralelo eso se lleva por
+  delante las esperas—, pero **no está comprobado**. Lo zanja correr la suite como manda la
+  documentación, contra el bundle compilado: `compose.local.yml` con `E2E_URL=http://localhost`.
+
+## Lo que este documento no puede saber
+
+**Los defectos abiertos no están aquí.** Viven en el tracker, en el servidor de desarrollo; el último
+identificador asignado es `E-008`. Cómo se levanta y cómo se consulta está en
 [`_specs/09-errores.md`](../_specs/09-errores.md).
 
-Cada punto lleva el archivo y la línea, para que se pueda retomar sin repetir la investigación.
-
-> Estas entradas nacieron el 27/08/2026, al descubrir por qué la suite E2E completa no podía pasar.
-> El tracker (Gitea) estaba inaccesible ese día, así que se anotaron aquí. **Conviene pasarlas a
-> issues cuando el tracker vuelva.**
-
----
-
-## 1. El techo anónimo del API va corto para producción
-
-`backend/config/settings.py` — `anon: 1000/hour` por IP.
-
-La portada dispara **8 peticiones** por carga, así que el techo son **125 vistas de página por hora
-y por IP**. El detalle que lo vuelve un problema real: **una oficina entera detrás de un NAT comparte
-una sola IP**. Treinta personas en un taller tienen ~4 vistas cada una antes de empezar a recibir
-429.
-
-No es una hipótesis: es exactamente el escenario que el comentario de ese mismo bloque ya describe
-para el beacon de métricas, donde se resolvió subiendo la tasa a `600/min`. Quedó resuelto para el
-beacon y pendiente para el resto del API.
-
-Desde el 27/08/2026 las tres tasas se leen del entorno (`API_THROTTLE_ANON`, `API_THROTTLE_DESCARGA`,
-`API_THROTTLE_BEACON`), con los valores de hoy como defecto — así que **subir el techo ya no exige
-tocar código**, solo decidir la cifra. Lo que falta es decidirla.
-
-Ojo también con `descarga: 30/hour`, que es la más justa de las tres.
-
-## 2. Cinco de los siete endpoints de la portada no mandan cabecera de caché
-
-Sin `Cache-Control`: `/peligros/resumen/`, `/territorio/distritos/`, `/medidas/`, `/noticias/`,
-`/normativa/`. Solo llevan `cache_control(max_age=300, public=True)`:
-
-- `backend/apps/api/views/sitio.py:24` — `/api/sitio/`
-- `backend/apps/api/views/inversion.py:84` y `:210`
-
-Y el más caro está entre los descubiertos: **`/peligros/resumen/` hace dos pasadas completas sobre
-los 8.968 centros poblados** (`backend/apps/peligros/consultas.py:57-97`), con un bucle en Python por
-medio, en cada carga de la portada.
-
-`/territorio/distritos/` es el otro candidato obvio: `pagination_class = None`, o sea los 112
-distritos serializados enteros, para un catálogo que no cambia nunca.
-
-## 3. No hay caché de servidor en ningún nivel
-
-- **`CACHES` no está configurado** en `settings.py`. Django cae a `LocMemCache`.
-- No hay `cache_page`, ni middleware de caché, ni `from django.core.cache` en `backend/apps/`.
-- En nginx, la zona `proxy_cache_path` de `deploy/nginx/conf.d/observatorio.conf:23` **está declarada
-  y no se usa en ningún `location`**. `location /api/` es un `proxy_pass` desnudo.
-
-Consecuencia adicional, y poco intuitiva: **el contador del throttle vive en esa caché**, así que es
-por proceso. Con varios workers de gunicorn el límite efectivo es N × la tasa, y es inconsistente
-entre ellos. Efecto lateral útil mientras tanto: reiniciar el backend borra los 429 al instante.
-
-## 4. La portada podría pedir bastante menos
-
-Tres de las cuatro cifras se bajan un payload entero para leer un número:
-
-- `/territorio/distritos/` → los 112 distritos, para hacer `.length` (`Home.tsx:45`)
-- `/medidas/?page_size=1&resultado=exito` → paga el `COUNT(*)` de la paginación para leer `.count`
-- `/inversion/` → un agregado caro, para un solo campo (`entidades_con_devengado`)
-
-Además `/medidas/` se pide **dos veces** con parámetros distintos.
-
-El patrón para arreglarlo ya existe en el repo y está bendecido: `/api/sitio/`, cuyo docstring
-(`backend/apps/api/views/sitio.py:17-22`) explica por qué se sirve todo el cascarón en una sola
-petición cacheada en vez de partirlo en cuatro. Nadie lo aplicó a `Home`. Un `/api/portada/` con
-`cache_control` reduciría de 8 peticiones a 2 o 3.
-
-## 5. Un 429 se reintenta en bucle y realimenta el propio límite
-
-`frontend/src/lib/api.ts` **borra de la caché las peticiones fallidas a propósito** (líneas 98-99 y
-149-151), para que un fallo transitorio pueda reintentarse en el siguiente montaje. Correcto en
-general, pero no distingue el 429 ni aplica ningún backoff: `ErrorApi.status` se guarda (línea 67) y
-**nadie lo consulta** — cero apariciones de `429` o `Retry-After` en todo `frontend/src`.
-
-El resultado es que, una vez agotada la cuota, cada vuelta a la portada relanza las 8 peticiones y
-alimenta el límite que la está bloqueando. Faltaría respetar `Retry-After` o, como mínimo, no
-reintentar en el mismo montaje.
-
-## 6. `home.spec.ts` busca una tarjeta que la portada ya no tiene
-
-`e2e/home.spec.ts:19` — la prueba «las cifras salen del API y coinciden con el resumen» localiza
-`page.getByText("Centros poblados monitoreados")` y comprueba que su número sea `resumen.total_ccpp`.
-
-Esa tarjeta **no existe**. Las cuatro de la portada son «Distritos cubiertos», «Centros poblados
-con peligro alto/muy alto», «Experiencias exitosas» y «Municipios con presupuesto ejecutado»
-(`frontend/src/routes/Home.tsx:142-145`). El commit `0e216c3` (18/08/2026, «pagina02: completado»)
-rehízo las cifras y la prueba se quedó con las viejas.
-
-Ojo con el parecido: «Centros poblados con peligro alto/muy alto» **no** satisface al localizador,
-que busca «Centros poblados monitoreados» como subcadena. Sigue en rojo.
-
-Lleva rota desde entonces sin que se notara, tapada primero por la carrera de `esperarApi` —que la
-hacía morir antes de llegar a esta línea— y después por los 429. Es **el único fallo real** que
-apareció al despejar el ruido.
-
-No es solo renombrar el texto: la portada **dejó de publicar el total de centros poblados**, así que
-hay que decidir qué debe demostrar la prueba. Lo más fiel a su intención («las cifras vienen del API
-y cuadran») es afirmar sobre «CCPP con peligro alto/muy alto» contra la suma de los niveles 3 y 4 de
-`/api/peligros/resumen/`, que es justo lo que `Home.tsx:55-57` calcula.
-
-## 7. Las E2E del visor agotan el tiempo en el proyecto móvil
-
-Primera corrida completa con el throttling ya desactivado (27/08/2026, contra el dev server de
-Vite): **93 pasan, 13 fallan, 6 se saltan**, y **cero respuestas 429** en toda la corrida — el
-problema del techo está cerrado.
-
-De los 13 fallos, 2 son el punto 6 (la prueba obsoleta). Los **11 restantes se concentran en el
-proyecto `movil`** —10 de `peligros.spec.ts` y 1 de `buscar.spec.ts`— y **9 agotan exactamente los
-60 s de tiempo límite**. Son las pruebas caras: el visor con MapLibre, ~3 MB de GeoJSON y los tiles
-por rangos, emulando un Pixel 5.
-
-**No está atribuido**, y conviene no darlo por ambiental sin comprobarlo. La sospecha razonable es
-la que advierte el propio `playwright.config.ts`: contra el dev server, Vite compila cada módulo la
-primera vez que se lo piden y con varios navegadores en paralelo esa compilación se lleva por
-delante los tiempos de espera. Lo que zanja la duda es correr la suite **como manda la
-documentación**, contra el bundle compilado:
-
-```
-docker compose -f compose.yaml -f compose.local.yml up -d --build
-E2E_URL=http://localhost npx playwright test
-```
-
-Si ahí pasan, es saturación del entorno de desarrollo y basta con documentarlo. Si fallan igual, hay
-algo real en el visor móvil.
+Un inventario de deuda que también listara lo roto sería un segundo tracker, y dos listas de
+pendientes divergen — que es de lo que este proyecto ya salió una vez.

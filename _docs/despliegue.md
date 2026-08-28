@@ -449,7 +449,8 @@ E2E_URL=https://$SITE_DOMAIN npx playwright test
 `dist/` en el volumen que sirve nginx, recarga nginx, espera a que el backend esté sano y
 **verifica desde fuera, por HTTPS, que el sitio sirve el commit que se acaba de desplegar**.
 En `master` lo lanza Bitbucket Pipelines por SSH en cada push (`bitbucket-pipelines.yml`), pero
-vale igual lanzado a mano: el CI solo es quien llama.
+vale igual lanzado a mano: el CI solo es quien llama. El orden de las etapas, sus invariantes y
+qué comprueba el CI —y qué no— están en [`_specs/10-pipeline-cicd.md`](../_specs/10-pipeline-cicd.md).
 
 **Por qué existe, y por qué verifica.** El 27/08/2026 el sitio estuvo sirviendo el bundle del 11/08
 sin que nada fallara. El despliegue se había hecho con `docker compose up -d` **sin `--build`**:
@@ -493,15 +494,6 @@ Lo que hace falta configurar una vez para que Pipelines pueda entrar está en
 | Por qué se reinició algo solo | `cat ~/observatorio-registros/vigilancia.log` |
 | **Publicar el tracker** en `/gitea` | `docker compose -f compose.tracking.yaml -f compose.tracking-publicado.yml up -d` |
 | **Retirarlo** de `/gitea` (vuelve a solo túnel) | `docker compose -f compose.tracking.yaml up -d` |
-
-> El tracker de errores es una herramienta de desarrollo, no parte de la plataforma. Corre como
-> proyecto Compose **aparte** (`observatorio-tracking`), así que ni `docker compose up -d` ni
-> `docker compose down` de la tabla de arriba lo tocan, y `vigilar-contenedores.sh` no lo vigila.
-> **Su volumen `gitea_data` no entra en los backups**, que solo vuelcan PostgreSQL: si se pierde, se
-> pierde el historial de issues. Publicado, `/gitea` queda accesible desde internet detrás de un
-> login con límite de peticiones — ver la sección del tracker en
-> [`desarrollo.md`](./desarrollo.md), incluido el `allow`/`deny` por IP que está preparado y
-> comentado en `deploy/nginx/conf.d/observatorio.conf`.
 | Reindexar la búsqueda | `docker compose exec backend python manage.py meili_rebuild` — o el botón de la tarjeta «Buscador» del panel del admin, que hace lo mismo en segundo plano |
 | Regenerar los tiles de CCPP | `docker compose exec backend python manage.py generar_tiles_ccpp` |
 | Regenerar los tiles de las capas | `docker compose exec backend python manage.py generar_tiles --rehacer` |
@@ -515,6 +507,15 @@ Lo que hace falta configurar una vez para que Pipelines pueda entrar está en
 | Backup manual | `docker compose exec backup /backup.sh` |
 | Ver cuánto ocupa Docker | `docker system df` y `sudo du -sh /var/lib/docker` (ver más abajo: no dicen lo mismo) |
 | Limpiar imágenes y caché | `docker builder prune -f --max-used-space 4GB && docker image prune -f` |
+
+> El tracker de errores es una herramienta de desarrollo, no parte de la plataforma. Corre como
+> proyecto Compose **aparte** (`observatorio-tracking`), así que ni `docker compose up -d` ni
+> `docker compose down` de la tabla de arriba lo tocan, y `vigilar-contenedores.sh` no lo vigila.
+> **Su volumen `gitea_data` no entra en los backups**, que solo vuelcan PostgreSQL: si se pierde, se
+> pierde el historial de issues. Publicado, `/gitea` queda accesible desde internet detrás de un
+> login con límite de peticiones — ver la sección del tracker en
+> [`desarrollo.md`](./desarrollo.md), incluido el `allow`/`deny` por IP que está preparado y
+> comentado en `deploy/nginx/conf.d/observatorio.conf`.
 
 ### Que Docker no se coma el disco
 

@@ -217,6 +217,13 @@ git pull && docker compose build backend frontend && docker compose up -d \
   && docker compose exec nginx nginx -s reload
 ```
 
+**En el servidor esta cadena ya no se teclea: es `./deploy/desplegar.sh`.** Queda escrita porque
+explica lo que el script hace por dentro, y porque los dos avisos de arriba son la razón de que el
+script exista — un procedimiento que se arregla añadiéndole pasos volverá a fallar. El script hace
+además dos cosas que la cadena no: `nginx -t` antes de recargar, y **sella y verifica** el commit
+desplegado. La secuencia entera y sus reglas, en
+[`_specs/10-pipeline-cicd.md`](./_specs/10-pipeline-cicd.md).
+
 Y la contrapartida de reconstruir tanto: cada `build` del backend deja atrás una imagen de ~2.8 GB
 sin tag, y BuildKit guarda las capas intermedias. Se limpia con
 
@@ -230,7 +237,7 @@ En el servidor esto se automatiza con un techo en `/etc/docker/daemon.json` y un
 
 ## 5. Revisar que el sistema está bien
 
-Ocho comprobaciones, elegidas porque cada una cubre algo que **falla en silencio**: la página carga,
+Nueve comprobaciones, elegidas porque cada una cubre algo que **falla en silencio**: la página carga,
 el API responde 200 y la cifra que se publica es otra.
 
 | Qué | Cómo | Qué confirma |
@@ -251,14 +258,14 @@ Las cinco comprobaciones **manuales previas a la entrega** —más exigentes que
 ## 6. Probar
 
 ```bash
-dc exec backend pytest                 # 144 pruebas, ~30 s
-dc exec backend pytest -m lento        # 4 más: los Excel completos y el PDF con mapa
+dc exec backend pytest                 # 259 pruebas, ~30 s
+dc exec backend pytest -m lento        # 7 más: los Excel completos y el PDF con mapa
 
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
 
 ./e2e/instalar-dependencias.sh         # una sola vez, en la raíz
-npx playwright test                    # 56 E2E en escritorio y móvil
+npx playwright test                    # 56 casos E2E, ejecutados 112 veces (escritorio y móvil)
 ```
 
 `pytest` corre **dentro del contenedor**, con las mismas versiones de GDAL, tippecanoe y WeasyPrint
@@ -267,7 +274,7 @@ que producción. Si responde `executable file not found`, ver §9.
 **`instalar-dependencias.sh` sustituye al `npm install && npx playwright install chromium` que
 había aquí**, porque ese par se dejaba fuera el paso que rompe: las librerías de sistema de
 Chromium. En Debian/Ubuntu no se nota —`playwright install --with-deps` las instala solo—, pero en
-RHEL/Rocky/Fedora **Playwright solo sabe de apt** y no instala nada, así que las 62 pruebas fallan
+RHEL/Rocky/Fedora **Playwright solo sabe de apt** y no instala nada, así que la suite entera falla
 con `browserType.launch: Target page, context or browser has been closed`, que parece el sitio
 caído y es una `.so` ausente. El script cubre los tres pasos y termina arrancando el navegador
 para comprobarlo. Se ejecuta **como tu usuario, no con sudo**; da por hecho un servidor ya
@@ -588,6 +595,9 @@ por una fuente de mapa base con licencia apta para producción.
 | Levantarlo y trabajar en él | [`_docs/desarrollo.md`](./_docs/desarrollo.md) |
 | Desplegarlo con Docker y operarlo | [`_docs/despliegue.md`](./_docs/despliegue.md) |
 | Desplegarlo sin Docker | [`_docs/despliegue-sin-docker.md`](./_docs/despliegue-sin-docker.md) |
+| **Entender cómo se despliega solo** | [`_specs/10-pipeline-cicd.md`](./_specs/10-pipeline-cicd.md) — Bitbucket Pipelines, `deploy/desplegar.sh` y qué **no** comprueba el CI |
+| Ver cómo está montado el entorno de QA | [`_docs/despliegue-entorno-desarrollo.md`](./_docs/despliegue-entorno-desarrollo.md) |
+| **Saber qué deuda arrastra el proyecto** | [`_docs/deuda-tecnica.md`](./_docs/deuda-tecnica.md) — lo decidido a sabiendas, no lo roto |
 | Usar el API | [`_docs/api.md`](./_docs/api.md) |
 | Administrar contenido (para PREDES) | [`_docs/manual-admin-predes.md`](./_docs/manual-admin-predes.md) |
 | **Implementar algo** | [`_specs/`](./_specs/) — modelo de datos, contrato de API, ADR |

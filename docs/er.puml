@@ -1,0 +1,440 @@
+@startuml er
+title Observatorio Kallpachakuy — Modelo de datos (backend/apps)
+skinparam linetype ortho
+hide circle
+hide empty methods
+hide empty attributes
+
+note as Leyenda
+  **Mixins abstractos** (apps.core.models), no son tablas propias, se inyectan en cada
+  modelo que los declara:
+  - TimeStampedMixin: creado_en, actualizado_en
+  - WorkflowMixin: estado, publicado_en, nota_revision — flujo borrador → revisión →
+    publicado → archivado (se omiten aquí sus campos de auditoría creado_por/revisado_por
+    y el modelo Usuario, ver auth de Django)
+  - HtmlRicoMixin: no agrega columnas; sanea en save() los campos listados en campos_html
+
+  **+** = clave primaria / natural key única   **#** = clave foránea
+end note
+
+' ============================== territorio ==============================
+package territorio {
+  entity Provincia {
+    + ubigeo (4)
+    --
+    nombre
+    poblacion_censo [+]
+    superficie_km2 [+]
+  }
+
+  entity Distrito {
+    + ubigeo (6)
+    --
+    # provincia
+    nombre
+    nombre_normalizado
+    lat, lon
+    poblacion_censo [+]
+    superficie_km2 [+]
+    contacto_gdr [+]
+  }
+
+  entity CentroPoblado {
+    + codigo (INEI)
+    --
+    # distrito
+    nombre
+    categoria
+    lat, lon, altitud
+    poblacion  ' vacío a propósito, ADR-A19
+    vigente [+]
+    fuente_padron [+]
+    anio_padron [+]
+  }
+}
+
+' ============================== peligros ==============================
+package peligros {
+  entity TipoPeligro {
+    + slug
+    --
+    nombre
+    hoja_excel
+    categoria_geo
+    orden, icono, color
+    descripcion [+]
+  }
+
+  entity Fuente {
+    + nombre
+    --
+    sigla
+    url_base [+]
+  }
+
+  entity ClasificacionPeligro {
+    + id
+    --
+    # centro_poblado
+    # tipo_peligro
+    nivel (1-4)
+    # fuente
+    fuente_url
+    # dataset_upload
+    anio_dato [+], vigente [+]
+    ..
+    unique(centro_poblado, tipo_peligro)
+  }
+
+  entity CategoriaEvento {
+    + slug
+    --
+    nombre, orden
+    columna_total
+  }
+
+  entity TipoEvento {
+    + slug
+    --
+    nombre
+    # categoria
+    orden
+    columna_excel
+  }
+
+  entity FrecuenciaEmergencia {
+    + id
+    --
+    # distrito
+    # tipo_evento
+    conteo
+    rango_fecha, fuente, fuente_url
+    # dataset_upload
+    anio_inicio [+], anio_fin [+]
+    ..
+    unique(distrito, tipo_evento)
+  }
+
+  entity TotalDeclaradoEmergencias {
+    + id
+    --
+    # distrito
+    # categoria
+    total
+    rango_fecha, fuente, fuente_url
+    # dataset_upload
+    ..
+    unique(distrito, categoria)
+  }
+}
+
+' ============================== biblioteca ==============================
+package biblioteca {
+  entity CategoriaDocumento {
+    + slug
+    --
+    nombre, orden
+  }
+
+  entity Documento {
+    + id
+    --
+    titulo
+    # categoria
+    archivo / url_externa
+    resumen, resumen_generado_por_ia
+    autor_institucion, fecha_publicacion
+    ia_estado, log_ia
+    portada [+], paginas [+]
+    peso_bytes [+], descargas [+], idioma [+]
+    .. WorkflowMixin ..
+    estado, publicado_en, nota_revision
+  }
+}
+
+' ============================== medidas ==============================
+package medidas {
+  entity Medida {
+    + slug
+    --
+    titulo
+    # tipo_peligro
+    ambito, resultado
+    # distrito (nullable)
+    comunidad, resumen_corto, contenido
+    video_url, imagen_portada, imagen_titulo
+    palabras_clave []
+    enlaces (json)
+    destacada
+    # centro_poblado [+] (nullable)
+    fecha_implementacion [+]
+    actores [+], costo_referencial [+]
+    .. WorkflowMixin ..
+    estado, publicado_en, nota_revision
+  }
+
+  entity MedidaImagen {
+    + id
+    --
+    # medida
+    imagen, pie, orden
+    ..
+    unique(medida, orden)
+  }
+
+  entity MedidaFichaACC {
+    + id
+    --
+    # medida
+    value_001 .. value_017
+    
+  }
+}
+
+' ============================== contenidos ==============================
+package contenidos {
+  entity Noticia {
+    + slug
+    --
+    titulo, bajada, cuerpo, tipo
+    autor, fecha
+    imagen_portada, imagen_titulo
+    palabras_clave []
+    destacada
+    .. WorkflowMixin ..
+    estado, publicado_en, nota_revision
+  }
+
+  entity Video {
+    + id
+    --
+    titulo, descripcion, url, fecha
+    # tema (TipoPeligro, nullable)
+    thumbnail_override [+], duracion [+]
+    .. WorkflowMixin ..
+    estado, publicado_en, nota_revision
+  }
+
+  entity Evento {
+    + id
+    --
+    titulo, descripcion
+    inicio, fin, lugar, modalidad
+    url_inscripcion [+], organizador [+], imagen [+]
+    .. WorkflowMixin ..
+    estado, publicado_en, nota_revision
+  }
+}
+
+' ============================== normativa ==============================
+package normativa {
+  entity Norma {
+    + slug
+    --
+    titulo, tipo, ambito, fecha
+    resumen, contenido
+    url_oficial
+    # documento (Documento, nullable)
+    analisis_predes
+    imagen_portada, imagen_titulo
+    palabras_clave []
+    numero [+], estado_vigencia [+]
+    .. WorkflowMixin ..
+    estado, publicado_en, nota_revision
+  }
+}
+
+' ============================== mapas ==============================
+package mapas {
+  entity CapaCartografica {
+    + slug
+    --
+    nombre, descripcion
+    archivo_geojson, tipo_geometria
+    estilo (json)
+    min_zoom, max_zoom
+    filtro_atributo
+    visible_por_defecto, orden
+    atribucion, fuente, simplificacion
+    estado_tiles, pmtiles, log_error
+    crs_origen, features_generados
+  }
+}
+
+' ============================== sitio ==============================
+package sitio {
+  entity ConfiguracionSitio {
+    + id (singleton, pk=1)
+    --
+    nombre_sitio, descripcion_footer
+    email_contacto, telefono, direccion
+    redes (json)
+    mensaje_banner [+], logo [+], logo_footer [+]
+  }
+
+  entity BloqueTexto {
+    + clave
+    --
+    titulo, cuerpo, pagina
+  }
+
+  entity HeroSlide {
+    + id
+    --
+    titulo, subtitulo, imagen
+    cta_texto, cta_url, orden
+    vigente_desde [+], vigente_hasta [+]
+    .. WorkflowMixin ..
+    estado, publicado_en, nota_revision
+  }
+
+  entity EnlaceMenu {
+    + id
+    --
+    zona, texto, url, grupo
+    orden, visible
+  }
+}
+
+' ============================== metricas ==============================
+package metricas {
+  entity EventoUso {
+    + id
+    --
+    tipo, ruta, detalle
+    fecha
+    session_hash
+  }
+
+  entity ResumenDiario {
+    + id
+    --
+    fecha, tipo, ruta, detalle
+    conteo
+    ..
+    unique(fecha, tipo, ruta, detalle)
+  }
+}
+
+' ============================== datasets ==============================
+package datasets {
+  entity DatasetUpload {
+    + id
+    --
+    tipo
+    archivo
+    estado
+    log (json)
+    filas_leidas, filas_importadas
+    activado_en
+    # reemplaza_a (self)
+    checksum_sha256 [+], parametros [+]
+  }
+}
+
+' ============================== inversion ==============================
+package inversion {
+  entity ProcesoGRD {
+    + slug
+    --
+    nombre, orden, color
+    descripcion
+  }
+
+  entity ClasificacionActividad {
+    + codigo
+    --
+    nombre, origen
+    # proceso (nullable = sin clasificar)
+    automatico
+  }
+
+  entity Ejercicio {
+    + anio
+    --
+    corte, fuente
+    es_parcial, fecha_corte
+    visible  ' interruptor de /api/inversion/
+  }
+
+  entity EntidadEjecutora {
+    + codigo (MEF)
+    --
+    nombre, ambito
+    # distrito (sede, nullable)
+    # provincia (nullable)
+  }
+
+  entity PresupuestoEntidad {
+    + id
+    --
+    # ejercicio
+    # entidad
+    pia, pim, devengado
+    pia_institucional, pim_institucional, devengado_institucional
+    # dataset_upload
+    ..
+    unique(ejercicio, entidad)
+  }
+
+  entity PresupuestoActividad {
+    + id
+    --
+    # ejercicio
+    # entidad
+    # clasificacion
+    pia, pim, devengado
+    ..
+    unique(ejercicio, entidad, clasificacion)
+  }
+}
+
+' ============================== relaciones: territorio ==============================
+Distrito }o--|| Provincia : provincia
+CentroPoblado }o--|| Distrito : distrito
+
+' ============================== relaciones: peligros ==============================
+ClasificacionPeligro }o--|| CentroPoblado : centro_poblado
+ClasificacionPeligro }o--|| TipoPeligro : tipo_peligro
+ClasificacionPeligro }o--o| Fuente : fuente
+ClasificacionPeligro }o--o| DatasetUpload : dataset_upload
+TipoEvento }o--|| CategoriaEvento : categoria
+FrecuenciaEmergencia }o--|| Distrito : distrito
+FrecuenciaEmergencia }o--|| TipoEvento : tipo_evento
+FrecuenciaEmergencia }o--o| DatasetUpload : dataset_upload
+TotalDeclaradoEmergencias }o--|| Distrito : distrito
+TotalDeclaradoEmergencias }o--|| CategoriaEvento : categoria
+TotalDeclaradoEmergencias }o--o| DatasetUpload : dataset_upload
+
+' ============================== relaciones: biblioteca ==============================
+Documento }o--|| CategoriaDocumento : categoria
+
+' ============================== relaciones: medidas ==============================
+Medida }o--|| TipoPeligro : tipo_peligro
+Medida }o--o| Distrito : distrito
+Medida }o--o| CentroPoblado : centro_poblado
+Medida }o--o{ Documento : documentos (M2M)
+MedidaImagen }o--|| Medida : medida
+MedidaFichaACC }o--|| Medida : medida
+
+' ============================== relaciones: contenidos ==============================
+Video }o--o| TipoPeligro : tema
+
+' ============================== relaciones: normativa ==============================
+Norma }o--o| Documento : documento
+
+' ============================== relaciones: inversion ==============================
+ClasificacionActividad }o--o| ProcesoGRD : proceso
+EntidadEjecutora }o--o| Distrito : distrito
+EntidadEjecutora }o--o| Provincia : provincia
+PresupuestoEntidad }o--|| Ejercicio : ejercicio
+PresupuestoEntidad }o--|| EntidadEjecutora : entidad
+PresupuestoEntidad }o--o| DatasetUpload : dataset_upload
+PresupuestoActividad }o--|| Ejercicio : ejercicio
+PresupuestoActividad }o--|| EntidadEjecutora : entidad
+PresupuestoActividad }o--|| ClasificacionActividad : clasificacion
+
+' ============================== relaciones: datasets ==============================
+DatasetUpload }o--o| DatasetUpload : reemplaza_a (self)
+
+@enduml

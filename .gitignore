@@ -77,6 +77,9 @@ frontend/vite.config.d.ts
 !/_docs/despliegue-entorno-desarrollo.md
 !/_docs/manual-admin-predes.md
 !/_docs/api.md
+# Va aquí, y no en _specs/, porque no especifica nada: es un inventario de lo que se decidió a
+# sabiendas y sigue costando. Se versiona por la misma razón que el resto — una lista de deuda
+# que vive fuera del repositorio deja de cuadrar con el código en cuanto alguien la paga.
 !/_docs/deuda-tecnica.md
 
 # _specs/ SÍ se versiona: acumula los ADR, el modelo de datos y los contratos de API con los que

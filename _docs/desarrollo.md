@@ -159,12 +159,12 @@ hasta que la añadas.
 ## Pruebas
 
 ```bash
-dc exec backend pytest                 # 144 pruebas, ~30 s (sin las lentas)
-dc exec backend pytest -m lento        # 5 más: los Excel completos y el PDF con mapa
+dc exec backend pytest                 # 259 pruebas, ~30 s (sin las lentas)
+dc exec backend pytest -m lento        # 7 más: los Excel completos y el PDF con mapa
 cd frontend && npm run lint            # tsc --noEmit
 cd frontend && npm run build           # el build es parte de la verificación
 ./e2e/instalar-dependencias.sh         # una sola vez, en la raíz
-npx playwright test                    # 56 E2E en escritorio y móvil
+npx playwright test                    # 56 casos E2E, ejecutados 112 veces (escritorio y móvil)
 ```
 
 ### El throttling está apagado en desarrollo, y no es un descuido
@@ -194,7 +194,7 @@ El detalle que lo explica: **Playwright no soporta oficialmente la familia RHEL*
 Ubuntu, `playwright install --with-deps` instala esos paquetes por su cuenta; en Rocky, Fedora o
 RHEL descarga el binario compilado para Ubuntu —lo avisa con un `BEWARE: your OS is not officially
 supported`— y **no instala ninguna dependencia**, porque solo sabe de `apt`. El resultado es que
-las 62 pruebas fallan con `browserType.launch: Target page, context or browser has been closed`,
+la suite entera falla con `browserType.launch: Target page, context or browser has been closed`,
 que se lee como si el sitio estuviera caído cuando lo que falta es una `.so`.
 
 El script detecta la familia de la distribución, delega en Playwright si es Debian/Ubuntu, instala

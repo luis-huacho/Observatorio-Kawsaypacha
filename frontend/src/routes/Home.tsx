@@ -44,7 +44,7 @@ export default function Home() {
   const cifras = resumen.status === "ok" ? resumen.data : null;
   const distritos = distritosApi.status === "ok" ? distritosApi.data.length : null;
   const experienciasExitosas = medidasExito.status === "ok" ? medidasExito.data.count : null;
-  // Sin ejercicio visible el tablero responde `disponible: false` (ADR-D3): la cifra se queda en
+  // Sin ejercicio visible el tablero responde `disponible: false` (ADR-D4): la cifra se queda en
   // `null` y la tarjeta muestra "…", igual que mientras carga.
   const municipiosConEjecucion =
     inversion.status === "ok" && inversion.data.disponible
