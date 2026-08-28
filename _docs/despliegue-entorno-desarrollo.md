@@ -92,6 +92,7 @@ todo lo de abajo son variables de entorno y un comando.
 | Datos | `seed --solo-catalogos --demo` | `seed --capas --tiles`, con `data/layers/` completo |
 | SMTP | sin configurar: los avisos del flujo editorial van al log | credenciales reales, o los correos no salen |
 | `GEMINI_API_KEY` | vacío: el resumen automático de PDF queda deshabilitado con aviso | la llave real |
+| `OPENROUTER_API_KEY` | vacío: las funciones de IA de propósito general quedan deshabilitadas | la llave real |
 | Cuentas | `adminpredes` y `userobs` | las que PREDES decida |
 | `ADMIN_URL` | `loginseguro/` | `loginseguro/`, salvo que PREDES quiera otro |
 | Despliegue automático | Pipelines entra por SSH a este servidor | mismo pipeline, otro `DESPLIEGUE_HOST` y otra clave |

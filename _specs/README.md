@@ -13,6 +13,52 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — OpenRouter: una pasarela para el resto de los usos de IA (ADR-A22)
+
+- **ADR-A22**: **OpenRouter** entra como pasarela de IA de propósito general, con la librería
+  `openai` apuntada a su `base_url` — OpenRouter expone esa misma API, así que no hay que llamar a
+  OpenAI para usar su cliente. Un solo secreto y un solo cliente para cualquier modelo, y **el
+  modelo se elige con `OPENROUTER_MODELO`**: cambiar de proveedor deja de ser código y pasa a ser
+  una variable de entorno.
+- **A10 no se supera.** Gemini conserva los resúmenes de PDF porque lee el PDF de forma nativa, que
+  es de lo que depende esa función. Conviven, y la frontera de proveedor sigue confinada a
+  `services/` y a las settings: los campos del modelo ya se llaman `ia_estado` y `log_ia`, sin el
+  nombre de nadie.
+- **Se entrega solo la capa de servicio**, por decisión del usuario:
+  `apps/core/services/openrouter.py`, las settings, el bloque de `backend/.env.example`, la
+  dependencia y las pruebas. Todavía no la usa ninguna pantalla.
+- **La continuidad del razonamiento es lo único que puede romperse en silencio.** OpenRouter exige
+  que `reasoning_details` se reenvíe idéntico y en el mismo orden; si se altera, la segunda llamada
+  responde igual de bien y el modelo simplemente ya no retoma su razonamiento. Lo resuelve
+  `Respuesta.como_mensaje()`, y lo fija una prueba que compara el bloque reenviado con el recibido.
+- **Dos trampas del SDK, documentadas donde se tropieza con ellas.** `reasoning_details` es un campo
+  *extra*: el atributo **no existe** cuando el modelo no razona, así que leerlo directo revienta en
+  vez de degradarse — va con `getattr`. Y `razonamiento` acepta `None`/`bool`/`dict` sin traducir
+  nada: inventar aquí un vocabulario propio solo añadiría una capa que mantener sincronizada.
+- **De paso se cumple lo que 03 pedía y nunca se implementó**: timeout de 60 s y un reintento con
+  backoff. No hay que escribirlos — el cliente de `openai` los trae y basta pasárselos al
+  constructor. Tampoco se hereda el otro desajuste de Gemini, que ignora su propia
+  `GEMINI_MODELO` y lleva el modelo escrito a fuego.
+- **`manage.py ia_probar`** hace una llamada real y muestra modelo, texto, tokens y coste. Existe
+  porque todo lo demás se prueba con un cliente falso: sin él, la única forma de saber si la llave
+  y el modelo sirven sería conectar la capa a una pantalla y descubrirlo ahí. No es un `estado`
+  para un cron —gasta dinero—, y ahí está la diferencia con `meili_estado`.
+- **Coste que queda escrito por primera vez**: la llave viaja también a los contenedores `db`,
+  `meilisearch` y `backup`, que comparten `env_file: backend/.env`. Ya ocurría con
+  `GEMINI_API_KEY` y no constaba en ninguna parte.
+- **Dos cosas que solo salieron al probar contra el API real**, con la llave puesta:
+  - **`razonamiento=None` no significa «sin razonamiento».** El modelo configurado razona por
+    defecto, así que `None` —que deja mandar al proveedor— sigue pagando esos tokens. La bandera
+    `--sin-razonamiento` de `ia_probar` mapeaba a `None` y **quedaba sin efecto**, sin que nada lo
+    delatara: la respuesta era correcta y la factura, la misma. Ahora manda `False` (44 tokens de
+    salida contra 3) y hay una prueba que lo fija. `{"exclude": True}` es otra cosa distinta: el
+    modelo razona igual y **se cobra igual**, solo que no devuelve los bloques.
+  - **OpenRouter enruta cada petición por separado**: en la misma conversación el turno 1 salió por
+    CoreWeave y el 2 por DigitalOcean. La continuidad del razonamiento aguanta el salto, pero **los
+    tokens de entrada no son comparables entre turnos** —cada upstream cuenta a su manera; el
+    segundo turno, con más historial, informó menos entrada que el primero—. Si alguna vez hace
+    falta un conteo estable, hay que fijar el proveedor con `extra_body={"provider": …}`.
+
 ### Actualización 28/08/2026 — noticias: destacadas primero, y el cuerpo que se leía en HTML
 
 Dos restos de la fase prototipo en la misma sección.

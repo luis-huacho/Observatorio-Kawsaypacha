@@ -11,10 +11,11 @@ va mal. Requisito 8 del TDR: servidor propio, dominio, HTTPS y backups automáti
 | DNS de los dos dominios (`SITE_DOMAIN` y `API_DOMAIN`) apuntando al VPS | PREDES | certbot no puede emitir certificados |
 | Credenciales SMTP | PREDES | Los avisos del flujo editorial no salen (van a los logs) |
 | API key de Gemini | PREDES o el desarrollador | El resumen automático de PDF queda deshabilitado, con aviso en el admin |
+| API key de OpenRouter | PREDES o el desarrollador | Las funciones de IA de propósito general quedan deshabilitadas, con aviso. Se comprueba con `manage.py ia_probar` |
 | Los Excel y GeoJSON de `data/layers/` | PREDES | El seed no tiene qué importar |
 | Los CSV del PP 0068 de `data/inversion/` | PREDES / el desarrollador | `/inversion` se queda en «información en preparación» |
 
-Los tres últimos **no bloquean el despliegue**: la plataforma arranca y funciona sin ellos, con
+Los cuatro últimos **no bloquean el despliegue**: la plataforma arranca y funciona sin ellos, con
 las funciones correspondientes desactivadas y avisando de por qué. Sin los Excel y GeoJSON hay que
 sembrar con `seed --solo-catalogos`, y el visor de peligros sale vacío hasta que lleguen.
 

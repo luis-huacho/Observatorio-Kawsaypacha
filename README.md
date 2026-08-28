@@ -22,8 +22,8 @@ Plataforma web pública de PREDES para monitorear la **Gestión del Riesgo de De
 ## Stack
 
 - **Backend** — Django 5.2 LTS + DRF + PostgreSQL 16 (sin PostGIS) + django-tasks (worker por BD,
-  sin Redis) + admin con django-unfold. Gemini 2.5 Flash autocompleta resúmenes de PDF; siempre los
-  revisa una persona antes de publicar.
+  sin Redis) + admin con django-unfold. Gemini 2.5 Flash autocompleta resúmenes de PDF y OpenRouter
+  es la pasarela para el resto de usos de IA; siempre los revisa una persona antes de publicar.
 - **Frontend** — Vite + React 18 + TypeScript + Tailwind 3 + react-router 6 + MapLibre GL.
 - **Búsqueda** — Meilisearch, con llave *search-only* en el bundle del navegador.
 - **Mapas** — capas de contexto (ríos, lagunas, glaciares) como PMTiles estáticos servidos con HTTP
@@ -135,7 +135,7 @@ Es la confusión más habitual: son tres archivos, con tres consumidores distint
 
 | Archivo | Lo lee | Contiene |
 | --- | --- | --- |
-| `backend/.env` | Django (`environ.Env.read_env`) y los contenedores (`env_file`) | Secretos: `SECRET_KEY`, `POSTGRES_*`, `MEILI_MASTER_KEY`, SMTP, Gemini, superusuario, `ADMIN_URL` |
+| `backend/.env` | Django (`environ.Env.read_env`) y los contenedores (`env_file`) | Secretos: `SECRET_KEY`, `POSTGRES_*`, `MEILI_MASTER_KEY`, SMTP, Gemini, OpenRouter, superusuario, `ADMIN_URL` |
 | `.env` (raíz) | **Docker Compose**, al interpolar `compose.yaml` | Las `VITE_*` que se hornean en el bundle del frontend al construir la imagen |
 | `frontend/.env` | Vite en `npm run dev` | URL del API, de la búsqueda y de los tiles para el modo desarrollo |
 
@@ -581,7 +581,8 @@ nadie levante el contenedor.
 
 Se implementó todo con valores por defecto seguros, y estas piezas quedan pendientes del cliente:
 DNS de los dos dominios, credenciales SMTP (mientras tanto los correos van al log),
-`GEMINI_API_KEY` (sin ella el resumen con IA se deshabilita con aviso), publicar el ejercicio de
+`GEMINI_API_KEY` y `OPENROUTER_API_KEY` (sin ellas las funciones de IA se deshabilitan con
+aviso), publicar el ejercicio de
 Inversión —la importación lo deja oculto a propósito—, la fila de Acomayo, y sustituir OpenTopoMap
 por una fuente de mapa base con licencia apta para producción.
 
