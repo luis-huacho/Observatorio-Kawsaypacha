@@ -7,9 +7,11 @@ Duplicarlo habría dejado dos copias que divergen; peor aún, el **sondeo que re
 uno solo para los dos**, así que si el estado o el candado se llamaran distinto en cada app, ese
 endpoint dejaría de valer para una de ellas.
 
-Lo único que pone cada admin es `encolar_ia()`: qué tarea se manda al worker. El resto es idéntico
-porque los cuatro campos vienen de `core.RedaccionIAMixin` y los tres provisionales —`titulo`,
-`slug`, `fecha`— existen con el mismo nombre en los dos modelos.
+Lo que pone cada admin es `encolar_ia()` —qué tarea se manda al worker— y, si su procedencia no
+es una URL, `etiqueta_provisional()` y `fechas_provisionales`. El resto es idéntico porque el
+estado y el candado vienen de `core.EstadoIAMixin` y `titulo`/`slug` se llaman igual en los tres
+modelos. Medidas (ADR-D10) es el caso que obligó a separarlo: su origen es una ficha ACC ya
+cargada en la base y no tiene ningún campo `fecha` obligatorio que provisionar.
 """
 from datetime import date
 from urllib.parse import urlparse
@@ -42,6 +44,11 @@ class RedaccionIAAdminMixin:
         # responde a «¿cómo sé cuándo acabó?» sin dejar al editor pulsando F5 a ciegas.
         js = (JS_REDACCION_IA,)
 
+    #: Fechas `NOT NULL` que hay que rellenar para poder guardar con el formulario casi vacío.
+    #: `Medida` la deja vacía a propósito: su `fecha_implementacion` es nullable y ponerle la de
+    #: hoy sería un dato falso indistinguible de uno real.
+    fechas_provisionales: tuple[str, ...] = ("fecha",)
+
     # --- Lo que pone cada admin ---------------------------------------------
 
     def encolar_ia(self, obj) -> None:
@@ -63,13 +70,17 @@ class RedaccionIAAdminMixin:
         return tuple(super().get_readonly_fields(request, obj)) + ("ia_badge_ficha", "log_ia")
 
     def get_prepopulated_fields(self, request, obj=None):
-        """Sin título no hay slug que derivar.
+        """Sin título no hay slug que derivar — **pero solo en el alta**.
 
-        `prepopulated_fields` es JS: copia lo que se teclea en `titulo`. Con la casilla marcada el
-        editor no teclea nada, así que el slug saldría vacío y el segundo registro así creado
-        chocaría contra el índice único. El provisional lo pone `save_model`.
+        `prepopulated_fields` es JS: copia lo que se teclea en `titulo`. En el alta con la casilla
+        marcada el editor no teclea nada, así que el slug saldría vacío y el segundo registro así
+        creado chocaría contra el índice único; el provisional lo pone `save_model`.
+
+        Al **editar** el argumento no vale, y neutralizarlo ahí rompía el autoslug de cualquier
+        ficha escrita a mano —que en medidas son casi todas las que ya existen— sin que nada lo
+        dijera.
         """
-        if obj is None or not obj.redactada_por_ia:
+        if obj is None:
             return {}
         return super().get_prepopulated_fields(request, obj)
 
@@ -109,23 +120,32 @@ class RedaccionIAAdminMixin:
             messages.INFO,
         )
 
+    def etiqueta_provisional(self, obj) -> str:
+        """Con qué se nombra el registro mientras la IA trabaja.
+
+        Por defecto, el host del origen. Lo redefine quien no redacte desde una URL.
+        """
+        return urlparse(obj.url_origen).hostname or "origen"
+
     def provisionales_ia(self, obj) -> None:
         """Lo mínimo para que el registro entre en la base con el formulario casi vacío.
 
-        No es cosmética: `fecha` y `slug` son `NOT NULL` y `slug` además `unique`, así que relajar
-        los obligatorios en el formulario no basta para poder guardar. Migrarlos a `null=True`
-        habría sido peor — dejaría publicar fichas sin título.
+        No es cosmética: `slug` es `NOT NULL` y `unique`, y en noticias y normas `fecha` también
+        es `NOT NULL`, así que relajar los obligatorios en el formulario no basta para poder
+        guardar. Migrarlos todos a `null=True` habría sido peor — dejaría publicar fichas sin
+        título.
         """
-        host = urlparse(obj.url_origen).hostname or "origen"
+        etiqueta = self.etiqueta_provisional(obj)
 
         if not obj.titulo:
             # Con este prefijo el listado se lee mientras tanto, y la tarea sabe que el título lo
             # puso la máquina y puede sustituirlo.
             tope = obj._meta.get_field("titulo").max_length
-            obj.titulo = f"{obj.PREFIJO_PROVISIONAL} {host}"[:tope]
+            obj.titulo = f"{obj.PREFIJO_PROVISIONAL} {etiqueta}"[:tope]
         if not obj.slug:
             # El sufijo aleatorio no es adorno: sin él, dos fichas creadas seguidas desde el mismo
             # sitio chocan contra el índice único.
-            obj.slug = f"{slugify(host)[:80]}-{uuid4().hex[:8]}"
-        if not obj.fecha:
-            obj.fecha = date.today()
+            obj.slug = f"{slugify(etiqueta)[:80]}-{uuid4().hex[:8]}"
+        for nombre in self.fechas_provisionales:
+            if not getattr(obj, nombre, None):
+                setattr(obj, nombre, date.today())

@@ -158,7 +158,7 @@ package medidas {
     + slug
     --
     titulo
-    # tipo_peligro
+    # tipo_peligro (nullable, ADR-D10)
     ambito, resultado
     # distrito (nullable)
     comunidad, resumen_corto, contenido
@@ -169,8 +169,11 @@ package medidas {
     # centro_poblado [+] (nullable)
     fecha_implementacion [+]
     actores [+], costo_referencial [+]
+    # ficha_acc (nullable, PROTECT)
     .. WorkflowMixin ..
     estado, publicado_en, nota_revision
+    .. EstadoIAMixin ..
+    ia_estado, log_ia, redactada_por_ia
   }
 
   entity MedidaImagen {
@@ -410,7 +413,8 @@ TotalDeclaradoEmergencias }o--o| DatasetUpload : dataset_upload
 Documento }o--|| CategoriaDocumento : categoria
 
 ' ============================== relaciones: medidas ==============================
-Medida }o--|| TipoPeligro : tipo_peligro
+Medida }o--o| TipoPeligro : tipo_peligro
+Medida }o--o| MedidaFichaACC : ficha_acc (IA, ADR-D10)
 Medida }o--o| Distrito : distrito
 Medida }o--o| CentroPoblado : centro_poblado
 Medida }o--o{ Documento : documentos (M2M)

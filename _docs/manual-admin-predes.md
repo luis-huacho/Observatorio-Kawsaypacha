@@ -295,6 +295,46 @@ fichas se verían bien estando mal. Si te pasa, descarga la plantilla y copia tu
 
 Lo importado se edita después como cualquier otra ficha.
 
+## Redactar una medida desde una ficha ACC
+
+Una vez que las fichas están cargadas, no hay que volver a teclear su contenido: la medida se
+redacta desde la ficha. En **Medidas → Añadir medida**, arriba del todo hay un bloque **Origen**:
+
+1. Elige la **ficha ACC de origen** en el buscador. Escribe unas palabras del nombre de la
+   experiencia y aparecerán las que coincidan. **Solo salen las fichas que todavía no se han
+   usado**: cada ficha sirve para una medida y no vuelve a ofrecerse.
+2. Marca **«Procesar con IA»** y pulsa **Guardar**, dejando todo lo demás en blanco.
+3. La medida aparece con el título provisional «(redactando) …» y la pantalla **se actualiza sola**
+   en cuanto termina — normalmente unos segundos.
+
+Se rellenan el título, el resumen corto, el tipo de peligro, el alcance, el resultado, el distrito,
+la comunidad, el contenido, las palabras clave, los actores, la fecha de implementación y el costo
+referencial. Todo es editable después, como cualquier otra medida.
+
+Cinco cosas que conviene saber:
+
+- **Es una propuesta, no un resultado.** Léela entera antes de publicar. Presta atención sobre todo
+  al **alcance** y al **resultado**: una ficha ACC describe una buena práctica, así que casi
+  siempre se clasificará como «Éxito», y eso no siempre es lo que corresponde.
+- **No se puede publicar a medias.** Si falta el título, el tipo de peligro, el alcance, el
+  resultado o el resumen corto, al pulsar «Publicar» aparece un aviso diciendo cuáles faltan y no
+  se publica nada. Tampoco se publica con el título «(redactando) …» todavía puesto.
+- **Al final del contenido aparece un bloque «Contacto de la experiencia»** con el nombre, el
+  teléfono y el correo que traía la ficha. **Esos datos no se le mandan a la inteligencia
+  artificial** —los pone el sistema directamente—, pero **el contenido de una medida es público**.
+  Antes de publicar, bórralo, o confirma con esa persona que acepta que sus datos aparezcan en el
+  sitio. Al publicar sale un recordatorio.
+- **Lo que quedó vacío es a propósito.** Si la IA no pudo deducir el peligro, el alcance o el
+  resultado los deja **en blanco** en vez de poner cualquier cosa: prefiere no clasificar a
+  clasificar mal. Lo mismo con el distrito cuando la ficha no dice de qué provincia es, con el
+  costo cuando viene en otra moneda —no se convierten monedas— y con la fecha cuando no hay periodo.
+- **Si la IA falla, la ficha no se gasta.** Aparece el motivo en «Registro de la IA» y puedes
+  volver a marcar la casilla. Y en el registro se anota siempre lo que hay que revisar.
+
+**No se rellenan la portada, el video, los enlaces ni «Caso destacado»**, y no es un olvido: una
+ficha no trae ninguna de esas cosas, e inventarlas sería peor que dejarlas vacías. Sin portada, el
+sitio usa la ilustración institucional del peligro y se ve perfectamente.
+
 ## Resúmenes con inteligencia artificial
 
 En **Biblioteca**, la acción **«Generar resumen con IA»** propone un resumen del documento. Al

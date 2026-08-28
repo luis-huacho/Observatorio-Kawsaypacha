@@ -56,6 +56,7 @@ bitácora, no esta lista.
 | **`/comparar` fuera del menú**, con ruta y endpoint vivos y probados | ADR-P2 | Una migración de datos (`sitio.0002`) existe solo para ocultar un enlace, porque el seed no pisa lo que ya está sembrado | Igual que la anterior |
 | **Los campos `[+]` del modelo**: 25 líneas de `01-modelo-datos.md` los declaran | [`_specs/01`](../_specs/01-modelo-datos.md) (la convención, en su primer párrafo) | Columnas nullables que ninguna vista usa. Coste real bajo —se crearon a coste cero— pero engordan el ER y el admin | Que una funcionalidad los estrene, o una limpieza deliberada. No se listan aquí: la lista es el spec |
 | **`prototype/`, 100 archivos versionados y congelados** | `CLAUDE.md`, `_specs/archive/` | Peso en el repositorio y confusión al buscar: un `grep` devuelve resultados de código que no corre | Nada previsto. Es referencia aprobada por el cliente y borrarla pierde el original |
+| **`interpretar_json` vive en `core/lectura_web.py`**, que ya usan tres apps y una de ellas —medidas— no descarga nada | ADR-D10 | El nombre del módulo dejó de describir lo que hace: quien lo abra buscando descargas encuentra un parser de respuestas de IA. Coste real bajo, coste de lectura no | Moverlo junto a `services/openrouter.py`, que es de quien es el JSON. Se dejó fuera del alcance de D10 para no ampliarlo |
 
 ## Datos provisionales y lo que falta
 
@@ -85,6 +86,7 @@ entorno y `compose.dev.yml` las vacía—; lo que queda aquí es lo que sigue co
 | **El procedimiento de despliegue vivía en cinco documentos** (`README`, `comandos.md`, `_docs/despliegue.md`, `_specs/07` y ahora el 10) | Divergieron, y no de forma inocua: `_specs/07` acabó mandando la cadena que causó el incidente del 27/08 y un `certbot renew` que no renueva. Se corrigió quitando la copia del spec | Que ningún documento nuevo vuelva a copiar la secuencia. El 10 lleva una tabla de «qué no está aquí» justo para eso |
 | **`comandos.md` está versionado y no lo cita ni el README ni CLAUDE.md** | Un documento sin dueño declarado envejece sin que nadie lo note | Darle una fila en la tabla de documentación, o fundirlo con el README |
 | **Toda cifra escrita a mano en la documentación** | «144 pruebas» sobrevivió a que fueran 259; «ocho comprobaciones» a que fueran nueve. Una cifra desfasada no da ningún síntoma | Escribir al lado el comando que la reproduce. Es lo que se hizo con los conteos de pruebas |
+| **La calidad de lo que redacta la IA depende de `OPENROUTER_MODELO`, y el valor por defecto no da la talla para la ficha ACC** | Medido el 28/08/2026: con `deepseek/deepseek-v4-flash-0731` el `contenido` de una medida vuelve en texto plano o Markdown y transcribe la ficha (~$0.0002); la misma ficha con `google/gemini-2.5-flash` sale en HTML con subtítulos y sin avisos ($0.003). El código lo hace visible —envuelve en párrafos y lo anota en el registro—, no lo arregla | Una decisión de coste del dueño del proyecto: cambiar la variable, que afecta también a noticias y normas. No hay cambio de código pendiente |
 
 ## Residuos del árbol de trabajo, que no del repositorio
 

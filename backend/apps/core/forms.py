@@ -17,22 +17,33 @@ from apps.core.models import EstadoIA
 
 
 class RedaccionIAFormMixin(forms.ModelForm):
-    """Cada formulario declara `opcionales_con_ia` con los suyos y hereda todo lo demás."""
+    """Cada formulario declara `opcionales_con_ia` con los suyos y hereda todo lo demás.
+
+    **De dónde redacta la IA lo nombra `campo_origen`.** Empezó estando clavado en `url_origen`,
+    que es lo que usan noticias y normas; desde ADR-D10 hay un tercer caso cuya procedencia es una
+    ficha ACC ya cargada en la base, y un `URLField` y una clave foránea no tienen nada que
+    abstraer salvo el papel que cumplen. Los valores por defecto son los de siempre, así que los
+    dos formularios que ya existían no cambian.
+    """
 
     #: Los que deja de escribir el editor cuando la IA va a redactar.
     opcionales_con_ia: tuple[str, ...] = ()
-
-    procesar_con_ia = forms.BooleanField(
-        label="Procesar con IA",
-        required=False,
-        help_text=(
-            "Al guardar, se leerá la URL de origen y se redactará la ficha en segundo plano. "
-            "Puedes dejar el resto en blanco. Revisa y corrige antes de publicar."
-        ),
+    #: El campo que declara la procedencia. Sin él, la casilla no tiene de dónde redactar.
+    campo_origen: str = "url_origen"
+    #: `{nombre}` se sustituye por el `verbose_name` del modelo.
+    mensaje_sin_origen: str = (
+        "Hace falta la URL de origen para que la IA pueda redactar la {nombre}."
     )
+    ayuda_procesar_con_ia: str = (
+        "Al guardar, se leerá la URL de origen y se redactará la ficha en segundo plano. "
+        "Puedes dejar el resto en blanco. Revisa y corrige antes de publicar."
+    )
+
+    procesar_con_ia = forms.BooleanField(label="Procesar con IA", required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["procesar_con_ia"].help_text = self.ayuda_procesar_con_ia
         for nombre in self.opcionales_con_ia:
             if nombre in self.fields:
                 self.fields[nombre].required = False
@@ -59,11 +70,8 @@ class RedaccionIAFormMixin(forms.ModelForm):
                     self.add_error(campo, self.fields[campo].error_messages["required"])
             return datos
 
-        if not datos.get("url_origen"):
-            self.add_error(
-                "url_origen",
-                f"Hace falta la URL de origen para que la IA pueda redactar la {nombre}.",
-            )
+        if not datos.get(self.campo_origen):
+            self.add_error(self.campo_origen, self.mensaje_sin_origen.format(nombre=nombre))
         if self.instance.pk and self.instance.ia_estado == EstadoIA.PROCESANDO:
             self.add_error(
                 "procesar_con_ia",

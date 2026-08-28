@@ -71,13 +71,18 @@ class WorkflowAdmin(admin.ModelAdmin):
 
     # -- Acciones de transición -------------------------------------------
     def _transicionar(self, request, queryset, destino: str, verbo: str):
-        hechas, rechazadas = 0, []
+        hechas, rechazadas, avisos = 0, [], []
         for obj in queryset:
             try:
                 obj.transicionar(destino, usuario=request.user)
                 hechas += 1
             except (ValueError, PermissionError) as exc:
                 rechazadas.append(f"«{obj}»: {exc}")
+                continue
+            # Lo que no impide publicar pero hay que mirar una vez (p. ej. el bloque de contacto
+            # de una ficha ACC, que lleva datos personales de un tercero).
+            if destino == WorkflowMixin.Estado.PUBLICADO:
+                avisos += [f"«{obj}»: {aviso}" for aviso in obj.avisos_al_publicar()]
 
         if hechas:
             self.message_user(
@@ -85,6 +90,8 @@ class WorkflowAdmin(admin.ModelAdmin):
                 f"{hechas} elemento(s) {verbo}. Los avisos por correo se envían en segundo plano.",
                 messages.SUCCESS,
             )
+        for aviso in avisos[:8]:
+            self.message_user(request, aviso, messages.WARNING)
         for detalle in rechazadas[:8]:
             self.message_user(request, detalle, messages.WARNING)
         if len(rechazadas) > 8:

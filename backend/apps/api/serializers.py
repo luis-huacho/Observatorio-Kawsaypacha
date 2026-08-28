@@ -163,8 +163,16 @@ class PortadaMixin(serializers.Serializer):
 
 
 class MedidaListaSerializer(PortadaMixin, serializers.ModelSerializer):
-    peligro = serializers.CharField(source="tipo_peligro.nombre", read_only=True)
-    peligro_slug = serializers.CharField(source="tipo_peligro.slug", read_only=True)
+    # `allow_null` + `default`: `tipo_peligro` es nullable desde ADR-D10 y, sin esto, un objeto
+    # sin peligro no daría error — **la clave desaparecería del JSON**, que es peor. Hoy no
+    # llega ninguno porque el viewset sirve `Medida.publicados` y publicar exige el campo, pero
+    # el seguro cuesta dos líneas y el fallo sería invisible desde el backend.
+    peligro = serializers.CharField(
+        source="tipo_peligro.nombre", read_only=True, allow_null=True, default=""
+    )
+    peligro_slug = serializers.CharField(
+        source="tipo_peligro.slug", read_only=True, allow_null=True, default=""
+    )
     distrito = DistritoBreveSerializer(read_only=True)
 
     class Meta:
