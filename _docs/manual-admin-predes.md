@@ -16,7 +16,7 @@ puede hacer por sí misma.
 
 Al entrar se ve el **Panel**, que responde de un vistazo las preguntas del día:
 
-- **Cuántas piezas esperan revisión**, y el reparto de todo el contenido por estado.
+- **El reparto de todo el contenido por estado**: qué hay en borrador, qué está publicado y qué se retiró.
 - Los últimos 30 días de uso: visitas, búsquedas, ayudas memoria y exports descargados.
 - **Páginas más vistas**, **búsquedas más frecuentes** y **distritos con más ayudas memoria
   descargadas**. Esta última lista dice qué distritos se están llevando a mesas técnicas.
@@ -53,22 +53,23 @@ ningún otro síntoma. Por eso está la tarjeta.
 
 | Rol | Puede |
 |---|---|
-| **Editor** | Crear y modificar contenido, enviarlo a revisión. **No puede publicar** |
-| **Publicador** | Todo lo del Editor, y además publicar, devolver y archivar |
-| **Administrador** | Todo, incluidos los datos, las capas del mapa, los textos y los usuarios |
+| **Editor** | Crear y modificar contenido, **publicarlo y retirarlo** |
+| **Publicador** | Todo lo del Editor, y además borrar y gestionar los datos y las capas |
+| **Administrador** | Todo, incluidos los textos del sitio y los usuarios |
 
-Un Editor no ve los botones de publicar: no están escondidos, simplemente no existen para su
-usuario. Es a propósito — nada que un equipo no haya revisado sale al sitio público.
+Conviene decirlo en voz alta en la capacitación: **quien escribe también publica**, y no hay
+ningún paso intermedio en el que otra persona lo revise. Lo que salga al sitio sale con lo que
+tenga escrito, así que la relectura antes de pulsar «Publicar» es la única que hay.
 
 ## Publicar contenido
 
 Todo el contenido —medidas, normativa, noticias, videos, eventos, biblioteca— funciona igual y
-pasa por cuatro estados:
+pasa por tres estados:
 
 ```
-   Borrador ──enviar a revisión──▶ En revisión ──publicar──▶ Publicado ──▶ Archivado
-      ▲                                 │                        │            │
-      └────────── devolver ─────────────┘                        └── volver a borrador ──┘
+   Borrador ──publicar──▶ Publicado ──archivar──▶ Archivado
+      ▲                       │                       │
+      └── retirar del sitio ──┘                       └── volver a borrador ──┘
 ```
 
 **En el sitio público solo se ve lo que está en Publicado.** Un borrador no aparece ni buscándolo
@@ -77,18 +78,20 @@ por su dirección exacta.
 El paso de estado **no se hace editando un campo**, se hace con las acciones del final del
 formulario o desde la lista, marcando las filas y eligiendo la acción:
 
-- **Enviar a revisión** — avisa por correo al equipo de Publicadores.
-- **Publicar** — lo saca al sitio y avisa a quien lo escribió.
-- **Devolver a borrador** — pide unas observaciones, y **esas observaciones van en el correo** a
-  quien lo escribió. Es el único sitio donde se le puede explicar qué corregir, así que conviene
-  ser concreto.
+- **Publicar** — lo saca al sitio. Si lo publica otra persona, avisa por correo a quien lo
+  escribió; si lo publicas tú, no te llega un correo contándote lo que acabas de hacer.
+- **Retirar del sitio y devolver a borrador** — pide unas observaciones, y **esas observaciones
+  van en el correo** a quien lo escribió. Es el único sitio donde se le puede explicar qué
+  corregir, así que conviene ser concreto.
 - **Archivar** — lo retira del sitio sin borrarlo. **Archivar es lo correcto para retirar algo**;
   borrar destruye el historial y las direcciones que ya se hayan compartido.
 
 ### Ejercicio de la capacitación
 
-Crear una noticia, enviarla a revisión, verla llegar por correo, devolverla con una observación,
-corregirla y publicarla. Comprobar que aparece en `https://observatorio.predes.org.pe/noticias`.
+Crear una noticia, publicarla y comprobar que aparece en
+`https://observatorio.predes.org.pe/noticias`. Después, entre dos personas: que una la retire del
+sitio con una observación concreta, que la otra reciba el correo con esa observación, la corrija y
+la vuelva a publicar. Esa segunda parte es la que enseña para qué sirve el campo de observaciones.
 
 ### Escribir en el editor
 
@@ -310,7 +313,7 @@ eso es en sí mismo un argumento para pedir que se haga.
 | Sale en su página pero el buscador no lo encuentra | Panel → tarjeta **Buscador** → **Reindexar la búsqueda**. Si la tarjeta dice «no responde», avisar |
 | El Excel no entró | Leer el registro de la carga: dice hoja y fila |
 | Una capa quedó en **error** | Leer el campo de errores de esa capa |
-| No llegan los correos de revisión | Comprobar que los usuarios tienen correo en su ficha, y avisar |
+| No llegan los correos del flujo editorial | Comprobar que los usuarios tienen correo en su ficha, y avisar. Ojo: publicar algo tuyo **no** genera correo, es a propósito |
 | El mapa sale en blanco | Avisar. No es algo que se arregle desde el panel |
 
 Para lo que hay que avisar, quien recibe el aviso encuentra el procedimiento en
@@ -326,4 +329,4 @@ Para lo que hay que avisar, quien recibe el aviso encuentra el procedimiento en
 - **Contraseñas propias, nunca compartidas.** El sistema registra quién hizo cada cambio, y eso
   solo sirve si cada persona entra con su usuario.
 - **Revisar el panel una vez por semana.** Las búsquedas más frecuentes son la agenda de contenido
-  que pide el público, y la cola de «espera revisión» no se mueve sola.
+  que pide el público, y lo que lleva semanas en borrador no se publica solo.

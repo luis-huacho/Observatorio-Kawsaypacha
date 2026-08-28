@@ -204,7 +204,7 @@ Sesión grabada (registro audiovisual = anexo del informe final). El guion desar
 1. Ingreso al admin, roles y contraseñas.
 2. Subir/reemplazar el Excel de peligros y el de frecuencia (DatasetUpload) — ver el cambio en el visor.
 3. Subir/reemplazar una capa GeoJSON y regenerar tiles.
-4. Crear medida/noticia → enviar a revisión → publicar (correo incluido).
+4. Crear medida/noticia → publicar (ADR-P3: sin paso de revisión; el correo va al autor si publica otra persona).
 5. Subir un PDF y generar resumen con IA; corregirlo.
 6. Editar textos del sitio (hero, footer, sobre) y el menú.
 7. Descargar ayuda memoria PDF y exports Excel.

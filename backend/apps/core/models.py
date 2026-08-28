@@ -67,25 +67,31 @@ class PublicadosManager(models.Manager):
 
 
 class WorkflowMixin(models.Model):
-    """Flujo editorial del TDR: borrador → revisión → publicado, con avisos por correo."""
+    """Flujo editorial: borrador → publicado, con avisos por correo (ADR-P3).
+
+    El paso intermedio de «revisión» **se retiró por decisión del dueño del proyecto**. El TDR lo
+    pedía (requisito 2), así que la decisión y su riesgo están escritos en el ADR: desde aquí,
+    quien redacta también publica y nadie mira el contenido antes de que salga.
+
+    `archivado` se conserva: retirar algo publicado y dejarlo en borrador no son lo mismo.
+    """
 
     class Estado(models.TextChoices):
         BORRADOR = "borrador", "Borrador"
-        REVISION = "revision", "En revisión"
         PUBLICADO = "publicado", "Publicado"
         ARCHIVADO = "archivado", "Archivado"
 
     TRANSICIONES = {
-        Estado.BORRADOR: {Estado.REVISION, Estado.ARCHIVADO},
-        Estado.REVISION: {Estado.PUBLICADO, Estado.BORRADOR},
-        Estado.PUBLICADO: {Estado.ARCHIVADO, Estado.BORRADOR},
+        Estado.BORRADOR: {Estado.PUBLICADO, Estado.ARCHIVADO},
+        Estado.PUBLICADO: {Estado.BORRADOR, Estado.ARCHIVADO},
         Estado.ARCHIVADO: {Estado.BORRADOR},
     }
 
-    # Transiciones que exigen el permiso `puede_publicar` (grupo Publicador o Administrador);
-    # el resto las puede hacer cualquier editor sobre su propio contenido.
+    # Transiciones que exigen el permiso `puede_publicar`. Desde ADR-P3 los tres grupos lo tienen,
+    # así que esto ya no separa a un editor de un publicador; se conserva porque sigue siendo la
+    # única defensa frente a un usuario de staff sin grupo, que si no publicaría al sitio.
     TRANSICIONES_RESERVADAS = {
-        (Estado.REVISION, Estado.PUBLICADO),
+        (Estado.BORRADOR, Estado.PUBLICADO),
         (Estado.PUBLICADO, Estado.ARCHIVADO),
         (Estado.PUBLICADO, Estado.BORRADOR),
         (Estado.BORRADOR, Estado.ARCHIVADO),

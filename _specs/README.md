@@ -13,6 +13,39 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — el flujo editorial pierde el paso de revisión (ADR-P3)
+
+- **ADR-P3**: los estados pasan a ser **`borrador → publicado`**, con `archivado` para retirar sin
+  borrar, y el grupo **Editor recibe `puede_publicar`**. Las dos mitades van juntas: al quitar el
+  paso de revisión, «Enviar a revisión» era la única acción que tenía un Editor sobre su propio
+  contenido, así que sin el permiso se quedaba sin poder hacer nada.
+- **Se aparta del requisito 2 del TDR**, que pedía literalmente «borrador → revisión →
+  publicación». Queda dicho en el ADR y anotado en la propia lista de requisitos: documentarlo como
+  si el TDR no lo pidiera habría sido la peor forma de resolverlo. La otra mitad del requisito —los
+  avisos por correo— **se conserva**.
+- **Lo que queda para contener el riesgo** de que nadie mire antes de publicar: el estado sigue sin
+  editarse a mano (un `<select>` guardaría el cambio sin disparar el aviso ni registrar quién fue),
+  y `TRANSICIONES_RESERVADAS` se conserva entera — ya no separa a un editor de un publicador, pero
+  es lo único que impide publicar a una cuenta de staff **sin grupo**.
+- **Los correos se reducen a dos y los dos van al autor**, y se añade una regla nueva: **no se
+  avisa a quien se avisaría a sí mismo**. Ahora el autor suele ser quien publica, y un correo que
+  informa a alguien de lo que acaba de hacer es la forma más rápida de que se dejen de leer todos
+  los demás. Se retiran la constante `GRUPOS_REVISORES` y las plantillas `emails/a_revision.*`, y
+  se corrige `publicado.html`, que decía «que enviaste a revisión fue publicada».
+- **Dos migraciones de datos, y ninguna es opcional.** La columna `estado` **no tiene `CHECK` en
+  PostgreSQL** —comprobado—, así que una fila que quedara en `revision` no daría ningún error: se
+  mostraría en crudo y sin ninguna transición que la sacara de ahí; va un `RunPython` defensivo en
+  las cinco apps. Y el permiso del Editor necesita la suya (`core.0001`) porque **el seed no corre
+  en el despliegue**: `docker-entrypoint.sh` solo hace `migrate` y `meili_setup`, así que cambiar
+  `seed.py` solo se vería en instalaciones nuevas. Es el mismo razonamiento de `sitio.0002`.
+- **Fuera del panel** el aviso «N contenido(s) esperando revisión» y su columna: con el estado
+  retirado contarían siempre cero, y una columna que siempre vale cero se lee como un dato.
+- **`revisado_por` y `nota_revision` conservan su nombre** aunque hoy signifiquen «quién publicó o
+  retiró» y «por qué se retiró». Renombrarlos costaba catorce `AlterField` en cinco apps para
+  cambiar dos rótulos.
+- **Comprobado en el admin con un usuario del grupo Editor**: ve «Publicar», «Retirar del sitio» y
+  «Archivar», no ve «Enviar a revisión», y publica un borrador de un clic sellando `publicado_en`.
+
 ### Actualización 28/08/2026 — una noticia puede nacer de una URL (ADR-D7)
 
 - **ADR-D7**: el formulario de Noticias lleva arriba **URL de origen** y la casilla **«Procesar con

@@ -9,7 +9,7 @@
 ## Requisitos obligatorios del TDR
 
 1. Sistema integrado único con ventanas temáticas, **administrable por PREDES sin asistencia técnica**: actualización por **carga de archivos** (Excel de exposición, presupuesto, etc.) y **reemplazo de capas cartográficas**.
-2. Flujo editorial **borrador → revisión → publicación** con **avisos por correo**.
+2. Flujo editorial con **avisos por correo**. El TDR lo enunciaba como «borrador → revisión → publicación»; **el paso de revisión se retiró por acuerdo con el dueño del proyecto** (ADR-P3) y el flujo es `borrador → publicado` (+ `archivado`). Los avisos, que son la otra mitad del requisito, se conservan.
 3. **Exportar tablas a Excel**.
 4. **Ayudas memoria PDF por distrito** (para mesas técnicas).
 5. **Tableros comparativos entre distritos**.
@@ -43,6 +43,22 @@
 > **ADR-P2 — El comparador de distritos sale de la navegación.** `/comparar` deja de ofrecerse en el menú principal y en el pie. **No se retira nada más**: la ruta del SPA sigue registrada y responde por URL directa, `GET /api/comparador/distritos/` sigue publicado y probado, y el enlace de menú se conserva con `EnlaceMenu.visible=False`, así que volver a mostrarlo es marcar una casilla en el admin. Es un grado más suave que ADR-P1, donde la ruta ni existe. Hizo falta además una migración de datos (`sitio.0002`), porque el seed crea lo que falta y no toca lo que ya existe: sin ella las bases ya sembradas seguirían sirviendo el enlace. Decisión del dueño del proyecto.
 
 Complementan a las ventanas: portada (hero administrable), buscador global, noticias, videos, eventos, biblioteca/recursos, comparador de distritos (accesible por URL, fuera del menú — ADR-P2), sección Sobre.
+
+> **ADR-P3 — El flujo editorial pierde el paso de revisión, y quien redacta publica.** Los estados pasan a ser `borrador → publicado`, con `archivado` para retirar sin borrar; el grupo Editor recibe `puede_publicar`. Antes no se podía publicar nada sin pasar por «En revisión», y el Editor solo tenía el botón «Enviar a revisión»: al quitar ese paso se habría quedado sin ninguna acción posible sobre su propio contenido, así que las dos mitades de la decisión van juntas.
+>
+> **Se aparta del requisito 2 del TDR**, que pedía literalmente «borrador → revisión → publicación». Queda dicho aquí porque documentarlo como si el TDR no lo pidiera sería la peor forma de resolverlo. La otra mitad de ese requisito —los avisos por correo— **se conserva**.
+>
+> **Riesgo aceptado por el dueño del proyecto**: nadie mira el contenido antes de que salga al sitio público. Lo que queda para contenerlo:
+>
+> 1. **El estado sigue sin editarse a mano.** Se cambia con acciones, no con un `<select>`, porque un guardado directo no dispara el aviso ni registra quién lo hizo.
+> 2. **`TRANSICIONES_RESERVADAS` se conserva entera.** Ya no separa a un editor de un publicador —los tres grupos tienen el permiso—, pero es lo único que impide que una cuenta de staff recién creada, todavía sin grupo, publique al sitio.
+> 3. **Retirar del sitio sigue avisando al autor con la nota**, que es el único canal para explicarle qué corregir. Lo que se retira es el aviso de «espera revisión», que ya no tiene a quién esperar.
+> 4. **No se avisa a quien se avisaría a sí mismo.** Ahora el autor suele ser quien publica, y un correo que informa a alguien de lo que acaba de hacer es la forma más rápida de que se dejen de leer todos los demás.
+>
+> Consecuencias que no son opcionales: `revision` desaparece de los `choices` de los siete modelos, con **migración de datos defensiva** en las cinco apps —la columna no tiene `CHECK` en PostgreSQL, así que una fila que quedara ahí no daría error, solo se mostraría en crudo—; el permiso del Editor necesita **su propia migración de datos** porque el seed no corre en el despliegue; y desaparecen del panel el aviso de «esperando revisión» y su columna, que si no contarían siempre cero.
+>
+> **`revisado_por` y `nota_revision` conservan su nombre** aunque hayan envejecido: hoy significan «quién publicó o retiró» y «por qué se retiró». Renombrarlos costaba catorce `AlterField` en cinco apps para cambiar dos rótulos, y se prefirió decirlo aquí. Decisión del dueño del proyecto.
+
 
 ## ADRs de arquitectura
 

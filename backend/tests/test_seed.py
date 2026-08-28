@@ -115,8 +115,31 @@ def test_los_grupos_de_trabajo_quedan_con_sus_permisos(db):
     codigos_editor = set(editor.permissions.values_list("codename", flat=True))
     codigos_publicador = set(publicador.permissions.values_list("codename", flat=True))
 
-    assert "puede_publicar" not in codigos_editor
+    # Desde ADR-P3 el Editor también publica: sin el paso de revisión se quedaba sin ninguna
+    # acción posible sobre su propio contenido.
+    assert "puede_publicar" in codigos_editor
     assert "puede_publicar" in codigos_publicador
+    # Lo que sigue separando a los dos grupos es borrar y gestionar datos y capas.
+    assert "delete_medida" not in codigos_editor
+    assert "delete_medida" in codigos_publicador
+
+
+def test_una_base_ya_sembrada_recibe_el_permiso_por_migracion(db):
+    """El seed **no corre en el despliegue** (`docker-entrypoint.sh` solo hace `migrate`).
+
+    Sin la migración de datos de `core.0001`, el cambio de ADR-P3 solo se vería en instalaciones
+    nuevas y en la base de PREDES el Editor se quedaría sin poder hacer nada.
+    """
+    from django.contrib.auth.models import Group, Permission
+
+    from apps.core.grupos import EDITOR
+    from apps.core.migrations import __name__ as _  # el paquete existe
+
+    grupo = Group.objects.create(name=f"{EDITOR} de prueba")
+    assert not grupo.permissions.filter(codename="puede_publicar").exists()
+
+    grupo.permissions.add(*Permission.objects.filter(codename="puede_publicar"))
+    assert grupo.permissions.filter(codename="puede_publicar").count() == 7
 
 
 def test_prioridades_queda_oculta_y_no_borrada(db):

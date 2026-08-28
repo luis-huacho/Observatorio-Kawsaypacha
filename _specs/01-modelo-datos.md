@@ -78,11 +78,12 @@ class TimeStampedMixin(models.Model):        # abstract
     creado_en / actualizado_en
 
 class WorkflowMixin(models.Model):           # abstract
-    estado          # choices: borrador | revision | publicado | archivado; default borrador; db_index
+    estado          # choices: borrador | publicado | archivado; default borrador; db_index
+                    # «revision» se retiró con ADR-P3, con migración de datos en las 5 apps
     publicado_en    # datetime null
     creado_por      # FK User SET_NULL
-    revisado_por    # [+] FK User null
-    nota_revision   # [+] Text (comentario del revisor al devolver)
+    revisado_por    # [+] FK User null — hoy: quién publicó o retiró (nombre heredado, ADR-P3)
+    nota_revision   # [+] Text — hoy: por qué se retiró del sitio
     # Manager .publicados(); método transicionar(nuevo_estado, usuario):
     #   valida transición y permisos, setea publicado_en, encola email (ver 03-admin-editorial)
 ```

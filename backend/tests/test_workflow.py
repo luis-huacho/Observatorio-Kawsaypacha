@@ -1,9 +1,11 @@
 """Flujo editorial (spec 03): transiciones, permisos y avisos por correo.
 
-Lo que se protege aquí es que **la revisión signifique algo**: que no se pueda publicar sin pasar
-por ella, que no pueda publicar quien no debe, y que el aviso llegue a alguien. Los tres fallos
-de esta familia son silenciosos —el contenido se guarda, la operación «funciona»— así que sin
-pruebas no se notan hasta que alguien pregunta por un correo que nunca llegó.
+Desde ADR-P3 el flujo es **borrador → publicado**, sin paso de revisión, y cualquier editor
+publica. Lo que se protege aquí es lo que sigue pudiendo fallar en silencio: que solo se pueda
+llegar a `publicado` por una transición —y no editando el campo, que no dispara nada—, que no
+publique quien no tiene el permiso, y que el aviso llegue a alguien. Los tres fallos son mudos
+—el contenido se guarda, la operación «funciona»— así que sin pruebas no se notan hasta que
+alguien pregunta por un correo que nunca llegó.
 """
 from django.core import mail
 
@@ -53,54 +55,84 @@ def _correos_encolados():
 # --- Transiciones -----------------------------------------------------------
 
 
-def test_no_se_puede_publicar_sin_pasar_por_revision(medida, usuarios):
-    """`borrador → publicado` directo no existe. Si existiera, la revisión sería opcional."""
-    with pytest.raises(ValueError, match="Transición inválida"):
-        medida.transicionar("publicado", usuario=usuarios["publicador"])
+def test_se_publica_directo_desde_borrador(medida, usuarios):
+    """El cambio de ADR-P3: ya no hay paso intermedio.
+
+    Antes esto lanzaba «Transición inválida» y era el punto del flujo. Ahora el punto es el
+    contrario, y esta prueba existe para que reintroducir la revisión sin decirlo se note.
+    """
+    medida.transicionar("publicado", usuario=usuarios["editor"])
+
+    assert medida.estado == "publicado"
+
+
+def test_revision_ya_no_es_un_estado(medida, usuarios):
+    """No queda ni como destino alcanzable ni como valor válido."""
+    with pytest.raises(ValueError):
+        medida.transicionar("revision", usuario=usuarios["publicador"])
 
     medida.refresh_from_db()
     assert medida.estado == "borrador"
+    assert "revision" not in dict(medida.Estado.choices)
 
 
 def test_el_camino_completo_funciona(medida, usuarios):
-    medida.transicionar("revision", usuario=usuarios["editor"])
-    assert medida.estado == "revision"
-
-    medida.transicionar("publicado", usuario=usuarios["publicador"])
+    medida.transicionar("publicado", usuario=usuarios["editor"])
     assert medida.estado == "publicado"
 
     medida.transicionar("archivado", usuario=usuarios["publicador"])
     assert medida.estado == "archivado"
 
+    medida.transicionar("borrador", usuario=usuarios["publicador"])
+    assert medida.estado == "borrador"
+
 
 def test_publicar_sella_la_fecha(medida, usuarios):
     """`publicado_en` ordena los listados y sale en las fichas: no puede quedarse vacío."""
-    medida.transicionar("revision", usuario=usuarios["editor"])
     medida.transicionar("publicado", usuario=usuarios["publicador"])
 
     assert medida.publicado_en is not None
     assert medida.revisado_por == usuarios["publicador"]
 
 
-def test_un_editor_no_puede_publicar_lo_que_escribio(medida, usuarios):
-    """Es el punto del flujo: cuatro ojos antes de que algo salga al sitio público."""
-    medida.transicionar("revision", usuario=usuarios["editor"])
+def test_un_editor_publica_lo_que_escribio(medida, usuarios):
+    """Decisión de ADR-P3: sin paso de revisión, el editor se quedaba sin ninguna acción.
+
+    El precio está escrito en el ADR: nadie mira el contenido antes de que salga al público.
+    """
+    medida.transicionar("publicado", usuario=usuarios["editor"])
+
+    assert medida.estado == "publicado"
+
+
+def test_un_usuario_de_staff_sin_grupo_no_publica(medida, db):
+    """`TRANSICIONES_RESERVADAS` sigue sirviendo para algo.
+
+    Ya no separa al editor del publicador —los tres grupos tienen el permiso—, pero es lo único
+    que impide que una cuenta de staff recién creada, todavía sin grupo, publique al sitio.
+    """
+    from django.contrib.auth import get_user_model
+
+    suelto = get_user_model().objects.create_user(
+        username="sin-grupo", email="suelto@predes.test", password="x", is_staff=True
+    )
 
     with pytest.raises(PermissionError):
-        medida.transicionar("publicado", usuario=usuarios["editor"])
+        medida.transicionar("publicado", usuario=suelto)
 
     medida.refresh_from_db()
-    assert medida.estado == "revision"
+    assert medida.estado == "borrador"
 
 
-def test_el_admin_no_ofrece_transiciones_que_van_a_fallar(medida, usuarios):
-    """Las acciones se filtran por permiso: un botón que salta un error no es una opción."""
-    medida.estado = "revision"
+def test_las_transiciones_posibles_se_filtran_por_permiso(medida, usuarios, db):
+    from django.contrib.auth import get_user_model
 
-    assert "publicado" in medida.transiciones_posibles(usuarios["publicador"])
-    assert "publicado" not in medida.transiciones_posibles(usuarios["editor"])
-    # Devolver a borrador sí puede hacerlo cualquiera de los dos.
-    assert "borrador" in medida.transiciones_posibles(usuarios["editor"])
+    suelto = get_user_model().objects.create_user(
+        username="sin-grupo-2", email="suelto2@predes.test", password="x", is_staff=True
+    )
+
+    assert "publicado" in medida.transiciones_posibles(usuarios["editor"])
+    assert "publicado" not in medida.transiciones_posibles(suelto)
 
 
 def test_un_superusuario_puede_publicar_sin_estar_en_el_grupo(medida):
@@ -109,7 +141,6 @@ def test_un_superusuario_puede_publicar_sin_estar_en_el_grupo(medida):
     admin = get_user_model().objects.create_superuser(
         username="admin-pruebas", email="admin@predes.test", password="x"
     )
-    medida.transicionar("revision", usuario=admin)
     medida.transicionar("publicado", usuario=admin)
 
     assert medida.estado == "publicado"
@@ -118,24 +149,8 @@ def test_un_superusuario_puede_publicar_sin_estar_en_el_grupo(medida):
 # --- Avisos por correo ------------------------------------------------------
 
 
-def test_enviar_a_revision_avisa_a_los_revisores(medida, usuarios):
-    """El grupo se resuelve por las constantes de `core.grupos`.
-
-    La primera versión buscaba «Publicadores» mientras el seed creaba «Publicador»: los avisos no
-    llegaban a nadie y la tarea terminaba bien, así que el fallo era invisible desde fuera.
-    """
-    mail.outbox.clear()
-    medida.transicionar("revision", usuario=usuarios["editor"])
-    enviados = _correos_encolados()
-
-    assert len(enviados) == 1
-    assert usuarios["publicador"].email in enviados[0].to
-    assert medida.titulo in enviados[0].subject + enviados[0].body
-
-
 def test_publicar_avisa_a_quien_lo_escribio(medida, usuarios):
-    medida.transicionar("revision", usuario=usuarios["editor"])
-    _correos_encolados()
+    """Cuando publica **otra persona**, el autor se entera."""
     mail.outbox.clear()
 
     medida.transicionar("publicado", usuario=usuarios["publicador"])
@@ -143,15 +158,29 @@ def test_publicar_avisa_a_quien_lo_escribio(medida, usuarios):
 
     assert len(enviados) == 1
     assert enviados[0].to == [usuarios["editor"].email]
+    assert medida.titulo in enviados[0].subject + enviados[0].body
 
 
-def test_devolver_a_borrador_lleva_las_observaciones_en_el_correo(medida, usuarios):
+def test_no_se_avisa_a_quien_se_avisaria_a_si_mismo(medida, usuarios):
+    """Desde ADR-P3 el autor suele ser quien publica.
+
+    Sin esta regla, cada publicación le mandaría un correo contándole lo que acaba de hacer él, y
+    en dos semanas nadie leería ninguno — que es como se estropea un sistema de avisos.
+    """
+    mail.outbox.clear()
+
+    medida.transicionar("publicado", usuario=usuarios["editor"])
+
+    assert _correos_encolados() == []
+
+
+def test_retirar_del_sitio_lleva_las_observaciones_en_el_correo(medida, usuarios):
     """Es el único sitio donde se le puede explicar al autor qué corregir.
 
     Si la nota no viajara en el correo, el autor vería su contenido de vuelta en borrador sin
     saber por qué, y tendría que entrar al admin a buscarla.
     """
-    medida.transicionar("revision", usuario=usuarios["editor"])
+    medida.transicionar("publicado", usuario=usuarios["publicador"])
     _correos_encolados()
     mail.outbox.clear()
 
@@ -165,11 +194,10 @@ def test_devolver_a_borrador_lleva_las_observaciones_en_el_correo(medida, usuari
 
 
 def test_archivar_no_llena_la_bandeja_de_nadie(medida, usuarios):
-    """Solo las tres transiciones que le importan a una persona generan correo.
+    """Solo las transiciones que le importan a una persona generan correo.
 
     Un aviso que se ignora deja de ser un aviso.
     """
-    medida.transicionar("revision", usuario=usuarios["editor"])
     medida.transicionar("publicado", usuario=usuarios["publicador"])
     _correos_encolados()
     mail.outbox.clear()
@@ -179,19 +207,19 @@ def test_archivar_no_llena_la_bandeja_de_nadie(medida, usuarios):
     assert _correos_encolados() == []
 
 
-def test_sin_destinatarios_la_transicion_sigue_adelante(medida, usuarios):
+def test_sin_destinatario_la_transicion_sigue_adelante(medida, usuarios):
     """Un buzón mal configurado no puede impedir publicar.
 
-    Queda registrado en el log —es el síntoma de un grupo mal nombrado o de usuarios sin correo—
-    pero la operación editorial no se bloquea por ello.
+    Queda registrado en el log —es el síntoma de un contenido sin autor o de un usuario sin
+    correo— pero la operación editorial no se bloquea por ello.
     """
-    usuarios["publicador"].email = ""
-    usuarios["publicador"].save()
+    usuarios["editor"].email = ""
+    usuarios["editor"].save()
     mail.outbox.clear()
 
-    medida.transicionar("revision", usuario=usuarios["editor"])
+    medida.transicionar("publicado", usuario=usuarios["publicador"])
 
-    assert medida.estado == "revision"
+    assert medida.estado == "publicado"
     assert _correos_encolados() == []
 
 
@@ -201,7 +229,7 @@ def test_sin_destinatarios_la_transicion_sigue_adelante(medida, usuarios):
 def test_el_manager_publicados_es_el_unico_filtro_de_visibilidad(medida, usuarios):
     from apps.medidas.models import Medida
 
-    for estado in ("borrador", "revision", "archivado"):
+    for estado in ("borrador", "archivado"):
         Medida.objects.filter(pk=medida.pk).update(estado=estado)
         assert not Medida.publicados.filter(pk=medida.pk).exists()
 

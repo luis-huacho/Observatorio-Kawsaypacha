@@ -21,13 +21,6 @@ tarjeta del buscador, hasta el 04/08/2026.
   </p>
 </div>
 
-{% if pendientes_revision %}
-  <div class="mb-6 rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-3">
-    <strong class="text-sm">{{ pendientes_revision }} contenido(s) esperando revisión.</strong>
-    <span class="text-sm">Mientras estén en revisión no aparecen en el sitio público.</span>
-  </div>
-{% endif %}
-
 {% for capa in capas_con_error %}
   <div class="mb-3 rounded-lg border border-red-300 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm">
     La capa <strong>{{ capa.nombre }}</strong> falló al generar sus tiles y no se está mostrando
@@ -87,7 +80,6 @@ tarjeta del buscador, hasta el 04/08/2026.
       <tr>
         <th class="px-4 py-2 text-left font-medium">Tipo</th>
         <th class="px-4 py-2 text-right font-medium">Borrador</th>
-        <th class="px-4 py-2 text-right font-medium">En revisión</th>
         <th class="px-4 py-2 text-right font-medium">Publicado</th>
         <th class="px-4 py-2 text-right font-medium">Archivado</th>
       </tr>
@@ -97,9 +89,6 @@ tarjeta del buscador, hasta el 04/08/2026.
         <tr class="border-t border-base-100 dark:border-base-900">
           <td class="px-4 py-2">{{ c.nombre }}</td>
           <td class="px-4 py-2 text-right">{{ c.borrador }}</td>
-          <td class="px-4 py-2 text-right {% if c.revision %}font-semibold text-yellow-700{% endif %}">
-            {{ c.revision }}
-          </td>
           <td class="px-4 py-2 text-right">{{ c.publicado }}</td>
           <td class="px-4 py-2 text-right">{{ c.archivado }}</td>
         </tr>

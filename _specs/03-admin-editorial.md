@@ -17,25 +17,26 @@ Idioma `es-pe`, zona horaria `America/Lima`. Branding con paleta PREDES (colores
 
 | Grupo | Puede |
 |---|---|
-| **Editor** | Crear/editar contenido propio; pasar `borrador → revision`; subir documentos |
-| **Publicador** | Todo lo del editor + `revision → publicado`, `publicado → archivado/borrador`; gestionar datasets y capas |
+| **Editor** | Crear/editar contenido propio, **publicarlo y retirarlo** (ADR-P3); subir documentos |
+| **Publicador** | Todo lo del editor + borrar, y gestionar datasets y capas |
 | **Administrador** | Todo + usuarios, configuración del sitio, menú |
 
-Implementación: permisos custom `puede_publicar` por modelo Workflow; en Unfold se ocultan las acciones de transición no permitidas.
+Implementación: permisos custom `puede_publicar` por modelo Workflow. Desde ADR-P3 lo tienen los tres grupos; se conserva porque es lo único que impide publicar a una cuenta de staff **sin grupo**. En Unfold se ocultan las acciones de transición no permitidas — por **permiso, no por estado**: no hay `get_actions` en el proyecto, así que una acción imposible desde el estado actual se ofrece igual y falla con un aviso por objeto.
 
 ## Flujo editorial (WorkflowMixin)
 
-Estados: `borrador → revision → publicado` (+ `archivado`). Reglas:
+Estados: `borrador → publicado`, con `archivado` para retirar sin borrar (ADR-P3; el paso de «revisión» se retiró). Reglas:
 - Solo `publicado` aparece en API pública y en Meilisearch.
-- Transiciones vía botones de acción en el change form (Unfold actions), no editando el campo a mano.
+- Transiciones vía botones de acción en el change form (Unfold actions), **no editando el campo a mano**: un guardado directo no dispara el aviso ni registra quién lo hizo.
 - `transicionar()` valida el paso y **encola** el correo (django-tasks, nunca bloquea el request).
 
 ### Avisos por correo (requisito TDR)
 | Transición | Destinatario | Plantilla |
 |---|---|---|
-| borrador → revision | grupo Publicadores | `emails/a_revision.html` — "«{titulo}» espera revisión" + enlace admin |
-| revision → publicado | autor (`creado_por`) | `emails/publicado.html` |
-| revision → borrador (devuelto) | autor, incluye `nota_revision` | `emails/devuelto.html` |
+| borrador → publicado | autor (`creado_por`) | `emails/publicado.html` |
+| publicado → borrador (retirado) | autor, incluye `nota_revision` | `emails/devuelto.html` |
+
+**No se avisa a quien se avisaría a sí mismo**: desde ADR-P3 el autor suele ser quien publica, y un correo que informa a alguien de lo que acaba de hacer es la forma más rápida de que se dejen de leer los demás. Archivar no genera correo, por lo mismo.
 
 SMTP de PREDES por `.env` (`EMAIL_HOST…`); en dev, `console.EmailBackend`. Plantillas en `backend/apps/core/templates/emails/` con marca PREDES.
 

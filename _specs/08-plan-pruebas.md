@@ -80,7 +80,7 @@ Un módulo por familia. El criterio es el **contrato del spec 02**, no la implem
 - **El listado de frecuencia trae los distritos de las dos tablas**, incluidos los 26 que solo declaran subtotales. Consultar solo `FrecuenciaEmergencia` los dejaba fuera —Cusco incluido— mientras el detalle sí los servía.
 - El export de frecuencia **respeta los filtros también para los declarados**: filtrado por un distrito no puede traer los declarados de toda la región.
 - `clasificaciones: []` para un CCPP sin clasificar — «sin dato» no es «nivel bajo».
-- Solo se sirve `estado=publicado`: un objeto en borrador, en revisión o archivado no aparece en listado, detalle (404, no 403) ni export.
+- Solo se sirve `estado=publicado`: un objeto en borrador o archivado no aparece en listado, detalle (404, no 403) ni export.
 - Paginación (`page_size` default 50, máximo 200) y filtros de cada endpoint; `?tema=` por coincidencia exacta y no parcial.
 - Throttling de exports y PDF (`30/hour`). **Se parchea la clase, no el ajuste**: DRF liga `THROTTLE_RATES` al diccionario de `api_settings` cuando se define la clase, así que sobrescribir `REST_FRAMEWORK` no llega a las clases ya importadas y la prueba pasa o falla según el orden de los módulos.
 - **Paginación y ranking del listado** (`test_api_inversion.py`): forma y techo del sobre; **orden estable entre páginas** —recorrerlas de una en una tiene que dar cada municipalidad exactamente una vez, que es el fallo que el desempate por código existe para evitar y no se ve a simple vista—; cada clave de `ordenar` ordena de verdad con los nulos al final; `buscar` recorta por nombre.
@@ -108,12 +108,12 @@ Un módulo por familia. El criterio es el **contrato del spec 02**, no la implem
 
 ### `test_workflow.py`
 
-- Transiciones válidas e inválidas de `WorkflowMixin.transicionar()` (`borrador → publicado` directo debe fallar).
-- Cada transición encola su correo con el destinatario correcto: a revisión → grupo Publicador; publicado → autor; devuelto → autor **con la `nota_revision` en el cuerpo**, que es el único sitio donde se le explica qué corregir. Archivar no genera correo: un aviso que se ignora deja de ser un aviso.
+- Transiciones válidas e inválidas de `WorkflowMixin.transicionar()`. Desde ADR-P3 `borrador → publicado` **sí** es válida, y lo que debe fallar es cualquier intento de pasar por `revision`, que ya no es un estado.
+- Cada transición encola su correo con el destinatario correcto: publicado → autor; retirado del sitio → autor **con la `nota_revision` en el cuerpo**, que es el único sitio donde se le explica qué corregir. Archivar no genera correo, y **tampoco se avisa a quien se avisaría a sí mismo**: desde ADR-P3 el autor suele ser quien publica, y un aviso que se ignora deja de ser un aviso.
 - Se ejecuta la tarea real con sus argumentos reales, leídos de la cola de django-tasks.
 - Sin destinatarios la transición sigue adelante: un buzón mal configurado no puede impedir publicar.
 - `publicado_en` se sella al publicar y `revisado_por` queda registrado.
-- Un editor no puede publicar lo que escribió, ni ve la acción; un superusuario sí, sin estar en el grupo.
+- Un editor **sí** publica lo que escribió (ADR-P3); lo que no puede es una cuenta de staff sin grupo, que es lo único que `TRANSICIONES_RESERVADAS` sigue conteniendo. Un superusuario publica sin estar en ningún grupo.
 - **El HTML se sanea en `save()`**, no en el admin: `HtmlRicoMixin` con `campos_html`. Mientras vivió en `WorkflowAdmin.save_model`, cualquier escritura que no pasara por el formulario —un `loaddata`, un script— metía el HTML sin filtrar, aunque el `help_text` del campo prometiera lo contrario. Se conserva `<oembed>`, que es cómo CKEditor 5 representa un video.
 
 ### `test_seed.py`
@@ -213,7 +213,7 @@ Y una trampa de medición, que costó una prueba que no comprobaba nada: **`elem
 Automatizarlas no sale a cuenta, pero omitirlas sí:
 
 1. **Restauración de backup**: compose limpio + `psql < dump` + `meili_rebuild` + visor OK. Se cronometra y el tiempo se documenta en `_docs/despliegue.md`. El TDR pide backups; un backup no probado no es un backup.
-2. **Ciclo completo de administración**, tal como lo hará PREDES: subir el Excel → ver el cambio en el visor → crear una medida → enviarla a revisión → publicarla → verla en el sitio.
+2. **Ciclo completo de administración**, tal como lo hará PREDES: subir el Excel → ver el cambio en el visor → crear una medida → publicarla → verla en el sitio.
 3. **Reemplazo de una capa cartográfica** y regeneración de tiles desde el admin.
 4. **Impresión de la ayuda memoria** en vista previa de impresión, no solo la descarga.
 5. **Responsive y accesibilidad** en las rutas principales (criterios de `archive/02-navegacion-ux.md`).
