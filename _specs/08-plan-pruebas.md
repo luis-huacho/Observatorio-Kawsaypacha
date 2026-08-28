@@ -118,7 +118,7 @@ Un módulo por familia. El criterio es el **contrato del spec 02**, no la implem
 
 ### `test_seed.py`
 
-- Idempotencia: `seed` corre en **cada despliegue**, así que no puede pisar los textos que PREDES haya editado. El catálogo de peligros es la excepción deliberada —es código, no contenido— y sí se restaura.
+- Idempotencia: `seed` se corre a mano en la instalación inicial y en **cada recarga de datos** del runbook, así que no puede pisar los textos que PREDES haya editado. El catálogo de peligros es la excepción deliberada —es código, no contenido— y sí se restaura. Ojo con la otra cara: **el despliegue no lo corre** (el entrypoint solo migra), así que lo que se añada al YAML y no a una migración de datos no llega a ningún servidor.
 - Grupos con sus permisos y con los nombres exactos de `core.grupos`; Prioridades oculta y no borrada, y el comparador sembrado fuera del menú (ADR-P2) con sus dos enlaces intactos.
 - Conteos canónicos tras `manage.py seed` sobre los Excel reales (marcado `lento`): **13 provincias · 112 distritos · 8,968 CCPP · 3,238 clasificados · 5,730 sin dato · 10,978 clasificaciones · 644 frecuencias en 64 distritos · 104 totales declarados en 26 distritos**. Si un refactor del importador pierde filas, esta prueba es la que lo dice.
 - Las anomalías conocidas siguen reportándose (229 sin nivel, 2 sin código, ACOMAYO sin fila, 21 con fila vacía, 90 con datos). **Las advertencias son un entregable**: son lo que PREDES le lleva a la fuente de los datos, así que silenciarlas es perder trabajo del cliente, no mejorar el importador.

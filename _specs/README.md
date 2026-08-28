@@ -13,6 +13,39 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — la barra superior llevaba nueve días sin el enlace a predes.org.pe
+
+- **El síntoma no era el que parecía.** «El enlace no se ve» sonaba a CSS —la banda es blanco al
+  90 % sobre `mountain-500`—, pero no había nada que ver: `GET /api/sitio/` del servidor devolvía
+  `menu.top: []` y el `<a>` no estaba en el DOM. La banda no lleva una sola clase de breakpoint,
+  así que ninguna hipótesis de maquetación podía ser cierta.
+- **Se añadió a dos de los tres sitios donde vive el menú.** El 19/08/2026 entró en la semilla
+  (`sitio.yaml`) y en el respaldo del frontend (`lib/sitio.tsx`), y faltó el tercero: la base ya
+  sembrada. Lo arregla la migración de datos `sitio.0007`, idempotente y reversible, que casa por
+  `(zona, url)` como `0004` —el texto es editable desde el admin y casar por él crearía una
+  segunda fila en vez de reconocer la que ya está—.
+- **Lo que lo volvió invisible fue una frase falsa repetida en cuatro sitios: «el seed corre en
+  cada despliegue».** No corre. `docker-entrypoint.sh` hace `migrate` y `meili_setup`, y `seed` es
+  un paso manual del runbook para la instalación inicial y las recargas. Por eso el enlace se veía
+  perfecto en desarrollo —donde alguien lo sembró a mano después del 19/08— y no existía en
+  ningún servidor. Corregida en `08-plan-pruebas.md`, en los docstrings de `test_seed.py` y en la
+  regla de `CLAUDE.md`, que ahora pide migración para **cualquier** cambio de menú y no solo para
+  uno de visibilidad. Las etiquetas del menú principal sí estaban al día en el servidor, y eso
+  confirma el mecanismo: llegaron por las migraciones `0004` y `0005`, no por el seed.
+- **La prueba que faltaba era e2e, y se comprobó que falla.** Las tres de `header.spec.ts`
+  localizaban `getByRole("navigation", { name: "Principal" })`, o sea solo el nav: la banda
+  superior no tenía ninguna cobertura. La nueva exige el `a[href="https://predes.org.pe/"]`
+  visible y con `target="_blank"`. Se verificó revirtiendo `sitio.0007` —lo que reproduce el
+  estado exacto del servidor—: falla en escritorio y en móvil, y vuelve a pasar al aplicarla. La
+  prueba de API que la acompaña guarda la semilla y el serializer, pero **no** habría cazado esto:
+  corre sobre una base recién sembrada por fixtures, que es justo el entorno donde el fallo no
+  existe.
+- **Queda fuera, anotado y sin tocar**: el contraste de la banda (2.2:1 medido en vivo, por debajo
+  del 4.5:1 de AA a 12 px) viene del prototipo aprobado; correr `seed --solo-catalogos` en el
+  entrypoint cerraría toda esta clase de fallo pero es un cambio de comportamiento del despliegue;
+  y `ConfiguracionSitio.redes` se serializa (`web: https://predes.org.pe/`) sin que ninguna
+  plantilla lo pinte.
+
 ### Actualización 28/08/2026 — una medida nace de una ficha ACC, y el contacto no pasa por la IA (ADR-D10)
 
 - **ADR-D10** extiende ADR-D7/D8 a `medidas.Medida` y estrena lo que faltaba: **un origen que no es
