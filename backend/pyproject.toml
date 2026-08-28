@@ -18,6 +18,9 @@ dependencies = [
     "nh3>=0.2.19",
     "meilisearch>=0.33",
     "google-genai>=1.0",
+    # Cliente de OpenRouter, no de OpenAI (ADR-A22): OpenRouter expone la API de OpenAI,
+    # así que su cliente es esta misma librería apuntada a otra `base_url`.
+    "openai>=1.60",
     "openpyxl>=3.1",
     "weasyprint>=63",
     # Captura del mapa del PDF en navegador headless (ver 02).

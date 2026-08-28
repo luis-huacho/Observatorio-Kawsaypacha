@@ -45,7 +45,7 @@ defensa.
 | Servidor con Debian/Ubuntu o RHEL/Rocky/Fedora, acceso `sudo` | PREDES |
 | **PostgreSQL 16 gestionado**: host, puerto, base, usuario, contraseña | PREDES |
 | DNS de `observatorio.predes.org.pe` y `obs.predes.org.pe` apuntando al servidor | PREDES |
-| Credenciales SMTP y `GEMINI_API_KEY` | PREDES (opcionales: sin ellas esas funciones se degradan con aviso) |
+| Credenciales SMTP, `GEMINI_API_KEY` y `OPENROUTER_API_KEY` | PREDES (opcionales: sin ellas esas funciones se degradan con aviso) |
 | `data/layers/` con los Excel y GeoJSON (145 MB) | PREDES |
 | `data/inversion/` con los CSV del PP 0068 | PREDES / el desarrollador |
 

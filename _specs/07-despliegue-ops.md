@@ -148,6 +148,7 @@ CSRF_TRUSTED_ORIGINS=https://obs.predes.org.pe,https://observatorio.predes.org.p
 POSTGRES_DB= POSTGRES_USER= POSTGRES_PASSWORD= POSTGRES_HOST=db POSTGRES_PORT=5432
 MEILI_URL=http://meilisearch:7700        MEILI_MASTER_KEY=
 GEMINI_API_KEY=
+OPENROUTER_API_KEY=  OPENROUTER_MODELO=deepseek/deepseek-v4-flash-0731
 EMAIL_HOST= EMAIL_PORT= EMAIL_HOST_USER= EMAIL_HOST_PASSWORD= DEFAULT_FROM_EMAIL=
 ADMIN_URL=loginseguro/ # admin fuera de /admin/ por defecto
 DJANGO_SUPERUSER_USERNAME= DJANGO_SUPERUSER_EMAIL= DJANGO_SUPERUSER_PASSWORD=   # los usa `manage.py seed`
@@ -209,4 +210,4 @@ Sesión grabada (registro audiovisual = anexo del informe final). El guion desar
 8. Leer el dashboard de métricas.
 9. Dónde están los backups y a quién llamar si algo falla.
 
-Pendientes de PREDES para producción: DNS de los dos dominios, credenciales SMTP, API key de Gemini (o se entrega una), servidor (acceso SSH), capas SIG oficiales, textos definitivos, y **publicar el ejercicio de inversión** (Inversión → Ejercicios → `visible`), que la importación deja oculto a propósito.
+Pendientes de PREDES para producción: DNS de los dos dominios, credenciales SMTP, API key de Gemini y de OpenRouter (o se entregan), servidor (acceso SSH), capas SIG oficiales, textos definitivos, y **publicar el ejercicio de inversión** (Inversión → Ejercicios → `visible`), que la importación deja oculto a propósito.

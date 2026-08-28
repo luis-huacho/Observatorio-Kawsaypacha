@@ -376,6 +376,15 @@ MEILI_URL = env("MEILI_URL", default="http://meilisearch:7700")
 MEILI_MASTER_KEY = env("MEILI_MASTER_KEY", default="")
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
 GEMINI_MODELO = env("GEMINI_MODELO", default="gemini-2.5-flash")
+# OpenRouter (ADR-A22): pasarela de IA de propósito general. Un solo secreto y un solo cliente
+# para cualquier modelo; el modelo se elige por variable de entorno y no por código.
+OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
+OPENROUTER_MODELO = env("OPENROUTER_MODELO", default="deepseek/deepseek-v4-flash-0731")
+OPENROUTER_BASE_URL = env("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
+# El timeout y el reintento con backoff que 03 pedía y que la integración con Gemini nunca llegó
+# a implementar. Aquí no hay que escribirlos: el cliente de `openai` los trae, basta pasárselos.
+OPENROUTER_TIMEOUT = env.float("OPENROUTER_TIMEOUT", default=60.0)
+OPENROUTER_REINTENTOS = env.int("OPENROUTER_REINTENTOS", default=1)
 
 # --- Datos y pipeline geoespacial ------------------------------------------
 # Excel y GeoJSON canónicos que alimentan `manage.py seed`. Fuera de la imagen: son 145 MB
