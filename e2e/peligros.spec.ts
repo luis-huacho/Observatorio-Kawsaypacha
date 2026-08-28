@@ -7,7 +7,7 @@
  */
 import { expect, test } from "./fixtures";
 
-import { aNumero, esperarApi, esperarMapaPintado, vigilarConsola } from "./apoyo";
+import { aNumero, esperarApi, esperarMapaPintado, irEsperando, vigilarConsola } from "./apoyo";
 
 import type { Page } from "@playwright/test";
 
@@ -35,8 +35,7 @@ test.describe("Visor de exposición a peligros", () => {
   test("el mapa carga y dibuja los centros poblados", async ({ page }) => {
     const errores = vigilarConsola(page);
 
-    await page.goto("/peligros");
-    const geojson = await esperarApi(page, "/api/ccpp/geojson/");
+    const geojson = await irEsperando(page, "/peligros", "/api/ccpp/geojson/");
     await esperarMapaPintado(page);
 
     const datos = await geojson.json();
@@ -49,8 +48,7 @@ test.describe("Visor de exposición a peligros", () => {
   }) => {
     // Fue un error real: con la tabla paginada de 50 en 50, el panel mostraba «50 CCPP» donde
     // hay 3,238. El total tiene que venir del resumen del API.
-    await page.goto("/peligros");
-    const resumen = await (await esperarApi(page, "/api/peligros/resumen/")).json();
+    const resumen = await (await irEsperando(page, "/peligros", "/api/peligros/resumen/")).json();
 
     const total = page.getByText(/CCPP$/).first();
     await expect(total).toBeVisible();
@@ -66,8 +64,7 @@ test.describe("Visor de exposición a peligros", () => {
   test("los resultados son una grilla por tipo, y cuentan centros poblados", async ({ page }) => {
     // La grilla es lo que sustituyó al panel «Distribución», que vivía dentro del `aside` de
     // filtros y se leía como una leyenda del mapa en vez de como la respuesta a la consulta.
-    await page.goto("/peligros");
-    const resumen = await (await esperarApi(page, "/api/peligros/resumen/")).json();
+    const resumen = await (await irEsperando(page, "/peligros", "/api/peligros/resumen/")).json();
 
     const bloque = page.getByRole("region", { name: "Resultados" });
     await expect(bloque).toBeVisible();
@@ -92,8 +89,7 @@ test.describe("Visor de exposición a peligros", () => {
       if (r.url().includes("/api/peligros/frecuencia/")) pedidas.push(r.url());
     });
 
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/territorio/distritos/");
+    await irEsperando(page, "/peligros", "/api/territorio/distritos/");
     await page.getByLabel("Provincia").selectOption({ index: 1 });
     await esperarApi(page, "provincia=");
     await page.getByLabel("Distrito").selectOption({ index: 1 });
@@ -116,8 +112,7 @@ test.describe("Visor de exposición a peligros", () => {
     // Es el requisito que evita el problema original: los filtros de exposición no pueden
     // afectar a un eje con otra taxonomía, así que este panel no depende de ellos ni del
     // distrito. Depender solo de la provincia lo hace evidente sin explicarlo.
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/territorio/distritos/");
+    await irEsperando(page, "/peligros", "/api/territorio/distritos/");
     await page.getByLabel("Provincia").selectOption({ index: 1 });
     await esperarApi(page, "provincia=");
     const respuesta = esperarApi(page, "/api/peligros/frecuencia/provincia/");
@@ -147,8 +142,7 @@ test.describe("Visor de exposición a peligros", () => {
     // Las dos agrupaciones vienen en el mismo payload. Y no suman igual a propósito: los
     // distritos que declaran subtotales sin desagregar (ADR-D1) cuentan por tipo de evento y no
     // por evento, así que el total sube al agrupar por tipo y la pantalla lo explica.
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/territorio/distritos/");
+    await irEsperando(page, "/peligros", "/api/territorio/distritos/");
     await page.getByLabel("Provincia").selectOption({ index: 1 });
     await esperarApi(page, "provincia=");
     const respuesta = esperarApi(page, "/api/peligros/frecuencia/provincia/");
@@ -171,8 +165,7 @@ test.describe("Visor de exposición a peligros", () => {
   test("encender y apagar las emergencias conserva la provincia y el distrito", async ({
     page,
   }) => {
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/territorio/distritos/");
+    await irEsperando(page, "/peligros", "/api/territorio/distritos/");
     await page.getByLabel("Provincia").selectOption({ index: 1 });
     await esperarApi(page, "provincia=");
     await page.getByLabel("Distrito").selectOption({ index: 1 });
@@ -194,15 +187,13 @@ test.describe("Visor de exposición a peligros", () => {
   test("la tabla dice cuántos centros poblados quedan sin clasificación", async ({ page }) => {
     // «Sin dato» no es «nivel bajo», y la pantalla tiene que decirlo o la tabla se lee como si
     // fuera el padrón completo.
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/peligros/resumen/");
+    await irEsperando(page, "/peligros", "/api/peligros/resumen/");
 
     await expect(page.getByText(/sin clasificación/i).first()).toBeVisible();
   });
 
   test("filtrar por peligro y por nivel reduce la tabla", async ({ page }) => {
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/ccpp/?");
+    await irEsperando(page, "/peligros", "/api/ccpp/?");
 
     const contador = page.getByText(/de .* centros poblados clasificados/i);
     await expect(contador).toBeVisible();
@@ -223,8 +214,7 @@ test.describe("Visor de exposición a peligros", () => {
   test("los niveles son una selección, no un umbral", async ({ page }) => {
     // Con el «nivel mínimo» de antes, pedir «Muy alto y Bajo» sin lo de en medio era
     // inexpresable. Es la consulta que distingue un checklist de un deslizador.
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/peligros/resumen/");
+    await irEsperando(page, "/peligros", "/api/peligros/resumen/");
 
     await soloPeligro(page, "Sismo");
     await esperarApi(page, "peligros=sismo");
@@ -242,8 +232,7 @@ test.describe("Visor de exposición a peligros", () => {
   });
 
   test("desde la grilla se llega a la relación de centros poblados", async ({ page }) => {
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/peligros/resumen/");
+    await irEsperando(page, "/peligros", "/api/peligros/resumen/");
 
     const fila = page.getByRole("row", { name: /Inundación/ });
     await fila.getByRole("button", { name: /Ver centros poblados/ }).click();
@@ -258,8 +247,7 @@ test.describe("Visor de exposición a peligros", () => {
   test("la tabla lista todos los peligros de cada centro poblado", async ({ page }) => {
     // El nivel máximo es un resumen: con 3.4 peligros de media por lugar, «Muy alto» no dice a
     // qué está expuesto, que es lo que decide qué medida le toca.
-    await page.goto("/peligros");
-    const filas = (await (await esperarApi(page, "/api/ccpp/?")).json()).results;
+    const filas = (await (await irEsperando(page, "/peligros", "/api/ccpp/?")).json()).results;
     const conVarios = filas.findIndex((f: { peligros: unknown[] }) => f.peligros.length > 1);
     expect(conVarios, "el API no devolvió ninguno con varios peligros").toBeGreaterThanOrEqual(0);
 
@@ -279,8 +267,7 @@ test.describe("Visor de exposición a peligros", () => {
     // la respuesta de una página bajo el número de la siguiente. Se veían filas duplicadas; lo
     // que no se veía, los centros poblados perdidos.
     const errores = vigilarConsola(page);
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/ccpp/?");
+    await irEsperando(page, "/peligros", "/api/ccpp/?");
 
     const filas = page.locator("table").last().locator("tbody tr");
     await expect(filas).toHaveCount(20);
@@ -298,8 +285,7 @@ test.describe("Visor de exposición a peligros", () => {
   });
 
   test("«Reiniciar» devuelve los filtros a su estado inicial", async ({ page }) => {
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/peligros/resumen/");
+    await irEsperando(page, "/peligros", "/api/peligros/resumen/");
 
     await soloPeligro(page, "Sismo");
     await esperarApi(page, "peligros=sismo");
@@ -319,8 +305,7 @@ test.describe("Visor de exposición a peligros", () => {
     // de estilo inválida tumba la capa entera, y un `icon-image` sin su imagen registrada
     // escupe un error por punto. Los dos fallos son mudos en la pantalla.
     const errores = vigilarConsola(page);
-    await page.goto("/peligros");
-    const geojson = await (await esperarApi(page, "/api/ccpp/geojson/")).json();
+    const geojson = await (await irEsperando(page, "/peligros", "/api/ccpp/geojson/")).json();
     await esperarMapaPintado(page);
 
     type Props = Record<string, unknown>;
@@ -341,8 +326,7 @@ test.describe("Visor de exposición a peligros", () => {
   test("desmarcar todos los peligros no muestra todo, sino nada", async ({ page }) => {
     // Un checklist vacío significa «ninguno». Interpretarlo como «todos» sorprendería a quien
     // acaba de desmarcarlo: pediría nada y se le devolvería la región entera.
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/peligros/resumen/");
+    await irEsperando(page, "/peligros", "/api/peligros/resumen/");
 
     await page
       .getByRole("group", { name: "Tipo de peligro" })
@@ -359,8 +343,7 @@ test.describe("Visor de exposición a peligros", () => {
     // poblados. Antes salía de `point_count` de MapLibre y era inmune a los filtros: el visor
     // conserva los que no cumplen para pintarlos en gris, así que el grupo seguía contándolos
     // mientras la tabla de al lado ya había encogido.
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/peligros/resumen/");
+    await irEsperando(page, "/peligros", "/api/peligros/resumen/");
 
     const contador = page.getByText(/peligros clasificados/);
     await expect(contador).toBeVisible();
@@ -390,8 +373,7 @@ test.describe("Visor de exposición a peligros", () => {
       if (/githubusercontent|github\.com|geoperu\.gob\.pe/.test(url)) externas.push(url);
     });
 
-    await page.goto("/peligros");
-    const capas = await (await esperarApi(page, "/api/mapas/capas/")).json();
+    const capas = await (await irEsperando(page, "/peligros", "/api/mapas/capas/")).json();
     await esperarMapaPintado(page);
 
     const limites = capas.filter((c: { slug: string }) => c.slug.startsWith("limites-"));
@@ -418,8 +400,7 @@ test.describe("Visor de exposición a peligros", () => {
   test("los centros poblados sin clasificación se pueden ocultar", async ({ page }) => {
     const errores = vigilarConsola(page);
 
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/ccpp/geojson/");
+    await irEsperando(page, "/peligros", "/api/ccpp/geojson/");
     await esperarMapaPintado(page);
 
     await page.getByRole("button", { name: /Capas/ }).click();
@@ -437,8 +418,7 @@ test.describe("Visor de exposición a peligros", () => {
   test("elegir provincia acota el ámbito y habilita la ayuda memoria por distrito", async ({
     page,
   }) => {
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/territorio/distritos/");
+    await irEsperando(page, "/peligros", "/api/territorio/distritos/");
 
     // El PDF es por distrito a propósito: un informe regional produce decenas de páginas y deja
     // de servir para una reunión.
@@ -451,8 +431,7 @@ test.describe("Visor de exposición a peligros", () => {
   });
 
   test("el popup del mapa lleva a la ficha del centro poblado", async ({ page }) => {
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/ccpp/geojson/");
+    await irEsperando(page, "/peligros", "/api/ccpp/geojson/");
     await esperarMapaPintado(page);
 
     // Se llega a la ficha por la tabla, que es el camino accesible y estable; el popup del mapa
@@ -472,13 +451,11 @@ test.describe("Visor de exposición a peligros", () => {
     // la consola queda limpia: un `icon-image` sin su imagen registrada escupe un error por
     // símbolo, y con la corona son varios por punto.
     const errores = vigilarConsola(page);
-    await page.goto("/peligros");
-    const filas = (await (await esperarApi(page, "/api/ccpp/?")).json()).results;
+    const filas = (await (await irEsperando(page, "/peligros", "/api/ccpp/?")).json()).results;
     const conVarios = filas.find((f: { peligros: unknown[] }) => f.peligros.length > 1);
     expect(conVarios, "el API no devolvió ninguno con varios peligros").toBeTruthy();
 
-    await page.goto(`/peligros/${conVarios.codigo}`);
-    await esperarApi(page, `/api/ccpp/${conVarios.codigo}/`);
+    await irEsperando(page, `/peligros/${conVarios.codigo}`, `/api/ccpp/${conVarios.codigo}/`);
     await esperarMapaPintado(page);
 
     // La población no tiene fuente respaldada; la columna «Tipo / Detalle» mostraba «—» en las
@@ -497,8 +474,7 @@ test.describe("Visor de exposición a peligros", () => {
   test("la ayuda memoria descarga un PDF de verdad", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === "movil", "la descarga se comprueba en escritorio");
 
-    await page.goto("/peligros");
-    await esperarApi(page, "/api/territorio/distritos/");
+    await irEsperando(page, "/peligros", "/api/territorio/distritos/");
 
     // El selector trabaja con nombres y la capa de datos los traduce a ubigeo para el API.
     await page.getByLabel("Provincia").selectOption({ index: 1 });

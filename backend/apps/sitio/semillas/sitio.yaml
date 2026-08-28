@@ -16,23 +16,26 @@ configuracion:
 # --- Barra superior ---------------------------------------------------------
 menu:
   - {zona: top, texto: predes.org.pe, url: 'https://predes.org.pe/', orden: 1}
-  - {zona: top, texto: Sobre el observatorio, url: /sobre, orden: 2}
 
   # --- Menú principal --------------------------------------------------------
-  - {zona: header, texto: Peligros, url: /peligros, orden: 1}
-  - {zona: header, texto: Medidas, url: /medidas, orden: 2}
-  - {zona: header, texto: Inversión, url: /inversion, orden: 3}
-  - {zona: header, texto: Normativa, url: /normativa, orden: 4}
+  # «Sobre el observatorio» abre el menú: es la puerta de entrada para quien llega sin saber qué
+  # es esto, y por eso va antes que las ventanas de datos. Es la etiqueta más larga de la barra,
+  # así que al tocar el menú hay que volver a medir que entre en una línea (`e2e/header.spec.ts`).
+  - {zona: header, texto: Sobre el observatorio, url: /sobre, orden: 1}
+  - {zona: header, texto: Peligros, url: /peligros, orden: 2}
+  - {zona: header, texto: Buenas prácticas, url: /medidas, orden: 3}
+  - {zona: header, texto: Inversión, url: /inversion, orden: 4}
+  - {zona: header, texto: Normativa, url: /normativa, orden: 5}
   # El comparador sale de la navegación (ADR-P2): la ruta del SPA y `/api/comparador/distritos/`
   # siguen vivos y se llega por URL, pero no se anuncia. Se oculta, no se borra: volver a mostrarlo
   # es marcar la casilla «visible» en el admin.
-  - {zona: header, texto: Comparar distritos, url: /comparar, orden: 5, visible: false}
+  - {zona: header, texto: Comparar distritos, url: /comparar, orden: 6, visible: false}
   # Prioridades existe con visible=false y NO se borra (ADR-P1): la decisión fue desactivar la
   # ventana para este proyecto, no descartarla.
   - {zona: header, texto: Prioridades, url: /prioridades, orden: 7, visible: false}
 
   - {zona: footer, grupo: Secciones, texto: Peligros, url: /peligros, orden: 1}
-  - {zona: footer, grupo: Secciones, texto: Medidas, url: /medidas, orden: 2}
+  - {zona: footer, grupo: Secciones, texto: Buenas prácticas, url: /medidas, orden: 2}
   - {zona: footer, grupo: Secciones, texto: Inversión, url: /inversion, orden: 3}
   - {zona: footer, grupo: Secciones, texto: Comparar distritos, url: /comparar, orden: 4, visible: false}
   - {zona: footer, grupo: Más, texto: Normativa, url: /normativa, orden: 5}

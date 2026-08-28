@@ -7,14 +7,13 @@
  */
 import { expect, test } from "./fixtures";
 
-import { esperarApi, vigilarConsola } from "./apoyo";
+import { esperarApi, irEsperando, vigilarConsola } from "./apoyo";
 
 test.describe("Medidas", () => {
   test("el listado sale del API y cada tarjeta tiene su imagen", async ({ page }) => {
     const errores = vigilarConsola(page);
 
-    await page.goto("/medidas");
-    const datos = await (await esperarApi(page, "/api/medidas/")).json();
+    const datos = await (await irEsperando(page, "/medidas", "/api/medidas/")).json();
 
     if (datos.count === 0) test.skip(true, "no hay medidas publicadas (seed sin --demo)");
 
@@ -31,8 +30,7 @@ test.describe("Medidas", () => {
   });
 
   test("elegir un peligro llega al API y recorta el listado", async ({ page }) => {
-    await page.goto("/medidas");
-    const datos = await (await esperarApi(page, "/api/medidas/")).json();
+    const datos = await (await irEsperando(page, "/medidas", "/api/medidas/")).json();
     if (datos.count === 0) test.skip(true, "no hay medidas publicadas (seed sin --demo)");
 
     const selectores = page.locator("select");
@@ -51,8 +49,7 @@ test.describe("Medidas", () => {
   });
 
   test("la ficha abre con su contenido", async ({ page }) => {
-    await page.goto("/medidas");
-    const datos = await (await esperarApi(page, "/api/medidas/")).json();
+    const datos = await (await irEsperando(page, "/medidas", "/api/medidas/")).json();
     if (datos.count === 0) test.skip(true, "no hay medidas publicadas (seed sin --demo)");
 
     const primera = page.locator('a[href^="/medidas/"]').first();
@@ -74,8 +71,7 @@ test.describe("Medidas", () => {
   });
 
   test("los chips de palabras clave llevan al listado recortado", async ({ page }) => {
-    await page.goto("/medidas");
-    const datos = await (await esperarApi(page, "/api/medidas/")).json();
+    const datos = await (await irEsperando(page, "/medidas", "/api/medidas/")).json();
     if (datos.count === 0) test.skip(true, "no hay medidas publicadas (seed sin --demo)");
 
     const chips = page.locator('a[href*="tema="]');

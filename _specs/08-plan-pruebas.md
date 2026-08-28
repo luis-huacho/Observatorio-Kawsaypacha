@@ -177,11 +177,19 @@ Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** 
 | `inversion.spec.ts` | Según lo que responda el API del entorno: con ejercicio publicado se dibuja el tablero (KPIs, PIA→PIM→devengado, procesos de la GRD, tabla de **municipalidades** y aviso del corte parcial); sin él, el estado vacío, **no un cero ni un gráfico en blanco** · el ranking **ordena de verdad** por su columna, que con 116 filas no se nota a ojo · la tabla **se pagina** y «Ver 50 más» trae más filas · la ficha se abre y **el ejercicio elegido sobrevive al volver** · una municipalidad inexistente no deja la página en blanco · comparar ejercicios **advierte** cuando los cortes no son comparables · la sección sigue anunciada en el menú · **el cuadro de evolución** trae una fila por ejercicio publicado y marca el corte parcial · **el visor declara el dinero que no puede pintar** y a nivel provincial ese pie desaparece, porque a ese nivel no queda nada fuera · **el reporte en PDF se ofrece y se descarga de verdad**, y su enlace arrastra `nivel` y `metrica`; se afirma sobre la **respuesta HTTP** (`%PDF` y `content-type`) y no sobre el visor de PDF del navegador, que sería una dependencia ajena al fallo que importa. Del mapa se afirma sobre **la leyenda y el pie**, que son DOM real: el canvas de MapLibre no se inspecciona, porque un `expect` sobre píxeles falla por razones que no son el fallo que importa. **Tres trampas del propio spec**: `esperarApi` casa por subcadena, así que `/api/inversion/` atrapa la respuesta de `/api/inversion/entidades/`; la espera hay que armarla **antes** de `goto`, porque la respuesta puede llegar antes del `load`; y desde que existe el cuadro de evolución **hay dos `<table>` en la página**, así que los selectores del listado se acotan a su sección — un `table tbody tr` suelto leería las cifras por año como si fueran municipalidades, y también son números |
 | `header.spec.ts` | «Comparar distritos» no se ofrece en la navegación (ADR-P2), y el resto del menú sí sigue ahí · en escritorio el menú **cabe en una línea** a 1024, 1280 y 1440 px, sin que la página desborde a lo ancho · la «X» vacía la caja de búsqueda de la cabecera sin navegar |
 
-Tres convenciones que la suite impone desde `e2e/apoyo.ts` y `e2e/fixtures.ts`:
+Cuatro convenciones que la suite impone desde `e2e/apoyo.ts` y `e2e/fixtures.ts`:
 
 1. **Se vigila la consola.** Un error de JavaScript no rompe la página de forma visible —React sigue pintando lo que puede—, así que sin esto se puede dar por bueno un visor que perdió su capa de puntos.
 2. **El beacon de métricas se descarta.** El tráfico de las pruebas no es uso real y no debe acabar en el panel del admin.
 3. **Los enlaces del menú se buscan con `:visible`.** Existen dos veces —nav de escritorio y panel móvil— y solo una se muestra según el ancho; `.first()` cae siempre en la de escritorio.
+4. **Para navegar se usa `irEsperando`, no `goto` + `esperarApi`.** `page.goto()` resuelve con el
+   evento `load`, que espera a la imagen del hero; React ya montó y disparó sus peticiones mucho
+   antes, así que registrar el escucha después de `goto` es una carrera perdida: las respuestas ya
+   pasaron y la espera se agota a los 30 s **como si el sitio estuviera caído**. Tenía en rojo tres
+   pruebas de la portada con el sitio funcionando perfectamente, y la única que pasaba lo hacía por
+   casualidad —esperaba `/api/sitio/`, que resulta ser la última petición en llegar—. `irEsperando`
+   registra el escucha y **luego** navega. Para las esperas que siguen a un clic o a un cambio de
+   filtro sigue valiendo `esperarApi` a secas: ahí la interacción es posterior al registro.
 
 Y dos trampas más, las dos con la misma forma —**la prueba comprobaba la intención y no el
 resultado**—, las dos encontradas por un fallo real:

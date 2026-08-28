@@ -18,13 +18,12 @@
  */
 import { expect, test } from "./fixtures";
 
-import { esperarApi } from "./apoyo";
+import { irEsperando } from "./apoyo";
 import { abrirMenu } from "./fixtures";
 
 test.describe("Menú superior", () => {
   test("comparar distritos no se ofrece en la navegación", async ({ page }) => {
-    await page.goto("/");
-    await esperarApi(page, "/api/sitio/");
+    await irEsperando(page, "/", "/api/sitio/");
     // En móvil los enlaces viven detrás del botón de hamburguesa: sin abrirlo, la comprobación
     // pasaría por estar el panel cerrado y no por la decisión que se quiere fijar.
     await abrirMenu(page);
@@ -59,8 +58,7 @@ test.describe("Menú superior", () => {
   test("el menú de escritorio cabe en una línea", async ({ page, isMobile }) => {
     test.skip(!!isMobile, "en móvil el menú es un panel vertical, por diseño");
 
-    await page.goto("/");
-    await esperarApi(page, "/api/sitio/");
+    await irEsperando(page, "/", "/api/sitio/");
     const menu = page.getByRole("navigation", { name: "Principal" });
     const enlaces = menu.locator("a");
     await expect(enlaces.first()).toBeVisible();

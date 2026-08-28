@@ -162,7 +162,7 @@ export default function Comparar() {
                       etiqueta="Con clasificación"
                       valor={formatNumber(t.total_ccpp - t.por_ccpp.sin_clasificar)}
                     />
-                    <Dato etiqueta="Medidas documentadas" valor={String(t.medidas_publicadas)} />
+                    <Dato etiqueta="Buenas prácticas documentadas" valor={String(t.medidas_publicadas)} />
                   </dl>
 
                   <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-600">

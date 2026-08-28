@@ -13,6 +13,94 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 27/08/2026 — la suite E2E no cabía en su propia cuota (429)
+
+La suite completa fallaba en bloque —`peligros`, `inversion`, `medidas`, `buscar`— y parecía una
+regresión de los cambios del día. No lo era: **el API respondía 429 a media corrida**.
+
+- **La aritmética.** `AnonRateThrottle` a `anon: 1000/hour` por IP se aplicaba **igual en desarrollo
+  que en producción**: no estaba dentro de ningún `if DEBUG`. La suite son 56 casos × 2 proyectos =
+  112 corridas, **cada una con caché de navegador fría** —Playwright abre un contexto nuevo por
+  prueba, no hay `storageState`— y la portada sola dispara 8 peticiones. ~1.100 contra 1.000: **la
+  suite no cabe en la cuota**, y una vez agotada todo responde 429 durante el resto de la hora.
+- **Por qué costó verlo.** *Un 429 no se parece a un límite, se parece a un sitio caído.* La prueba
+  solo ve que los datos no llegan y agota sus 30 s igual que con el backend muerto. Lo delató que
+  las corridas **sueltas** pasaban siempre: el fallo dependía del volumen, no del código. Se
+  confirmó recargando la portada a mano mientras la suite corría — la consola pasó de 0 a 8 errores,
+  los ocho `429`.
+- **La caché no era la salida.** Era la hipótesis natural («que no repita las peticiones»), y no
+  sirve: cada prueba parte de un contexto nuevo, así que no hay nada que reutilizar.
+- **El arreglo.** `THROTTLE_PRODUCCION` en `settings.py` conserva los valores del servicio, y cada
+  uno se puede sustituir por su variable de entorno; **vaciarla desactiva ese límite**.
+  `compose.dev.yml` las vacía las tres. Producción no cambia: sin variables definidas rigen los
+  mismos 1000/hora, 30/hora y 600/min, comprobado en un contenedor sin ellas.
+- **Las tres, no solo `anon`.** `descarga: 30/hour` es aún más justa, y `inversion.spec.ts` pide el
+  PDF en los dos proyectos.
+- **La prueba que lo cazó bien.** `test_las_descargas_estan_limitadas` afirmaba sobre la tasa
+  *efectiva* y se puso roja al vaciarla — tenía razón en existir, pero el anclaje ya no valía: ahora
+  afirma sobre `THROTTLE_PRODUCCION`, que no depende de dónde se corra. Una prueba de configuración
+  debe fijar **la decisión**, no el valor que resulte del entorno.
+- El techo de **producción** sí va corto (125 vistas/hora por IP, y una oficina tras NAT comparte
+  IP), pero es otra decisión: queda con la caché en `_docs/deuda-tecnica.md`, archivo nuevo porque
+  el tracker estaba inaccesible ese día.
+
+### Actualización 27/08/2026 — los textos de la portada, «Buenas prácticas» y la lupa
+
+Encargo de contenido con dos consecuencias técnicas que solo salieron al medirlo.
+
+- **El hero no necesitaba tocar código.** El título y el subtítulo pedidos ya estaban, palabra por
+  palabra, en la semilla y en los respaldos de `Home.tsx` desde el commit `b635d54`; lo que se veía
+  salía de la base, que se quedó con los del prototipo. Segunda vez en el mismo día que aparece este
+  patrón: **si un texto administrable «no cambia», mirar la BD antes que el código.**
+- **`Medidas` → `Buenas prácticas` en todo lo visible**, con una regla para no pasarse: se cambia
+  donde nombra la sección (menú, pie, H1, grupo del buscador, `Comparar`), y se deja donde «medidas»
+  es un sustantivo común dentro de una frase. La ruta `/medidas`, el API, el índice de Meilisearch y
+  el admin **no se tocan**. De paso cierra una incoherencia que ya existía: la tarjeta de la portada
+  decía «Buenas prácticas» mientras el menú decía «Medidas».
+- **El buscador de la cabecera colapsa a lupa entre `lg` y `xl`.** Con la etiqueta nueva el nav pasa
+  de 496 a **555 px** a 1024 px, y al campo le quedaban **63 px**. Lo importante: *la prueba de la
+  línea única seguía pasando* —no hay enlaces partidos ni desborde—, así que el arreglo anterior
+  «que el buscador ceda» habría degradado el buscador hasta lo inservible **sin que nada fallara**.
+  De `md` a `lg` el campo sigue visible, porque ahí el menú está tras la hamburguesa y sobra sitio.
+- **Tres pruebas de la portada estaban en rojo con el sitio perfecto.** No era un fallo del front
+  —las 8 peticiones responden 200 y la consola está limpia—, sino del arnés: `esperarApi` registraba
+  el escucha **después** de `page.goto()`, y como `goto` resuelve con `load` (que espera la imagen
+  del hero), React ya había disparado y recibido sus peticiones. La única que pasaba lo hacía por
+  casualidad: esperaba `/api/sitio/`, la última respuesta en llegar. El spec 08 ya había anotado la
+  trampa para `inversion.spec.ts` sin generalizarla; ahora vive en `irEsperando`, que registra y
+  luego navega, y se aplicó a los **37 sitios** con ese patrón. `esperarApi` se queda para las
+  esperas que siguen a un clic, donde no hay carrera.
+- Migración `sitio.0005`. Los bloques del hero se reescriben **solo si conservan el texto viejo
+  exacto**: son contenido que PREDES edita, y el contrato es no pisar lo editado.
+
+### Actualización 27/08/2026 — el menú abre con «Sobre el observatorio»
+
+Cambio pedido sobre el menú principal: «Exposición a peligros» pasa a llamarse **«Peligros»**,
+«Sobre» pasa a **«Sobre el observatorio»**, y esta última **abre el menú** en lugar de cerrarlo. El
+nav queda `Sobre el observatorio · Peligros · Medidas · Inversión · Normativa` (Medidas pasó a
+«Buenas prácticas» ese mismo día, ver la entrada de arriba), y la barra superior
+gris se queda con `predes.org.pe` y `Contacto`.
+
+- **La mitad del cambio ya estaba en el código y no se veía.** El commit `51a9795` había renombrado
+  las etiquetas en la semilla y en el respaldo del frontend, pero **sin migración de datos**: como
+  `semilla.sembrar` crea lo que falta y no pisa lo que existe, la base ya sembrada seguía sirviendo
+  las etiquetas viejas y el cambio solo se habría visto en instalaciones nuevas. Que la zona `top`
+  estuviera **vacía** en la BD fue la prueba de que `seed` no había vuelto a correr desde entonces.
+- **La trampa que cerró la migración `sitio.0004`.** El seed casa las filas por
+  `(zona, url, texto)`, así que cambiar solo la etiqueta del YAML **no actualiza** la fila: crea una
+  segunda, y el menú habría mostrado «Exposición a peligros» *y* «Peligros». La migración opera por
+  `(zona, url)` —lo estable— y desduplica antes de renombrar, por si algún entorno ya había sembrado
+  con el YAML nuevo. Se comprueba con una prueba que corre `seed` **dos veces** y exige que ningún
+  `(zona, url)` tenga más de una fila; y tras aplicarla, `seed` reporta *1 enlace nuevo* (el
+  `predes.org.pe` de la barra superior, que nunca llegó a sembrarse) y *17 ya existían*.
+- **El menú sigue entrando en una línea, y esta vez se midió.** «Sobre el observatorio» tiene los
+  mismos 21 caracteres que «Exposición a peligros», la etiqueta que en su día partía el nav en dos a
+  1024 px. Ahora no se parte porque aquel arreglo dejó los enlaces con `whitespace-nowrap` y al
+  buscador como el que cede: a 1024 px el nav mide 495 px y el buscador baja a 184 px (campo de
+  134 px, con el marcador de posición recortado). Pasa, pero sin margen para otra entrada.
+- Los tres sitios tocados, como manda la regla: la semilla, la base sembrada (migración) y el menú
+  de respaldo de `frontend/src/lib/sitio.tsx`. Se corrigieron además 02 y 06.
+
 ### Actualización 27/08/2026 — el pipeline llega a los specs, y la documentación deja de mentir
 
 El despliegue automático de la entrada de abajo quedó bien contado en `_docs` y en esta bitácora,

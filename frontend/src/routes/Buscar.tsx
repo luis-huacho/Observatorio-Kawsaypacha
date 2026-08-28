@@ -58,7 +58,7 @@ export default function Buscar() {
           buscando
             ? "Buscando…"
             : q
-              ? `${formatNumber(total)} resultado(s) en medidas, normativa, noticias, documentos, videos y eventos.`
+              ? `${formatNumber(total)} resultado(s) en buenas prácticas, normativa, noticias, documentos, videos y eventos.`
               : "Busca por medida, norma, noticia, documento o centro poblado."
         }
       />

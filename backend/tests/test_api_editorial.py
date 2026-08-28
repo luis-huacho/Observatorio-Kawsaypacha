@@ -281,12 +281,17 @@ def test_las_descargas_estan_limitadas(api, norma, monkeypatch, settings):
     Se comprueba el ajuste **y** que el límite se aplica de verdad. Bajarlo a 2/hora se hace
     parcheando la clase, no el ajuste: DRF liga las tasas al definir la clase (ver
     `sin_throttling` en conftest).
+
+    Se afirma sobre `THROTTLE_PRODUCCION` y no sobre `DEFAULT_THROTTLE_RATES`, que es lo que la
+    aplicación acaba usando: desde que las tasas se pueden vaciar por variable de entorno, la
+    efectiva vale `None` en cualquier entorno de desarrollo, y una prueba que la mirase pasaría a
+    fallar según dónde se corra en vez de según lo que se haya cambiado.
     """
     from django.core.cache import cache
 
     from apps.api.throttling import DescargaThrottle
 
-    assert settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["descarga"] == "30/hour"
+    assert settings.THROTTLE_PRODUCCION["descarga"] == "30/hour"
     monkeypatch.setattr(DescargaThrottle, "get_rate", lambda self: "2/hour")
     cache.clear()
 

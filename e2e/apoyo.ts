@@ -61,6 +61,36 @@ export async function esperarApi(page: Page, ruta: string | RegExp): Promise<Res
   return respuesta;
 }
 
+/**
+ * Navega **y** espera la respuesta del API, en ese orden pero registrando la escucha antes.
+ *
+ * `esperarApi` después de un `page.goto()` es una carrera perdida de antemano: `goto` resuelve con
+ * el evento `load`, que espera a la imagen del hero, mientras React ya montó y disparó sus
+ * peticiones. Cuando se registra el escucha, las respuestas **ya pasaron** y la espera se agota a
+ * los 30 s como si el sitio estuviera roto. Es lo que tenía en rojo tres pruebas de la portada, con
+ * el sitio funcionando perfectamente.
+ *
+ * Funciona porque `page.waitForResponse()` engancha su escucha de forma síncrona: llamar a
+ * `esperarApi` **sin `await`** deja la promesa pendiente con el escucha ya puesto, y solo entonces
+ * se navega.
+ *
+ * Para las esperas que siguen a un clic o a un cambio de filtro sigue valiendo `esperarApi` a
+ * secas: ahí la interacción es posterior al registro y no hay carrera.
+ */
+export async function irEsperando(
+  page: Page,
+  destino: string,
+  ruta: string | RegExp,
+): Promise<Response> {
+  const respuesta = esperarApi(page, ruta);
+  // Marca la promesa como atendida sin consumirla: si `goto` falla antes de que se llegue al
+  // `return`, Node avisaría de un rechazo sin gestionar y ensuciaría la salida con un aviso que no
+  // es el fallo. El rechazo sigue vivo y salta igual al esperarla abajo.
+  respuesta.catch(() => {});
+  await page.goto(destino);
+  return respuesta;
+}
+
 /** El canvas de MapLibre existe **y ha pintado algo**: un canvas en blanco pasa cualquier `toBeVisible`. */
 export async function esperarMapaPintado(page: Page): Promise<void> {
   const canvas = page.locator("canvas.maplibregl-canvas");

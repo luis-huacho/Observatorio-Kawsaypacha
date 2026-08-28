@@ -19,7 +19,7 @@ const SEARCH_KEY: string = import.meta.env.VITE_MEILI_SEARCH_KEY ?? "";
 
 /** Índices de contenido de la búsqueda global. Los CCPP van aparte (autocompletado del mapa). */
 export const INDICES_CONTENIDO = [
-  { indice: "medidas", etiqueta: "Medidas" },
+  { indice: "medidas", etiqueta: "Buenas prácticas" },
   { indice: "normativa", etiqueta: "Normativa" },
   { indice: "noticias", etiqueta: "Noticias" },
   { indice: "documentos", etiqueta: "Documentos" },

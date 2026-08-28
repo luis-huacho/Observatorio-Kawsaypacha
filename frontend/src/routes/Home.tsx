@@ -28,7 +28,7 @@ const SECCIONES = [
     to: "/inversion",
     icon: Coins,
     titulo: "Inversión",
-    pregunta: "Cuánto y en qué se invirte el PP0068",
+    pregunta: "¿Cuánto y en qué se invierte el PP0068?",
     color: "from-sky-700 to-sky-500",
   },
 ];
@@ -115,10 +115,10 @@ export default function Home() {
               dangerouslySetInnerHTML={{ __html: heroSubtitulo }}
             />
             <div className="mt-8 flex flex-wrap gap-3 animate-fade-up" style={{ animationDelay: "240ms" }}>
-              <Link to="/sobre" className="btn-ghost text-white hover:bg-white/10">
+              <Link to="/sobre" className="btn-primary bg-white text-mountain-900 hover:bg-paper">
                 Sobre el observatorio
               </Link>
-              <Link to="/peligros" className="btn-primary bg-white text-mountain-900 hover:bg-paper">
+              <Link to="/peligros" className="btn-ghost text-white hover:bg-white/10">
                 Explorar mi distrito <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -140,9 +140,9 @@ export default function Home() {
         <Reveal>
           <div className="card grid grid-cols-2 md:grid-cols-4 divide-x divide-ink-300/30 overflow-hidden">
             <Stat label="Distritos cubiertos" value={distritos != null ? String(distritos) : "…"} />
-            <Stat label="CCPP con peligro alto/muy alto" value={ccppAltos != null ? formatNumber(ccppAltos) : "…"} accent />
-            <Stat label="de experiencias exitosas" value={experienciasExitosas != null ? formatNumber(experienciasExitosas) : "…"} />
-            <Stat label="de municipios con presupuesto ejecutado" value={municipiosConEjecucion != null ? formatNumber(municipiosConEjecucion) : "…"} />
+            <Stat label="Centros poblados con peligro alto/muy alto" value={ccppAltos != null ? formatNumber(ccppAltos) : "…"} accent />
+            <Stat label="Experiencias exitosas" value={experienciasExitosas != null ? formatNumber(experienciasExitosas) : "…"} />
+            <Stat label="Municipios con presupuesto ejecutado" value={municipiosConEjecucion != null ? formatNumber(municipiosConEjecucion) : "…"} />
           </div>
         </Reveal>
       </section>
@@ -193,8 +193,8 @@ export default function Home() {
 
       {/* Casos */}
       <section className="container-page mt-16">
-        <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Medidas y buenas prácticas</h2>
-        <p className="text-ink-600 mt-1 text-center">Qué hacer ante las sequías e incendios forestales</p>
+        <h2 className="font-display text-3xl font-bold text-mountain-700 text-center">Buenas prácticas</h2>
+        <p className="text-ink-600 mt-1 text-center">¿Qué hacer ante las sequías e incendios forestales?</p>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {/* Cada tarjeta lleva a su ficha, no al listado genérico. */}
           {casos.map((m, i) => (

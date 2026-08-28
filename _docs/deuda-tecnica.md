@@ -39,7 +39,7 @@ bitácora, no esta lista.
 
 | Qué es | Declarado en | Qué cuesta hoy | Qué lo salda |
 |---|---|---|---|
-| **El CI no corre las pruebas.** Bitbucket Pipelines solo comprueba tipos (`tsc --noEmit`) | ADR-A21, [`_specs/10-pipeline-cicd.md`](../_specs/10-pipeline-cicd.md) | 259 pruebas de backend y 56 casos E2E que **nadie dispara automáticamente**. Un check verde no dice que pasaran; dice que el frontend compila. La puerta previa al despliegue es una regla de conducta | Un runner con GDAL, tippecanoe, WeasyPrint y Chromium, o el stack levantado en CI. Hoy no compensa: por eso el ADR |
+| **El CI no corre las pruebas.** Bitbucket Pipelines solo comprueba tipos (`tsc --noEmit`) | ADR-A21, [`_specs/10-pipeline-cicd.md`](../_specs/10-pipeline-cicd.md) | 261 pruebas de backend y 56 casos E2E que **nadie dispara automáticamente**. Un check verde no dice que pasaran; dice que el frontend compila. La puerta previa al despliegue es una regla de conducta | Un runner con GDAL, tippecanoe, WeasyPrint y Chromium, o el stack levantado en CI. Hoy no compensa: por eso el ADR |
 | **`ruff` está configurado y no instalado** | `backend/pyproject.toml` (`[tool.ruff]`, línea 56) | Un bloque de configuración que no gobierna nada. Quien lo lea supondrá que el código pasa por un linter, y no pasa | Añadir `ruff` al grupo `dev` y correrlo, o borrar el bloque. Las dos salidas son mejores que la actual |
 | **No hay ESLint**: `npm run lint` es `tsc --noEmit` | `frontend/package.json` | Los tipos se comprueban; las reglas de estilo y los errores que el compilador no ve, no | Cuando el frontend lo pida. No es urgente con un solo desarrollador |
 | **No hay ningún script que corra la suite completa** | — | La secuencia entera está en `comandos.md` y en 08, y se teclea a mano cada vez, en el orden correcto | Un script, el día que el orden se recuerde mal — que es exactamente lo que pasó con el despliegue el 27/08 |
@@ -65,6 +65,19 @@ bitácora, no esta lista.
 | **Ocho observaciones de calidad de datos, abiertas con el cliente** | [`_specs/00`](../_specs/00-alcance-decisiones.md) §Observaciones | Filas sin nivel, un distrito sin fila de frecuencia, subtotales sin desagregar, dos grafías de la misma fuente. El sitio publica lo que hay y lo declara | Que PREDES corrija en origen. **No se copian aquí**: eran seis y ya son ocho, y una copia se habría quedado en seis |
 | **Dependencias del cliente aún abiertas** | [`_specs/00`](../_specs/00-alcance-decisiones.md) §Dependencias | Las funciones afectadas se degradan con aviso, no fallan | Cada una, cuando llegue lo suyo |
 
+## Rendimiento y límites del API
+
+Todo esto salió de una misma investigación (27/08/2026): la suite E2E no cabía en la cuota anónima
+del API y fallaba en bloque con 429. El límite en desarrollo ya está resuelto —las tasas se leen del
+entorno y `compose.dev.yml` las vacía—; lo que queda aquí es lo que sigue costando en producción.
+
+| Qué es | Declarado en | Qué cuesta hoy | Qué lo salda |
+|---|---|---|---|
+| **El techo anónimo va corto para una oficina.** `anon: 1000/hour` por IP, y la portada pide 8 veces por carga | `THROTTLE_PRODUCCION` en `backend/config/settings.py`, [`_specs/02`](../_specs/02-api.md) §Las tasas se configuran por entorno | **125 vistas de página por hora y por IP**, y una oficina entera tras un NAT comparte una sola: treinta personas tienen ~4 vistas cada una antes del 429. Es el mismo escenario que ya obligó a subir el beacon a 600/min, resuelto allí y no aquí | Decidir la cifra. **Ya no hace falta tocar código**: basta `API_THROTTLE_ANON` en el `.env` del servidor. Ojo también con `descarga: 30/hour`, la más justa de las tres |
+| **Cinco de los siete endpoints de la portada no mandan `Cache-Control`**: `/peligros/resumen/`, `/territorio/distritos/`, `/medidas/`, `/noticias/`, `/normativa/` | Las cabeceras que sí existen, en `backend/apps/api/views/sitio.py:24` e `inversion.py:84` y `:210` | El más caro está entre los descubiertos: `/peligros/resumen/` hace **dos pasadas completas sobre los 8.968 centros poblados** (`backend/apps/peligros/consultas.py:57-97`), con un bucle en Python, en cada carga. `/territorio/distritos/` sirve los 112 distritos enteros para un catálogo que no cambia nunca | Añadir `cache_control` donde toque, que es una línea por vista. El criterio de cuánto dura cada uno es la decisión, no el código |
+| **No hay caché de servidor en ningún nivel**: `CACHES` sin configurar, sin `cache_page`, y la zona `proxy_cache_path` de nginx **declarada y nunca usada** | `deploy/nginx/conf.d/observatorio.conf:23` | Cada petición recalcula. Y una consecuencia poco intuitiva: **el contador del throttle vive en esa caché**, así que con `LocMemCache` es por proceso — con N workers de gunicorn el límite efectivo es N × la tasa, e inconsistente entre ellos | Configurar `CACHES`, o usar la zona de nginx que ya está declarada. Mientras tanto, reiniciar el backend borra los 429 al instante |
+| **La portada pide 8 veces lo que cabría en 2** | `frontend/src/routes/Home.tsx:39-68` | Tres de las cuatro cifras bajan un payload entero para leer un número: los 112 distritos para hacer `.length`, un `COUNT(*)` para leer `.count`, un agregado caro para un solo campo. Y `/medidas/` se pide dos veces | Un `/api/portada/` con `cache_control`. El patrón ya existe y está bendecido: el docstring de `backend/apps/api/views/sitio.py:17-22` explica por qué el cascarón va en una sola petición |
+
 ## Documentación como deuda
 
 | Qué es | Qué cuesta hoy | Qué lo salda |
@@ -82,6 +95,37 @@ En la máquina de desarrollo hay `inversion_cusco.sqlite3` (0 bytes), `pp0068_cu
 **Git no versiona ninguno**: los tapan las reglas `__pycache__/`, `/*.sqlite3` y `/test-results/` de
 `.gitignore`, y un clon limpio no los tiene. Se anotan aquí precisamente para que nadie los confunda con deuda del proyecto y «arregle»
 un `.gitignore` que ya funciona. Se saldan borrándolos, o no saldándolos.
+
+## Pendientes de pasar al tracker
+
+> **Esta sección viola a propósito la regla de arriba, y es temporal.** Son defectos, no deuda, y su
+> sitio es el tracker; se anotan aquí porque el 27/08/2026 el MCP de Gitea no conectaba y perder el
+> hallazgo era peor que ensuciar el documento. **Al abrir cada issue, se borra su entrada.** Si esta
+> sección sigue aquí dentro de unas semanas, el problema ya no son los defectos sino ella.
+
+- **Un 429 se reintenta en bucle y realimenta el propio límite.** `frontend/src/lib/api.ts` borra de
+  la caché las peticiones fallidas a propósito (líneas 98-99 y 149-151), para poder reintentar. Pero
+  no distingue el 429 ni aplica backoff: `ErrorApi.status` se guarda y **nadie lo consulta** — cero
+  apariciones de `429` o `Retry-After` en todo `frontend/src`. Una vez agotada la cuota, cada vuelta
+  a la portada relanza las 8 peticiones contra el límite que la está bloqueando.
+
+- **`home.spec.ts:19` busca una tarjeta que la portada ya no tiene.** La prueba «las cifras salen del
+  API y coinciden con el resumen» localiza `getByText("Centros poblados monitoreados")`; esa tarjeta
+  no existe desde el commit `0e216c3` (18/08/2026), que rehízo las cifras. Lleva rota desde entonces,
+  tapada primero por una carrera en `esperarApi` y después por los 429. **No basta con renombrar el
+  texto**: la portada dejó de publicar el total de centros poblados, así que hay que decidir qué debe
+  demostrar. Lo más fiel a su intención es cuadrar «Centros poblados con peligro alto/muy alto»
+  contra la suma de los niveles 3 y 4 de `/api/peligros/resumen/`, que es lo que calcula
+  `Home.tsx:55-57`.
+
+- **Once E2E del visor agotan el tiempo en el proyecto móvil, sin atribuir.** Primera corrida
+  completa sin 429 (27/08/2026, contra el dev server de Vite): 93 pasan, 13 fallan, 6 se saltan, y
+  **cero respuestas 429**. Dos de los fallos son la prueba de arriba; los otros once se concentran en
+  `movil` —diez de `peligros.spec.ts`, uno de `buscar.spec.ts`— y nueve agotan exactamente los 60 s.
+  La sospecha razonable es la que advierte el propio `playwright.config.ts` —contra el dev server,
+  Vite compila cada módulo la primera vez y con varios navegadores en paralelo eso se lleva por
+  delante las esperas—, pero **no está comprobado**. Lo zanja correr la suite como manda la
+  documentación, contra el bundle compilado: `compose.local.yml` con `E2E_URL=http://localhost`.
 
 ## Lo que este documento no puede saber
 

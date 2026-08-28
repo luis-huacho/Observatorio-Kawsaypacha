@@ -53,14 +53,14 @@ export default function Medidas() {
   if (medidas.status === "error")
     return (
       <div className="container-page py-12">
-        <EmptyState title="No se pudieron cargar las medidas" message={medidas.error?.message} />
+        <EmptyState title="No se pudieron cargar las buenas prácticas" message={medidas.error?.message} />
       </div>
     );
 
   return (
     <>
       <PageHeader
-        titulo="Medidas"
+        titulo="Buenas prácticas"
         descripcion="¿Qué prácticas están funcionando para enfrentar peligros climáticos? Experiencias documentadas por PREDES y otras organizaciones: casos de éxito, lecciones aprendidas y advertencias de mal-adaptación."
       />
       <div className="container-page py-8">
@@ -102,7 +102,7 @@ export default function Medidas() {
 
       {filtradas.length === 0 ? (
         <EmptyState
-          title="Sin medidas con esos filtros"
+          title="Sin buenas prácticas con esos filtros"
           message="Prueba con otro peligro, ámbito o palabra clave."
         />
       ) : (
