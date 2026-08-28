@@ -56,13 +56,13 @@ def _metricas(request) -> dict:
         ("Videos", Video), ("Eventos", Evento), ("Documentos", Documento),
     ]
     contenido = []
-    pendientes_revision = 0
     for nombre, modelo in modelos:
+        # Sin «revisión» desde ADR-P3. La columna se retiró en vez de dejarla en cero: una que
+        # siempre vale cero se lee como un dato, no como un residuo.
         conteos = {
             estado: modelo.objects.filter(estado=estado).count()
-            for estado in ("borrador", "revision", "publicado", "archivado")
+            for estado in ("borrador", "publicado", "archivado")
         }
-        pendientes_revision += conteos["revision"]
         contenido.append({"nombre": nombre, **conteos})
 
     ultima_carga = DatasetUpload.objects.filter(estado="activo").order_by("-activado_en").first()
@@ -74,7 +74,6 @@ def _metricas(request) -> dict:
         ]
 
     return {
-        "pendientes_revision": pendientes_revision,
         "contenido": contenido,
         "cifras": [
             ("Visitas", total(TipoEventoUso.PAGEVIEW)),

@@ -28,7 +28,10 @@ El servicio **lanza**; no registra ni traga errores. El log y el estado visible 
 pone quien llama (ver `apps/core/tasks.py`), que es la frontera que permite que un fallo de IA no
 tumbe nunca la operación que lo disparó.
 """
+import json
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from django.conf import settings
@@ -87,6 +90,7 @@ def completar(
     modelo: str | None = None,
     razonamiento: bool | dict | None = None,
     timeout: float | None = None,
+    etiqueta: str = "",
     **opciones: Any,
 ) -> Respuesta:
     """Una llamada a `chat.completions`.
@@ -102,6 +106,9 @@ def completar(
     igual y **se cobra igual**, solo que no devuelve los bloques.
 
     `**opciones` pasa directo al SDK (`temperature`, `max_tokens`, `response_format`…).
+
+    `etiqueta` solo sirve para el registro en disco: dice **para qué** era la llamada, que es
+    lo primero que se busca al abrir un log con decenas de intercambios seguidos.
     """
     if not mensajes:
         raise ValueError("Se requiere al menos un mensaje")
@@ -112,16 +119,21 @@ def completar(
             razonamiento if isinstance(razonamiento, dict) else {"enabled": razonamiento}
         )
 
-    respuesta = cliente(timeout=timeout).chat.completions.create(
-        model=modelo or settings.OPENROUTER_MODELO,
-        messages=mensajes,
-        **({"extra_body": extra_body} if extra_body else {}),
-        **opciones,
-    )
+    pedido = modelo or settings.OPENROUTER_MODELO
+    try:
+        respuesta = cliente(timeout=timeout).chat.completions.create(
+            model=pedido,
+            messages=mensajes,
+            **({"extra_body": extra_body} if extra_body else {}),
+            **opciones,
+        )
+    except Exception as exc:  # noqa: BLE001 — se registra y se relanza sin tocar
+        registrar(etiqueta, pedido, mensajes, opciones, error=exc)
+        raise
 
     elegida = respuesta.choices[0].message
     uso = respuesta.usage
-    return Respuesta(
+    resultado = Respuesta(
         texto=(elegida.content or "").strip(),
         razonamiento=getattr(elegida, "reasoning_details", None),
         modelo=getattr(respuesta, "model", "") or "",
@@ -132,3 +144,80 @@ def completar(
         },
         costo=getattr(uso, "cost", None) if uso else None,
     )
+    registrar(
+        etiqueta,
+        pedido,
+        mensajes,
+        opciones,
+        respuesta=resultado,
+        proveedor=getattr(respuesta, "provider", "") or "",
+    )
+    return resultado
+
+
+def registrar(
+    etiqueta: str,
+    modelo_pedido: str,
+    mensajes: list[Mensaje],
+    opciones: dict,
+    *,
+    respuesta: Respuesta | None = None,
+    proveedor: str = "",
+    error: Exception | None = None,
+) -> None:
+    """Deja el intercambio completo —entrada y salida— en un .txt de `settings.IA_LOGS_DIR`.
+
+    Va aquí y no en cada llamador porque **éste es el único punto por el que pasan las dos
+    mitades**: lo que se mandó y lo que volvió. Un archivo por día, en modo añadir.
+
+    Dos cosas deliberadas:
+
+    - **La llave nunca se escribe.** Solo se vuelca lo que el llamador compuso; el secreto vive en
+      el cliente, que no se toca aquí. Hay una prueba que lo comprueba.
+    - **Fallar escribiendo no puede tumbar la llamada.** El registro es para depurar después; si el
+      disco está lleno o el directorio no se puede crear, la respuesta de la IA sigue siendo válida
+      y el trabajo del editor no se pierde por un log.
+
+    Sin rotación, igual que `despliegue.log` y `vigilancia.log`: crece y se poda a mano.
+    """
+    try:
+        directorio = Path(settings.IA_LOGS_DIR)
+        directorio.mkdir(parents=True, exist_ok=True)
+        ahora = datetime.now()
+        lineas = [
+            "=" * 78,
+            f"{ahora.isoformat(timespec='seconds')}  {etiqueta or 'sin etiqueta'}",
+            f"modelo pedido : {modelo_pedido}",
+        ]
+        if opciones:
+            lineas.append(f"opciones      : {json.dumps(opciones, ensure_ascii=False, default=str)}")
+        lineas += ["", "--- ENTRADA ---", json.dumps(mensajes, ensure_ascii=False, indent=2)]
+
+        if error is not None:
+            lineas += ["", "--- ERROR ---", f"{type(error).__name__}: {error}"]
+        elif respuesta is not None:
+            lineas += [
+                "",
+                "--- SALIDA ---",
+                respuesta.texto,
+                "",
+                f"respondió     : {respuesta.modelo}"
+                + (f" (proveedor {proveedor})" if proveedor else ""),
+                f"tokens        : {respuesta.tokens}",
+                f"coste         : {respuesta.costo}",
+            ]
+            if respuesta.razonamiento:
+                lineas += [
+                    "",
+                    "--- RAZONAMIENTO ---",
+                    json.dumps(respuesta.razonamiento, ensure_ascii=False, indent=2),
+                ]
+        lineas.append("")
+
+        archivo = directorio / f"ia-{ahora:%Y-%m-%d}.txt"
+        with archivo.open("a", encoding="utf-8") as salida:
+            salida.write("\n".join(lineas) + "\n")
+    except Exception:  # noqa: BLE001 — un log roto no puede costar el trabajo del editor
+        import logging
+
+        logging.getLogger(__name__).warning("No se pudo escribir el registro de IA", exc_info=True)

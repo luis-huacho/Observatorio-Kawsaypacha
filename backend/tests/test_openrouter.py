@@ -260,3 +260,73 @@ def test_una_conversacion_vacia_se_rechaza_antes_de_gastar(openrouter_falso):
 
     with pytest.raises(ValueError):
         openrouter.completar([])
+
+
+# --- El registro en disco ---------------------------------------------------
+
+
+def test_cada_llamada_deja_su_intercambio_en_un_txt(openrouter_falso, settings, tmp_path):
+    """Entrada y salida en el mismo archivo, que es para lo que sirve.
+
+    Se escribe en `completar()` y no en cada llamador porque **éste es el único punto por el que
+    pasan las dos mitades**. Con el registro en el llamador, media docena de sitios tendrían que
+    acordarse, y el que se olvidara no daría ningún síntoma.
+    """
+    settings.IA_LOGS_DIR = tmp_path
+    openrouter_falso(respuesta_falsa("Hay tres.", RAZONAMIENTO, modelo="modelo/real", costo=0.0001))
+
+    openrouter.completar(
+        [{"role": "user", "content": "¿Cuántas erres tiene 'fresa'?"}],
+        razonamiento=True,
+        etiqueta="prueba de registro",
+    )
+
+    archivos = list(tmp_path.glob("ia-*.txt"))
+    assert len(archivos) == 1
+    texto = archivos[0].read_text(encoding="utf-8")
+    assert "prueba de registro" in texto
+    assert "--- ENTRADA ---" in texto and "¿Cuántas erres tiene 'fresa'?" in texto
+    assert "--- SALIDA ---" in texto and "Hay tres." in texto
+    assert "modelo/real" in texto and "0.0001" in texto
+
+
+def test_el_registro_NUNCA_lleva_la_llave(openrouter_falso, settings, tmp_path):
+    """Estos .txt se copian a un correo o a un issue al depurar. La llave no puede viajar ahí."""
+    settings.IA_LOGS_DIR = tmp_path
+    openrouter_falso(respuesta_falsa("Vale."))
+    settings.OPENROUTER_API_KEY = "sk-or-v1-secreto-que-no-debe-aparecer"
+
+    openrouter.completar([{"role": "user", "content": "Hola"}])
+
+    texto = next(tmp_path.glob("ia-*.txt")).read_text(encoding="utf-8")
+    assert "sk-or-v1" not in texto
+    assert "secreto-que-no-debe-aparecer" not in texto
+
+
+def test_una_llamada_fallida_tambien_se_registra(openrouter_falso, settings, tmp_path):
+    """El caso que más se depura es el que falla; dejarlo fuera del log sería lo contrario."""
+    settings.IA_LOGS_DIR = tmp_path
+    falso = openrouter_falso(respuesta_falsa("no llega"))
+
+    def revienta(**kwargs):
+        raise RuntimeError("el proveedor devolvió 503")
+
+    falso.chat.completions.create = revienta
+
+    with pytest.raises(RuntimeError):
+        openrouter.completar([{"role": "user", "content": "Hola"}], etiqueta="la que falla")
+
+    texto = next(tmp_path.glob("ia-*.txt")).read_text(encoding="utf-8")
+    assert "la que falla" in texto
+    assert "--- ERROR ---" in texto and "503" in texto
+
+
+def test_un_registro_roto_no_tumba_la_llamada(openrouter_falso, settings):
+    """El log es para depurar después; si no se puede escribir, la respuesta sigue siendo válida.
+
+    Perder el trabajo del editor porque un disco está lleno sería un intercambio pésimo.
+    """
+    settings.IA_LOGS_DIR = "/no/existe/y/no/se/puede/crear"
+    openrouter_falso(respuesta_falsa("Sale igual."))
+
+    assert openrouter.completar([{"role": "user", "content": "Hola"}]).texto == "Sale igual."

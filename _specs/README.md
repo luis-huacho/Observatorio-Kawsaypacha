@@ -13,6 +13,78 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — el flujo editorial pierde el paso de revisión (ADR-P3)
+
+- **ADR-P3**: los estados pasan a ser **`borrador → publicado`**, con `archivado` para retirar sin
+  borrar, y el grupo **Editor recibe `puede_publicar`**. Las dos mitades van juntas: al quitar el
+  paso de revisión, «Enviar a revisión» era la única acción que tenía un Editor sobre su propio
+  contenido, así que sin el permiso se quedaba sin poder hacer nada.
+- **Se aparta del requisito 2 del TDR**, que pedía literalmente «borrador → revisión →
+  publicación». Queda dicho en el ADR y anotado en la propia lista de requisitos: documentarlo como
+  si el TDR no lo pidiera habría sido la peor forma de resolverlo. La otra mitad del requisito —los
+  avisos por correo— **se conserva**.
+- **Lo que queda para contener el riesgo** de que nadie mire antes de publicar: el estado sigue sin
+  editarse a mano (un `<select>` guardaría el cambio sin disparar el aviso ni registrar quién fue),
+  y `TRANSICIONES_RESERVADAS` se conserva entera — ya no separa a un editor de un publicador, pero
+  es lo único que impide publicar a una cuenta de staff **sin grupo**.
+- **Los correos se reducen a dos y los dos van al autor**, y se añade una regla nueva: **no se
+  avisa a quien se avisaría a sí mismo**. Ahora el autor suele ser quien publica, y un correo que
+  informa a alguien de lo que acaba de hacer es la forma más rápida de que se dejen de leer todos
+  los demás. Se retiran la constante `GRUPOS_REVISORES` y las plantillas `emails/a_revision.*`, y
+  se corrige `publicado.html`, que decía «que enviaste a revisión fue publicada».
+- **Dos migraciones de datos, y ninguna es opcional.** La columna `estado` **no tiene `CHECK` en
+  PostgreSQL** —comprobado—, así que una fila que quedara en `revision` no daría ningún error: se
+  mostraría en crudo y sin ninguna transición que la sacara de ahí; va un `RunPython` defensivo en
+  las cinco apps. Y el permiso del Editor necesita la suya (`core.0001`) porque **el seed no corre
+  en el despliegue**: `docker-entrypoint.sh` solo hace `migrate` y `meili_setup`, así que cambiar
+  `seed.py` solo se vería en instalaciones nuevas. Es el mismo razonamiento de `sitio.0002`.
+- **Fuera del panel** el aviso «N contenido(s) esperando revisión» y su columna: con el estado
+  retirado contarían siempre cero, y una columna que siempre vale cero se lee como un dato.
+- **`revisado_por` y `nota_revision` conservan su nombre** aunque hoy signifiquen «quién publicó o
+  retiró» y «por qué se retiró». Renombrarlos costaba catorce `AlterField` en cinco apps para
+  cambiar dos rótulos.
+- **Comprobado en el admin con un usuario del grupo Editor**: ve «Publicar», «Retirar del sitio» y
+  «Archivar», no ve «Enviar a revisión», y publica un borrador de un clic sellando `publicado_en`.
+
+### Actualización 28/08/2026 — una noticia puede nacer de una URL (ADR-D7)
+
+- **ADR-D7**: el formulario de Noticias lleva arriba **URL de origen** y la casilla **«Procesar con
+  IA»**. Marcada, los obligatorios dejan de serlo, el registro se guarda al instante y el worker
+  rellena título, bajada, cuerpo, tipo, autor, fecha, palabras clave y **la portada** desde la
+  `og:image`. Editable después, y **una sola vez por registro**.
+- **Asíncrono, con los números delante.** gunicorn corre con `--timeout 120` y 3 workers, y la
+  llamada puede tardar hasta ~120 s (60 s más el reintento con backoff): síncrono, gunicorn mataría
+  al worker **justo en el límite** y el editor vería un 502 con el guardado a medias, mientras tres
+  redacciones a la vez dejarían el admin sin atender. Para que el asíncrono sea usable, **la ficha
+  se refresca sola**: sondea un endpoint de estado y recarga al terminar. Esa ruta va **antes** de
+  `admin.site.urls`, o el `catch_all_view` del AdminSite la deja en 404 sin que nada más falle — la
+  misma trampa que rompió la subida de imágenes de CKEditor en su día.
+- **El candado solo se cierra si la IA llegó a escribir**, por decisión del usuario. Un timeout deja
+  `ia_estado=error` con el motivo y permite reintentar: un corte de red no puede inutilizar una
+  noticia para siempre.
+- **Relajar los obligatorios en el formulario no bastaba.** `slug`, `titulo`, `bajada` y `fecha` son
+  `NOT NULL` y `slug` además `unique`: `fecha=None` da `IntegrityError` y dos noticias sin slug
+  chocan entre sí. Se rellenan con provisionales al guardar —el slug con sufijo aleatorio— en vez de
+  migrar el modelo a `null=True`, que dejaría publicar noticias sin título.
+- **Tres cosas que solo salieron al probar, y una era un fallo:**
+  - **`tipo` tiene default**, así que la comprobación de «¿lo escribió una persona?» lo leía siempre
+    como escrito a mano y **la clasificación de la IA no se aplicaba nunca**. Lo delató el propio
+    registro, que declaraba «se conservó lo escrito a mano en: tipo» sobre algo que nadie había
+    escrito. Ahora solo se respeta un valor distinto del default, y hay dos pruebas.
+  - **Del mismo modelo hay proveedores sin salida estructurada** (CoreWeave, DigitalOcean, DeepSeek,
+    BaseTen, GMICloud, Relace, StreamLake), y OpenRouter enruta cada petición por separado — las dos
+    llamadas reales del día anterior habían caído justo en dos de ellos. Se fija con
+    `provider.require_parameters`; sin eso la función falla de forma intermitente.
+  - **`/media/` es público**: nginx lo sirve entero con CORS `*`. Los `.txt` de la IA van al mismo
+    directorio que `despliegue.log` y `vigilancia.log`, por bind mount que **nginx no monta**.
+- **La descarga se acota.** Solo `http`/`https`, y se resuelve el nombre para rechazar destinos
+  internos: la URL la escribe un editor y la petición la hace el servidor, así que sin eso el
+  formulario sería una vía para sondear la red privada desde dentro.
+- **El saneador de ADR-D2 estrena papel**: ser la red bajo un HTML que no escribió una persona. El
+  cuerpo propuesto pasa por `HtmlRicoMixin.save()` como todo lo demás.
+- **Probado de extremo a extremo contra el API real**: una noticia del portal del Senamhi quedó con
+  titular, bajada, cuerpo, autor, fecha, cinco palabras clave y portada descargada, por $0.000318.
+
 ### Actualización 28/08/2026 — OpenRouter: una pasarela para el resto de los usos de IA (ADR-A22)
 
 - **ADR-A22**: **OpenRouter** entra como pasarela de IA de propósito general, con la librería

@@ -1,12 +1,13 @@
 {% extends "emails/base.html" %}
 {% block contenido %}
   <h1 style="margin:0 0 10px;font-size:18px;color:#8A5A00">
-    «{{ titulo }}» fue devuelto a borrador
+    «{{ titulo }}» fue retirado del sitio
   </h1>
   <p style="margin:0 0 10px;font-size:14px;line-height:1.5">
-    {{ tipo|capfirst }} <strong>«{{ titulo }}»</strong> volvió a borrador
+    {{ tipo|capfirst }} <strong>«{{ titulo }}»</strong> se retiró del sitio público y volvió a
+    borrador
     {% if usuario %}a pedido de <strong>{{ usuario.get_full_name|default:usuario.username }}</strong>
-    {% endif %}para que se corrija antes de publicarla.
+    {% endif %}para que se corrija antes de volver a publicarla.
   </p>
   {# La nota es el motivo de este correo: sin ella el editor no sabe qué cambiar. #}
   {% if nota_revision %}

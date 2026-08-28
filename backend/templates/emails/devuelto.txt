@@ -1,8 +1,8 @@
-«{{ titulo }}» fue devuelto a borrador
+«{{ titulo }}» fue retirado del sitio
 
-{{ tipo|capfirst }} «{{ titulo }}» volvió a borrador{% if usuario %} a pedido de {{ usuario.get_full_name|default:usuario.username }}{% endif %} para que se corrija antes de publicarla.
+{{ tipo|capfirst }} «{{ titulo }}» se retiró del sitio público y volvió a borrador{% if usuario %} a pedido de {{ usuario.get_full_name|default:usuario.username }}{% endif %}, para que se corrija antes de volver a publicarla.
 
 {% if nota_revision %}Observaciones:
-{{ nota_revision }}{% else %}No se registraron observaciones. Consulta con quien la devolvió antes de rehacerla.{% endif %}
+{{ nota_revision }}{% else %}No se registraron observaciones. Consulta con quien la retiró antes de rehacerla.{% endif %}
 
 Corregir en el panel: {{ url_admin }}

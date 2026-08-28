@@ -36,6 +36,9 @@ prototype/vite.config.d.ts
 
 # Logs
 *.log
+# Los .txt con los intercambios con la IA: `*.log` NO los cubre, y llevan dentro los
+# prompts y las respuestas. Sin esta línea aparecen en `git status` listos para commitear.
+/logs/
 
 # Python (for one-off scripts)
 __pycache__/
@@ -46,6 +49,10 @@ venv/
 # Backend (Django)
 backend/media/
 backend/staticfiles/
+# Punto de montaje que crea Docker bajo el bind `./backend:/app` de compose.dev.yml. Los
+# .txt de verdad caen en /logs de la raíz; esto queda vacío, pero sin ignorarlo ensucia
+# `git status` en cada máquina de desarrollo.
+backend/logs/
 **/.env
 uv.lock.tmp
 

@@ -44,10 +44,12 @@ ARCHIVOS_CAPA = {
 # gestiona datos y capas; el administrador toca usuarios y configuración del sitio.
 APPS_EDITORIALES = ["medidas", "normativa", "biblioteca", "contenidos"]
 GRUPOS = {
+    # El Editor publica desde ADR-P3: al retirarse el paso de revisión, sin este permiso se
+    # quedaba sin ninguna acción posible sobre su propio contenido.
     "Editor": {
         "apps": APPS_EDITORIALES,
         "acciones": {"add", "change", "view"},
-        "publicar": False,
+        "publicar": True,
     },
     "Publicador": {
         "apps": APPS_EDITORIALES + ["datasets", "mapas", "peligros", "sitio"],

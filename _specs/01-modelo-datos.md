@@ -78,11 +78,12 @@ class TimeStampedMixin(models.Model):        # abstract
     creado_en / actualizado_en
 
 class WorkflowMixin(models.Model):           # abstract
-    estado          # choices: borrador | revision | publicado | archivado; default borrador; db_index
+    estado          # choices: borrador | publicado | archivado; default borrador; db_index
+                    # «revision» se retiró con ADR-P3, con migración de datos en las 5 apps
     publicado_en    # datetime null
     creado_por      # FK User SET_NULL
-    revisado_por    # [+] FK User null
-    nota_revision   # [+] Text (comentario del revisor al devolver)
+    revisado_por    # [+] FK User null — hoy: quién publicó o retiró (nombre heredado, ADR-P3)
+    nota_revision   # [+] Text — hoy: por qué se retiró del sitio
     # Manager .publicados(); método transicionar(nuevo_estado, usuario):
     #   valida transición y permisos, setea publicado_en, encola email (ver 03-admin-editorial)
 ```
@@ -196,7 +197,7 @@ Fuente y consolidación: `scripts/consolidar_pp0068.py` (serie 2022-2026, mezcla
 ### contenidos
 | Modelo | Campos |
 |---|---|
-| `Noticia (Workflow)` | `slug` unique, `titulo`, `bajada`, `cuerpo` rich, `imagen_portada` ImageField **null**, `imagen_titulo` char null (pie de imagen), `palabras_clave` ArrayField(char), `fecha` (index desc); [+] `destacada` bool (home), `tipo` (noticia\|articulo\|opinion), `autor`. Orden `-destacada, -fecha, -id` —el remate único lo exige la paginación— e índice `(estado, -destacada, -fecha)` |
+| `Noticia (Workflow)` | `slug` unique, `titulo`, `bajada`, `cuerpo` rich, `imagen_portada` ImageField **null**, `imagen_titulo` char null (pie de imagen), `palabras_clave` ArrayField(char), `fecha` (index desc); [+] `destacada` bool (home), `tipo` (noticia\|articulo\|opinion), `autor`. Redacción asistida (ADR-D7): `url_origen` URLField(500) blank, `ia_estado` (pendiente\|procesando\|ok\|error), `log_ia` Text, `redactada_por_ia` bool **= el candado, una sola vez por registro**. Orden `-destacada, -fecha, -id` —el remate único lo exige la paginación— e índice `(estado, -destacada, -fecha)` |
 | `Video (Workflow)` | `titulo`, `descripcion`, `url` (YouTube/Vimeo), `fecha`; [+] `thumbnail_override`, `duracion`, FK `tema` (TipoPeligro) null |
 | `Evento (Workflow)` | `titulo`, `descripcion`, `inicio` datetime (index), `fin` null, `lugar`; [+] `modalidad` (presencial|virtual|mixta), `url_inscripcion`, `organizador`, `imagen` |
 

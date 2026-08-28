@@ -52,7 +52,7 @@ def norma(db):
 
 
 @pytest.mark.parametrize(
-    "estado", ["borrador", "revision", "archivado"]
+    "estado", ["borrador", "archivado"]
 )
 def test_lo_no_publicado_no_existe_para_el_api(api, medida, estado):
     """Ni en el listado, ni en el detalle por slug. Un 404, no un 403.

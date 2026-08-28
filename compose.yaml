@@ -42,6 +42,11 @@ services:
     volumes:
       - media:/app/media
       - static:/app/staticfiles
+      # Registros .txt de cada intercambio con la IA (entrada y salida). Va al MISMO
+      # directorio en el que ya escriben `desplegar.sh` y `vigilar-contenedores.sh`, que es
+      # donde mira quien opera. **Nunca se monta en nginx**: eso es lo que impide que
+      # estos archivos acaben siendo descargables, como sí lo sería todo lo de /media/.
+      - ${OBSERVATORIO_REGISTROS:-./logs}:/app/logs
       # Los Excel y GeoJSON canónicos, de solo lectura: `manage.py seed` los importa desde aquí.
       - ./data/layers:/datos:ro
       # Los CSV del PP 0068. Montaje aparte y no dentro de `/datos` porque anidar un montaje
@@ -63,6 +68,11 @@ services:
     command: python manage.py db_worker
     volumes:
       - media:/app/media
+      # Registros .txt de cada intercambio con la IA (entrada y salida). Va al MISMO
+      # directorio en el que ya escriben `desplegar.sh` y `vigilar-contenedores.sh`, que es
+      # donde mira quien opera. **Nunca se monta en nginx**: eso es lo que impide que
+      # estos archivos acaben siendo descargables, como sí lo sería todo lo de /media/.
+      - ${OBSERVATORIO_REGISTROS:-./logs}:/app/logs
       - ./data/layers:/datos:ro
       - ./data/inversion:/datos-inversion:ro
     depends_on:

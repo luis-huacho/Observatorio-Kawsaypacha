@@ -16,7 +16,7 @@ Si el esquema y este documento discrepan, gana el esquema: sale del código.
 métricas (también anónimo) y el admin, que no es parte del API. Escribir se hace desde el admin.
 
 **Solo se ve lo publicado.** Todos los recursos editoriales filtran por `estado=publicado`; los
-borradores y lo que está en revisión no existen para el API, no aparecen ni con un id directo.
+los borradores y lo archivado no existen para el API, no aparecen ni con un id directo.
 
 **Paginación** al estilo DRF, `?page=` y `?page_size=` (por defecto 50, máximo 200):
 

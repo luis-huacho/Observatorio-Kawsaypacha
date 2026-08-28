@@ -3,11 +3,13 @@
 Dos decisiones que gobiernan este módulo:
 
 1. **El estado no se edita a mano.** `estado` es de solo lectura y se cambia con botones de
-   acción. Un `<select>` con los cuatro estados deja hacer `borrador → publicado` de un salto,
-   saltándose la revisión que el TDR exige, y además no dispara el aviso por correo.
-2. **No se ofrece lo que va a fallar.** Las acciones que exigen `puede_publicar` no aparecen
-   para quien no lo tiene. Mostrarlas y responder «no tienes permiso» es una forma peor de
-   decir lo mismo.
+   acción. Un `<select>` guardaría el cambio **sin disparar el aviso por correo** y sin registrar
+   quién lo hizo, que es justo lo que la transición aporta. Desde ADR-P3 ya no hay una revisión
+   que saltarse, pero el argumento del correo sigue en pie.
+2. **Las acciones que exigen `puede_publicar` no aparecen para quien no lo tiene.** Mostrarlas y
+   responder «no tienes permiso» es una forma peor de decir lo mismo. Ojo: eso las filtra por
+   **permiso, no por estado** — no hay `get_actions` en el proyecto, así que una acción cuya
+   transición no cabe desde el estado actual se ofrece igual y falla con un aviso por objeto.
 """
 from django.contrib import admin, messages
 from django.utils.html import format_html
@@ -16,7 +18,6 @@ from apps.core.models import WorkflowMixin
 
 COLORES_ESTADO = {
     "borrador": ("#6B7280", "#F3F4F6"),
-    "revision": ("#8A5A00", "#FFF8E6"),
     "publicado": ("#0B3B26", "#E7F0EA"),
     "archivado": ("#7C2D12", "#FEF2F2"),
 }
@@ -39,7 +40,7 @@ class WorkflowAdmin(admin.ModelAdmin):
     readonly_fields = ("estado_badge", "publicado_en", "creado_por", "revisado_por",
                        "creado_en", "actualizado_en")
     list_filter = ("estado",)
-    actions = ("enviar_a_revision", "publicar", "devolver_a_borrador", "archivar")
+    actions = ("publicar", "devolver_a_borrador", "archivar")
 
     @admin.display(description="estado", ordering="estado")
     def estado_badge(self, obj):
@@ -91,16 +92,12 @@ class WorkflowAdmin(admin.ModelAdmin):
                 request, f"…y {len(rechazadas) - 8} más sin cambiar.", messages.WARNING
             )
 
-    @admin.action(description="Enviar a revisión")
-    def enviar_a_revision(self, request, queryset):
-        self._transicionar(request, queryset, WorkflowMixin.Estado.REVISION, "enviado(s) a revisión")
-
     @admin.action(description="Publicar", permissions=["publicar"])
     def publicar(self, request, queryset):
         self._transicionar(request, queryset, WorkflowMixin.Estado.PUBLICADO, "publicado(s)")
 
     @admin.action(
-        description="Devolver a borrador (avisa al autor con las observaciones)",
+        description="Retirar del sitio y devolver a borrador (avisa al autor)",
         permissions=["publicar"],
     )
     def devolver_a_borrador(self, request, queryset):

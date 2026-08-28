@@ -149,6 +149,7 @@ POSTGRES_DB= POSTGRES_USER= POSTGRES_PASSWORD= POSTGRES_HOST=db POSTGRES_PORT=54
 MEILI_URL=http://meilisearch:7700        MEILI_MASTER_KEY=
 GEMINI_API_KEY=
 OPENROUTER_API_KEY=  OPENROUTER_MODELO=deepseek/deepseek-v4-flash-0731
+IA_LOGS_DIR=/app/logs   # .txt de cada llamada; el anfitrión lo monta con OBSERVATORIO_REGISTROS
 EMAIL_HOST= EMAIL_PORT= EMAIL_HOST_USER= EMAIL_HOST_PASSWORD= DEFAULT_FROM_EMAIL=
 ADMIN_URL=loginseguro/ # admin fuera de /admin/ por defecto
 DJANGO_SUPERUSER_USERNAME= DJANGO_SUPERUSER_EMAIL= DJANGO_SUPERUSER_PASSWORD=   # los usa `manage.py seed`
@@ -203,7 +204,7 @@ Sesión grabada (registro audiovisual = anexo del informe final). El guion desar
 1. Ingreso al admin, roles y contraseñas.
 2. Subir/reemplazar el Excel de peligros y el de frecuencia (DatasetUpload) — ver el cambio en el visor.
 3. Subir/reemplazar una capa GeoJSON y regenerar tiles.
-4. Crear medida/noticia → enviar a revisión → publicar (correo incluido).
+4. Crear medida/noticia → publicar (ADR-P3: sin paso de revisión; el correo va al autor si publica otra persona).
 5. Subir un PDF y generar resumen con IA; corregirlo.
 6. Editar textos del sitio (hero, footer, sobre) y el menú.
 7. Descargar ayuda memoria PDF y exports Excel.

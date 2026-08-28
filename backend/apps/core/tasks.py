@@ -13,15 +13,14 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django_tasks import task
 
-from apps.core.grupos import GRUPOS_REVISORES
 
 logger = logging.getLogger(__name__)
 
-# Transición → (plantilla, a quién se avisa)
+# Transición → plantilla. Desde ADR-P3 solo hay dos que le importen a una persona, y las dos
+# escriben al autor: ya no existe el aviso de «espera revisión» porque ya no hay a quién esperar.
 PLANTILLAS = {
-    ("borrador", "revision"): ("a_revision", "revisores"),
-    ("revision", "publicado"): ("publicado", "autor"),
-    ("revision", "borrador"): ("devuelto", "autor"),
+    ("borrador", "publicado"): "publicado",
+    ("publicado", "borrador"): "devuelto",
 }
 
 
@@ -36,14 +35,17 @@ def notificar_transicion_editorial(
 ) -> None:
     """Aviso por correo del flujo editorial (requisito 2 del TDR).
 
-    Solo las tres transiciones que le importan a una persona generan correo. Publicar y
-    archivar en cadena, o mover algo entre borradores, no llena la bandeja de nadie: un aviso
-    que se ignora deja de ser un aviso.
+    Solo las transiciones que le importan a una persona generan correo. Archivar en cadena, o
+    mover algo entre borradores, no llena la bandeja de nadie: un aviso que se ignora deja de ser
+    un aviso.
+
+    Por eso mismo **no se avisa a quien se avisó a sí mismo**. Desde ADR-P3 quien redacta también
+    publica, así que sin esta regla el editor recibiría un correo contándole lo que acaba de hacer
+    él, en cada publicación.
     """
-    plantilla_destino = PLANTILLAS.get((de_estado, a_estado))
-    if plantilla_destino is None:
+    plantilla = PLANTILLAS.get((de_estado, a_estado))
+    if plantilla is None:
         return
-    plantilla, destino = plantilla_destino
 
     from django.apps import apps as django_apps
 
@@ -51,26 +53,20 @@ def notificar_transicion_editorial(
     if objeto is None:
         return
 
-    Usuario = get_user_model()
-    if destino == "revisores":
-        destinatarios = list(
-            Usuario.objects.filter(groups__name__in=GRUPOS_REVISORES, is_active=True)
-            .exclude(email="")
-            .values_list("email", flat=True)
-            .distinct()
-        )
-    else:
-        autor = getattr(objeto, "creado_por", None)
-        destinatarios = [autor.email] if autor and autor.email else []
+    autor = getattr(objeto, "creado_por", None)
+    if autor is not None and usuario_id is not None and autor.pk == usuario_id:
+        return
 
+    destinatarios = [autor.email] if autor and autor.email else []
     if not destinatarios:
-        # Sin destinatarios no hay nada que enviar, pero conviene dejar rastro: es el síntoma
-        # de un grupo mal nombrado o de usuarios sin correo, y si no se registra es invisible.
+        # Sin destinatarios no hay nada que enviar, pero conviene dejar rastro: es el síntoma de
+        # un contenido sin autor o de un usuario sin correo, y si no se registra es invisible.
         logger.info(
-            "Transición %s → %s de «%s» sin destinatarios (%s).",
-            de_estado, a_estado, titulo, destino,
+            "Transición %s → %s de «%s» sin destinatario.", de_estado, a_estado, titulo
         )
         return
+
+    Usuario = get_user_model()
 
     quien = Usuario.objects.filter(pk=usuario_id).first() if usuario_id else None
     contexto = {
@@ -86,9 +82,8 @@ def notificar_transicion_editorial(
     }
 
     asuntos = {
-        "a_revision": f"«{titulo}» espera revisión",
         "publicado": f"«{titulo}» ya está publicado",
-        "devuelto": f"«{titulo}» fue devuelto a borrador",
+        "devuelto": f"«{titulo}» fue retirado del sitio",
     }
     cuerpo_html = render_to_string(f"emails/{plantilla}.html", contexto)
     cuerpo_texto = render_to_string(f"emails/{plantilla}.txt", contexto)
