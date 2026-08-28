@@ -385,11 +385,22 @@ OPENROUTER_BASE_URL = env("OPENROUTER_BASE_URL", default="https://openrouter.ai/
 # a implementar. Aquí no hay que escribirlos: el cliente de `openai` los trae, basta pasárselos.
 OPENROUTER_TIMEOUT = env.float("OPENROUTER_TIMEOUT", default=60.0)
 OPENROUTER_REINTENTOS = env.int("OPENROUTER_REINTENTOS", default=1)
+# Cómo lee OpenRouter un PDF adjunto (plugin `file-parser`, ADR-D8). `pdf-text` extrae la capa
+# de texto y **no se cobra**, que es lo que sirve para las normas del diario oficial. Un PDF
+# escaneado no tiene capa de texto y con este motor vuelve en blanco: ahí se cambia a
+# `mistral-ocr`, que sí lo lee y se cobra por página. Es una perilla de entorno a propósito —
+# escrita en código obligaría a desplegar para atender un caso que se ve una vez al mes.
+OPENROUTER_PDF_ENGINE = env("OPENROUTER_PDF_ENGINE", default="pdf-text")
 # Dónde queda el .txt con cada intercambio con la IA (entrada y salida). **Fuera de MEDIA_ROOT**:
 # nginx sirve todo /media/ como estático público con CORS abierto, y un nombre como
 # `ia-2026-08-28.txt` se adivina. Compose lo bind-monta al mismo directorio en el que ya escriben
 # `desplegar.sh` y `vigilar-contenedores.sh`, que es donde mira quien opera.
 IA_LOGS_DIR = Path(env("IA_LOGS_DIR", default=str(BASE_DIR / "logs")))
+
+# Dónde espera el Excel de fichas ACC entre la pantalla de confirmación y el «Importar». También
+# **fuera de MEDIA_ROOT**, y por lo mismo: son datos del cliente sin publicar, y /media/ es
+# público. Se barre solo, pero es un directorio de paso: nada de aquí debe versionarse.
+IMPORTACIONES_TMP_DIR = Path(env("IMPORTACIONES_TMP_DIR", default=str(BASE_DIR / "importaciones")))
 
 # --- Datos y pipeline geoespacial ------------------------------------------
 # Excel y GeoJSON canónicos que alimentan `manage.py seed`. Fuera de la imagen: son 145 MB

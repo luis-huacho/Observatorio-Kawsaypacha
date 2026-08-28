@@ -2,23 +2,41 @@ from django.contrib import admin
 from django_ckeditor_5.widgets import CKEditor5Widget
 from unfold.admin import ModelAdmin
 
+from apps.core.admin_ia import RedaccionIAAdminMixin
 from apps.core.admin_workflow import WorkflowAdmin
 
+from .forms import NormaForm
 from .models import Norma
 
 
 @admin.register(Norma)
-class NormaAdmin(WorkflowAdmin, ModelAdmin):
-    campos_rich = ["contenido"]
+class NormaAdmin(RedaccionIAAdminMixin, WorkflowAdmin, ModelAdmin):
+    """La norma puede nacer del enlace a su publicación oficial (ADR-D8).
 
-    list_display = ("titulo", "tipo", "ambito", "fecha", "acceso")
-    list_filter = ("estado", "tipo", "ambito", "estado_vigencia")
+    El mecanismo entero —insignia, campos de solo lectura, provisionales, encolado y el JS que
+    refresca la ficha— vive en `RedaccionIAAdminMixin`, compartido con noticias. Va **primero** en
+    las bases para que su `save_model` envuelva al de `WorkflowAdmin`.
+    """
+
+    campos_rich = ["contenido"]
+    form = NormaForm
+
+    list_display = ("titulo", "tipo", "ambito", "fecha", "acceso", "ia_badge")
+    list_filter = ("estado", "tipo", "ambito", "estado_vigencia", "ia_estado")
     search_fields = ("titulo", "numero", "resumen", "slug")
     prepopulated_fields = {"slug": ("titulo",)}
     autocomplete_fields = ("documento",)
     date_hierarchy = "fecha"
 
     fieldsets = (
+        ("Origen", {
+            "fields": ("url_origen", "procesar_con_ia", "ia_badge_ficha", "log_ia"),
+            "description": "Pega el enlace a la publicación oficial —página web o PDF—, marca la "
+                           "casilla y guarda: se leerá y se redactará el resto en segundo plano. "
+                           "Los demás campos pueden quedar en blanco. Cada norma puede usar la IA "
+                           "una sola vez, el análisis de PREDES lo sigues escribiendo tú, y lo "
+                           "redactado hay que revisarlo antes de publicar.",
+        }),
         (None, {"fields": ("titulo", "slug", "numero", "resumen")}),
         ("Clasificación", {"fields": ("tipo", "ambito", "fecha", "estado_vigencia")}),
         ("Análisis", {"fields": ("analisis_predes", "contenido", "palabras_clave")}),
@@ -51,3 +69,8 @@ class NormaAdmin(WorkflowAdmin, ModelAdmin):
         if db_field.name in self.campos_rich:
             kwargs["widget"] = CKEditor5Widget(config_name="default")
         return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+    def encolar_ia(self, obj) -> None:
+        from apps.normativa.tasks import redactar_norma_desde_url
+
+        redactar_norma_desde_url.enqueue(pk=obj.pk)

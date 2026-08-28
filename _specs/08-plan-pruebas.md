@@ -15,7 +15,7 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (259 pruebas, ~30 s)
+$DC exec backend pytest                 # suite backend (340 pruebas, ~80 s)
                                         # la cifra sale de `pytest --collect-only -q`, no de la memoria
 $DC exec backend pytest -m lento        # 7 más: los Excel completos y el PDF con mapa (~35 s)
 cd frontend && npm run lint && npm run build    # tipos + build
@@ -154,6 +154,60 @@ de la carpeta; y un archivo que no es imagen **no rompe la subida**.
 - Las claves emitidas coinciden exactamente con los slugs de `TipoPeligro`, con guion bajo.
 - `nivel_max` es el máximo de los niveles presentes.
 - Cada feature lleva lo que el popup necesita —se pinta **desde el tile**, sin pedir nada al API— y `poblacion` va como entero: con `null`, MapLibre descarta el punto al interpolar el radio.
+
+### `test_noticias_ia.py`, `test_normativa_ia.py`, `test_lectura_web.py` y `test_openrouter.py`
+
+La redacción asistida desde una URL (ADR-D7 en noticias, ADR-D8 en normas). **La red no se toca**:
+el cliente de OpenRouter y la descarga son falsos, así que la suite no gasta dinero ni depende de
+que un portal del Estado esté en pie.
+
+Los dos archivos por modelo cubren lo mismo —formulario, candado, tarea, forma de la llamada,
+normalización y el endpoint de sondeo—, y **eso es deliberado**: son dos modelos distintos con
+obligatorios distintos, y una regresión en uno no la ve la prueba del otro. Lo que **no** se
+duplica es lo compartido, que se prueba una vez:
+
+- **`test_lectura_web.py`** — la extracción de texto y la **guarda anti-SSRF**. Duplicar la prueba
+  de un control de seguridad garantiza que una de las dos copias se quede atrás. Fija también que
+  un PDF se reconozca por los bytes `%PDF-` **además** de por la cabecera: hay servidores del
+  Estado que lo sirven declarando `application/octet-stream`.
+- **`test_openrouter.py`** — que el registro en disco lleve entrada y salida, que **nunca** lleve la
+  llave, que una llamada fallida también se registre, que un registro roto no tumbe la llamada, y
+  que **el base64 de un PDF adjunto se elida conservando el prompt**: son megabytes por llamada
+  sobre un archivo diario sin rotación.
+
+Los cinco fallos que estos archivos vigilan, y ninguno da síntoma:
+
+1. Que la casilla deje de eximir de los obligatorios —y el editor no pueda guardar— o al revés, que
+   los exima siempre y se cuelen fichas sin título.
+2. Que el candado se cierre cuando no debía. Un timeout no puede inutilizar un registro para
+   siempre, así que un fallo deja `ia_estado=error` y **el candado abierto**.
+3. Que la tarea pise lo que un editor escribió mientras estaba en cola. Cuidado con los campos que
+   tienen default: `Noticia.tipo` hacía que la clasificación de la IA no se aplicara **nunca**, y
+   el propio registro lo delató diciendo que había conservado algo que nadie escribió.
+4. Que la llamada deje de ser **una** o pierda `provider.require_parameters`: sin él OpenRouter
+   enruta a un proveedor sin salida estructurada y falla una de cada tantas veces.
+5. Que un PDF entre por la rama de HTML —la IA redactaría a partir de basura binaria— o que un PDF
+   escaneado se guarde en blanco **con el candado cerrado**.
+
+Y dos de admin que no se ven hasta que se usan: que los **dos** admin declaren el JS que refresca
+la ficha (el `class Media` vive en un mixin, y que Django lo recoja desde ahí es lo que puede
+romperse al reorganizar las bases), y que el endpoint genérico de sondeo **rechace un modelo fuera
+de su lista blanca**.
+
+### `test_fichas_acc.py`
+
+La ficha autónoma y su importación por Excel (ADR-D9). Quince pruebas, y las que importan son las que vigilan lo que no se ve:
+
+1. **La previsualización no escribe.** Se comprueba el conteo después del primer POST, no solo después del segundo: si el paso 2 guardara, nadie lo notaría hasta tener fichas que nadie confirmó.
+2. **El duplicado se detecta con el criterio que se le anuncia al usuario** —recorte y mayúsculas—, contra la base y dentro del mismo archivo; y la otra fila del archivo **sí** entra.
+3. **El texto se guarda tal como vino.** Normalizar al guardar destrozaría el nombre que PREDES publica, y la prueba pasa igual si solo se mira el conteo.
+4. **Una fila incompleta no arrastra al archivo, y el motivo nombra la columna.** Con los tres campos opcionales comprobados aparte: exigirlos al importar sería inventar una regla que el formulario del admin no aplica.
+5. **Una cabecera distinta no importa nada** y dice qué esperaba y qué encontró; pero **tolera espacios de más y tildes perdidas**, porque son preguntas largas que el usuario copia y pega.
+6. **El temporal se consume una sola vez**: recargar la confirmación no puede duplicar la carga.
+7. **La prueba redonda**: se descarga la plantilla, se rellena y se importa. Es lo que detecta que la plantilla y el validador se hayan separado.
+8. Un archivo que no es un Excel da mensaje, no un 500; y sin el permiso de alta no se llega ni a la vista ni a la plantilla.
+
+Una fixture `autouse` manda `IMPORTACIONES_TMP_DIR` a `tmp_path`. Sin ella la suite deja Excel dentro del repositorio: el barrido del admin solo se lleva los de más de seis horas, así que se acumulan entre corridas sin que nadie los mire.
 
 ### Las cuatro que vigilan lo que no da síntomas
 

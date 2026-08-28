@@ -234,6 +234,67 @@ Tres cosas que conviene decir en la capacitación:
   tenga permiso para publicarla. Antes de publicar hay que comprobar de quién es o sustituirla; sin
   imagen, el sitio usa la ilustración institucional y se ve perfectamente.
 
+## Registrar una norma desde su enlace
+
+En **Normativa** funciona igual que en Noticias, y con una ventaja: **el enlace puede ser un PDF**.
+Pega en **URL de origen** la dirección de la publicación oficial —la página de El Peruano o de
+gob.pe, o directamente el PDF—, marca **«Procesar con IA»** y guarda dejando el resto en blanco. Se
+rellenarán el título, el número, el tipo, el ámbito, la fecha, el resumen, el análisis desarrollado,
+las palabras clave y el estado de vigencia. La pantalla se actualiza sola al terminar.
+
+Lo mismo que en Noticias —una sola vez por norma, es una propuesta y no un resultado, y ojo con los
+derechos de la imagen— más cuatro cosas propias de aquí:
+
+- **El «análisis de PREDES» lo escribes tú.** La IA no lo toca a propósito: es la nota que firma la
+  organización en el listado, y ponerle un texto de máquina sería atribuirle a PREDES algo que no
+  ha dicho.
+- **La «URL oficial» tampoco se rellena sola.** «URL de origen» es de dónde se leyó la norma, que
+  puede ser cualquier sitio; «URL oficial» es el enlace que ve el público como publicación oficial.
+  Si son el mismo, cópialo tú.
+- **Revisa siempre el tipo, el ámbito y la fecha.** Si la IA no pudo deducir el tipo o el ámbito los
+  deja **vacíos** —a propósito: prefiere no clasificar a clasificar mal— y tendrás que elegirlos
+  antes de guardar. Y cuando el documento no trae fecha visible, se pone la de hoy: casi nunca es la
+  correcta.
+- **Si el PDF está escaneado, no se puede leer.** Un PDF escaneado es una foto de un texto, y el
+  lector configurado solo entiende texto de verdad. Aparecerá un aviso diciéndolo. Salidas: pegar el
+  enlace a la versión web de la norma, o pedirle al administrador de la plataforma que cambie el
+  lector a uno que reconozca imágenes (tiene coste por página, por eso no está puesto por defecto).
+
+## Cargar fichas ACC desde un Excel
+
+Las **Fichas de Adaptación al Cambio Climático** son las 17 preguntas del formulario que se
+reparte en campo. Se pueden llenar de a una desde el admin, o cargarlas todas juntas desde un
+Excel. Una ficha **no depende de ninguna medida**: es un registro por su cuenta.
+
+En **Medidas - Fichas ACC** hay dos botones arriba a la derecha:
+
+1. **Descargar plantilla.** Baja un Excel con las 17 columnas ya puestas y en el orden correcto.
+   Cada título trae un comentario con la indicación de cómo llenarlo, y hay una segunda hoja
+   **Instrucciones** con lo mismo en texto. Empieza siempre por aquí: ahorra el ida y vuelta de
+   «¿qué columnas van?».
+2. **Importar desde Excel.** Sube el archivo lleno. **No se guarda nada todavía**: primero
+   aparece una pantalla que dice cuántas fichas van a entrar y **cuáles no, con el motivo de cada
+   una**. Recién al pulsar «Importar» se guardan.
+
+Una fila no se carga por dos motivos, y los dos se ven en esa pantalla:
+
+- **Le falta algún dato obligatorio.** El aviso nombra la columna vacía. Los únicos tres que
+  pueden ir en blanco son *Ubicación*, *Persona de contacto* y *Descripción de la práctica*.
+- **El nombre de la experiencia está repetido.** El *«Nombre de la experiencia, práctica proyecto
+  o programa»* tiene que ser distinto en cada ficha. Al comparar no se distinguen mayúsculas ni
+  espacios de más, así que «Cosecha de agua en Ccatca» y «  cosecha DE AGUA en Ccatca » cuentan
+  como la misma. Se comprueba contra lo que ya está cargado **y dentro del propio archivo**.
+
+Las fichas que sí están bien se cargan igual: no hace falta corregir el Excel entero para
+aprovechar lo que ya está listo. Corrige lo que la pantalla te señaló y vuelve a subir solo esas.
+
+**Lo único que detiene el archivo completo es la cabecera.** Si la fila 1 no trae las 17 columnas
+esperadas no se carga nada, y el aviso muestra qué esperaba y qué encontró. Es a propósito: con
+las columnas cambiadas de sitio, cada respuesta se guardaría en la pregunta equivocada y las
+fichas se verían bien estando mal. Si te pasa, descarga la plantilla y copia tus datos ahí.
+
+Lo importado se edita después como cualquier otra ficha.
+
 ## Resúmenes con inteligencia artificial
 
 En **Biblioteca**, la acción **«Generar resumen con IA»** propone un resumen del documento. Al

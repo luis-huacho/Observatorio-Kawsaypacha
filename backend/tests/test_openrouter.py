@@ -303,6 +303,46 @@ def test_el_registro_NUNCA_lleva_la_llave(openrouter_falso, settings, tmp_path):
     assert "secreto-que-no-debe-aparecer" not in texto
 
 
+def test_el_registro_ELIDE_el_pdf_adjunto_pero_conserva_el_prompt(
+    openrouter_falso, settings, tmp_path
+):
+    """Un PDF viaja en base64 dentro del mensaje (ADR-D8), y son megabytes por llamada.
+
+    `ia-AAAA-MM-DD.txt` es un archivo diario, en modo añadir y **sin rotación**: sin elidir, una
+    tanda de normas llena el disco del servidor con datos que ya están en el PDF original. Lo que
+    **no** se puede recortar es el texto del prompt, que es justo para lo que existe el registro.
+    """
+    settings.IA_LOGS_DIR = tmp_path
+    openrouter_falso(respuesta_falsa("Vale."))
+    base64_gordo = "J" * 200_000
+
+    openrouter.completar(
+        [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Esto sí tiene que quedar en el registro"},
+                    {
+                        "type": "file",
+                        "file": {
+                            "filename": "norma.pdf",
+                            "file_data": f"data:application/pdf;base64,{base64_gordo}",
+                        },
+                    },
+                ],
+            }
+        ]
+    )
+
+    texto = next(tmp_path.glob("ia-*.txt")).read_text(encoding="utf-8")
+    assert base64_gordo not in texto
+    assert len(texto) < 10_000
+    # Se conservan la cabecera del adjunto y el prompt: el log sigue diciendo qué se mandó.
+    assert "data:application/pdf;base64," in texto
+    assert "KB omitidos" in texto
+    assert "Esto sí tiene que quedar en el registro" in texto
+
+
 def test_una_llamada_fallida_tambien_se_registra(openrouter_falso, settings, tmp_path):
     """El caso que más se depura es el que falla; dejarlo fuera del log sería lo contrario."""
     settings.IA_LOGS_DIR = tmp_path

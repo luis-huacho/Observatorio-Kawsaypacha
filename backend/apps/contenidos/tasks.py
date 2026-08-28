@@ -14,7 +14,7 @@ import logging
 from django.core.files.base import ContentFile
 from django_tasks import task
 
-from apps.core.models import EstadoIA
+from apps.core.models import EstadoIA, slug_unico
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ def redactar_noticia_desde_url(pk) -> None:
         if not noticia.imagen_titulo:
             noticia.imagen_titulo = propuesta.imagen_titulo
 
-    noticia.slug = _slug_unico(noticia)
+    noticia.slug = slug_unico(noticia)
     noticia.redactada_por_ia = True
     noticia.ia_estado = EstadoIA.OK
     noticia.log_ia = _bitacora(propuesta, respetados)
@@ -91,7 +91,7 @@ def _lo_escribio_una_persona(noticia, campo) -> bool:
 
     valor = getattr(noticia, campo)
     if campo == "titulo":
-        return bool(valor) and not str(valor).startswith("(redactando)")
+        return bool(valor) and not str(valor).startswith(Noticia.PREFIJO_PROVISIONAL)
     if campo == "fecha":
         return False  # la provisional es la de hoy y es indistinguible de una escrita a mano
     if campo == "tipo":
@@ -102,24 +102,6 @@ def _lo_escribio_una_persona(noticia, campo) -> bool:
         # decisión deliberada del editor.
         return valor != Noticia.Tipo.NOTICIA
     return bool(valor)
-
-
-def _slug_unico(noticia) -> str:
-    """Slug definitivo desde el título, sin chocar con los que ya existen.
-
-    Hace falta porque el provisional lleva un sufijo aleatorio —necesario para que dos noticias
-    creadas seguidas no colisionen— que no tiene por qué quedarse en la URL pública.
-    """
-    from django.utils.text import slugify
-
-    from apps.contenidos.models import Noticia
-
-    base = slugify(noticia.titulo)[:110] or noticia.slug
-    candidato, sufijo = base, 2
-    while Noticia.objects.filter(slug=candidato).exclude(pk=noticia.pk).exists():
-        candidato = f"{base}-{sufijo}"
-        sufijo += 1
-    return candidato
 
 
 def _bitacora(propuesta, respetados) -> str:

@@ -13,6 +13,42 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — la ficha ACC se suelta de la medida y se carga en lote (ADR-D9)
+
+- **La ficha ACC deja de colgar de una `Medida`.** La FK obligatoria se elimina del modelo: el
+  formulario que PREDES reparte es autónomo, y exigir una medida ya publicada a la cual colgarlo
+  bloqueaba la carga sin aportar nada. **Nadie leía esa relación** —ni serializer, ni endpoint, ni
+  frontend, ni semilla, ni una sola prueba; solo el diagrama ER—, así que el radio de impacto se
+  agotó en `admin.py`. **La migración es irreversible** y se aceptó a sabiendas: se pierde qué
+  ficha pertenecía a qué medida en lo ya cargado. Quien identifica la ficha pasa a ser `value_001`.
+- **Su importador no pasa por `DatasetUpload`, y eso acota la regla en vez de romperla.** Esa vía
+  se diseñó para datasets de reemplazo total, asíncronos y todo-o-nada; las fichas son lo contrario
+  en las tres dimensiones —aditivas, parciales por diseño y síncronas, porque la confirmación tiene
+  que responder en el momento—. La regla queda escrita como dos vías que no se mezclan, y el import
+  ad-hoc sigue prohibido.
+- **La cabecera aborta el archivo entero; una fila mala, no.** Es la asimetría que sostiene todo lo
+  demás: con las columnas corridas cada texto se guardaría en el campo de al lado y la ficha
+  quedaría **plausible y mal**, que es justo lo que no da síntomas. Una fila incompleta o repetida
+  se omite con su motivo y las demás entran. La cabecera sí tolera espacios de más y tildes
+  perdidas, porque son preguntas largas que el usuario copia y pega.
+- **El nombre repetido se compara recortado y en mayúsculas, y solo para comparar.** Se guarda el
+  texto tal como vino: normalizarlo al guardar destrozaría el nombre que PREDES publica. Se detecta
+  contra la base y dentro del propio archivo. **No hay `UniqueConstraint`**: los datos ya cargados
+  podrían violarla y la migración fallaría en producción sin un mensaje útil, así que la regla vive
+  en el importador. El alta manual sigue admitiendo un repetido — asimetría deliberada.
+- **Los 17 `verbose_name` son la única fuente**: de ahí salen la plantilla descargable, el
+  validador de la cabecera y la lista que se pinta en pantalla, así que solo pueden separarse por
+  accidente. Hay una prueba redonda que descarga la plantilla, la rellena y la importa.
+- **Dos hallazgos de camino.** El Excel a medio importar necesitaba un sitio, y el primero elegido
+  cayó **dentro del repositorio**: la suite dejaba ahí un `.xlsx` por prueba y el barrido solo se
+  lleva los de más de seis horas. Ahora es `IMPORTACIONES_TMP_DIR`, fuera de `MEDIA_ROOT` por lo
+  mismo que `IA_LOGS_DIR`, ignorado en git, y una fixture `autouse` lo manda a `tmp_path`. Y el
+  **CSS de Unfold viene precompilado**: `sm:grid-cols-2`, `tabular-nums`, `list-decimal` y varias
+  más no existen, y una clase ausente **no da error, simplemente no hace nada** — las dos tarjetas
+  del resumen salían apiladas por eso. Queda anotado en CLAUDE.md; `templates/admin/index.html` ya
+  tenía tres clases muertas de antes.
+- Quince pruebas nuevas en `backend/tests/test_fichas_acc.py`; la suite pasa de 340 a 355.
+
 ### Actualización 28/08/2026 — el flujo editorial pierde el paso de revisión (ADR-P3)
 
 - **ADR-P3**: los estados pasan a ser **`borrador → publicado`**, con `archivado` para retirar sin
@@ -1355,6 +1391,49 @@ navegador ataca a Meilisearch directamente y el fallo del proxy no existe—, y 
 Excel tienen que ser consistentes entre sí, porque el importador de frecuencia resuelve el distrito
 por nombre contra el padrón y sin un CCPP de Ollantaytambo las pruebas de ADR-D1 pasaban sin
 comprobar nada.
+
+### Actualización 28/08/2026 — una norma también nace de una URL, y esa URL puede ser un PDF (ADR-D8)
+
+- **ADR-D8** extiende ADR-D7 a `normativa.Norma`: mismo bloque «Origen», mismos obligatorios
+  relajados, mismo candado de una vez por registro, mismo «el editor revisa siempre». La IA rellena
+  título, número, tipo, ámbito, fecha, resumen, contenido, palabras clave, estado de vigencia y la
+  portada.
+- **Se generalizó en vez de copiarse.** Cuatro piezas pasan a `core` —`RedaccionIAMixin`,
+  `RedaccionIAAdminMixin`, `forms.RedaccionIAFormMixin` y `lectura_web`— y el endpoint de sondeo y
+  su JS pasan a ser **uno solo** para los dos modelos. El argumento no es la elegancia: duplicar
+  habría duplicado la **guarda anti-SSRF**, y una de las dos copias se habría quedado atrás. El
+  refactor entró con la suite entera en verde (312 pruebas antes, 340 después).
+- **La rama PDF es lo único realmente nuevo.** Media Perú publica sus normas como PDF y por la rama
+  de HTML el extractor le habría pasado al modelo basura binaria decodificada. El archivo viaja en
+  base64 dentro del mismo mensaje y lo parsea el `file-parser` de OpenRouter: **sigue siendo una
+  sola petición**, que es la razón de no haber metido a Gemini a extraer el texto primero. Se
+  detecta por los bytes `%PDF-` además de por la cabecera, porque hay servidores del Estado que lo
+  sirven declarando `application/octet-stream`.
+- **Dos campos que la IA no escribe, y no por olvido**: `analisis_predes` es la voz institucional
+  que firma PREDES en el listado, y `url_oficial` presenta un enlace como publicación oficial — no
+  puede acabar apuntando a la nota de prensa que el editor pegó arriba. `url_origen` es la
+  procedencia y es otra cosa; el spec 01 lo dice ahora explícitamente.
+- **Nada de repliegues inventados en la clasificación.** Un `tipo` o un `ambito` fuera del catálogo
+  se dejan **vacíos** para que el editor elija. Replegar a una opción cualquiera pondría una
+  clasificación falsa que nadie revisaría, porque el campo se vería lleno. Es lo contrario de lo que
+  hace `Noticia.tipo`, y la diferencia es que ahí el default es una opción honesta y aquí no la hay.
+- **Dos fallos silenciosos que este trabajo cerró antes de que ocurrieran**: un PDF escaneado
+  devuelve la ficha en blanco sin quejarse —y se habría guardado vacía **con el candado cerrado**,
+  lo único que no se puede reintentar—, y el base64 del adjunto habría entrado entero en
+  `ia-AAAA-MM-DD.txt`, que es un archivo diario en modo añadir y sin rotación: un PDF de 5 MB son
+  ~7 MB por llamada. `openrouter.registrar` lo elide y conserva el prompt, con su prueba.
+- **Se corrigió una promesa caduca del spec 03**, que desde la fase de diseño afirmaba soporte de
+  Gemini para `normativa.Norma` «vía su documento adjunto». Nunca se implementó:
+  `generar_resumen_ia` asume los campos de `biblioteca.Documento` y no funcionaría sobre `Norma`.
+  Ahora el spec dice qué hay y qué no.
+- **Probado de extremo a extremo contra el API real**, las dos ramas: una norma de gob.pe quedó con
+  título, número, tipo, ámbito, fecha, resumen, cinco palabras clave y portada descargada por
+  $0.00016; el mismo documento en PDF, por $0.00009. El registro en disco muestra los dos
+  intercambios y el adjunto elidido a «33 KB omitidos».
+- Una lección de método: la prueba nueva que comprobaba el JS renderizando la ficha del admin
+  **falló por el manifiesto de estáticos**, no por el código. Se reescribió para mirar
+  `ModelAdmin.media`, que es lo que de verdad está en riesgo al mover un `class Media` a un mixin,
+  y además no obliga a haber corrido `collectstatic` para pasar.
 
 ## Orden de lectura
 

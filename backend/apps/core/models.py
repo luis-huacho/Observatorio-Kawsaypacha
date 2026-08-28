@@ -50,15 +50,68 @@ class EstadoIA(models.TextChoices):
     """Estado de un campo que la IA puede rellenar.
 
     Vive aquí y no en una app concreta porque ya lo usan dos —`biblioteca.Documento` para el
-    resumen de un PDF y `contenidos.Noticia` para la redacción desde una URL— y el vocabulario
-    tiene que ser el mismo: la insignia del admin y el texto que lee el editor se derivan de él.
-    `Documento` conserva su copia idéntica para no arrastrar una migración que no cambia nada.
+    resumen de un PDF, y `contenidos.Noticia` y `normativa.Norma` para la redacción desde una
+    URL— y el vocabulario tiene que ser el mismo: la insignia del admin y el texto que lee el
+    editor se derivan de él. `Documento` conserva su copia idéntica para no arrastrar una
+    migración que no cambia nada.
     """
 
     PENDIENTE = "pendiente", "Pendiente"
     PROCESANDO = "procesando", "Procesando"
     OK = "ok", "Generado"
     ERROR = "error", "Error"
+
+
+class RedaccionIAMixin(models.Model):
+    """Un registro que la IA puede redactar desde una URL (ADR-D7 para noticias, D8 para normas).
+
+    Los cuatro campos son idénticos en los dos modelos, así que viven aquí: si el candado o el
+    vocabulario del estado divergieran entre apps, el mixin de admin y el sondeo que refresca la
+    ficha —que son uno solo para ambos— dejarían de valer para una de las dos.
+
+    **`redactada_por_ia` es el candado, y solo se cierra cuando la IA llegó a escribir.** Un
+    timeout o una URL caída dejan `ia_estado=error` con el motivo a la vista y permiten reintentar:
+    un corte de red no debería inutilizar un registro para siempre.
+    """
+
+    #: Con lo que el admin rellena el título mientras la IA trabaja. Vive aquí porque lo escriben
+    #: el admin y lo leen las tareas: es la marca por la que «¿lo escribió una persona?» sabe que
+    #: ese título lo puso la máquina y puede sustituirlo.
+    PREFIJO_PROVISIONAL = "(redactando)"
+
+    url_origen = models.URLField(
+        "URL de origen",
+        max_length=500,
+        blank=True,
+        help_text="Página de la que se redactó la ficha. Queda como procedencia.",
+    )
+    ia_estado = models.CharField(
+        "estado de la IA", max_length=12, choices=EstadoIA.choices, default=EstadoIA.PENDIENTE
+    )
+    log_ia = models.TextField("registro de la IA", blank=True)
+    redactada_por_ia = models.BooleanField("redactada por IA", default=False)
+
+    class Meta:
+        abstract = True
+
+
+def slug_unico(obj) -> str:
+    """Slug definitivo desde el título del registro, sin chocar con los que ya existen.
+
+    Hace falta porque el provisional que puso el admin lleva un sufijo aleatorio —necesario para
+    que dos fichas creadas seguidas no colisionen— que no tiene por qué quedarse en la URL pública.
+    Vale para cualquier modelo con `titulo` y `slug`, que son los dos que redacta la IA.
+    """
+    from django.utils.text import slugify
+
+    tope = obj._meta.get_field("slug").max_length
+    base = slugify(obj.titulo)[: tope - 10] or obj.slug
+    candidato, sufijo = base, 2
+    hermanos = type(obj)._default_manager.exclude(pk=obj.pk)
+    while hermanos.filter(slug=candidato).exists():
+        candidato = f"{base}-{sufijo}"
+        sufijo += 1
+    return candidato
 
 
 class PublicadosManager(models.Manager):

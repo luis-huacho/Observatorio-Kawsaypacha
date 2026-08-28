@@ -53,6 +53,9 @@ backend/staticfiles/
 # .txt de verdad caen en /logs de la raíz; esto queda vacío, pero sin ignorarlo ensucia
 # `git status` en cada máquina de desarrollo.
 backend/logs/
+
+# Excel de fichas ACC a medio importar; el admin los borra al confirmar o al caducar
+backend/importaciones/
 **/.env
 uv.lock.tmp
 

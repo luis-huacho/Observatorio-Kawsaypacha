@@ -52,8 +52,10 @@ def ia(monkeypatch, settings):
     llamadas = []
 
     def instalar(ficha=FICHA, error=None, html=PAGINA):
-        monkeypatch.setattr(redaccion, "_descargar", lambda url: html.encode("utf-8"))
-        monkeypatch.setattr(redaccion, "descargar_imagen", lambda html, url: None)
+        monkeypatch.setattr(
+            redaccion.lectura_web, "descargar", lambda url, **kw: (html.encode("utf-8"), "text/html")
+        )
+        monkeypatch.setattr(redaccion.lectura_web, "descargar_imagen", lambda html, url: None)
 
         def completar(mensajes, **opciones):
             llamadas.append({"mensajes": mensajes, **opciones})
@@ -313,42 +315,6 @@ def test_una_pagina_sin_texto_se_rechaza_con_un_motivo_util(ia):
         redaccion.redactar("https://medio.pe/nota")
 
 
-# --- Extracción y guardas ---------------------------------------------------
-
-
-def test_la_extraccion_descarta_scripts_y_separa_los_bloques():
-    """Sin el salto previo, nh3 pega las palabras entre sí y el prompt queda ilegible."""
-    texto = redaccion.extraer_texto(PAGINA)
-
-    assert "rastreador" not in texto
-    assert "color:red" not in texto
-    assert "Huaicos en Quispicanchi" in texto
-    assert "PortadaHuaicos" not in texto
-
-
-@pytest.mark.parametrize(
-    "url",
-    [
-        "ftp://medio.pe/nota",
-        "file:///etc/passwd",
-        "http://127.0.0.1/admin",
-        "http://[::1]/admin",
-    ],
-)
-def test_no_se_puede_apuntar_la_descarga_a_la_red_interna(url):
-    """La URL la escribe un editor y la petición la hace el servidor.
-
-    Sin esto, el formulario sería una vía para sondear la red privada desde dentro
-    (`http://meilisearch:7700`, `http://db:5432`) con una cuenta de editor cualquiera.
-    """
-    with pytest.raises(ValueError):
-        redaccion._comprobar_destino(url)
-
-
-def test_una_url_publica_si_pasa():
-    redaccion._comprobar_destino("https://www.gob.pe/senamhi")
-
-
 # --- El sondeo que refresca la ficha ----------------------------------------
 
 
@@ -385,4 +351,4 @@ def test_el_endpoint_va_declarado_ANTES_del_admin(admin_client):
 def _url_estado(pk):
     from django.urls import reverse
 
-    return reverse("estado-ia-noticia", args=[pk])
+    return reverse("estado-ia", args=["contenidos", "noticia", pk])
