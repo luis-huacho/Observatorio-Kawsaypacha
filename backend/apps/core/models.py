@@ -46,6 +46,21 @@ class HtmlRicoMixin(models.Model):
         super().save(*args, **kwargs)
 
 
+class EstadoIA(models.TextChoices):
+    """Estado de un campo que la IA puede rellenar.
+
+    Vive aquí y no en una app concreta porque ya lo usan dos —`biblioteca.Documento` para el
+    resumen de un PDF y `contenidos.Noticia` para la redacción desde una URL— y el vocabulario
+    tiene que ser el mismo: la insignia del admin y el texto que lee el editor se derivan de él.
+    `Documento` conserva su copia idéntica para no arrastrar una migración que no cambia nada.
+    """
+
+    PENDIENTE = "pendiente", "Pendiente"
+    PROCESANDO = "procesando", "Procesando"
+    OK = "ok", "Generado"
+    ERROR = "error", "Error"
+
+
 class PublicadosManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(estado=WorkflowMixin.Estado.PUBLICADO)

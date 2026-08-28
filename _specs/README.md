@@ -13,6 +13,45 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — una noticia puede nacer de una URL (ADR-D7)
+
+- **ADR-D7**: el formulario de Noticias lleva arriba **URL de origen** y la casilla **«Procesar con
+  IA»**. Marcada, los obligatorios dejan de serlo, el registro se guarda al instante y el worker
+  rellena título, bajada, cuerpo, tipo, autor, fecha, palabras clave y **la portada** desde la
+  `og:image`. Editable después, y **una sola vez por registro**.
+- **Asíncrono, con los números delante.** gunicorn corre con `--timeout 120` y 3 workers, y la
+  llamada puede tardar hasta ~120 s (60 s más el reintento con backoff): síncrono, gunicorn mataría
+  al worker **justo en el límite** y el editor vería un 502 con el guardado a medias, mientras tres
+  redacciones a la vez dejarían el admin sin atender. Para que el asíncrono sea usable, **la ficha
+  se refresca sola**: sondea un endpoint de estado y recarga al terminar. Esa ruta va **antes** de
+  `admin.site.urls`, o el `catch_all_view` del AdminSite la deja en 404 sin que nada más falle — la
+  misma trampa que rompió la subida de imágenes de CKEditor en su día.
+- **El candado solo se cierra si la IA llegó a escribir**, por decisión del usuario. Un timeout deja
+  `ia_estado=error` con el motivo y permite reintentar: un corte de red no puede inutilizar una
+  noticia para siempre.
+- **Relajar los obligatorios en el formulario no bastaba.** `slug`, `titulo`, `bajada` y `fecha` son
+  `NOT NULL` y `slug` además `unique`: `fecha=None` da `IntegrityError` y dos noticias sin slug
+  chocan entre sí. Se rellenan con provisionales al guardar —el slug con sufijo aleatorio— en vez de
+  migrar el modelo a `null=True`, que dejaría publicar noticias sin título.
+- **Tres cosas que solo salieron al probar, y una era un fallo:**
+  - **`tipo` tiene default**, así que la comprobación de «¿lo escribió una persona?» lo leía siempre
+    como escrito a mano y **la clasificación de la IA no se aplicaba nunca**. Lo delató el propio
+    registro, que declaraba «se conservó lo escrito a mano en: tipo» sobre algo que nadie había
+    escrito. Ahora solo se respeta un valor distinto del default, y hay dos pruebas.
+  - **Del mismo modelo hay proveedores sin salida estructurada** (CoreWeave, DigitalOcean, DeepSeek,
+    BaseTen, GMICloud, Relace, StreamLake), y OpenRouter enruta cada petición por separado — las dos
+    llamadas reales del día anterior habían caído justo en dos de ellos. Se fija con
+    `provider.require_parameters`; sin eso la función falla de forma intermitente.
+  - **`/media/` es público**: nginx lo sirve entero con CORS `*`. Los `.txt` de la IA van al mismo
+    directorio que `despliegue.log` y `vigilancia.log`, por bind mount que **nginx no monta**.
+- **La descarga se acota.** Solo `http`/`https`, y se resuelve el nombre para rechazar destinos
+  internos: la URL la escribe un editor y la petición la hace el servidor, así que sin eso el
+  formulario sería una vía para sondear la red privada desde dentro.
+- **El saneador de ADR-D2 estrena papel**: ser la red bajo un HTML que no escribió una persona. El
+  cuerpo propuesto pasa por `HtmlRicoMixin.save()` como todo lo demás.
+- **Probado de extremo a extremo contra el API real**: una noticia del portal del Senamhi quedó con
+  titular, bajada, cuerpo, autor, fecha, cinco palabras clave y portada descargada, por $0.000318.
+
 ### Actualización 28/08/2026 — OpenRouter: una pasarela para el resto de los usos de IA (ADR-A22)
 
 - **ADR-A22**: **OpenRouter** entra como pasarela de IA de propósito general, con la librería

@@ -2,6 +2,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 from apps.core.models import (
+    EstadoIA,
     HtmlRicoMixin,
     TimeStampedMixin,
     WorkflowMixin,
@@ -40,6 +41,22 @@ class Noticia(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
         blank=True,
     )
     destacada = models.BooleanField(default=False, help_text="Aparece en la portada.")
+
+    # --- Redacción asistida desde una URL (ADR-D7) ---
+    url_origen = models.URLField(
+        "URL de origen",
+        max_length=500,
+        blank=True,
+        help_text="Página de la que se redactó la noticia. Queda como procedencia.",
+    )
+    ia_estado = models.CharField(
+        "estado de la IA", max_length=12, choices=EstadoIA.choices, default=EstadoIA.PENDIENTE
+    )
+    log_ia = models.TextField("registro de la IA", blank=True)
+    # El candado, y **solo se cierra cuando la IA llegó a escribir**: un timeout o una URL caída
+    # dejan `ia_estado=error` y permiten reintentar, porque un corte de red no debería inutilizar
+    # la noticia para siempre.
+    redactada_por_ia = models.BooleanField("redactada por IA", default=False)
 
     class Meta:
         # Destacadas primero y, dentro de cada grupo, lo más reciente. `-id` remata el orden y no

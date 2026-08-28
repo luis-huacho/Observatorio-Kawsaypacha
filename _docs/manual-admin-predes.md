@@ -212,6 +212,25 @@ cambiar el color de los niveles de peligro desde aquí: eso es parte del diseño
 
 Un cambio aquí se ve en el sitio en cuanto se recarga la página.
 
+## Redactar una noticia desde un enlace
+
+En **Noticias**, arriba del formulario hay dos campos: **URL de origen** y la casilla **«Procesar
+con IA»**. Si la marcas y guardas, puedes dejar el resto en blanco: se leerá esa página y se
+rellenarán el titular, la bajada, el cuerpo, el autor, la fecha, las palabras clave y la imagen de
+portada. No hay que esperar mirando — **la pantalla se actualiza sola** en cuanto termina, y suele
+tardar unos segundos.
+
+Tres cosas que conviene decir en la capacitación:
+
+- **Cada noticia puede usarlo una sola vez.** Después la casilla queda desactivada y se sigue
+  editando a mano, como cualquier otra noticia. Si el intento falla —porque el enlace no responde o
+  la página está tras un muro de pago—, no se gasta: aparece el motivo y se puede reintentar.
+- **Es una propuesta, no un resultado.** Hay que leerla y corregirla antes de publicar, igual que
+  los resúmenes de Biblioteca.
+- **Ojo con la imagen.** La portada se trae de la página de origen, y eso **no** significa que se
+  tenga permiso para publicarla. Antes de publicar hay que comprobar de quién es o sustituirla; sin
+  imagen, el sitio usa la ilustración institucional y se ve perfectamente.
+
 ## Resúmenes con inteligencia artificial
 
 En **Biblioteca**, la acción **«Generar resumen con IA»** propone un resumen del documento. Al
