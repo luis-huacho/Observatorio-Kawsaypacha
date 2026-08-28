@@ -1,7 +1,9 @@
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
+from django.utils.html import escape
 
 from apps.core.models import (
+    EstadoIAMixin,
     HtmlRicoMixin,
     TimeStampedMixin,
     WorkflowMixin,
@@ -15,10 +17,25 @@ def extracto(texto: str, limite: int = 80) -> str:
     return texto[:limite] + ("…" if len(texto) > limite else "")
 
 
-class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
-    """Buena práctica o experiencia de campo documentada por PREDES."""
+class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, EstadoIAMixin):
+    """Buena práctica o experiencia de campo documentada por PREDES.
+
+    Puede **nacer de una ficha ACC** (ADR-D10): el editor elige una arriba del formulario, marca
+    «Procesar con IA» y el worker redacta el borrador desde las respuestas de esa ficha. Es el
+    tercer caso del mecanismo de ADR-D7/D8 y el primero cuyo origen no es una URL.
+    """
 
     campos_html = ("contenido",)
+
+    #: Clase del bloque de contacto que la tarea pega al final del contenido. **Es el marcador**,
+    #: y por eso es una clase y no un comentario HTML: `sanear()` corre con `strip_comments=True`
+    #: y se llevaría un comentario en silencio, dejando `tiene_bloque_de_contacto()` en falso
+    #: sobre un contenido que sí lleva datos personales.
+    CLASE_CONTACTO = "contacto-ficha-acc"
+
+    #: Sin esto no se publica. `contenido` no está: una medida puede ser un apunte breve, y la
+    #: portada ya se resuelve sola desde el peligro.
+    CAMPOS_PARA_PUBLICAR = ("titulo", "tipo_peligro", "ambito", "resultado", "resumen_corto")
 
     class Ambito(models.TextChoices):
         COMUNAL = "comunal", "Comunal"
@@ -32,9 +49,18 @@ class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
         MAL_ADAPTACION = "mal_adaptacion", "Mala adaptación"
 
     slug = models.SlugField(max_length=120, unique=True)
-    titulo = models.CharField(max_length=200)
+    titulo = models.CharField("título", max_length=200)
+    # Nullable desde ADR-D10: un borrador recién creado desde una ficha ACC todavía no tiene
+    # peligro, y replegarlo a una opción cualquiera pondría una clasificación falsa que nadie
+    # revisaría porque el campo se vería lleno. Lo que no puede es publicarse así — de eso se
+    # encarga `faltantes_para_publicar()`.
     tipo_peligro = models.ForeignKey(
-        "peligros.TipoPeligro", on_delete=models.PROTECT, related_name="medidas"
+        "peligros.TipoPeligro",
+        verbose_name="tipo de peligro",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="medidas",
     )
     ambito = models.CharField("Alcance de la experiencia", max_length=12, choices=Ambito.choices)
     resultado = models.CharField(max_length=16, choices=Resultado.choices, db_index=True)
@@ -89,6 +115,18 @@ class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
     )
     documentos = models.ManyToManyField("biblioteca.Documento", blank=True, related_name="medidas")
 
+    #: La procedencia (ADR-D10). `PROTECT` y no `SET_NULL`: borrar la ficha borraría de dónde
+    #: salió la medida **y liberaría el candado**, dejando redactar dos medidas de lo mismo.
+    ficha_acc = models.ForeignKey(
+        "medidas.MedidaFichaACC",
+        verbose_name="ficha ACC de origen",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="medidas",
+        help_text="Ficha de la que la IA redactó esta medida. Queda como procedencia.",
+    )
+
     class Meta:
         ordering = ["-publicado_en", "-creado_en"]
         verbose_name = "medida"
@@ -97,6 +135,52 @@ class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin):
 
     def __str__(self) -> str:
         return self.titulo
+
+    # -- Flujo editorial ---------------------------------------------------
+    def faltantes_para_publicar(self) -> list[str]:
+        """Lo que impide publicar, nombrado como se ve en pantalla.
+
+        El título provisional cuenta como faltante: publicar «(redactando) Cosecha de agua» es
+        exactamente el fallo que se ve idéntico a un acierto.
+        """
+        faltan = []
+        for nombre in self.CAMPOS_PARA_PUBLICAR:
+            campo = self._meta.get_field(nombre)
+            valor = getattr(self, f"{nombre}_id" if campo.is_relation else nombre)
+            provisional = nombre == "titulo" and str(valor or "").startswith(
+                self.PREFIJO_PROVISIONAL
+            )
+            if not valor or provisional:
+                faltan.append(str(campo.verbose_name))
+        return faltan
+
+    def tiene_bloque_de_contacto(self) -> bool:
+        """¿El contenido todavía lleva los datos de contacto que venían de la ficha ACC?"""
+        return self.CLASE_CONTACTO in (self.contenido or "")
+
+    def avisos_al_publicar(self) -> list[str]:
+        if not self.tiene_bloque_de_contacto():
+            return []
+        return [
+            "aún lleva el bloque de contacto de la ficha ACC, con el nombre, el teléfono y el "
+            "correo de un tercero. El contenido es público: bórralo del contenido o confirma "
+            "que esa persona autorizó publicarlo."
+        ]
+
+    def bloque_de_contacto(self) -> str:
+        """El HTML del contacto, listo para pegarse al final del contenido.
+
+        El valor se escapa porque lo rellenó un tercero en un Excel. La clase es el marcador y
+        sobrevive al saneador: `figure`, `div`, `span` y `p` conservan `class` (ver
+        `core/sanitizar.py`).
+        """
+        contacto = " ".join((self.ficha_acc.value_004 or "").split()) if self.ficha_acc_id else ""
+        if not contacto:
+            return ""
+        return (
+            f'<div class="{self.CLASE_CONTACTO}"><h3>Contacto de la experiencia</h3>'
+            f"<p>{escape(contacto)}</p></div>"
+        )
 
 
 class MedidaImagen(TimeStampedMixin):
@@ -123,6 +207,25 @@ class MedidaImagen(TimeStampedMixin):
         return f"{self.medida.slug} #{self.orden}"
 
 
+class FichasACCQuerySet(models.QuerySet):
+    def disponibles_para_ia(self, incluyendo=None):
+        """Las que todavía no ha gastado la IA (ADR-D10).
+
+        **El candado es derivado y no un campo:** una ficha está gastada si existe una Medida que
+        la referencia y cuya IA llegó a escribir. Así hay una sola fuente de verdad —el mismo
+        `redactada_por_ia` que ya gobierna a noticias y normas—, y una medida fallida o borrada
+        devuelve su ficha a la circulación sola, sin nada que sincronizar.
+
+        `incluyendo` no es una comodidad: sin ella, una medida ya redactada **no se podría volver
+        a guardar nunca**, porque su propia ficha habría salido del queryset del select y el
+        `ModelChoiceField` respondería «Escoja una opción válida» sin decir por qué.
+        """
+        libres = self.exclude(medidas__redactada_por_ia=True)
+        if incluyendo is None:
+            return libres
+        return self.filter(models.Q(pk__in=libres.values("pk")) | models.Q(pk=incluyendo))
+
+
 class MedidaFichaACC(TimeStampedMixin):
     """Ficha de Adaptación al Cambio Climático (formulario docs/medida_fichas_acc.csv).
 
@@ -134,6 +237,8 @@ class MedidaFichaACC(TimeStampedMixin):
     aportar nada: nadie leía la relación (no hay serializer, API ni frontend que la use). Quien
     identifica la ficha es `value_001`, el nombre de la experiencia.
     """
+
+    objects = FichasACCQuerySet.as_manager()
 
     value_001 = models.TextField("Nombre de la experiencia, práctica proyecto o programa")
     value_002 = models.TextField(

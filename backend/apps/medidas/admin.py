@@ -13,10 +13,11 @@ from django_ckeditor_5.widgets import CKEditor5Widget
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action
 
+from apps.core.admin_ia import RedaccionIAAdminMixin
 from apps.core.admin_workflow import WorkflowAdmin
 
 from . import importacion
-from .forms import SubirFichasACCForm
+from .forms import MedidaForm, SubirFichasACCForm
 from .models import Medida, MedidaFichaACC, MedidaImagen, extracto
 
 #: Un temporal abandonado (el usuario cerró la pestaña en la pantalla de confirmación) se barre
@@ -53,18 +54,41 @@ class MedidaImagenInline(TabularInline):
 
 
 @admin.register(Medida)
-class MedidaAdmin(WorkflowAdmin, ModelAdmin):
-    campos_rich = ["contenido"]
+class MedidaAdmin(RedaccionIAAdminMixin, WorkflowAdmin, ModelAdmin):
+    """La medida puede nacer de una ficha ACC ya cargada (ADR-D10).
 
-    list_display = ("titulo", "tipo_peligro", "ambito", "resultado", "distrito", "destacada")
-    list_filter = ("estado", "resultado", "ambito", "tipo_peligro", "destacada")
+    El mecanismo entero —insignia, campos de solo lectura, provisionales, encolado y el JS que
+    refresca la ficha— vive en `RedaccionIAAdminMixin`, compartido con noticias y normas. Va
+    **primero** en las bases para que su `save_model` envuelva al de `WorkflowAdmin`; al revés no
+    se encolaría nada y no lo diría ningún error.
+    """
+
+    campos_rich = ["contenido"]
+    form = MedidaForm
+
+    #: `Medida` no tiene ninguna fecha `NOT NULL`. `fecha_implementacion` es nullable y ponerle
+    #: la de hoy sería un dato falso indistinguible de uno real.
+    fechas_provisionales = ()
+
+    list_display = ("titulo", "tipo_peligro", "ambito", "resultado", "distrito", "destacada",
+                    "ia_badge")
+    list_filter = ("estado", "resultado", "ambito", "tipo_peligro", "destacada", "ia_estado")
     search_fields = ("titulo", "comunidad", "resumen_corto", "slug")
     prepopulated_fields = {"slug": ("titulo",)}
-    autocomplete_fields = ("tipo_peligro", "distrito")
+    # `ficha_acc` va aquí y no en un `<select>` plano: las fichas entran por Excel en lote y
+    # cargarlas todas en cada alta es inmanejable.
+    autocomplete_fields = ("tipo_peligro", "distrito", "ficha_acc")
     inlines = (MedidaImagenInline,)
     list_select_related = ("tipo_peligro", "distrito")
 
     fieldsets = (
+        ("Origen", {
+            "fields": ("ficha_acc", "procesar_con_ia", "ia_badge_ficha", "log_ia"),
+            "description": "Elige la ficha ACC de la experiencia, marca la casilla y guarda: se "
+                           "redactará el resto en segundo plano. Los demás campos pueden quedar "
+                           "en blanco. Cada ficha puede usar la IA una sola vez, y lo redactado "
+                           "hay que revisarlo antes de publicar.",
+        }),
         (None, {"fields": ("titulo", "slug", "resumen_corto", "destacada")}),
         ("Clasificación", {"fields": ("tipo_peligro", "ambito", "resultado")}),
         ("Ubicación", {"fields": ("distrito", "comunidad", "centro_poblado")}),
@@ -89,6 +113,21 @@ class MedidaAdmin(WorkflowAdmin, ModelAdmin):
             kwargs["widget"] = CKEditor5Widget(config_name="default")
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
+    def etiqueta_provisional(self, obj) -> str:
+        """El nombre de la experiencia, que es lo que identifica una ficha.
+
+        Se normalizan los espacios porque `value_001` viene de un Excel y puede traer saltos de
+        línea, que en el título del listado quedarían crudos.
+        """
+        if not obj.ficha_acc_id:
+            return "ficha ACC"
+        return " ".join((obj.ficha_acc.value_001 or "").split())[:120] or "ficha ACC"
+
+    def encolar_ia(self, obj) -> None:
+        from apps.medidas.tasks import redactar_medida_desde_ficha
+
+        redactar_medida_desde_ficha.enqueue(pk=obj.pk)
+
 
 @admin.register(MedidaFichaACC)
 class MedidaFichaACCAdmin(ModelAdmin):
@@ -99,6 +138,17 @@ class MedidaFichaACCAdmin(ModelAdmin):
 
     list_display = ("columna_001", "columna_002", "columna_003", "columna_005", "creado_en")
     search_fields = ("value_001", "value_002", "value_003")
+
+    def get_search_results(self, request, queryset, search_term):
+        """En el autocompletado de una Medida, solo las fichas que la IA todavía no gastó.
+
+        El queryset del formulario es lo que **valida**; esto es lo que evita ofrecer una opción
+        que después se rechaza con «Escoja una opción válida» sin decir por qué.
+        """
+        resultados, duplicados = super().get_search_results(request, queryset, search_term)
+        if request.GET.get("field_name") == "ficha_acc":
+            resultados = resultados.disponibles_para_ia()
+        return resultados, duplicados
 
     @admin.display(description=MedidaFichaACC._meta.get_field("value_001").verbose_name)
     def columna_001(self, obj):

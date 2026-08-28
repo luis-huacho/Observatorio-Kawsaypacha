@@ -62,16 +62,23 @@ class EstadoIA(models.TextChoices):
     ERROR = "error", "Error"
 
 
-class RedaccionIAMixin(models.Model):
-    """Un registro que la IA puede redactar desde una URL (ADR-D7 para noticias, D8 para normas).
+class EstadoIAMixin(models.Model):
+    """Un registro que la IA puede redactar. **La procedencia la declara cada modelo.**
 
-    Los cuatro campos son idénticos en los dos modelos, así que viven aquí: si el candado o el
-    vocabulario del estado divergieran entre apps, el mixin de admin y el sondeo que refresca la
-    ficha —que son uno solo para ambos— dejarían de valer para una de las dos.
+    Los tres campos del estado son idénticos en todos ellos, así que viven aquí: si el candado o
+    el vocabulario del estado divergieran entre apps, el mixin de admin y el sondeo que refresca
+    la ficha —que son uno solo para todas— dejarían de valer para una de ellas. De hecho la lista
+    blanca del sondeo se comprueba contra esta clase: lo que herede de aquí tiene que estar en
+    `MODELOS_CON_IA`.
 
     **`redactada_por_ia` es el candado, y solo se cierra cuando la IA llegó a escribir.** Un
     timeout o una URL caída dejan `ia_estado=error` con el motivo a la vista y permiten reintentar:
     un corte de red no debería inutilizar un registro para siempre.
+
+    De dónde redacta la IA **no** está aquí, y no es un olvido: en noticias y normas es una URL
+    (`RedaccionIAMixin`, abajo) y en medidas es una ficha ACC ya cargada en la base (ADR-D10). No
+    hay un campo común que abstraer entre un `URLField` y una clave foránea, solo un papel; quien
+    lo nombra es `campo_origen` en el formulario.
     """
 
     #: Con lo que el admin rellena el título mientras la IA trabaja. Vive aquí porque lo escriben
@@ -79,17 +86,25 @@ class RedaccionIAMixin(models.Model):
     #: ese título lo puso la máquina y puede sustituirlo.
     PREFIJO_PROVISIONAL = "(redactando)"
 
+    ia_estado = models.CharField(
+        "estado de la IA", max_length=12, choices=EstadoIA.choices, default=EstadoIA.PENDIENTE
+    )
+    log_ia = models.TextField("registro de la IA", blank=True)
+    redactada_por_ia = models.BooleanField("redactada por IA", default=False)
+
+    class Meta:
+        abstract = True
+
+
+class RedaccionIAMixin(EstadoIAMixin):
+    """`EstadoIAMixin` + la procedencia es una URL (ADR-D7 para noticias, D8 para normas)."""
+
     url_origen = models.URLField(
         "URL de origen",
         max_length=500,
         blank=True,
         help_text="Página de la que se redactó la ficha. Queda como procedencia.",
     )
-    ia_estado = models.CharField(
-        "estado de la IA", max_length=12, choices=EstadoIA.choices, default=EstadoIA.PENDIENTE
-    )
-    log_ia = models.TextField("registro de la IA", blank=True)
-    redactada_por_ia = models.BooleanField("redactada por IA", default=False)
 
     class Meta:
         abstract = True
@@ -181,6 +196,25 @@ class WorkflowMixin(models.Model):
         abstract = True
 
     # -- Flujo editorial ---------------------------------------------------
+    def faltantes_para_publicar(self) -> list[str]:
+        """Qué **impide** publicar este registro. Vacío = nada.
+
+        Lo redefine el modelo que tenga condiciones. Existe porque `estado` está excluido del
+        formulario (`WorkflowAdmin.get_exclude`), así que publicar no pasa por ningún `clean()`:
+        la única puerta es `transicionar()`, y ahí es donde tiene que estar la guarda.
+        """
+        return []
+
+    def avisos_al_publicar(self) -> list[str]:
+        """Lo que **no** impide publicar pero hay que mirar una vez.
+
+        Separado de `faltantes_para_publicar` a propósito: convertir un aviso en un bloqueo deja
+        al editor sin salida cuando el dato es correcto, y convertir un bloqueo en aviso publica
+        lo que no debía. Los muestra `WorkflowAdmin._transicionar` como advertencia, igual que ya
+        hace con las devoluciones sin nota de revisión.
+        """
+        return []
+
     def usuario_puede_publicar(self, usuario) -> bool:
         codigo = f"{self._meta.app_label}.{PERMISO_PUBLICAR}"
         return bool(usuario and (usuario.is_superuser or usuario.has_perm(codigo)))
@@ -209,6 +243,9 @@ class WorkflowMixin(models.Model):
             raise PermissionError(
                 f"«{usuario}» no tiene permiso para pasar de {actual.label} a {nuevo.label}."
             )
+        # Antes de tocar nada: un rechazo no puede dejar el estado escrito ni el correo encolado.
+        if nuevo == self.Estado.PUBLICADO and (faltan := self.faltantes_para_publicar()):
+            raise ValueError("Falta completar antes de publicar: " + ", ".join(faltan) + ".")
 
         self.estado = nuevo
         if nuevo == self.Estado.PUBLICADO:

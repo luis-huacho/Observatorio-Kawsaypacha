@@ -15,7 +15,7 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (340 pruebas, ~80 s)
+$DC exec backend pytest                 # suite backend (429 pruebas, ~80 s)
                                         # la cifra sale de `pytest --collect-only -q`, no de la memoria
 $DC exec backend pytest -m lento        # 7 más: los Excel completos y el PDF con mapa (~35 s)
 cd frontend && npm run lint && npm run build    # tipos + build
@@ -155,15 +155,15 @@ de la carpeta; y un archivo que no es imagen **no rompe la subida**.
 - `nivel_max` es el máximo de los niveles presentes.
 - Cada feature lleva lo que el popup necesita —se pinta **desde el tile**, sin pedir nada al API— y `poblacion` va como entero: con `null`, MapLibre descarta el punto al interpolar el radio.
 
-### `test_noticias_ia.py`, `test_normativa_ia.py`, `test_lectura_web.py` y `test_openrouter.py`
+### `test_noticias_ia.py`, `test_normativa_ia.py`, `test_medidas_ia.py`, `test_lectura_web.py` y `test_openrouter.py`
 
-La redacción asistida desde una URL (ADR-D7 en noticias, ADR-D8 en normas). **La red no se toca**:
-el cliente de OpenRouter y la descarga son falsos, así que la suite no gasta dinero ni depende de
-que un portal del Estado esté en pie.
+La redacción asistida (ADR-D7 en noticias, ADR-D8 en normas, ADR-D10 en medidas). **La red no se
+toca**: el cliente de OpenRouter y la descarga son falsos, así que la suite no gasta dinero ni
+depende de que un portal del Estado esté en pie.
 
-Los dos archivos por modelo cubren lo mismo —formulario, candado, tarea, forma de la llamada,
-normalización y el endpoint de sondeo—, y **eso es deliberado**: son dos modelos distintos con
-obligatorios distintos, y una regresión en uno no la ve la prueba del otro. Lo que **no** se
+Los tres archivos por modelo cubren lo mismo —formulario, candado, tarea, forma de la llamada,
+normalización y el endpoint de sondeo—, y **eso es deliberado**: son tres modelos distintos con
+obligatorios distintos, y una regresión en uno no la ve la prueba de los otros. Lo que **no** se
 duplica es lo compartido, que se prueba una vez:
 
 - **`test_lectura_web.py`** — la extracción de texto y la **guarda anti-SSRF**. Duplicar la prueba
@@ -189,10 +189,33 @@ Los cinco fallos que estos archivos vigilan, y ninguno da síntoma:
 5. Que un PDF entre por la rama de HTML —la IA redactaría a partir de basura binaria— o que un PDF
    escaneado se guarde en blanco **con el candado cerrado**.
 
-Y dos de admin que no se ven hasta que se usan: que los **dos** admin declaren el JS que refresca
+Y dos de admin que no se ven hasta que se usan: que los **tres** admin declaren el JS que refresca
 la ficha (el `class Media` vive en un mixin, y que Django lo recoja desde ahí es lo que puede
 romperse al reorganizar las bases), y que el endpoint genérico de sondeo **rechace un modelo fuera
 de su lista blanca**.
+
+`test_medidas_ia.py` añade lo que solo tiene el caso de la ficha ACC (ADR-D10), y son siete formas
+distintas de fallar sin dar ningún error:
+
+1. Que el candado de la **ficha** se salte, o al revés: que una medida ya redactada **no se pueda
+   volver a guardar** porque su propia ficha salió del queryset del select. El síntoma sería
+   «Escoja una opción válida» sobre el campo que el editor no tocó.
+2. Que dos medidas gasten la misma ficha. El formulario lo valida, pero entre validar y encolar
+   caben dos peticiones, así que la tarea vuelve a comprobarlo y hay una prueba de las dos.
+3. Que los **datos de contacto** de la ficha acaben en el prompt o en el registro en disco.
+4. Que el bloque de contacto se lo lleve el saneador —pasaría con un comentario HTML, porque
+   `sanear()` corre con `strip_comments=True`— y el aviso al publicar deje de dispararse.
+5. Que se publique una medida sin peligro o con el título provisional «(redactando) …» a la vista,
+   que es el fallo que se ve idéntico a un acierto.
+6. Que un `Decimal("0.00")` escrito a mano se pise porque es *falsy*.
+7. Que el `contenido` vuelva **sin etiquetas** y se pinte corrido: el frontend lo inyecta con
+   `dangerouslySetInnerHTML`, así que un texto plano se ve mal sin fallar. Le pasa de verdad al
+   modelo por defecto, y por eso hay red y aviso, con su prueba.
+
+Y dos que fija la generalización de `core`: que **partir `RedaccionIAMixin` en dos bases abstractas
+no emita ninguna migración** (`makemigrations --check`), y que **todo modelo que herede
+`EstadoIAMixin` esté en `MODELOS_CON_IA`** — olvidarlo deja el sondeo en 404, el JS reintentando
+noventa veces y un mensaje final que culpa al worker.
 
 ### `test_fichas_acc.py`
 
@@ -289,7 +312,7 @@ Y dos cosas que las pruebas mismas enseñaron: que las dos muestras de Excel tie
 
 ## Criterio de "listo para entregar"
 
-- `pytest` completo (incluido `-m lento`) en verde: 259 + 7 pruebas.
+- `pytest` completo (incluido `-m lento`) en verde: 429 + 7 pruebas.
 - `npm run lint && npm run build` sin errores.
 - `npx playwright test` en verde **dos veces**: contra el dev server y contra el bundle servido por nginx (`E2E_URL=http://localhost`). La segunda es la que vale.
 - Las cinco comprobaciones manuales hechas y documentadas.

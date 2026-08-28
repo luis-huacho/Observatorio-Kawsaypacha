@@ -35,9 +35,12 @@ def reindexar_busqueda(request):
 
 
 #: Qué modelos puede consultar el sondeo. Sin lista blanca, la ruta serviría para leer el estado
-#: —y el `log_ia`— de cualquier modelo del proyecto que casara con el patrón. Los dos que hay son
-#: los que heredan `core.RedaccionIAMixin`.
-MODELOS_CON_IA = {"contenidos.noticia", "normativa.norma"}
+#: —y el `log_ia`— de cualquier modelo del proyecto que casara con el patrón.
+#:
+#: **Añadir aquí todo modelo que herede `core.EstadoIAMixin`.** Olvidarlo no da ningún síntoma
+#: útil: el sondeo responde 404, el JS entra por su `.catch`, reintenta noventa veces y acaba
+#: culpando al worker. Hay una prueba que compara esta lista contra los modelos registrados.
+MODELOS_CON_IA = {"contenidos.noticia", "normativa.norma", "medidas.medida"}
 
 
 @staff_member_required

@@ -13,6 +13,67 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — una medida nace de una ficha ACC, y el contacto no pasa por la IA (ADR-D10)
+
+- **ADR-D10** extiende ADR-D7/D8 a `medidas.Medida` y estrena lo que faltaba: **un origen que no es
+  una URL**. El formulario lleva arriba el select de la ficha ACC y la casilla «Procesar con IA»;
+  marcada, los obligatorios dejan de serlo, la medida se guarda al instante y el worker redacta
+  título, resumen, tipo de peligro, alcance, resultado, distrito, comunidad, contenido, palabras
+  clave, actores, fecha de implementación y costo referencial. Una sola llamada, como siempre.
+- **Se generalizó otra vez, y lo que se partió fue el origen.** `RedaccionIAMixin` mezclaba el
+  estado de la IA con el hecho de que la procedencia fuera una URL. Ahora `core.EstadoIAMixin`
+  tiene el candado, la bitácora y el estado, y `RedaccionIAMixin(EstadoIAMixin)` solo añade
+  `url_origen`; quién es el origen lo nombra `campo_origen` en el formulario y
+  `fechas_provisionales` dice qué fechas `NOT NULL` provisionar — en medidas, ninguna. **La
+  partición no emitió ni una migración** para noticias y normas, y entró con la suite en verde
+  (340 pruebas antes, 429 después).
+- **Etiquetas XML en la entrada, JSON estricto en la salida.** Diecisiete respuestas de texto libre
+  concatenadas se confunden entre sí y varias empiezan igual («Describa brevemente…»), así que cada
+  una viaja como `<value_006 pregunta="…">…</value_006>`. La salida no cambia de formato porque es
+  lo que hace que el proveedor garantice los `enum`. El valor se escapa: el Excel lo rellena un
+  tercero y un `</value_007>` dentro del texto rompería el marcado.
+- **El contacto de la ficha no se le manda a la IA, y sí se pega al final del contenido.**
+  `value_004` es nombre, cargo, teléfono y correo de una persona; ningún campo de `Medida` se
+  alimenta de él y habría quedado en claro en `ia-AAAA-MM-DD.txt`, que es diario y sin rotación.
+  Lo pega el servidor en un bloque con la clase `contacto-ficha-acc`, y publicar con ese bloque
+  puesto **avisa pero no bloquea**: es el editor quien decide. El marcador tuvo que ser una clase
+  y no un comentario HTML — `sanear()` corre con `strip_comments=True` y se lo habría llevado en
+  silencio, dejando el aviso sin disparar.
+- **`tipo_peligro` pasa a nullable y publicar exige los cinco obligatorios de vuelta.** Era el
+  único que no podía guardarse como cadena vacía, y replegarlo a un peligro cualquiera habría
+  puesto una clasificación falsa que nadie revisaría. La guarda vive en
+  `WorkflowMixin.transicionar()` y no en un `clean()`, porque `estado` está excluido del formulario
+  y publicar no pasa por ninguno. El título provisional cuenta como faltante.
+- **El candado es la ficha, y es derivado**: sin campo nuevo, una ficha está gastada si alguna
+  medida la referencia con `redactada_por_ia=True`. Dos trampas que costaron su prueba cada una: el
+  queryset del select **tiene que incluir la propia ficha** de la medida que se edita —si no, una
+  medida ya redactada no se puede volver a guardar nunca, y el mensaje sería «Escoja una opción
+  válida» sobre un campo que el editor no tocó—, y la tarea vuelve a comprobarlo porque entre
+  validar el formulario y encolar caben dos peticiones.
+- **`Decimal("0.00")` es *falsy*, y un costo de cero es un dato legítimo.** «Aporte comunal, sin
+  costo monetario» es una respuesta real de la ficha, así que `costo_referencial` y
+  `fecha_implementacion` se comprueban con `is not None`. Es el equivalente de lo que `Noticia.tipo`
+  fue en ADR-D7: el campo donde «¿está lleno?» no significa lo que parece.
+- **Probado de extremo a extremo contra el API real, y ahí salió lo que ninguna prueba con dobles
+  iba a ver.** Con `deepseek/deepseek-v4-flash-0731` —el valor por defecto de `OPENROUTER_MODELO`—
+  la misma ficha dio tres resultados distintos en tres llamadas de ~$0.0002, y en las tres el
+  `contenido` volvió **en texto plano o en Markdown**, transcribiendo la ficha campo por campo en
+  vez de redactarla; una de ellas además dejó `ambito` en «regional» para una experiencia comunal y
+  `actores` en «community». La misma ficha con `google/gemini-2.5-flash` salió con subtítulos
+  `<h2>`, la clasificación correcta y cero avisos, por $0.003. **La variable no se cambió**: afecta
+  también a noticias y normas y es una decisión de coste del dueño del proyecto.
+- **De ahí salieron tres arreglos que no estaban en el plan**, los tres del mismo tipo —cosas que
+  se ven mal sin fallar—: un `contenido` sin etiquetas se envuelve en párrafos y queda anotado en
+  el registro de la IA (el frontend lo inyecta con `dangerouslySetInnerHTML`); «180,000 soles» se
+  lee como monto, porque quitar el separador de millar no cambia la cifra —lo que se sigue
+  rechazando son las otras monedas, que exigirían inventar un tipo de cambio—; y «2019-2022», que
+  es lo que el modelo devuelve cuando se le pide la fecha de inicio de un periodo, se fecha al 1 de
+  enero de 2019 con su aviso, en vez de perderse.
+- **Una lección de método, y es la misma que dejó ADR-D8 escrita**: la prueba que comprobaba el JS
+  renderizando la pantalla del admin volvió a fallar por el manifiesto de estáticos, no por el
+  código. La comprobación que vale es la de `ModelAdmin.media`; la de la pantalla se quedó, pero
+  mirando el bloque «Origen», que es lo que sí puede romperse al tocar un `fieldsets`.
+
 ### Actualización 28/08/2026 — la ficha ACC se suelta de la medida y se carga en lote (ADR-D9)
 
 - **La ficha ACC deja de colgar de una `Medida`.** La FK obligatoria se elimina del modelo: el

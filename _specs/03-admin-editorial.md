@@ -115,17 +115,23 @@ No hay ninguna acción de «reprocesar»: el reparto se calcula al vuelo sobre `
 
 Admin de `CapaCartografica`: subir/reemplazar GeoJSON → acción **"(Re)generar tiles"** → pipeline del spec 05 (recorte a Cusco + tippecanoe). `estado_tiles` como badge; `log_error` visible. El campo `estilo` (JSON) permite cambiar color/grosor sin tocar código: el frontend lo aplica al vuelo. Reemplazar una capa = subir nuevo archivo y regenerar; swap atómico garantiza que el mapa público nunca vea tiles corruptos.
 
-## Redacción asistida desde una URL (ADR-D7 en noticias, ADR-D8 en normativa)
+## Redacción asistida (ADR-D7 en noticias, ADR-D8 en normativa, ADR-D10 en medidas)
 
-Un mismo mecanismo para **`contenidos.Noticia`** y **`normativa.Norma`**. Lo compartido vive en
-`core.RedaccionIAMixin` (los cuatro campos), `core.RedaccionIAAdminMixin` (insignia, campos de
-solo lectura, provisionales y encolado), `core.forms.RedaccionIAFormMixin` (la casilla y el
-relajado de obligatorios) y `core.lectura_web` (descarga, guarda anti-SSRF, texto, `og:image`).
+Un mismo mecanismo para **`contenidos.Noticia`**, **`normativa.Norma`** y **`medidas.Medida`**. Lo
+compartido vive en `core.EstadoIAMixin` (estado, bitácora y candado), `core.RedaccionIAMixin`
+(= el anterior + `url_origen`, para los dos que redactan desde una web),
+`core.RedaccionIAAdminMixin` (insignia, campos de solo lectura, provisionales y encolado),
+`core.forms.RedaccionIAFormMixin` (la casilla y el relajado de obligatorios) y
+`core.lectura_web` (descarga, guarda anti-SSRF, texto, `og:image`).
 Lo propio de cada dominio —esquema JSON, instrucciones y normalización— vive en el
 `redaccion.py` de su app. **No duplicar ninguna de esas piezas**: el endpoint que refresca la
 ficha es uno solo para los dos, y depende de que el estado y el candado se llamen igual.
 
-- **Dónde**: bloque «Origen», arriba del todo del formulario — `url_origen`, casilla
+- **El origen no siempre es una URL.** Noticias y normas redactan desde una página web; medidas,
+  desde una **ficha ACC ya cargada en la base**. Quién es el origen lo declara `campo_origen` en
+  el formulario (`url_origen` por defecto, `ficha_acc` en medidas), y `fechas_provisionales` dice
+  qué fechas `NOT NULL` hay que rellenar para poder guardar — en medidas, **ninguna**.
+- **Dónde**: bloque «Origen», arriba del todo del formulario — el campo de origen, casilla
   **«Procesar con IA»**, insignia de estado y registro.
 - **Qué hace**: con la casilla marcada, los obligatorios dejan de serlo y el registro se guarda al
   instante con valores provisionales —el `slug` lleva sufijo aleatorio para no chocar contra su
@@ -136,6 +142,30 @@ ficha es uno solo para los dos, y depende de que el estado y el candado se llame
   - **Norma** (`redactar_norma_desde_url`): título, número, tipo, ámbito, fecha, resumen, contenido
     (HTML), palabras clave, estado de vigencia y la portada. Obligatorios que se relajan: `titulo`,
     `slug`, `tipo`, `ambito`, `fecha`, `resumen`.
+  - **Medida** (`redactar_medida_desde_ficha`): título, resumen corto, tipo de peligro, alcance,
+    resultado, distrito, comunidad, contenido (HTML), palabras clave, actores, fecha de
+    implementación y costo referencial. Obligatorios que se relajan: `titulo`, `slug`,
+    `tipo_peligro`, `ambito`, `resultado`, `resumen_corto`. **No hay portada**: una ficha no trae
+    URL de la que sacar una `og:image`, y la vacía ya es un estado correcto (la ilustración
+    institucional del peligro).
+- **La entrada de una ficha ACC va con etiquetas XML**, y solo ahí: diecisiete respuestas de
+  texto libre concatenadas se confunden entre sí, así que cada una viaja como
+  `<value_006 pregunta="…">…</value_006>`. El valor se **escapa** porque el Excel lo rellena un
+  tercero y un `</value_007>` dentro del texto rompería el marcado. La salida sigue siendo JSON
+  con esquema estricto en los tres modelos.
+- **`value_004` de la ficha —el contacto— no se le manda a la IA.** Es nombre, cargo, teléfono y
+  correo de una persona; ningún campo de `Medida` se alimenta de él y quedaría en claro en el
+  registro en disco. Lo pega el **servidor** al final del `contenido`, en un bloque con la clase
+  `contacto-ficha-acc`, y publicar con ese bloque puesto **avisa pero no bloquea**. La clase es el
+  marcador y no un comentario HTML: el saneador corre con `strip_comments=True` y se lo llevaría
+  en silencio.
+- **Publicar una medida exige los cinco obligatorios de vuelta**, incluido que el título ya no sea
+  el provisional. La guarda vive en `WorkflowMixin.transicionar()` (`faltantes_para_publicar()`), no
+  en un `clean()`: `estado` está excluido del formulario y publicar no pasa por ninguno. Su
+  hermano `avisos_al_publicar()` es lo que no impide publicar pero hay que mirar una vez.
+- **Los `enum` del esquema se construyen desde los catálogos vivos**, no escritos a mano: los nueve
+  slugs salen de `peligros.catalogo` y las dos taxonomías de `Medida`. Añadir un peligro no puede
+  dejar el esquema atrás, y el síntoma sería una clasificación vacía sin explicación.
 - **Dos campos de Norma que la IA NO escribe, y no por olvido**: `analisis_predes` es la voz
   institucional que firma la organización en el listado, y `url_oficial` presenta un enlace como
   publicación oficial — no puede acabar apuntando a lo que el editor pegó arriba. El `log_ia` se lo
@@ -159,12 +189,21 @@ ficha es uno solo para los dos, y depende de que el estado y el candado se llame
 - **El candado es por registro** (`redactada_por_ia`) y **solo se cierra si se llegó a escribir**. Un
   fallo deja `ia_estado=error` con el motivo y permite reintentar. En la ficha ya redactada la
   casilla llega `disabled`, así que tampoco se salta por POST.
+- **En medidas el candado es además de la ficha, y es derivado**: `disponibles_para_ia()` excluye
+  las que ya tiene alguna medida con `redactada_por_ia=True`. Sin campo nuevo, una sola fuente de
+  verdad y una redacción fallida devuelve su ficha sola. Dos cosas que hay que respetar: el
+  queryset del select **incluye la propia ficha** de la medida que se edita (sin eso, una medida
+  ya redactada no se puede volver a guardar nunca), y la tarea vuelve a comprobarlo porque entre
+  validar y encolar caben dos peticiones.
 - **Nunca pisa una edición humana**: la tarea recarga desde la base justo antes de escribir. Cuidado
   con los campos que tienen default: ahí «¿está lleno?» no distingue elección de default y hay que
   decidirlo campo a campo. Le pasa a `Noticia.tipo`, cuyo default «noticia» hacía que la
   clasificación de la IA no se aplicara nunca; **`Norma` no tiene ningún campo con default**, así
-  que ahí la comprobación simple basta.
-- **La ficha se refresca sola**: un JS (`admin/js/redaccion_ia.js`, uno para ambos modelos) sondea
+  que ahí la comprobación simple basta. En **`Medida`** el problema es otro y es el mismo de fondo:
+  `Decimal("0.00")` y una fecha son *falsy*, y un costo de cero («aporte comunal, sin costo
+  monetario») es un dato legítimo — `costo_referencial` y `fecha_implementacion` se comprueban con
+  `is not None`, no con `bool()`.
+- **La ficha se refresca sola**: un JS (`admin/js/redaccion_ia.js`, uno para los tres modelos) sondea
   `<ADMIN_URL><app>/<modelo>/<pk>/estado-ia/` cada 2 s mientras el estado es «procesando» y recarga
   al terminar, con corte a los 3 minutos. La ruta es genérica y **qué modelos acepta lo decide la
   lista blanca `MODELOS_CON_IA` de la vista**, no el patrón — sin ella serviría para leer el
