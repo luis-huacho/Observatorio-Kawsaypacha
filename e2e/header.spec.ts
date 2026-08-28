@@ -1,12 +1,16 @@
 /**
  * El menú superior.
  *
- * Dos cosas que solo un navegador puede afirmar:
+ * Tres cosas que solo un navegador puede afirmar:
  *
  * 1. Que «Comparar distritos» ya no se ofrece en la navegación (ADR-P2). El enlace vive en tres
  *    sitios —la semilla del backend, la base ya sembrada y el menú de respaldo del frontend—, así
  *    que se puede quitar de uno y seguir apareciendo.
- * 2. Que en escritorio el menú **cabe en una línea**. Es una medida en píxeles: la barra tiene
+ * 2. Que el enlace a `predes.org.pe` **sí** está en la barra superior. Es el reverso del punto
+ *    anterior, y el que faltaba: un enlace se puede añadir a dos de los tres sitios y no aparecer
+ *    en ninguna parte. Esta prueba corre contra un entorno real, no contra una base recién
+ *    sembrada por fixtures, que es lo único que distingue los dos casos.
+ * 3. Que en escritorio el menú **cabe en una línea**. Es una medida en píxeles: la barra tiene
  *    altura fija, de modo que un enlace partido en dos líneas se sale por arriba y por abajo sin
  *    que falle nada más.
  *
@@ -32,6 +36,18 @@ test.describe("Menú superior", () => {
     // Y el resto del menú sigue ahí: si el respaldo o la semilla se quedaran vacíos, la prueba de
     // arriba pasaría igual.
     await expect(page.locator('a[href="/peligros"]:visible').first()).toBeVisible();
+  });
+
+  test("la barra superior enlaza al sitio institucional", async ({ page }) => {
+    // Sin `abrirMenu`: la barra superior no se pliega tras la hamburguesa, se pinta en todos los
+    // anchos. Si algún día se ocultara en móvil, esta prueba tiene que fallar y no adaptarse.
+    await irEsperando(page, "/", "/api/sitio/");
+
+    const enlace = page.locator('header a[href="https://predes.org.pe/"]');
+
+    await expect(enlace).toBeVisible();
+    // Abre fuera: el Observatorio se sale al sitio de PREDES y no se lleva al visitante consigo.
+    await expect(enlace).toHaveAttribute("target", "_blank");
   });
 
   test("la caja de búsqueda de la cabecera se vacía con la «X»", async ({ page }) => {

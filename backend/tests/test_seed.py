@@ -2,9 +2,9 @@
 
 Dos garantías distintas:
 
-1. **Idempotencia y respeto por lo editado.** El runbook corre `seed` en cada despliegue: si
-   pisara los textos que PREDES haya cambiado, cada actualización se los devolvería al valor de
-   fábrica sin avisar.
+1. **Idempotencia y respeto por lo editado.** El runbook corre `seed` a mano en la instalación
+   inicial y en cada recarga de datos: si pisara los textos que PREDES haya cambiado, cada
+   recarga se los devolvería al valor de fábrica sin avisar.
 2. **Los conteos canónicos** tras importar los Excel completos. Si un refactor del importador
    pierde filas, es la prueba que lo dice — va marcada `lento` porque tarda un minuto.
 """
@@ -64,10 +64,10 @@ def test_correr_el_seed_dos_veces_no_duplica_nada(db):
 
 
 def test_el_seed_no_pisa_los_textos_que_edito_predes(db):
-    """La prueba que protege el runbook: `seed` corre en cada despliegue.
+    """La prueba que protege el runbook: `seed` se vuelve a correr en cada recarga de datos.
 
-    Si devolviera los textos al valor de fábrica, PREDES perdería su trabajo en cada
-    actualización y no habría forma de saber que fue el despliegue.
+    Si devolviera los textos al valor de fábrica, PREDES perdería su trabajo en cada recarga y
+    no habría forma de saber que fue el seed.
     """
     from apps.sitio.models import BloqueTexto
 

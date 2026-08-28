@@ -55,6 +55,19 @@ def test_inversion_sigue_visible_en_el_menu_con_su_pagina_en_espera(api):
     assert "/inversion" in urls
 
 
+def test_la_barra_superior_anuncia_el_sitio_institucional(api):
+    """El Observatorio es de PREDES y la barra superior es el único sitio donde se dice.
+
+    Estuvo ausente en el servidor desde el 19/08/2026: el enlace se añadió a la semilla y al
+    respaldo del frontend, pero no a la base ya sembrada, y `seed` no corre en el despliegue.
+    La zona `top` viajando vacía no rompe nada —el Header pinta «Contacto» y ya—, así que sin
+    esta prueba el fallo se vuelve a colar igual de callado.
+    """
+    urls = {e["url"] for e in api.get("/api/sitio/").json()["menu"]["top"]}
+
+    assert "https://predes.org.pe/" in urls
+
+
 def test_el_hero_solo_muestra_slides_publicados(api):
     """Los slides pasan por el mismo flujo editorial que el contenido."""
     from apps.sitio.models import HeroSlide
