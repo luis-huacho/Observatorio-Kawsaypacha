@@ -15,7 +15,7 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (464 pruebas, ~80 s)
+$DC exec backend pytest                 # suite backend (475 pruebas, ~80 s)
                                         # la cifra sale de `pytest --collect-only -q`, no de la memoria
 $DC exec backend pytest -m lento        # 7 más: los Excel completos y el PDF con mapa (~35 s)
 cd frontend && npm run lint && npm run build    # tipos + build
@@ -223,9 +223,27 @@ metas las pusiera React — y no comprobaría nada, porque a esos rastreadores R
 comprueban además dos fallos callados: que la inyección **no rompa la SPA** (los `<script>` del
 bundle siguen ahí) y que un **borrador no exponga su contenido** aunque se adivine el slug.
 
+**Descubrimiento para agentes (ADR-A26)**, por la misma razón y con la misma forma:
+`tests/test_descubrimiento.py` y `e2e/descubrimiento.spec.ts` no abren ninguna página, porque todo
+lo que hay que comprobar son cabeceras, códigos y tipos de contenido que ningún navegador enseña.
+Tres fallos silenciosos quedan fijados:
+
+- **La línea `Sitemap:` sale de `SITE_URL`**, y se comprueba **cambiando el ajuste**: es la única
+  forma de distinguir «está bien» de «está clavada y coincide por casualidad con este entorno». Con
+  el archivo estático de antes, esta prueba falla — y ese era el estado real: el sitemap funcionaba
+  y no lo leía nadie, porque el dominio que lo anunciaba no resolvía.
+- **Cada `href` del catálogo se pide.** Un catálogo que existe y apunta a URLs muertas se ve
+  exactamente igual que uno bueno.
+- **Lo que no se publica responde 404**, no 200 con el HTML de la SPA. Es el fallo que hacía
+  «suspender» cuatro comprobaciones de un test externo por documentos que sencillamente no existen.
+
+Y una que no es de forma sino de contenido: el catálogo **no puede nombrar OAuth ni OIDC**, porque
+el API es anónimo y prometer autenticación manda a un agente contra la nada (ADR-A26).
+
 Las de e2e **se saltan solas** en modo desarrollo en vez de fallar: ahí la SPA la sirve Vite y nginx
 no está delante. Un rojo diría «el sitio está mal» cuando lo que pasa es que ese modo no monta esa
-pieza. La corrida que sí las ejerce es la de `compose.local.yml`.
+pieza. La corrida que sí las ejerce es la de `compose.local.yml` — y es la que encontró que
+`/sitemap.xml` devolvía **HTML con 200** cuando el backend estaba caído, parándolo a propósito.
 
 **Imágenes (ADR-A25):** `tests/test_imagenes.py` fija que se reduzcan, que una imagen con
 transparencia **no** acabe en JPEG, que el proceso sea **idempotente** —corre en cada `save()`—, que

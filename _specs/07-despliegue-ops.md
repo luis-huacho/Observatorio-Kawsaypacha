@@ -86,8 +86,9 @@ server {
     server_name observatorio.predes.org.pe;
     root /srv/www;
     gzip on;
+    location /.well-known/ { return 404; }               # ADR-A26; ver abajo
     location / { try_files $uri /index.html; }          # client-side routing
-    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }   # SOLO en el server :80
 }
 
 # --- Backend ---------------------------------------------------------------
@@ -141,6 +142,34 @@ Graph de esa ficha. Tres condiciones que no son opcionales:
 - **Hay dos configuraciones de nginx** —`conf.d/observatorio.conf` y `local/observatorio-local.conf`—
   y estas rutas van en las dos. Tocar solo una deja el modo local sin probar justo la pieza nueva.
 
+**`/sitemap.xml` es la excepción y no repliega a `@spa`.** Lo copiaba de las rutas de ficha, y ahí
+no significa lo mismo: una ficha replegada sigue siendo una página legible, pero un sitemap replegado
+es HTML servido con **200** a un buscador que pidió XML — se lee como un sitemap roto en vez de como
+un servicio que no está. Un 502 se reintenta; un 200 mal formado, no. Lo encontró la corrida de
+`compose.local.yml` parando el contenedor a propósito.
+
+### Descubrimiento para agentes (ADR-A26)
+
+En el bloque de la SPA, además: `/robots.txt` y `/.well-known/api-catalog` van al backend, y **todo
+lo demás bajo `/.well-known/` responde `404`**. Cuatro cosas que hay que respetar:
+
+- **El corte de `/.well-known/` va solo en el server 443 de la SPA**, que nunca tuvo un bloque ahí.
+  El reto de certbot se sirve en el server `:80` y en el del API; tocarlos rompería la renovación.
+- **El repliegue de `/robots.txt` es el archivo estático del bundle, no `@spa`.** Un 5xx en
+  `/robots.txt` no hace que Google rastree el sitio entero, hace que **deje de rastrearlo**: el peor
+  caso tiene que ser un robots.txt permisivo sin `Sitemap:`, nunca un HTML.
+- **La cabecera `Link` va en `location = /index.html`**, no en `location /`. El `/index.html` final
+  de su `try_files` es una **redirección interna**, así que la portada entra por ese bloque —se ve en
+  que responde con el `Cache-Control: no-cache` que solo se declara ahí—; y `add_header` no se hereda
+  por acumulación, así que declararla en `location /` tumbaría HSTS, `nosniff` y `Referrer-Policy`.
+- El catálogo se publica **también en el server del API**. Ese no tiene `location /`, así que lo
+  desconocido ya devuelve un 404 honesto y no necesita el corte.
+
+`SITIO_INDEXABLE` (default `1`) decide si `/robots.txt` permite o prohíbe el rastreo entero. Se pone
+en `0` **en el entorno de desarrollo** el día que `observatorio.predes.org.pe` entre en el aire:
+hasta entonces ese entorno es el único sitio vivo y apagarlo lo dejaría fuera de Google; a partir de
+ese día son dos copias idénticas que se autocanonicalizan y compiten por las mismas búsquedas.
+
 ### `collectstatic` en el arranque
 
 `docker-entrypoint.sh` lo corre junto a `migrate` y `meili_setup`. El del Dockerfile **no llega a
@@ -165,6 +194,7 @@ SECRET_KEY=            DEBUG=0
 ALLOWED_HOSTS=obs.predes.org.pe,observatorio.predes.org.pe
 SITE_URL=https://observatorio.predes.org.pe        # el que se difunde y va en los correos
 BACKEND_URL=https://obs.predes.org.pe
+SITIO_INDEXABLE=1        # 0 = /robots.txt prohíbe todo (ADR-A26); ver «Descubrimiento»
 CORS_ALLOWED_ORIGINS=https://observatorio.predes.org.pe
 CSRF_TRUSTED_ORIGINS=https://obs.predes.org.pe,https://observatorio.predes.org.pe
 POSTGRES_DB= POSTGRES_USER= POSTGRES_PASSWORD= POSTGRES_HOST=db POSTGRES_PORT=5432

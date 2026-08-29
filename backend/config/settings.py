@@ -25,6 +25,13 @@ SITE_URL = env("SITE_URL", default="http://localhost:5173")
 # Dominio del backend (ADR-A14). Es la base de las URL absolutas que el API devuelve para
 # media y tiles: la SPA vive en otro origen y una ruta relativa apuntaría al sitio público.
 BACKEND_URL = env("BACKEND_URL", default="http://localhost:8000")
+# ¿Es este despliegue el sitio canónico? En `0`, `/robots.txt` prohíbe el rastreo entero.
+# Existe porque el entorno de desarrollo sirve el MISMO contenido en otro dominio y se
+# autocanonicaliza: el día que el dominio definitivo entre en el aire habrá dos copias idénticas
+# compitiendo por las mismas búsquedas, y quién sobrevive lo decide Google. Hoy va en `1` a
+# propósito —el dominio definitivo todavía no resuelve y apagarlo dejaría el observatorio
+# invisible—; se pone en `0` en el .env del entorno de desarrollo el día del cambio.
+SITIO_INDEXABLE = env.bool("SITIO_INDEXABLE", default=True)
 ADMIN_URL = env("ADMIN_URL", default="admin/")
 # Sin esto, entrar al admin sin `?next=` aterriza en /accounts/profile/, que no existe: el
 # editor ve un 404 justo después de escribir bien su contraseña.

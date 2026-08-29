@@ -6,6 +6,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.core.vistas_admin import estado_ia, reindexar_busqueda
 from apps.mapas.vistas_tiles import servir_tile
+from apps.sitio.descubrimiento import api_catalog, robots_txt
 from apps.sitio.vistas_html import ficha_html, sitemap
 
 urlpatterns = [
@@ -43,6 +44,18 @@ urlpatterns = [
     # portada de la ficha. Se responde lo mismo a todo el mundo; servir HTML distinto a los
     # rastreadores es cloaking. Ver el encabezado de `apps/sitio/vistas_html.py`.
     path("sitemap.xml", sitemap, name="sitemap"),
+    # --- Lo que se publica para que descubra el sitio una máquina (ADR-A26) ---
+    #
+    # También del dominio de la SPA, y también por Django: los dos documentos llevan dentro la URL
+    # del sitio, y un archivo estático del bundle no puede interpolarla. El robots.txt lo era y su
+    # línea `Sitemap:` quedó clavada a un dominio que ni siquiera resolvía.
+    #
+    # Ojo con `/.well-known/`: el `location /` de nginx hace `try_files $uri /index.html`, así que
+    # ANTES de esto cualquier URL bajo ese prefijo respondía 200 con el HTML de la SPA. Un 200 a
+    # algo que no tenemos es peor que un 404, y es lo que hacía parecer rotos cuatro documentos de
+    # descubrimiento que simplemente no existen. nginx los corta ahora con un `return 404`.
+    path("robots.txt", robots_txt, name="robots"),
+    path(".well-known/api-catalog", api_catalog, name="api-catalog"),
     # El patrón enumera los tipos en vez de aceptar cualquier segmento: un `<slug:tipo>` suelto
     # casaría con `media/foo.jpg` y taparía los archivos que sirve Django en desarrollo.
     re_path(

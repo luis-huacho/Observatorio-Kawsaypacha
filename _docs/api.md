@@ -10,6 +10,15 @@ En desarrollo, `http://localhost:8000/api/docs/`.
 
 Si el esquema y este documento discrepan, gana el esquema: sale del código.
 
+**Para descubrirlo desde un programa** hay un catálogo en
+`https://observatorio.predes.org.pe/.well-known/api-catalog` (y también en el dominio del API), en
+`application/linkset+json` según la RFC 9727. Lleva el esquema, esta documentación y la sonda de
+estado, así que un cliente puede llegar a todo desde una sola URL. La portada además lo anuncia con
+una cabecera `Link: </.well-known/api-catalog>; rel="api-catalog"`.
+
+No hay nada de OAuth ni de OIDC, y no es un olvido: **el API no tiene autenticación** (ver más
+abajo), así que no hay credenciales que negociar.
+
 ## Reglas generales
 
 **Todo es público y de solo lectura**, sin autenticación, con dos excepciones: el `POST` de
