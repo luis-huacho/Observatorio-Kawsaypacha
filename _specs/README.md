@@ -13,6 +13,39 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — la llave de CARTO, y el estilo que NO se cambió
+
+- **CARTO empezó a exigir llave para sus teselas ráster** y estampaba una marca de agua sobre el
+  mapa base «Claro»: el del visor de peligros y **el único fondo** de la ficha del centro poblado.
+  La llave entra por `VITE_CARTO_KEY`, artefacto de *build* como la de Meilisearch, con su misma
+  cadena: los dos `.env`, `compose.yaml`, `frontend/Dockerfile`. En los `.env.example` va con el
+  valor vacío — la credencial no entra en ningún archivo versionado.
+- **Lo que más valor tuvo fue no hacer caso al correo.** CARTO recomendaba pasar a
+  `rastertiles/voyager`; seguirlo habría cambiado el diseño del mapa sin necesidad. `voyager` va a
+  color y este visor está construido sobre el gris casi liso de `light_all` —el que deja leer el
+  semáforo, y la razón de que el halo de los puntos sea de 0.5 px **solo** sobre este fondo—. Se
+  midió que `light_all` **con** la llave responde 200 y sin marca: el cambio real era añadir
+  `?key=` a las URL que ya había.
+- **Medido, no mirado.** Comparando la misma tesela con y sin llave: 4,313 píxeles distintos
+  (1.6 %), agrupados en diagonal por el centro, y la versión sin llave más oscura en esa banda
+  (235.9 frente a 241.8 de luminancia media) — la firma de una marca repetida. En la aplicación,
+  12 de 12 teselas salen con `key=` en los dos mapas, y `canvas.toDataURL()` sigue funcionando, o
+  sea que **CORS aguanta y la exportación PNG no se rompe** (era el riesgo silencioso: una tesela
+  sin CORS contamina el canvas y lanza `SecurityError`).
+- **Las URL se juntan en `frontend/src/lib/mapasBase.ts`.** Estaban escritas dos veces carácter por
+  carácter, y con una credencial dentro eso es duplicar el sitio donde se olvida de actualizarla.
+  Mismo motivo que llevó `pmtiles.ts` a `lib/`. De paso, `vite-env.d.ts` deja de estar vacío de
+  tipos propios: ahora un `VITE_CARTO_KEI` mal escrito lo caza `tsc` en vez de devolver `undefined`
+  y reaparecer como una marca de agua.
+- **Sin llave las URL quedan idénticas a las de antes**, no con un `?key=` colgando: el mapa sigue
+  pintando, con la marca. Comprobado vaciando la variable — 12 teselas, cero con `?`. Es lo que
+  mantiene `npm run dev` usable para quien no tenga la llave.
+- **Sin prueba automática, a propósito.** El CI no corre Playwright ni pytest
+  (`bitbucket-pipelines.yml:22`); una prueba que exigiera `key=` fallaría en cualquier máquina sin
+  la llave y para pasar habría que repartir la credencial. Y el fallo que protegería **se ve**: la
+  marca de agua es visible, que es justo lo contrario del caso silencioso del enlace de la barra
+  superior.
+
 ### Actualización 28/08/2026 — la barra superior llevaba nueve días sin el enlace a predes.org.pe
 
 - **El síntoma no era el que parecía.** «El enlace no se ve» sonaba a CSS —la banda es blanco al

@@ -105,6 +105,7 @@ services:
         VITE_SEARCH_URL: ${VITE_SEARCH_URL:-}
         VITE_TILES_URL: ${VITE_TILES_URL:-}
         VITE_MEILI_SEARCH_KEY: ${VITE_MEILI_SEARCH_KEY:-}
+        VITE_CARTO_KEY: ${VITE_CARTO_KEY:-}
     volumes:
       - web_dist:/out
     restart: "no"

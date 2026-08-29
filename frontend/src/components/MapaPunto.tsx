@@ -7,6 +7,7 @@ import {
   iconoDe,
   registrarIconos,
 } from "@/lib/iconosPeligro";
+import { CARTO_CLARO } from "@/lib/mapasBase";
 import type { ClasificacionPeligro, TipoPeligroApi } from "@/lib/types";
 
 type Props = {
@@ -94,17 +95,12 @@ export default function MapaPunto({ lat, lon, nombre, clasificaciones, tipos }: 
         sources: {
           base: {
             type: "raster",
-            // Las mismas teselas que el mapa base «Claro» del visor: si la ficha usara otro
-            // proveedor, el mismo lugar se vería distinto en las dos pantallas.
-            tiles: [
-              "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
-              "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
-              "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
-            ],
+            // Las mismas teselas que el mapa base «Claro» del visor, y del mismo módulo: si la
+            // ficha usara otro proveedor, el mismo lugar se vería distinto en las dos pantallas.
+            tiles: CARTO_CLARO.tiles,
             tileSize: 256,
-            maxzoom: 20,
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            maxzoom: CARTO_CLARO.maxzoom,
+            attribution: CARTO_CLARO.atribucion,
           },
           punto: { type: "geojson", data: punto },
         },

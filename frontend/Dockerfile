@@ -10,6 +10,7 @@ ARG VITE_API_URL
 ARG VITE_SEARCH_URL
 ARG VITE_TILES_URL
 ARG VITE_MEILI_SEARCH_KEY
+ARG VITE_CARTO_KEY
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -24,6 +25,7 @@ RUN printf '%s\n' \
       "VITE_SEARCH_URL=$VITE_SEARCH_URL" \
       "VITE_TILES_URL=$VITE_TILES_URL" \
       "VITE_MEILI_SEARCH_KEY=$VITE_MEILI_SEARCH_KEY" \
+      "VITE_CARTO_KEY=$VITE_CARTO_KEY" \
     > .env.production
 RUN npm run build
 
