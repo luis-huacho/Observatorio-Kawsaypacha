@@ -3,6 +3,7 @@ from django.db import models
 
 from apps.core.models import (
     HtmlRicoMixin,
+    ImagenOptimizadaMixin,
     RedaccionIAMixin,
     TimeStampedMixin,
     WorkflowMixin,
@@ -10,7 +11,8 @@ from apps.core.models import (
 )
 
 
-class Norma(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, RedaccionIAMixin):
+class Norma(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, ImagenOptimizadaMixin,
+            RedaccionIAMixin):
     """Norma del marco GRD/ACC, con ficha propia en /normativa/{slug}.
 
     Puede nacer de una URL: `RedaccionIAMixin` trae `url_origen` y el candado con los que la
@@ -21,6 +23,7 @@ class Norma(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, RedaccionIAMixin):
     """
 
     campos_html = ("contenido",)
+    campos_imagen = ("imagen_portada",)
 
     class Tipo(models.TextChoices):
         LEY = "Ley", "Ley"

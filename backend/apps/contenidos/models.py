@@ -3,6 +3,7 @@ from django.db import models
 
 from apps.core.models import (
     HtmlRicoMixin,
+    ImagenOptimizadaMixin,
     RedaccionIAMixin,
     TimeStampedMixin,
     WorkflowMixin,
@@ -10,8 +11,10 @@ from apps.core.models import (
 )
 
 
-class Noticia(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, RedaccionIAMixin):
+class Noticia(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, ImagenOptimizadaMixin,
+              RedaccionIAMixin):
     campos_html = ("cuerpo",)
+    campos_imagen = ("imagen_portada",)
 
     class Tipo(models.TextChoices):
         NOTICIA = "noticia", "Noticia"
@@ -85,7 +88,9 @@ class Video(TimeStampedMixin, WorkflowMixin):
         return self.titulo
 
 
-class Evento(TimeStampedMixin, WorkflowMixin):
+class Evento(TimeStampedMixin, WorkflowMixin, ImagenOptimizadaMixin):
+
+    campos_imagen = ("imagen",)
     class Modalidad(models.TextChoices):
         PRESENCIAL = "presencial", "Presencial"
         VIRTUAL = "virtual", "Virtual"

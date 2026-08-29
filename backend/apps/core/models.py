@@ -46,6 +46,58 @@ class HtmlRicoMixin(models.Model):
         super().save(*args, **kwargs)
 
 
+class ImagenOptimizadaMixin(models.Model):
+    """Reduce y optimiza los campos de `campos_imagen` **en `save()`**.
+
+    Es el espejo de `HtmlRicoMixin`, y por la misma razón: la garantía tiene que ser del modelo,
+    no del formulario. Un `loaddata`, un importador o la portada que baja la IA desde una URL
+    escriben sin pasar por el admin, y el visitante se traga la foto entera igual.
+
+    **Por qué en `save()` y no con `storage=` en el campo**, que sería lo primero que uno prueba:
+    el `storage` forma parte de `FileField.deconstruct()`, así que ponerlo emitiría una migración
+    por cada campo tocado —seis migraciones que no cambian ni una columna—. Declararlo aquí no
+    emite ninguna, y hay una prueba de `makemigrations --check` que lo fija.
+
+    El trabajo lo hace `apps.core.imagenes.optimizar`, compartido con el editor de texto rico, y de
+    ahí sale gratis lo importante: **es idempotente y a prueba de fallos**. Una imagen ya reducida
+    se devuelve intacta —correr esto en cada `save()` no la degrada—, y si Pillow no sabe abrirla
+    (un SVG de logotipo, un archivo corrupto) se guarda tal cual antes que perderla.
+    """
+
+    #: Campos de imagen que hay que optimizar al guardar.
+    campos_imagen: tuple[str, ...] = ()
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        from pathlib import PurePosixPath
+
+        from django.conf import settings
+
+        from apps.core import imagenes
+
+        for nombre in self.campos_imagen:
+            campo = getattr(self, nombre, None)
+            # **`_committed` es la pregunta correcta**, no si hay archivo: dice si este `FieldFile`
+            # trae contenido nuevo sin escribir todavía. Un registro que se vuelve a guardar sin
+            # tocar la imagen la tiene ya escrita, y releerla de disco para reoptimizarla en cada
+            # `save()` sería trabajo inútil en el mejor caso y recompresión repetida en el peor.
+            if not campo or campo._committed:
+                continue
+            optimizada = imagenes.optimizar(
+                campo.file, settings.CONTENIDO_ANCHO_MAXIMO_PX, imagenes.FORMATO_PUBLICACION
+            )
+            if optimizada is campo.file:
+                continue
+            # **Solo el basename.** `FieldFile.save` vuelve a pasar el nombre por `upload_to`, así
+            # que darle una ruta ya resuelta produciría `noticias/2026/08/noticias/2026/08/foo.webp`.
+            base = PurePosixPath(str(campo.name or "imagen")).name
+            campo.save(imagenes.renombrar(base, imagenes.FORMATO_PUBLICACION),
+                       optimizada, save=False)
+        super().save(*args, **kwargs)
+
+
 class EstadoIA(models.TextChoices):
     """Estado de un campo que la IA puede rellenar.
 

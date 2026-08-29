@@ -112,6 +112,10 @@ export function TarjetaNoticia({ noticia: n }: { noticia: Noticia }) {
       <img
         src={n.imagen_portada}
         alt={n.titulo}
+        loading="lazy"
+        decoding="async"
+        width={600}
+        height={400}
         className="w-full aspect-[3/2] object-cover"
       />
       <div className="p-5">
@@ -141,6 +145,10 @@ export function TarjetaNoticiaCompacta({ noticia: n }: { noticia: Noticia }) {
       <img
         src={n.imagen_portada}
         alt={n.titulo}
+        loading="lazy"
+        decoding="async"
+        width={96}
+        height={96}
         className="w-24 h-24 shrink-0 object-cover rounded-lg"
       />
       <div className="min-w-0">

@@ -5,6 +5,7 @@ from django.utils.html import escape
 from apps.core.models import (
     EstadoIAMixin,
     HtmlRicoMixin,
+    ImagenOptimizadaMixin,
     TimeStampedMixin,
     WorkflowMixin,
     permiso_publicar,
@@ -17,7 +18,8 @@ def extracto(texto: str, limite: int = 80) -> str:
     return texto[:limite] + ("…" if len(texto) > limite else "")
 
 
-class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, EstadoIAMixin):
+class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, ImagenOptimizadaMixin,
+             EstadoIAMixin):
     """Buena práctica o experiencia de campo documentada por PREDES.
 
     Puede **nacer de una ficha ACC** (ADR-D10): el editor elige una arriba del formulario, marca
@@ -26,6 +28,7 @@ class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, EstadoIAMixin):
     """
 
     campos_html = ("contenido",)
+    campos_imagen = ("imagen_portada",)
 
     #: Clase del bloque de contacto que la tarea pega al final del contenido. **Es el marcador**,
     #: y por eso es una clase y no un comentario HTML: `sanear()` corre con `strip_comments=True`
@@ -183,12 +186,14 @@ class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, EstadoIAMixin):
         )
 
 
-class MedidaImagen(TimeStampedMixin):
+class MedidaImagen(TimeStampedMixin, ImagenOptimizadaMixin):
     """Foto de la galería de una medida.
 
     El pie es obligatorio a propósito: una foto sin pie no se puede citar en un informe ni
     describir a quien navega con lector de pantalla.
     """
+
+    campos_imagen = ("imagen",)
 
     medida = models.ForeignKey(Medida, on_delete=models.CASCADE, related_name="galeria")
     imagen = models.ImageField(upload_to="medidas/%Y/%m/")
