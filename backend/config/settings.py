@@ -134,6 +134,12 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
+# Dónde está el `index.html` COMPILADO de la SPA. Lo usa `apps.sitio.vistas_html` para servir las
+# fichas con sus metas Open Graph ya puestas, y tiene que ser el bundle real —no una plantilla—
+# porque los nombres de los assets llevan hash y cambian en cada build. En producción es el volumen
+# `web_dist` que llena el servicio `frontend`; en desarrollo no existe y esas rutas las sirve Vite.
+SPA_DIST_DIR = Path(env("SPA_DIST_DIR", default=str(BASE_DIR / "spa_dist")))
+
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 

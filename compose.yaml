@@ -26,6 +26,10 @@ services:
   backend:
     build: ./backend
     env_file: backend/.env
+    environment:
+      # Va aquí y no en `backend/.env` a propósito: es la MISMA ruta del montaje de abajo, y
+      # separarlas es la forma segura de que un día dejen de coincidir sin que nada avise.
+      SPA_DIST_DIR: /srv/www
     # Prueba de vida, no de dependencias: `/api/salud/` responde 200 aunque la base o el buscador
     # estén caídos (ver apps/api/views/salud.py). Si fallara por ellos, una caída de PostgreSQL
     # marcaría esto «unhealthy» y `deploy/vigilar-contenedores.sh` reiniciaría en bucle sin
@@ -47,6 +51,11 @@ services:
       # donde mira quien opera. **Nunca se monta en nginx**: eso es lo que impide que
       # estos archivos acaben siendo descargables, como sí lo sería todo lo de /media/.
       - ${OBSERVATORIO_REGISTROS:-./logs}:/app/logs
+      # El `index.html` COMPILADO de la SPA, de solo lectura. Lo lee `apps.sitio.vistas_html` para
+      # servir cada ficha con sus metas Open Graph puestas (compartir y SEO). Tiene que ser el
+      # bundle real y no una plantilla: los nombres de los assets llevan hash y cambian en cada
+      # build, así que una copia se quedaría apuntando a archivos que ya no existen.
+      - web_dist:/srv/www:ro
       # Los Excel y GeoJSON canónicos, de solo lectura: `manage.py seed` los importa desde aquí.
       - ./data/layers:/datos:ro
       # Los CSV del PP 0068. Montaje aparte y no dentro de `/datos` porque anidar un montaje

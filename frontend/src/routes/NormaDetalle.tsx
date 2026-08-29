@@ -8,17 +8,25 @@ import EmptyState from "@/components/EmptyState";
 import Portada from "@/components/Portada";
 import ContenidoRico from "@/components/ContenidoRico";
 import PalabrasClave from "@/components/PalabrasClave";
+import Compartir from "@/components/Compartir";
 import EnlaceNorma, { PUBLICA } from "@/components/EnlaceNorma";
+import { useMetaPagina } from "@/lib/meta";
 
 export default function NormaDetalle() {
   const { slug } = useParams();
   const norma = useApi<TNorma>(slug ? `/normativa/${slug}/` : null);
 
+  // El hook va **antes de cualquier `return`**: los de abajo son condicionales, y llamarlo
+  // después haría que React viera un número distinto de hooks entre el render de carga y
+  // el de datos. Con la ficha aún sin llegar recibe `undefined` y no hace nada.
+  const n = norma.status === "ok" ? norma.data : null;
+  useMetaPagina(n?.titulo, n?.resumen);
+
   if (norma.status === "loading") return <div className="container-page py-12">Cargando…</div>;
 
   // Un 404 se trata como "no existe o fue retirada", no como error del sitio: el flujo
   // editorial permite despublicar y los enlaces compartidos siguen circulando.
-  const n = norma.status === "ok" ? norma.data : null;
+
   if (!n) {
     return (
       <div className="container-page py-12">
@@ -79,6 +87,7 @@ export default function NormaDetalle() {
         )}
 
         <PalabrasClave palabras={n.palabras_clave} base="/normativa" />
+        <Compartir titulo={n.titulo} etiqueta="Compartir esta norma" />
       </article>
     </>
   );

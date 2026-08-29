@@ -7,6 +7,8 @@ import type { CentroPobladoDetalle, TipoPeligroApi } from "@/lib/types";
 import SemaforoChip from "@/components/SemaforoChip";
 import SourceLink from "@/components/SourceLink";
 import EmptyState from "@/components/EmptyState";
+import Compartir from "@/components/Compartir";
+import { useMetaPagina } from "@/lib/meta";
 
 // Diferido como en el visor: el chunk de MapLibre pesa ~840 KB y no se paga hasta abrir una
 // ficha. Quien llega desde /peligros ya lo tiene en caché.
@@ -20,11 +22,16 @@ export default function PeligroDetalle() {
   // corona igual que el visor.
   const catalogo = useApi<TipoPeligroApi[]>("/peligros/tipos/");
 
+  // El hook va **antes de cualquier `return`**: los de abajo son condicionales, y llamarlo
+  // después haría que React viera un número distinto de hooks entre el render de carga y
+  // el de datos. Con la ficha aún sin llegar recibe `undefined` y no hace nada.
+  const cp = detalle.status === "ok" ? detalle.data : null;
+  useMetaPagina(cp?.nombre);
+
   if (detalle.status === "loading") {
     return <div className="container-page py-12 text-ink-600">Cargando…</div>;
   }
 
-  const cp = detalle.status === "ok" ? detalle.data : null;
   if (!cp) {
     return (
       <div className="container-page py-12">
@@ -115,6 +122,7 @@ export default function PeligroDetalle() {
           </div>
         )}
       </section>
+        <Compartir titulo={cp.nombre} etiqueta="Compartir esta ficha" />
       </div>
     </>
   );

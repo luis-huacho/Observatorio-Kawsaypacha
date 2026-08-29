@@ -9,15 +9,22 @@ import EmptyState from "@/components/EmptyState";
 import Portada from "@/components/Portada";
 import ContenidoRico from "@/components/ContenidoRico";
 import PalabrasClave from "@/components/PalabrasClave";
+import Compartir from "@/components/Compartir";
+import { useMetaPagina } from "@/lib/meta";
 
 export default function NoticiaDetalle() {
   const { slug } = useParams();
   const noticia = useApi<TNoticia>(slug ? `/noticias/${slug}/` : null);
 
+  // El hook va **antes de cualquier `return`**: los de abajo son condicionales, y llamarlo
+  // después haría que React viera un número distinto de hooks entre el render de carga y
+  // el de datos. Con la ficha aún sin llegar recibe `undefined` y no hace nada.
+  const n = noticia.status === "ok" ? noticia.data : null;
+  useMetaPagina(n?.titulo, n?.bajada);
+
   if (noticia.status === "loading") return <div className="container-page py-12">Cargando…</div>;
   // Un 404 del API es "no existe o fue retirada", no un error del sitio: el flujo editorial
   // permite despublicar, y un enlace compartido antes seguirá circulando.
-  const n = noticia.status === "ok" ? noticia.data : null;
   if (!n) {
     return (
       <div className="container-page py-12">
@@ -64,6 +71,7 @@ export default function NoticiaDetalle() {
         <ContenidoRico html={n.cuerpo} className="mt-4" />
 
         <PalabrasClave palabras={n.palabras_clave} base="/noticias" />
+        <Compartir titulo={n.titulo} />
       </article>
     </>
   );
