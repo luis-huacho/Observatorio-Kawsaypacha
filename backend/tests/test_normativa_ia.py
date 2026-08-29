@@ -496,3 +496,40 @@ def _url_estado(pk):
     from django.urls import reverse
 
     return reverse("estado-ia", args=["normativa", "norma", pk])
+
+
+def test_un_contenido_en_texto_plano_se_envuelve_en_parrafos(ia):
+    """Aquí tampoco había red hasta ahora, y es donde más se notó.
+
+    Medido el 28/08/2026 con `deepseek/deepseek-v4-flash-0731` contra el API real: de tres normas
+    pedidas, **dos volvieron sin una sola etiqueta** —una de ellas la del PDF, en 255 caracteres—
+    y se guardaron tal cual. La tercera, la misma URL que una de esas dos, sí vino formateada:
+    es el mismo modelo dando dos resultados distintos para la misma entrada.
+    """
+    ia({**FICHA, "contenido": "Primer párrafo.\n\nSegundo párrafo."})
+    propuesta = redaccion.redactar("https://busquedas.elperuano.pe/normas/ds-048-2011")
+
+    assert propuesta.contenido == "<p>Primer párrafo.</p><p>Segundo párrafo.</p>"
+    assert any("sin formato" in aviso for aviso in propuesta.avisos)
+
+
+def test_un_contenido_que_ya_viene_en_html_no_se_toca(ia):
+    ia()
+    propuesta = redaccion.redactar("https://busquedas.elperuano.pe/normas/ds-048-2011")
+
+    assert propuesta.contenido == FICHA["contenido"]
+    assert not any("sin formato" in aviso for aviso in propuesta.avisos)
+
+
+def test_el_aviso_de_formato_llega_a_la_bitacora_del_editor(ia):
+    """Envolver sin avisar no sirve de nada: el editor tiene que enterarse de que hubo que
+    rescatar el contenido, porque es la señal de que conviene revisar la maqueta."""
+    ia({**FICHA, "contenido": "Un solo párrafo corrido."})
+    norma = _norma_en_proceso()
+
+    from apps.normativa.tasks import redactar_norma_desde_url
+
+    redactar_norma_desde_url.func(norma.pk)
+    norma.refresh_from_db()
+
+    assert "sin formato" in norma.log_ia

@@ -102,9 +102,10 @@ def completar(
     propio solo añadiría una capa que traducir mal.
 
     **`None` no significa «sin razonamiento»**, y la diferencia se paga: hay modelos que razonan
-    por defecto —el `deepseek-v4-flash` que viene configurado, sin ir más lejos—, así que para no
-    pagar esos tokens hay que pasar `False`. `{"exclude": True}` es otra cosa: el modelo razona
-    igual y **se cobra igual**, solo que no devuelve los bloques.
+    por defecto —el `gemini-2.5-flash` que viene configurado, sin ir más lejos: responder «LISTO»
+    le cuesta 39 tokens de salida con el default y 2 pasándole `False`—, así que para no pagar
+    esos tokens hay que pasar `False`. `{"exclude": True}` es otra cosa: el modelo razona igual y
+    **se cobra igual**, solo que no devuelve los bloques.
 
     `**opciones` pasa directo al SDK (`temperature`, `max_tokens`, `response_format`…).
 

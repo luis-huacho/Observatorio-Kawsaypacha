@@ -502,6 +502,7 @@ Lo que hace falta configurar una vez para que Pipelines pueda entrar está en
 | Agregar métricas y purgar | `docker compose exec backend python manage.py shell -c "from apps.core.tasks import agregar_metricas; agregar_metricas.func()"` |
 | Recargar nginx | `docker compose exec nginx nginx -s reload` |
 | **Cambiar de dominio** | Editar `SITE_DOMAIN`/`API_DOMAIN` en el `.env` de la raíz y `docker compose up -d nginx` — **recrear**, no `restart`: el entorno se congela al crear el contenedor. Y emitir el certificado del dominio nuevo antes |
+| **Cambiar el modelo de IA** | Editar `OPENROUTER_MODELO` en `backend/.env` y `docker compose up -d backend worker` — **recrear, no `restart`**, por lo mismo que la fila de arriba: `restart` NO relee `env_file` y se queda con el modelo viejo sin decir nada. Es de runtime: **no hace falta reconstruir**, al revés que las `VITE_*`. Se confirma con `docker compose exec backend printenv OPENROUTER_MODELO`, y en caliente porque cada registro redactado escribe «Redactada con …» en su bitácora |
 | Ver la configuración efectiva de nginx | `docker compose exec nginx nginx -T` |
 | Renovar certificados a mano | `docker compose run --rm --entrypoint certbot certbot renew --webroot -w /var/www/certbot && docker compose exec nginx nginx -s reload` |
 | Comprobar que la renovación funcionará | el mismo comando con `--dry-run` (no gasta cuota) |

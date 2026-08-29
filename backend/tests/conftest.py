@@ -46,6 +46,23 @@ def media_temporal(settings, tmp_path):
     shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
 
 
+@pytest.fixture(autouse=True)
+def registro_ia_temporal(settings, tmp_path):
+    """`IA_LOGS_DIR` aislado por prueba, por la misma razón que `media_temporal`.
+
+    `openrouter.registrar()` escribe **en cada llamada**, también con el cliente falso de la
+    suite, y el directorio que hereda del contenedor lo bind-monta compose a `./logs` del host.
+    Sin esto la suite ensucia el registro real: al inventariarlo, 308 de sus 318 entradas eran de
+    pytest —se reconocen por `modelo pedido : modelo/por-defecto`— y las diez llamadas de verdad
+    quedaban ahogadas entre ellas. Ese archivo es diario, en modo añadir y **sin rotación**, y es
+    donde se mira qué se le pidió a la IA y qué contestó cuando algo sale raro en producción.
+
+    Cinco pruebas de `test_openrouter.py` ya lo apuntaban a `tmp_path` a mano; con el fixture
+    dejan de tener que acordarse, y las de los tres consumidores quedan cubiertas también.
+    """
+    settings.IA_LOGS_DIR = tmp_path / "ia"
+
+
 def _upload(tipo: str, origen):
     from apps.datasets.models import DatasetUpload
 

@@ -15,7 +15,7 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (429 pruebas, ~80 s)
+$DC exec backend pytest                 # suite backend (436 pruebas, ~80 s)
                                         # la cifra sale de `pytest --collect-only -q`, no de la memoria
 $DC exec backend pytest -m lento        # 7 más: los Excel completos y el PDF con mapa (~35 s)
 cd frontend && npm run lint && npm run build    # tipos + build
@@ -209,8 +209,11 @@ distintas de fallar sin dar ningún error:
    que es el fallo que se ve idéntico a un acierto.
 6. Que un `Decimal("0.00")` escrito a mano se pise porque es *falsy*.
 7. Que el `contenido` vuelva **sin etiquetas** y se pinte corrido: el frontend lo inyecta con
-   `dangerouslySetInnerHTML`, así que un texto plano se ve mal sin fallar. Le pasa de verdad al
-   modelo por defecto, y por eso hay red y aviso, con su prueba.
+   `dangerouslySetInnerHTML`, así que un texto plano se ve mal sin fallar. Pasa de verdad —lo hizo
+   el modelo que estaba configurado antes de ADR-A23— y por eso hay red y aviso. **Desde A23 la
+   prueba está en los tres consumidores**, no solo aquí: noticias y normas no tenían red, y ahí el
+   mismo fallo no dejaba ni rastro en la bitácora. Cada uno comprueba las tres cosas: que el texto
+   plano se envuelve, que el HTML legítimo **no** se toca, y que el aviso llega al `log_ia`.
 
 Y dos que fija la generalización de `core`: que **partir `RedaccionIAMixin` en dos bases abstractas
 no emita ninguna migración** (`makemigrations --check`), y que **todo modelo que herede

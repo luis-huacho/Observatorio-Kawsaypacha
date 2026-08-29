@@ -148,7 +148,7 @@ CSRF_TRUSTED_ORIGINS=https://obs.predes.org.pe,https://observatorio.predes.org.p
 POSTGRES_DB= POSTGRES_USER= POSTGRES_PASSWORD= POSTGRES_HOST=db POSTGRES_PORT=5432
 MEILI_URL=http://meilisearch:7700        MEILI_MASTER_KEY=
 GEMINI_API_KEY=
-OPENROUTER_API_KEY=  OPENROUTER_MODELO=deepseek/deepseek-v4-flash-0731
+OPENROUTER_API_KEY=  OPENROUTER_MODELO=google/gemini-2.5-flash
 IA_LOGS_DIR=/app/logs   # .txt de cada llamada; el anfitrión lo monta con OBSERVATORIO_REGISTROS
 EMAIL_HOST= EMAIL_PORT= EMAIL_HOST_USER= EMAIL_HOST_PASSWORD= DEFAULT_FROM_EMAIL=
 ADMIN_URL=loginseguro/ # admin fuera de /admin/ por defecto

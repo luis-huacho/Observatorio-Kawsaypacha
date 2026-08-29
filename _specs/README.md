@@ -13,6 +13,60 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 28/08/2026 — se cambia el modelo de IA, y la red deja de estar en un solo sitio
+
+- **La decisión que ADR-D10 dejó abierta se cierra con medición, no con opinión.** Aquel día quedó
+  escrito «no se cambió la variable: afecta también a noticias y normas y es una decisión de coste
+  del dueño del proyecto». Eso era exactamente lo que faltaba medir, así que se midieron **los tres
+  consumidores con las mismas entradas que ya estaban en el registro de IA** — la comparación salió
+  gratis porque `logs/ia-2026-08-28.txt` guarda entrada **y** salida de cada llamada.
+
+  | Caso | `deepseek/deepseek-v4-flash-0731` | `google/gemini-2.5-flash` |
+  |---|---|---|
+  | Noticia (ADR-D7) | 1.063 car. **sin una sola etiqueta** · $0.00038 | 1.237 car. con `<p>` · $0.0015 |
+  | Norma HTML (D8), 1ª | 1.448 car. con `h2`/`p`/`blockquote` · $0.00016 | 803 car. con `h2`/`ul`/`li`/`p` · $0.0012 |
+  | Norma HTML (D8), 2ª — **misma URL** | 543 car. **sin etiquetas**, `estado_vigencia="vigente"` inventada · $0.00005 | — |
+  | Norma PDF (D8) | 255 car. **sin etiquetas**, `vigencia` inventada · $0.00009 | 1.919 car. con `h2`/`ul`/`li`/`strong` · $0.0024 |
+  | Medida ×3 (D10) | 3 clasificaciones distintas, sin etiquetas, `resultado=""` · $0.00007 | 3 idénticas, 7 `<h2>`, cero avisos · $0.0028 |
+
+- **Lo más elocuente es la fila de la norma repetida**: la misma URL, el mismo modelo, dos
+  resultados — uno formateado y otro corrido. No es que deepseek formatee mal, es que no formatea
+  de forma predecible, y eso no se arregla insistiendo en el prompt.
+- **`estado_vigencia="vigente"` es peor que un formato feo.** El prompt dice «no deduzcas la
+  vigencia del paso del tiempo» y deepseek la dedujo dos veces; gemini la dejó vacía las tres.
+  Un campo vacío el editor lo ve; uno relleno y falso, no.
+- **La rama PDF no obligó a tocar `OPENROUTER_PDF_ENGINE`.** Era el riesgo real de cambiar de
+  modelo —quien parsea el PDF cambia— y `pdf-text` siguió sirviendo: 1.919 caracteres bien
+  formados. También se descartó el otro riesgo, que `provider.require_parameters` dejara la
+  petición sin proveedor por pedir salida estructurada **y** razonamiento a la vez.
+- **Se paga unas 20 veces más y merece la pena**: $0.0028 contra $0.00007 por registro son $3 por
+  cada mil frente a $0.10, sobre un flujo editorial de decenas al mes. Lo que estaba en juego no
+  era el gasto sino que un editor publique algo mal formado.
+- **Y la lección de fondo: elegir bien el modelo no es una defensa.** La red que envuelve en
+  párrafos un contenido sin etiquetas vivía **solo en medidas**; noticias y normas guardaban lo que
+  viniera y no avisaban. Es decir, aquellas 1.063 caracteres de noticia corrida se publicaron sin
+  que nada lo dijera. `_a_html` sube a `apps/core/services/salida_ia.py` como `a_html` y la usan
+  los tres, con sus tres pruebas cada uno (envolver, no tocar el HTML bueno, y que el aviso llegue
+  al `log_ia`). La cañería ya estaba: las tres bitácoras hacían `lineas += propuesta.avisos` — solo
+  faltaba quien las llenara.
+- **`interpretar_json` se muda con ella** y cierra su fila de deuda: vivía en `core/lectura_web.py`,
+  que dejó de describir lo que hace desde que medidas —que no descarga nada— pasó a usarlo. Las dos
+  funciones normalizan lo que vuelve del modelo, así que viven juntas y al lado de `openrouter.py`.
+- **Dos trampas de operación, comprobadas a mano, no supuestas.** Cambiar `OPENROUTER_MODELO` en el
+  `.env` y hacer `docker compose restart` **no cambia nada**: `restart` no relee `env_file` y el
+  contenedor sigue con el modelo viejo sin avisar. Hay que `up -d`, que lo recrea — la misma
+  lección que ya tenía la fila «Cambiar de dominio» del runbook. Y **el `.env` de un servidor ya
+  instalado tiene la línea escrita**, así que cambiar el `default=` de `settings.py` no lo alcanza:
+  se despliega, sale todo en verde y se sigue redactando con el modelo viejo. Esta vez **no es
+  silencioso**, porque los tres consumidores escriben «Redactada con …» en la bitácora de cada
+  registro; se comprueba en frío con `printenv OPENROUTER_MODELO`.
+- **De camino salió que la suite ensuciaba el registro de IA real**: de las 318 entradas del día,
+  308 eran de pytest —`modelo pedido : modelo/por-defecto`— y las diez llamadas de verdad quedaban
+  ahogadas entre ellas, en un archivo diario, en modo añadir y sin rotación. Cinco pruebas ya
+  apuntaban `IA_LOGS_DIR` a `tmp_path` a mano; ahora lo hace un fixture `autouse` de `conftest.py`,
+  hermano del que ya aislaba `MEDIA_ROOT` por la misma razón. Tras el arreglo, una corrida completa
+  deja el archivo con el **mismo tamaño exacto**.
+
 ### Actualización 28/08/2026 — la llave de CARTO, y el estilo que NO se cambió
 
 - **CARTO empezó a exigir llave para sus teselas ráster** y estampaba una marca de agua sobre el
@@ -127,7 +181,8 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
   vez de redactarla; una de ellas además dejó `ambito` en «regional» para una experiencia comunal y
   `actores` en «community». La misma ficha con `google/gemini-2.5-flash` salió con subtítulos
   `<h2>`, la clasificación correcta y cero avisos, por $0.003. **La variable no se cambió**: afecta
-  también a noticias y normas y es una decisión de coste del dueño del proyecto.
+  también a noticias y normas y es una decisión de coste del dueño del proyecto. *(Se cambió ese
+  mismo día, tras medir los otros dos consumidores — ver la entrada de más arriba y ADR-A23.)*
 - **De ahí salieron tres arreglos que no estaban en el plan**, los tres del mismo tipo —cosas que
   se ven mal sin fallar—: un `contenido` sin etiquetas se envuelve en párrafos y queda anotado en
   el registro de la IA (el frontend lo inyecta con `dangerouslySetInnerHTML`); «180,000 soles» se

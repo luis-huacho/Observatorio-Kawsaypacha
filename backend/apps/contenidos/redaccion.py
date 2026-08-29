@@ -10,7 +10,7 @@ una vez y se pide de vuelta el registro entero con un esquema JSON. Encadenar ll
 título, otra para el resumen, otra para las palabras clave— multiplicaría el coste y el tiempo por
 el mismo texto de entrada, que es lo caro.
 
-Dos trampas que este módulo cierra y que conviene no reabrir:
+Tres trampas que este módulo cierra y que conviene no reabrir:
 
 1. **OpenRouter enruta cada petición a un proveedor distinto**, y del mismo modelo hay proveedores
    que **no** soportan salida estructurada (`structured_outputs=false` en CoreWeave, DigitalOcean,
@@ -20,6 +20,11 @@ Dos trampas que este módulo cierra y que conviene no reabrir:
    el tipo contra sus opciones, la fecha en ISO con repliegue a hoy, y las palabras clave recortadas
    al `max_length` del `ArrayField`. Un valor fuera de rango reventaría al guardar, en el worker,
    donde el editor no lo ve.
+3. **El `cuerpo` puede volver sin etiquetas** pese a que el esquema pide HTML, y entonces se pinta
+   corrido sin que falle nada. Lo rescata `salida_ia.a_html`, que lo envuelve por párrafos y lo
+   avisa en la bitácora. No es teórico: medido el 28/08/2026, el modelo anterior devolvió 1.063
+   caracteres de texto plano para una noticia real, y como aquí no había red se guardó tal cual
+   (ADR-A23).
 
 El `cuerpo` **no se sanea aquí**: lo hace `HtmlRicoMixin.save()` al guardar, y ahí el saneador de
 ADR-D2 pasa a cumplir un papel que no tenía — ser la red bajo un HTML que no escribió una persona.
@@ -28,7 +33,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from apps.core import lectura_web
-from apps.core.services import openrouter
+from apps.core.services import openrouter, salida_ia
 
 #: Lo que se le manda al modelo. Recortar aquí es lo que mantiene barata la llamada.
 MAXIMO_CARACTERES = 24_000
@@ -126,7 +131,7 @@ def redactar(url: str, *, con_imagen: bool = True) -> Redaccion:
         etiqueta=f"noticia desde {url}",
     )
 
-    datos = lectura_web.interpretar_json(respuesta.texto)
+    datos = salida_ia.interpretar_json(respuesta.texto)
     redaccion = _normalizar(datos, modelo=respuesta.modelo, costo=respuesta.costo)
 
     if con_imagen:
@@ -144,6 +149,7 @@ def redactar(url: str, *, con_imagen: bool = True) -> Redaccion:
 def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
     from apps.contenidos.models import Noticia
 
+    avisos: list[str] = []
     tipos = {opcion for opcion, _ in Noticia.Tipo.choices}
     tipo = str(datos.get("tipo") or "").strip()
 
@@ -156,7 +162,7 @@ def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
     return Redaccion(
         titulo=str(datos.get("titulo") or "").strip()[:250],
         bajada=str(datos.get("bajada") or "").strip()[:500],
-        cuerpo=str(datos.get("cuerpo") or "").strip(),
+        cuerpo=salida_ia.a_html(str(datos.get("cuerpo") or "").strip(), avisos),
         tipo=tipo if tipo in tipos else Noticia.Tipo.NOTICIA,
         autor=str(datos.get("autor") or "").strip()[:150],
         fecha=_a_fecha(datos.get("fecha")),
@@ -164,6 +170,7 @@ def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
         imagen_titulo=str(datos.get("imagen_titulo") or "").strip()[:300],
         modelo=modelo,
         costo=costo,
+        avisos=avisos,
     )
 
 

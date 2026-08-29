@@ -34,8 +34,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from xml.sax.saxutils import escape, quoteattr
 
-from apps.core import lectura_web
-from apps.core.services import openrouter
+from apps.core.services import openrouter, salida_ia
 
 #: Tope de la entrada. Una ficha son diecisiete respuestas de formulario, no un articulado: si
 #: alguna llega con un informe pegado dentro, se paga como tokens de entrada sin aportar nada.
@@ -253,7 +252,7 @@ def redactar(ficha) -> Redaccion:
         etiqueta=f"medida desde ficha ACC #{ficha.pk}",
     )
 
-    datos = lectura_web.interpretar_json(respuesta.texto)
+    datos = salida_ia.interpretar_json(respuesta.texto)
     if not str(datos.get("titulo") or "").strip():
         raise ValueError(_MOTIVO_SIN_FICHA)
 
@@ -297,7 +296,7 @@ def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
         resultado=resultado if resultado in resultados else "",
         distrito=_resolver_distrito(datos.get("distrito"), datos.get("provincia"), avisos),
         comunidad=str(datos.get("comunidad") or "").strip()[:150],
-        contenido=_a_html(str(datos.get("contenido") or "").strip(), avisos),
+        contenido=salida_ia.a_html(str(datos.get("contenido") or "").strip(), avisos),
         palabras_clave=claves[:8],
         actores=str(datos.get("actores") or "").strip()[:300],
         fecha_implementacion=fecha,
@@ -306,24 +305,6 @@ def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
         costo=costo,
         avisos=avisos,
     )
-
-
-def _a_html(texto: str, avisos: list[str]) -> str:
-    """Red para cuando el modelo devuelve texto plano pese a que el esquema pide HTML.
-
-    No es teórico: pasó en la primera prueba contra el API real. El frontend inyecta este campo
-    con `dangerouslySetInnerHTML` y el PDF lo maqueta, así que un texto sin etiquetas se pinta
-    como un bloque corrido con los saltos de línea comidos — se ve mal, pero **no falla**, que es
-    la peor forma de fallar. Se envuelve por párrafos y se avisa en la bitácora.
-    """
-    if not texto or "<" in texto:
-        return texto
-    parrafos = [p.strip() for p in re.split(r"\n\s*\n", texto) if p.strip()]
-    avisos.append(
-        "El contenido volvió sin formato y se envolvió en párrafos: revisa la maqueta y añade "
-        "subtítulos si hace falta."
-    )
-    return "".join(f"<p>{escape(p)}</p>" for p in parrafos)
 
 
 def _resolver_peligro(slug, avisos: list[str]):
