@@ -474,3 +474,15 @@ La búsqueda global y las facetas van **directo a Meilisearch** (`/search/`, lla
 - Throttling anónimo global (p.ej. `1000/hour`), más estricto en exports y PDF (`30/hour`).
 - **CORS activo también en producción** (ADR-A14: la SPA vive en `observatorio.predes.org.pe` y el API en `obs.predes.org.pe`). `django-cors-headers` con allowlist desde `CORS_ALLOWED_ORIGINS`; en dev, `localhost:5173`. nginx añade las cabeceras de `/media/` y `/tiles/`, que Django no sirve.
 - Los serializers viven en `backend/apps/api/`; sus formas se reflejan en `frontend/src/lib/types.ts`.
+
+## Rutas que NO son del API pero las sirve Django (ADR-A24)
+
+Cuelgan de la raíz, no de `/api/`, porque las pide el **dominio público** de la SPA:
+
+| Ruta | Qué devuelve |
+|---|---|
+| `/(noticias\|normativa\|medidas\|peligros)/<clave>` | El `index.html` compilado de la SPA con `title`, `canonical` y `og:*` de esa ficha. Una ficha inexistente o en borrador devuelve **200 con las metas del sitio**, no un 404: el «no encontrado» lo pinta el router de React |
+| `/sitemap.xml` | Las rutas fijas más las fichas publicadas, con `lastmod`. `/comparar` no se anuncia (ADR-P2) |
+
+Los tipos que acepta la primera son una **lista blanca** en `apps/sitio/vistas_html.py`, igual que
+`MODELOS_CON_IA`: el segmento viene de la URL y no puede elegir qué modelo se consulta.

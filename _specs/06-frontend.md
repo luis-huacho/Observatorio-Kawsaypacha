@@ -102,6 +102,34 @@ y fija el filtro de provincia a nivel provincial. Lo que **no** es negociable en
 - **El menú de escritorio va en una sola línea** (desde `lg`). La barra tiene altura fija, así que un enlace que parte su texto en dos se sale por arriba y por abajo: los enlaces llevan `whitespace-nowrap`, logo y `nav` van con `shrink-0`, y el que cede espacio cuando falta es el buscador (`min-w-0` en el `form` y en el `input`, `w-40` hasta `xl` y `w-56` desde ahí). Medido a 1024, 1280 y 1440 px en `e2e/header.spec.ts`. Con «Sobre el observatorio» y «Buenas prácticas» el nav mide **555 px a 1024 px**, y ahí ceder dejó de alcanzar: al campo le quedaban 63 px, que no dan para escribir. Así que **entre `lg` y `xl` el buscador colapsa a un botón-lupa** que lleva a `/buscar` (`hidden md:flex lg:hidden xl:flex` en el `form`, `hidden lg:flex xl:hidden` en la lupa), y desde `xl` vuelve el campo entero con sus 224 px. De `md` a `lg` el campo sigue visible porque ahí el menú está detrás de la hamburguesa y sobra sitio. El `aria-label` de la lupa es «Ir al buscador» y no «Buscar»: navega en vez de buscar en sitio, y así no choca con el `input[aria-label="Buscar"]` que localizan las pruebas.
 - Hero de portada: carrusel/slide único según nº de `HeroSlide` publicados.
 
+## Compartir, títulos y recorte de texto
+
+**Compartir** (`components/Compartir.tsx`) va al pie de las cinco fichas de detalle:
+`navigator.share` en móvil, y WhatsApp / Facebook / LinkedIn / copiar enlace en escritorio. Sin
+dependencia nueva —los iconos son de `lucide-react`, ya instalado—. **La previsualización no la
+hace este componente**: sale de las metas que inyecta el servidor (ADR-A24), porque los
+rastreadores no ejecutan JavaScript.
+
+**Títulos por página** (`lib/meta.ts`). `useMetaPagina()` pone `document.title` y la
+`description`; `META_RUTAS` tiene los de las rutas fijas y las fichas lo llaman con su contenido.
+Dos reglas: **el hook va antes de cualquier `return`** —las fichas tienen returns condicionales de
+carga y error, y llamarlo después haría que React viera un número distinto de hooks entre
+renders—, y **no toca `og:*`**, que son del servidor: dos sitios escribiendo las mismas metas es
+la forma segura de que un día discrepen. El recorte a 110 caracteres es el mismo que aplica el
+servidor, a propósito.
+
+**Recorte de texto largo.** El patrón del sitio es `line-clamp-2` / `line-clamp-3` de Tailwind
+(nativo desde 3.3, `plugins: []`), acompañado de `break-words` cuando el texto puede traer tokens
+sin espacios. Se recorta **por CSS y no por JS**: el texto entero sigue en el DOM para el lector de
+pantalla y para Google, y el atributo `title` lo enseña al pasar el ratón. `/normativa` era la
+única sección sin recorte y a una sola columna de 1280 px; sus tres campos largos —título (300),
+resumen (700) y análisis (**sin límite**)— van clamped, y el `numero` de la norma se pinta de chip
+porque es lo que permite recortar el título sin que el usuario pierda de qué norma se trata.
+
+**Imágenes.** `Portada.tsx` es el único envoltorio compartido. Lleva `width`/`height` para reservar
+el hueco, y **no** `loading="lazy"`: es la imagen LCP de su propia página. En los listados sí se
+difiere.
+
 ## Métricas (beacon)
 
 Hook `useMetrica()`: pageview en cada cambio de ruta (`navigator.sendBeacon` a `/api/metricas/evento/`), y eventos en descargas (PDF, Excel, documento) y búsquedas. Sin cookies, sin PII.
