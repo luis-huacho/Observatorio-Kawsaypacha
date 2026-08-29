@@ -352,3 +352,39 @@ def _url_estado(pk):
     from django.urls import reverse
 
     return reverse("estado-ia", args=["contenidos", "noticia", pk])
+
+
+def test_un_cuerpo_en_texto_plano_se_envuelve_en_parrafos(ia):
+    """Le pasa de verdad al modelo barato, y aquí no había red hasta ahora.
+
+    Medido el 28/08/2026 con `deepseek/deepseek-v4-flash-0731` contra el API real: el cuerpo de
+    esta misma noticia volvió en 1.063 caracteres **sin una sola etiqueta** y se guardó tal cual,
+    porque la red vivía solo en medidas. El frontend lo inyecta con `dangerouslySetInnerHTML`.
+    """
+    ia({**FICHA, "cuerpo": "Primer párrafo.\n\nSegundo párrafo."})
+    propuesta = redaccion.redactar("https://medio.pe/nota")
+
+    assert propuesta.cuerpo == "<p>Primer párrafo.</p><p>Segundo párrafo.</p>"
+    assert any("sin formato" in aviso for aviso in propuesta.avisos)
+
+
+def test_un_cuerpo_que_ya_viene_en_html_no_se_toca(ia):
+    ia()
+    propuesta = redaccion.redactar("https://medio.pe/nota")
+
+    assert propuesta.cuerpo == FICHA["cuerpo"]
+    assert not any("sin formato" in aviso for aviso in propuesta.avisos)
+
+
+def test_el_aviso_de_formato_llega_a_la_bitacora_del_editor(ia):
+    """Envolver sin avisar no sirve de nada: el editor tiene que enterarse de que hubo que
+    rescatar el cuerpo, porque es la señal de que conviene revisar la maqueta."""
+    ia({**FICHA, "cuerpo": "Un solo párrafo corrido."})
+    noticia = _noticia_en_proceso()
+
+    from apps.contenidos.tasks import redactar_noticia_desde_url
+
+    redactar_noticia_desde_url.func(pk=noticia.pk)
+    noticia.refresh_from_db()
+
+    assert "sin formato" in noticia.log_ia

@@ -21,7 +21,6 @@ Tres trampas que este módulo cierra y que conviene no reabrir:
    guardarla.
 """
 import ipaddress
-import json
 import re
 import socket
 import urllib.request
@@ -157,16 +156,3 @@ def descargar_imagen(html: str, url_base: str) -> tuple[str, bytes] | None:
     extension = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}[formato]
     return f"portada.{extension}", buffer.getvalue()
 
-
-def interpretar_json(texto: str) -> dict:
-    """El JSON del modelo, tolerando que lo envuelva en un bloque de código."""
-    limpio = texto.strip()
-    if limpio.startswith("```"):
-        limpio = re.sub(r"^```[a-z]*\n?|\n?```$", "", limpio).strip()
-    try:
-        datos = json.loads(limpio)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"La IA no devolvió un JSON válido: {exc}") from exc
-    if not isinstance(datos, dict):
-        raise ValueError("La IA devolvió algo que no es una ficha.")
-    return datos

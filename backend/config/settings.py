@@ -379,7 +379,13 @@ GEMINI_MODELO = env("GEMINI_MODELO", default="gemini-2.5-flash")
 # OpenRouter (ADR-A22): pasarela de IA de propósito general. Un solo secreto y un solo cliente
 # para cualquier modelo; el modelo se elige por variable de entorno y no por código.
 OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
-OPENROUTER_MODELO = env("OPENROUTER_MODELO", default="deepseek/deepseek-v4-flash-0731")
+# Medido el 28/08/2026 contra el API real, los tres consumidores y las mismas entradas: con
+# `deepseek/deepseek-v4-flash-0731` el contenido volvió **sin etiquetas HTML** en 4 de 6 llamadas
+# —incluida la noticia entera, 1.063 caracteres de texto corrido—, dio tres redacciones distintas
+# de la misma ficha ACC y dedujo `estado_vigencia="vigente"` que el prompt prohíbe deducir. Con
+# éste, 7 de 7 con etiquetas, cero avisos y la misma clasificación en las tres repeticiones. Cuesta
+# ~20 veces más: $0.0028 contra $0.00007 por registro, que son $3 por cada mil frente a $0.10.
+OPENROUTER_MODELO = env("OPENROUTER_MODELO", default="google/gemini-2.5-flash")
 OPENROUTER_BASE_URL = env("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
 # El timeout y el reintento con backoff que 03 pedía y que la integración con Gemini nunca llegó
 # a implementar. Aquí no hay que escribirlos: el cliente de `openai` los trae, basta pasárselos.

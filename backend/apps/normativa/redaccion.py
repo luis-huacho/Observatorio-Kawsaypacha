@@ -9,7 +9,7 @@ buena parte de las normas peruanas se publica **como PDF** —El Peruano, gob.pe
 HTML le pasaría basura al modelo. Cuando lo descargado es un PDF se manda el archivo dentro del
 mismo mensaje y lo parsea OpenRouter con su plugin `file-parser`; sigue siendo una petición.
 
-Cuatro trampas que este módulo cierra:
+Cinco trampas que este módulo cierra:
 
 1. **OpenRouter enruta cada petición a un proveedor distinto**, y del mismo modelo hay proveedores
    sin salida estructurada. Sin `provider.require_parameters` la llamada falla una de cada tantas
@@ -24,6 +24,11 @@ Cuatro trampas que este módulo cierra:
    ámbito y estado de vigencia contra sus opciones, la fecha en ISO con repliegue a hoy, y los
    textos recortados a su `max_length`. Un valor fuera de rango reventaría al guardar, en el
    worker, donde el editor no lo ve.
+5. **El `contenido` puede volver sin etiquetas** pese a que el esquema pide HTML, y entonces se
+   pinta corrido sin que falle nada. Lo rescata `salida_ia.a_html`, que lo envuelve por párrafos y
+   lo avisa en la bitácora. Aquí es donde más se vio: medido el 28/08/2026, de tres normas el
+   modelo anterior devolvió dos en texto plano —una de ellas la del PDF— y la tercera, con la misma
+   URL que una de esas dos, sí formateada (ADR-A23).
 
 El `contenido` **no se sanea aquí**: lo hace `HtmlRicoMixin.save()` al guardar, que es donde el
 saneador de ADR-D2 hace de red bajo un HTML que no escribió una persona.
@@ -36,7 +41,7 @@ from urllib.parse import unquote, urlparse
 from django.conf import settings
 
 from apps.core import lectura_web
-from apps.core.services import openrouter
+from apps.core.services import openrouter, salida_ia
 
 #: Lo que se le manda al modelo en la rama HTML. Recortar aquí es lo que mantiene barata la llamada.
 #: Más generoso que en noticias: una norma trae articulado y el corte se nota antes.
@@ -181,7 +186,7 @@ def redactar(url: str, *, con_imagen: bool = True) -> Redaccion:
         etiqueta=etiqueta,
     )
 
-    datos = lectura_web.interpretar_json(respuesta.texto)
+    datos = salida_ia.interpretar_json(respuesta.texto)
     if not str(datos.get("titulo") or "").strip():
         raise ValueError(_MOTIVO_SIN_TEXTO if es_pdf else _MOTIVO_SIN_FICHA)
 
@@ -257,6 +262,7 @@ def _nombre_pdf(url: str) -> str:
 def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
     from apps.normativa.models import Norma
 
+    avisos: list[str] = []
     tipos = {opcion for opcion, _ in Norma.Tipo.choices}
     ambitos = {opcion for opcion, _ in Norma.Ambito.choices}
     vigencias = {"vigente", "derogada", "modificada"}
@@ -280,12 +286,13 @@ def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
         ambito=ambito if ambito in ambitos else "",
         fecha=_a_fecha(datos.get("fecha")),
         resumen=str(datos.get("resumen") or "").strip()[:700],
-        contenido=str(datos.get("contenido") or "").strip(),
+        contenido=salida_ia.a_html(str(datos.get("contenido") or "").strip(), avisos),
         palabras_clave=claves[:8],
         estado_vigencia=vigencia if vigencia in vigencias else "",
         imagen_titulo=str(datos.get("imagen_titulo") or "").strip()[:300],
         modelo=modelo,
         costo=costo,
+        avisos=avisos,
     )
 
 
