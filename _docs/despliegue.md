@@ -66,6 +66,7 @@ DEBUG=0
 ALLOWED_HOSTS=obs.predes.org.pe,observatorio.predes.org.pe,localhost,127.0.0.1
 SITE_URL=https://observatorio.predes.org.pe
 BACKEND_URL=https://obs.predes.org.pe
+SITIO_INDEXABLE=1
 CORS_ALLOWED_ORIGINS=https://observatorio.predes.org.pe
 CSRF_TRUSTED_ORIGINS=https://obs.predes.org.pe,https://observatorio.predes.org.pe
 ADMIN_URL=loginseguro/

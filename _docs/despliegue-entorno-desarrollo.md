@@ -88,6 +88,7 @@ todo lo de abajo son variables de entorno y un comando.
 | `API_DOMAIN` (`.env` raíz) | `obs.somosiadigital.com` | `obs.predes.org.pe` |
 | `VITE_API_URL` / `_SEARCH_URL` / `_TILES_URL` | contra `obs.somosiadigital.com` | contra `obs.predes.org.pe` |
 | `ALLOWED_HOSTS`, `SITE_URL`, `BACKEND_URL`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS` (`backend/.env`) | dominios de somosiadigital | dominios de predes |
+| `SITIO_INDEXABLE` (`backend/.env`) | **`0` a partir de ese día** | `1` |
 | Certificado | `--cert-name observatorio.somosiadigital.com` | `--cert-name observatorio.predes.org.pe` |
 | Datos | `seed --solo-catalogos --demo` | `seed --capas --tiles`, con `data/layers/` completo |
 | SMTP | sin configurar: los avisos del flujo editorial van al log | credenciales reales, o los correos no salen |

@@ -13,6 +13,71 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 29/08/2026 — el sitio decía «200, aquí está» a documentos que no existen (ADR-A26)
+
+Un test externo de *agent-readiness* señaló doce carencias. Se comprobaron **las doce contra el
+sitio en vivo** antes de tocar nada, y el reparto no era el que decía el informe.
+
+**Cuatro hallazgos eran un solo bug, y no el que se reportaba.** «El catálogo de la API devolvió
+HTML en lugar de JSON», y lo mismo de `auth.md`, del índice de skills y del manifiesto ARD. La causa
+es una línea: `location / { try_files $uri /index.html; }`. Sin `=404` al final, **toda URL
+desconocida responde 200 con el `index.html`** — comprobado en `/.well-known/api-catalog`,
+`/.well-known/ai-catalog.json`, `/.well-known/agent-skills/index.json` y `/llms.txt`, los cuatro
+`200` + `text/html`. Esos documentos no estaban rotos: **no existen**, y el fallback los disfrazaba.
+Decirle 200 a un cliente que pregunta por algo que no se tiene es peor que decirle 404, porque el
+404 es información. Ahora `/.well-known/` corta con un `return 404`.
+
+**Seis pedían describir capacidades inexistentes, y no se hicieron.** El API es anónimo y de solo
+lectura (`AllowAny`, sin `DEFAULT_AUTHENTICATION_CLASSES`); no hay recursos protegidos por token ni
+servidor MCP del sitio. Publicar `openid-configuration` u `oauth-protected-resource` mandaría a un
+agente a negociar credenciales contra la nada, y además es justo lo que escanean los bots buscando
+IdP mal configurados: fabricarlo **empeora** la superficie. DNS-AID es zona DNS y DNSSEC. Queda
+escrito en ADR-A26 para que el próximo informe automático no reabra la discusión.
+
+**Y el hallazgo propio, que el informe no vio: el `robots.txt` anunciaba el sitemap en un dominio
+que no resuelve.** Era un archivo estático del bundle con la línea escrita a mano —
+`Sitemap: https://observatorio.predes.org.pe/sitemap.xml`— y el sitio vivo es otro; ese host
+devuelve `000`. El sitemap funcionaba perfectamente —26 URL, `application/xml`, todo en verde— y
+**no lo leía nadie**, porque el único documento que dice dónde está apuntaba a la nada. Es de la
+misma familia que el incidente del 27/08: todas las piezas correctas y el resultado, cero. Pasa a
+Django, que interpola `SITE_URL` igual que el sitemap.
+
+Lo que se publica, entonces, es **solo lo que existe**: `/robots.txt` y `/.well-known/api-catalog`
+(RFC 9727), que enlaza el OpenAPI de `/api/schema/`, la documentación de `/api/docs/` y la sonda de
+`/api/salud/` — con `reverse()`, para que renombrar una ruta rompa la prueba en vez de dejar el
+catálogo apuntando a una URL muerta. Hay una prueba que **pide cada enlace**: un catálogo que existe
+y apunta a URLs muertas se ve exactamente igual que uno bueno.
+
+Cuatro cosas que costaron más de lo que parecen:
+
+1. **El repliegue de `/robots.txt` es el archivo estático, no `@spa`.** Un 5xx en `/robots.txt` no
+   hace que Google rastree el sitio entero, hace que **deje de rastrearlo**. El peor caso tiene que
+   ser un robots.txt permisivo sin `Sitemap:`, nunca un HTML. Probado parando el contenedor.
+2. **La cabecera `Link` va en `location = /index.html`**, no en `location /`. El `/index.html` final
+   del `try_files` es una **redirección interna**, así que la portada entra por ese bloque — se ve
+   en que responde con el `Cache-Control: no-cache` que solo se declara ahí. Y `add_header` no se
+   hereda por acumulación: declararla en `location /` habría tumbado HSTS y `nosniff`.
+3. **Certbot no se toca.** El corte de `/.well-known/` va solo en el server 443 de la SPA, que nunca
+   tuvo un bloque ahí; el reto ACME se sirve en el `:80` y en el del API. Verificado, no deducido.
+4. **`/sitemap.xml` dejó de replegar a `@spa`**, y esto lo encontró la corrida de `compose.local.yml`
+   parando el backend a propósito: devolvía **HTML con 200** a quien pedía XML. Una ficha replegada
+   sigue siendo una página legible; un sitemap replegado se lee como un sitemap roto. Un 502 se
+   reintenta; un 200 mal formado, no. Las fichas conservan su repliegue, que es donde tiene sentido.
+
+Las señales de contenido las decidió PREDES: `ai-train=no, search=yes, ai-input=yes` — que el
+contenido se pueda encontrar y citar, no que sea corpus de entrenamiento. Y `SITIO_INDEXABLE` queda
+en `1`: el entorno de desarrollo es hoy el **único** sitio vivo, y apagarlo lo dejaría fuera de
+Google; se pone en `0` el día que el dominio definitivo entre en el aire, que es cuando pasan a ser
+dos copias compitiendo.
+
+**Lo que queda fuera, medido y anotado en deuda técnica:** `GET /noticias/<slug>` devuelve 2 674
+bytes con **0 caracteres de texto en el `<body>`**. Las metas de ADR-A24 arreglan la
+previsualización al compartir, pero el artículo en sí sigue siendo invisible sin JavaScript. La
+negociación `text/markdown` y `/llms.txt` lo saldarían; se dejaron fuera del alcance a propósito.
+
+475 pruebas de backend (11 nuevas) y 4 de extremo a extremo. `_specs/00` (ADR-A26), `02`, `07`, `08`,
+`CLAUDE.md` y `_docs/deuda-tecnica.md` actualizados.
+
 ### Actualización 29/08/2026 — normativa que se deforma, compartir, SEO, imágenes y estáticos
 
 Cuatro encargos sobre el sitio desplegado. Los cuatro se diagnosticaron **midiendo el sitio en

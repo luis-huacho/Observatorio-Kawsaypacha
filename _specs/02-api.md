@@ -475,7 +475,7 @@ La búsqueda global y las facetas van **directo a Meilisearch** (`/search/`, lla
 - **CORS activo también en producción** (ADR-A14: la SPA vive en `observatorio.predes.org.pe` y el API en `obs.predes.org.pe`). `django-cors-headers` con allowlist desde `CORS_ALLOWED_ORIGINS`; en dev, `localhost:5173`. nginx añade las cabeceras de `/media/` y `/tiles/`, que Django no sirve.
 - Los serializers viven en `backend/apps/api/`; sus formas se reflejan en `frontend/src/lib/types.ts`.
 
-## Rutas que NO son del API pero las sirve Django (ADR-A24)
+## Rutas que NO son del API pero las sirve Django (ADR-A24, ADR-A26)
 
 Cuelgan de la raíz, no de `/api/`, porque las pide el **dominio público** de la SPA:
 
@@ -483,6 +483,34 @@ Cuelgan de la raíz, no de `/api/`, porque las pide el **dominio público** de l
 |---|---|
 | `/(noticias\|normativa\|medidas\|peligros)/<clave>` | El `index.html` compilado de la SPA con `title`, `canonical` y `og:*` de esa ficha. Una ficha inexistente o en borrador devuelve **200 con las metas del sitio**, no un 404: el «no encontrado» lo pinta el router de React |
 | `/sitemap.xml` | Las rutas fijas más las fichas publicadas, con `lastmod`. `/comparar` no se anuncia (ADR-P2) |
+| `/robots.txt` | `text/plain`. Permite todo, declara `Content-Signal: ai-train=no, search=yes, ai-input=yes` y anuncia el sitemap **con `SITE_URL`**. Con `SITIO_INDEXABLE=0` pasa a `Disallow: /` y **sin** línea `Sitemap:` |
+| `/.well-known/api-catalog` | `application/linkset+json` (RFC 9727, formato RFC 9264) y `Access-Control-Allow-Origin: *` |
 
 Los tipos que acepta la primera son una **lista blanca** en `apps/sitio/vistas_html.py`, igual que
 `MODELOS_CON_IA`: el segmento viene de la URL y no puede elegir qué modelo se consulta.
+
+Las dos últimas viven en `apps/sitio/descubrimiento.py`. Están aquí y no en el bundle de la SPA por
+el mismo motivo que el sitemap: **llevan dentro la URL del sitio**, y un archivo estático no puede
+interpolarla — el `robots.txt` lo era y su línea `Sitemap:` acabó clavada a un dominio que no
+resolvía, con lo que el sitemap funcionaba y no lo leía nadie.
+
+### El catálogo de API
+
+Un solo contexto, anclado en `/api/`, con las URL absolutas del **dominio del API** (`BACKEND_URL`,
+ADR-A14) construidas con `reverse()`:
+
+| Relación | Destino | Tipo |
+|---|---|---|
+| `service-desc` | `/api/schema/` y `/api/schema/?format=json` | `application/vnd.oai.openapi` y `…+json` |
+| `service-doc` | `/api/docs/` | `text/html` |
+| `status` | `/api/salud/` | `application/json` |
+| `author` | `https://predes.org.pe` | — |
+
+Se publica en **los dos orígenes** —el de la SPA y el del API—, porque un agente que llegue a
+`obs.…` lo buscará ahí. Hay una prueba que **pide cada `href`**: un catálogo que existe y apunta a
+URLs muertas se ve exactamente igual que uno bueno.
+
+**No lleva nada de autenticación**, y no por olvido: el API es anónimo y de solo lectura, así que
+declarar `authorization_servers` o un `token_endpoint` mandaría a un agente a negociar credenciales
+contra la nada. Lo mismo vale para todo lo que el sitio decide **no** publicar bajo `/.well-known/`
+(ADR-A26); nginx responde 404 ahí, que es información, en vez del 200 con HTML de antes.
