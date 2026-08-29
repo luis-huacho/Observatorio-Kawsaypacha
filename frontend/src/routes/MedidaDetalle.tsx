@@ -9,16 +9,24 @@ import ContenidoRico from "@/components/ContenidoRico";
 import GaleriaMedida from "@/components/GaleriaMedida";
 import Video from "@/components/Video";
 import PalabrasClave from "@/components/PalabrasClave";
+import Compartir from "@/components/Compartir";
 import { RESULTADO_ESTILO } from "@/routes/Medidas";
+import { useMetaPagina } from "@/lib/meta";
 
 export default function MedidaDetalle() {
   const { slug } = useParams();
   const medida = useApi<TMedida>(slug ? `/medidas/${slug}/` : null);
 
+  // El hook va **antes de cualquier `return`**: los de abajo son condicionales, y llamarlo
+  // después haría que React viera un número distinto de hooks entre el render de carga y
+  // el de datos. Con la ficha aún sin llegar recibe `undefined` y no hace nada.
+  const m = medida.status === "ok" ? medida.data : null;
+  useMetaPagina(m?.titulo, m?.resumen_corto);
+
   if (medida.status === "loading") return <div className="container-page py-12">Cargando…</div>;
 
   // Un 404 es "no existe o fue retirada", no un error del sitio.
-  const m = medida.status === "ok" ? medida.data : null;
+
   if (!m) {
     return (
       <div className="container-page py-12">
@@ -106,6 +114,7 @@ export default function MedidaDetalle() {
         )}
 
         <PalabrasClave palabras={m.palabras_clave} base="/medidas" />
+        <Compartir titulo={m.titulo} etiqueta="Compartir esta experiencia" />
       </article>
     </>
   );

@@ -9,6 +9,8 @@ import { formatPct, formatSoles } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
 import KPI from "@/components/KPI";
 import PageHeader from "@/components/PageHeader";
+import Compartir from "@/components/Compartir";
+import { useMetaPagina } from "@/lib/meta";
 
 /**
  * Ficha de una municipalidad (`/inversion/:codigo`).
@@ -31,6 +33,12 @@ export default function InversionDetalle() {
     codigo ? `/inversion/entidades/${codigo}/` : null,
     { anio: anio || undefined }
   );
+
+  // El hook va **antes de cualquier `return`**: los de abajo son condicionales, y llamarlo después
+  // haría que React viera un número distinto de hooks entre el render de carga y el de datos.
+  const entidad =
+    detalle.status === "ok" && detalle.data.disponible ? detalle.data.entidad : null;
+  useMetaPagina(entidad?.nombre);
 
   if (detalle.status === "loading") return <div className="container-page py-12">Cargando…</div>;
 
@@ -59,6 +67,7 @@ export default function InversionDetalle() {
   }
 
   const e = d.entidad;
+
   const actual = d.serie.find((s) => s.anio === d.anio);
   const procesos = [
     ...d.procesos.filter((p) => p.pim > 0).map((p) => ({
@@ -272,6 +281,7 @@ export default function InversionDetalle() {
             </table>
           )}
         </section>
+        <Compartir titulo={e.nombre} etiqueta="Compartir esta ficha" />
       </div>
     </>
   );

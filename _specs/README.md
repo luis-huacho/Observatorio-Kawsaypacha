@@ -13,6 +13,56 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 29/08/2026 — normativa que se deforma, compartir, SEO, imágenes y estáticos
+
+Cuatro encargos sobre el sitio desplegado. Los cuatro se diagnosticaron **midiendo el sitio en
+vivo**, y en dos de ellos lo medido no era lo que se pensaba.
+
+- **Normativa no desbordaba: crecía.** A 1905 px el desbordamiento horizontal era **cero**. Lo que
+  pasa es que `/normativa` es el **único listado del sitio a una columna de 1280 px** y el único
+  que no recorta nada, con tres campos largos encima: título (300), resumen (700) y
+  `analisis_predes`, que es un `TextField` **sin límite** cuyo `help_text` promete «nota breve» y
+  nada lo hace cumplir. Medido: la tarjeta larga pasa de 393 px a 293 px con el recorte, y —lo que
+  importa— queda **acotada** por mucho que crezca el análisis.
+- **Y el dato de origen está roto**: tres de las seis normas de producción tienen el título en
+  **exactamente 300 caracteres**, el `max_length` del campo, cortado a media palabra por la base.
+  No es un título, es la sumilla entera. Recortar en pantalla lo tapa; el arreglo de verdad es
+  separar `titulo` y `sumilla`, y queda en deuda.
+- **Lo que hace que recortar no cueste información** es que el `numero` de la norma **ya viajaba en
+  el serializer y no se pintaba en ninguna parte**. «DS 048-2011-PCM» identifica la norma en 16
+  caracteres donde el título necesita 300.
+
+- **Compartir y SEO resultaron ser el mismo problema**, y no el que parecía. No es que faltaran
+  botones: es que **el `<head>` era idéntico en todas las URL** —sin `og:*`, sin `canonical`, sin
+  `robots.txt` ni `sitemap.xml`—, así que compartir una noticia se previsualizaba igual que
+  compartir la portada. Poner las metas desde React habría arreglado Google y **nada más**:
+  WhatsApp, Facebook y LinkedIn no ejecutan JavaScript. Se inyectan en el servidor, sobre el
+  `index.html` **compilado** (ADR-A24), y **para todo el mundo**: distinguir bots es *cloaking*.
+- **El modo producción en local encontró lo que el de desarrollo no podía**: nginx tiene **dos**
+  configuraciones y la local es otro archivo. Todo funcionaba en las pruebas y no habría funcionado
+  en `compose.local.yml`. Es la tercera vez que esa corrida salva un despliegue a medias.
+- **El repliegue se probó parando el contenedor**, no razonándolo: con el backend caído la ficha
+  devuelve 200, la SPA carga y solo se pierden las metas.
+
+- **En imágenes el hallazgo fue peor de lo que decía el encargo.** No es que estuvieran poco
+  optimizadas: **ningún `ImageField` de ningún modelo se reescalaba**. El reescalado a 1600 px
+  cubría solo el editor de texto rico, cosa que su propio docstring declaraba desde el principio.
+  Medido con el comando nuevo: el hero de la portada —la imagen **LCP del sitio**— pesa 1 439 KB y
+  debería pesar 248 KB. Un 83 % que se descarga cada visitante nuevo **sin ningún síntoma**.
+
+- **De `collectstatic` la alarma era falsa, y comprobarlo importó.** El informe inicial decía que el
+  admin de producción estaría devolviendo 500. Se comprobó **contra el servidor** antes de tocar
+  nada: 276 entradas en el manifiesto, el `redaccion_ia.js` del día anterior incluido, y todos los
+  archivos con hash en 200. **No estaba roto.** Lo que falta es la garantía: el volumen `static` se
+  monta encima de lo que escribió el build y **Docker solo siembra un volumen nombrado cuando está
+  vacío**, así que hoy funciona por haberse recreado, no por diseño.
+
+- **Doce pruebas de `peligros.spec.ts` fallan en móvil, y no es de este cambio.** Se comprobó
+  ejecutándolas **contra producción, que corre `master`**: fallan nueve de las mismas. La causa está
+  medida y anotada en deuda: `/peligros` desborda 104 px a 375 px de ancho —el `<aside>` de filtros
+  mide 463 px— y el botón «Ninguno» queda en x=414, **fuera de la pantalla**. El panel de filtros no
+  se puede usar en un móvil. La corrección es un `min-w-0`, pero es otra página y otro encargo.
+
 ### Actualización 28/08/2026 — se cambia el modelo de IA, y la red deja de estar en un solo sitio
 
 - **La decisión que ADR-D10 dejó abierta se cierra con medición, no con opinión.** Aquel día quedó

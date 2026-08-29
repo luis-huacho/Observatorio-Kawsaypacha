@@ -6,6 +6,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.core.vistas_admin import estado_ia, reindexar_busqueda
 from apps.mapas.vistas_tiles import servir_tile
+from apps.sitio.vistas_html import ficha_html, sitemap
 
 urlpatterns = [
     # ⚠️ Todo lo que cuelgue del prefijo del admin va **ANTES** de `admin.site.urls`. El AdminSite
@@ -35,6 +36,20 @@ urlpatterns = [
     path("api/", include("apps.api.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    # --- El HTML de la SPA con las metas de cada ficha (compartir y SEO) ---
+    #
+    # Estas rutas las sirve la SPA, no el API: nginx las pasa por aquí en el dominio público para
+    # que WhatsApp, Facebook y LinkedIn —que NO ejecutan JavaScript— vean el título, la bajada y la
+    # portada de la ficha. Se responde lo mismo a todo el mundo; servir HTML distinto a los
+    # rastreadores es cloaking. Ver el encabezado de `apps/sitio/vistas_html.py`.
+    path("sitemap.xml", sitemap, name="sitemap"),
+    # El patrón enumera los tipos en vez de aceptar cualquier segmento: un `<slug:tipo>` suelto
+    # casaría con `media/foo.jpg` y taparía los archivos que sirve Django en desarrollo.
+    re_path(
+        r"^(?P<tipo>noticias|normativa|medidas|peligros)/(?P<clave>[^/]+)/?$",
+        ficha_html,
+        name="ficha-html",
+    ),
 ]
 
 if settings.DEBUG:

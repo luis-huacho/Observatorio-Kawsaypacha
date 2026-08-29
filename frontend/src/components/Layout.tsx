@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 
+import { META_RUTAS, useMetaPagina } from "@/lib/meta";
 import { useMetricaPagina } from "@/lib/metricas";
 import { ProveedorSitio, useSitio } from "@/lib/sitio";
 
@@ -21,6 +22,10 @@ function Estructura() {
   const { pathname } = useLocation();
   const { sitio } = useSitio();
   useMetricaPagina();
+  // Título de las rutas fijas. Las fichas lo ponen ellas —su título es su contenido— y el hook
+  // ignora un `undefined`, así que aquí no hace falta distinguirlas.
+  const meta = META_RUTAS[pathname];
+  useMetaPagina(meta?.titulo, meta?.descripcion);
 
   useEffect(() => {
     window.scrollTo(0, 0);

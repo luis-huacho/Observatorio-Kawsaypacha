@@ -66,13 +66,32 @@ def test_una_foto_grande_se_reduce_al_ancho_maximo(almacenamiento, settings):
 
     assert _dimensiones(almacenamiento, ruta) == (settings.CONTENIDO_ANCHO_MAXIMO_PX, 1067)
     assert almacenamiento.size(ruta) < len(original)
+    assert ruta.endswith(".webp")
 
 
-def test_lo_que_ya_cabe_no_se_recomprime(almacenamiento):
-    """Se escribe byte por byte: recomprimir «por si acaso» degrada sin ganar nada."""
+def test_una_imagen_del_editor_se_convierte_a_webp(almacenamiento):
+    """El contenido del editor va a WebP aunque ya quepa: ahí está el ahorro.
+
+    Se puede porque estas imágenes viven dentro del cuerpo del artículo y **no se usan como
+    `og:image`**, que es lo que obliga a las portadas a quedarse en JPEG (ver `core/imagenes.py`).
+    """
+    from PIL import Image
+
     original = _imagen(800, 600)
 
     ruta = almacenamiento.save("pequena.jpg", _subida("pequena.jpg", original))
+
+    assert ruta.endswith(".webp"), "el nombre tiene que decir lo que el archivo es"
+    assert _dimensiones(almacenamiento, ruta) == (800, 600)
+    with almacenamiento.open(ruta) as archivo:
+        assert Image.open(archivo).format == "WEBP"
+
+
+def test_lo_que_ya_esta_en_webp_y_cabe_no_se_recomprime(almacenamiento):
+    """Se escribe byte por byte: recomprimir «por si acaso» degrada un poco en cada guardado."""
+    original = _imagen(800, 600, formato="WEBP")
+
+    ruta = almacenamiento.save("pequena.webp", _subida("pequena.webp", original))
 
     assert _dimensiones(almacenamiento, ruta) == (800, 600)
     with almacenamiento.open(ruta) as archivo:

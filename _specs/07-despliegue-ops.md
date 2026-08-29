@@ -127,6 +127,28 @@ server {
 
 Ambos bloques con `listen 443 ssl` y redirección desde `:80`. **Un solo certificado con los dos dominios como SAN**, en la lineage `SITE_DOMAIN`, de la que leen los dos bloques: `certbot -d A -d B` emite una sola y la nombra con el primer `-d`, así que apuntar el bloque del API a `live/API_DOMAIN/` impide arrancar nginx. La primera emisión va por `--standalone` con nginx parado (es un círculo: nginx no arranca sin los `.pem` y no puede servir el reto); las renovaciones, por webroot desde el contenedor `certbot`. La recarga que las recoge la hace el propio nginx cada 6 h, desde `deploy/nginx/docker-entrypoint.d/40-recarga-periodica.sh`.
 
+### Las fichas pasan por Django (ADR-A24)
+
+En el bloque de la SPA, `/noticias/*`, `/normativa/*`, `/medidas/*`, `/peligros/<codigo>` y
+`/sitemap.xml` se proxyan al backend, que devuelve **el mismo `index.html`** con las metas Open
+Graph de esa ficha. Tres condiciones que no son opcionales:
+
+- El backend monta `web_dist:/srv/www:ro` y `SPA_DIST_DIR` apunta ahí. Las dos cosas viven en
+  `compose.yaml`, juntas, para que no puedan divergir.
+- `error_page 400 500 502 503 504 = @spa`. Sin eso, un backend caído se lleva por delante páginas
+  que antes eran estáticas. El **400** cubre `DisallowedHost`: aquí se proxya con `Host` = dominio
+  de la SPA, así que **`ALLOWED_HOSTS` tiene que incluir `SITE_DOMAIN`** además de `API_DOMAIN`.
+- **Hay dos configuraciones de nginx** —`conf.d/observatorio.conf` y `local/observatorio-local.conf`—
+  y estas rutas van en las dos. Tocar solo una deja el modo local sin probar justo la pieza nueva.
+
+### `collectstatic` en el arranque
+
+`docker-entrypoint.sh` lo corre junto a `migrate` y `meili_setup`. El del Dockerfile **no llega a
+producción**: el volumen `static` se monta encima de `/app/staticfiles` y Docker solo siembra un
+volumen nombrado cuando está vacío. Sin `--clear`, porque vaciar el directorio deja una ventana en
+la que nginx responde 404. Lo vigila `deploy/comprobar-sitio.sh` siguiendo la cadena entera:
+`staticfiles.json` → el archivo con hash que ese manifiesto promete.
+
 ## Dockerfile backend (multi-stage)
 
 1. Stage `tippecanoe`: compila tippecanoe ≥2.17 (es la versión donde aparece la escritura nativa de PMTiles).

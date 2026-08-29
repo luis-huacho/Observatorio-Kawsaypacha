@@ -82,22 +82,36 @@ export default function NormativaView() {
                     <span className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
                       {n.tipo}
                     </span>
+                    {/* El número es lo que identifica la norma —«DS 048-2011-PCM»— y viaja en el
+                        serializer desde siempre sin pintarse en ninguna parte. Aquí gana su sitio:
+                        es lo que deja recortar el título sin que el usuario pierda de qué norma se
+                        trata. */}
+                    {n.numero && (
+                      <span className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
+                        {n.numero}
+                      </span>
+                    )}
                     <span className="chip bg-sky-200/40 text-sky-700 border border-sky-500/20">
                       {PUBLICA[n.ambito]}
                     </span>
                     <span className="text-xs text-ink-600">{formatFecha(n.fecha)}</span>
                   </div>
+                  {/* Los tres bloques van recortados por CSS, no por JS: el texto entero sigue en
+                      el DOM para el lector de pantalla y para Google, y `title` lo enseña al pasar
+                      el ratón. `break-words` porque un código de norma sin espacios desborda la
+                      tarjeta y `min-w-0` no lo evita —deja encoger, no parte la palabra—. */}
                   <h3 className="font-display font-bold text-mountain-900 leading-tight">
                     <Link
                       to={`/normativa/${n.slug}`}
-                      className="text-mountain-900 hover:text-mountain-700 no-underline"
+                      title={n.titulo}
+                      className="text-mountain-900 hover:text-mountain-700 no-underline line-clamp-2 break-words"
                     >
                       {n.titulo}
                     </Link>
                   </h3>
-                  <p className="text-sm text-ink-600 mt-1">{n.resumen}</p>
+                  <p className="text-sm text-ink-600 mt-1 line-clamp-3 break-words">{n.resumen}</p>
                   {n.analisis_predes && (
-                    <div className="mt-3 callout p-3 text-sm">
+                    <div className="mt-3 callout p-3 text-sm line-clamp-2 break-words">
                       <span className="font-semibold text-mountain-900">Análisis PREDES: </span>
                       {n.analisis_predes}
                     </div>

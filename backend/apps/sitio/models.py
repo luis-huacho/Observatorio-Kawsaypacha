@@ -3,6 +3,7 @@ from django.db import models
 
 from apps.core.models import (
     HtmlRicoMixin,
+    ImagenOptimizadaMixin,
     TimeStampedMixin,
     WorkflowMixin,
     permiso_publicar,
@@ -77,7 +78,9 @@ class BloqueTexto(TimeStampedMixin, HtmlRicoMixin):
         return self.clave
 
 
-class HeroSlide(TimeStampedMixin, WorkflowMixin):
+class HeroSlide(TimeStampedMixin, WorkflowMixin, ImagenOptimizadaMixin):
+
+    campos_imagen = ("imagen",)
     titulo = models.CharField(max_length=200)
     subtitulo = models.CharField("subtítulo", max_length=300, blank=True)
     imagen = models.ImageField(upload_to="hero/", null=True, blank=True)

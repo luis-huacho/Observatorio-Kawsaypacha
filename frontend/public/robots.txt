@@ -1,0 +1,13 @@
+# Observatorio Kallpachakuy — https://predes.org.pe
+#
+# El sitio es público y su razón de ser es que la información de GRD y ACC de Cusco se encuentre,
+# así que se permite todo. El sitemap lo genera el backend (apps/sitio/vistas_html.py) porque el
+# contenido crece: una norma publicada hoy tiene que poder indexarse hoy, sin recompilar la SPA.
+
+User-agent: *
+Allow: /
+
+# `/comparar` sigue viva pero está fuera del menú por decisión de producto (ADR-P2). No se prohíbe
+# —no es secreta— pero tampoco se anuncia en el sitemap.
+
+Sitemap: https://observatorio.predes.org.pe/sitemap.xml

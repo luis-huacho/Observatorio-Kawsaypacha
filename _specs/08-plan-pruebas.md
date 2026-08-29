@@ -15,7 +15,7 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (436 pruebas, ~80 s)
+$DC exec backend pytest                 # suite backend (464 pruebas, ~80 s)
                                         # la cifra sale de `pytest --collect-only -q`, no de la memoria
 $DC exec backend pytest -m lento        # 7 más: los Excel completos y el PDF con mapa (~35 s)
 cd frontend && npm run lint && npm run build    # tipos + build
@@ -214,6 +214,24 @@ distintas de fallar sin dar ningún error:
    prueba está en los tres consumidores**, no solo aquí: noticias y normas no tenían red, y ahí el
    mismo fallo no dejaba ni rastro en la bitácora. Cada uno comprueba las tres cosas: que el texto
    plano se envuelve, que el HTML legítimo **no** se toca, y que el aviso llega al `log_ia`.
+
+**Compartir y SEO (ADR-A24) se prueban SIN navegador, y es la clave.** `tests/test_metas_html.py`
+usa el cliente de Django y `e2e/compartir.spec.ts` usa `page.request.get()`: las dos piden el HTML
+**sin ejecutar JavaScript**, que es exactamente lo que hacen WhatsApp, Facebook y LinkedIn. Una
+prueba que mirara `document.querySelector('meta[property=og:title]')` pasaría en verde aunque las
+metas las pusiera React — y no comprobaría nada, porque a esos rastreadores React no les llega. Se
+comprueban además dos fallos callados: que la inyección **no rompa la SPA** (los `<script>` del
+bundle siguen ahí) y que un **borrador no exponga su contenido** aunque se adivine el slug.
+
+Las de e2e **se saltan solas** en modo desarrollo en vez de fallar: ahí la SPA la sirve Vite y nginx
+no está delante. Un rojo diría «el sitio está mal» cuando lo que pasa es que ese modo no monta esa
+pieza. La corrida que sí las ejerce es la de `compose.local.yml`.
+
+**Imágenes (ADR-A25):** `tests/test_imagenes.py` fija que se reduzcan, que una imagen con
+transparencia **no** acabe en JPEG, que el proceso sea **idempotente** —corre en cada `save()`—, que
+un SVG y un archivo corrupto pasen intactos, y que la ruta **no se duplique** al renombrar. Más el
+comando: `--simular` no escribe, el formato se conserva, y una referencia a un archivo borrado a
+mano no para la pasada.
 
 Y dos que fija la generalización de `core`: que **partir `RedaccionIAMixin` en dos bases abstractas
 no emita ninguna migración** (`makemigrations --check`), y que **todo modelo que herede
