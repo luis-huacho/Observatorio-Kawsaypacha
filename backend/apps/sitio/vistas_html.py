@@ -22,6 +22,10 @@ apuntando a archivos que ya no existen y **la SPA no arrancaría**.
 
 Si el backend se cae, nginx repliega estas rutas al `index.html` de siempre (`error_page 502`): la
 ficha sigue abriendo, solo pierde las metas.
+
+Lo que se publica para que descubra el sitio una **máquina** —`/robots.txt` y el catálogo de API—
+está al lado, en `descubrimiento.py`: mismo dominio y mismo motivo (la URL del sitio va dentro del
+documento), pero otro destinatario.
 """
 import html
 import re
