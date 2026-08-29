@@ -164,6 +164,42 @@ else
     else mal "compartir" "sin og: en $ficha  ← ¿nginx pasa las fichas a Django?"; fi
 fi
 
+# --- Descubrimiento para agentes ------------------------------------------
+# El robots.txt lo genera Django justamente para que esta línea nombre al dominio desde el que te
+# lo estás descargando. Antes era un archivo estático con el dominio escrito a mano y apuntaba a un
+# host que ni siquiera resolvía: el sitemap funcionaba —26 URL, todo en verde— y no lo leía nadie.
+robots="$(pedir "https://$SPA/robots.txt" || echo '')"
+anunciado="$(printf '%s' "$robots" | sed -n 's/^Sitemap:[[:space:]]*//p' | head -1)"
+if [[ -z "$robots" ]]; then
+    mal "robots" "no responde"
+elif [[ -z "$anunciado" ]]; then
+    mal "robots" "no anuncia ningún sitemap"
+elif [[ "$anunciado" != "https://$SPA/"* ]]; then
+    mal "robots" "anuncia el sitemap en «$anunciado»  ← no es este dominio"
+else
+    ok "robots" "anuncia el sitemap de este dominio"
+fi
+
+# El catálogo de API (RFC 9727). Se mira el TIPO y no solo el código, porque el fallo del caso es
+# justo el contrario de un 404: el `try_files` de la SPA devolvía el index.html con 200 y el
+# documento parecía estar ahí, roto, cuando lo que pasaba es que no existía.
+tipo="$(pedir -o /dev/null -w '%{content_type}' "https://$SPA/.well-known/api-catalog" || echo '')"
+if [[ "$tipo" == application/linkset+json* ]]; then ok "api-catalog" "linkset+json"
+else mal "api-catalog" "tipo «$tipo»  ← ¿nginx pasa /.well-known/api-catalog a Django?"; fi
+
+# Y lo simétrico: que lo que NO publicamos conteste 404. Un 200 a un documento que no existe no es
+# amabilidad, es desinformación — y es lo que hacía «fallar» cuatro pruebas de un test externo.
+codigo="$(pedir -o /dev/null -w '%{http_code}' "https://$SPA/.well-known/no-existe-a-proposito" || echo 000)"
+if [[ "$codigo" == "404" ]]; then ok "well-known" "404 a lo que no existe"
+else mal "well-known" "$codigo  ← /.well-known/ vuelve a caer en el index.html de la SPA"; fi
+
+# La cabecera Link de la portada (RFC 8288), que es por donde un agente empieza a mirar.
+if pedir -o /dev/null -D - "https://$SPA/" | grep -qi '^link:.*api-catalog'; then
+    ok "cabecera Link" "presente en la portada"
+else
+    mal "cabecera Link" 'ausente  ← el add_header va en location = /index.html'
+fi
+
 # --- El buscador ----------------------------------------------------------
 # 405 significaría que el proxy manda todo a la raíz de Meilisearch. GET /search/health no vale
 # como comprobación: la raíz de Meilisearch también responde 200.
