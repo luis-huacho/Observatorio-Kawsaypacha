@@ -128,6 +128,28 @@ codigo="$(pedir -o /dev/null -w '%{http_code}' "https://$API/loginseguro/login/"
 if [[ "$codigo" == "200" ]]; then ok "admin" "200"
 else mal "admin" "$codigo  ← ¿coincide ADMIN_URL con el location de nginx?"; fi
 
+# --- Los estáticos del admin ----------------------------------------------
+# El login de arriba responde 200 aunque los estáticos estén desfasados, así que un admin sin CSS
+# —o directamente caído con 500 en las fichas— pasaba esta comprobación en verde. Aquí se sigue la
+# cadena entera: el manifiesto que Django consulta en tiempo de ejecución, y el archivo CON HASH
+# que ese manifiesto promete. Si el volumen `static` se quedó con una versión vieja, el archivo
+# nuevo no está y esto lo dice.
+manifiesto="$(pedir "https://$API/static/staticfiles.json" || echo '')"
+if [[ -z "$manifiesto" ]]; then
+    mal "estáticos" "no se pudo leer /static/staticfiles.json"
+else
+    # Una clave que existe desde que el admin usa Unfold; si algún día se va, esto avisa.
+    con_hash="$(printf '%s' "$manifiesto" \
+        | sed -n 's/.*"unfold\/css\/styles\.css"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+    if [[ -z "$con_hash" ]]; then
+        mal "estáticos" "el manifiesto no trae unfold/css/styles.css"
+    else
+        codigo="$(pedir -o /dev/null -w '%{http_code}' "https://$API/static/$con_hash" || echo 000)"
+        if [[ "$codigo" == "200" ]]; then ok "estáticos" "manifiesto y archivo coinciden"
+        else mal "estáticos" "$codigo en /static/$con_hash  ← falta collectstatic en el arranque"; fi
+    fi
+fi
+
 # --- El buscador ----------------------------------------------------------
 # 405 significaría que el proxy manda todo a la raíz de Meilisearch. GET /search/health no vale
 # como comprobación: la raíz de Meilisearch también responde 200.
