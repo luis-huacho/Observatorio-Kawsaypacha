@@ -27,11 +27,13 @@ export default function PageHeader({ titulo, descripcion, eyebrow, badge, backTo
           </Link>
         )}
         <div className="flex flex-wrap items-start gap-3 justify-between">
-          <div>
+          {/* `min-w-0` + `break-words`: el título de una norma llega hasta 300 caracteres y aquí se
+              pinta a 36 px. Sin esto, un código sin espacios se sale de la banda. */}
+          <div className="min-w-0">
             {eyebrow && (
               <div className="text-xs uppercase tracking-wider text-white/70 mb-1">{eyebrow}</div>
             )}
-            <h1 className="font-display text-3xl md:text-4xl font-bold">{titulo}</h1>
+            <h1 className="font-display text-3xl md:text-4xl font-bold break-words">{titulo}</h1>
             {descripcion && <p className="text-white/85 mt-2 max-w-3xl">{descripcion}</p>}
           </div>
           {badge}
