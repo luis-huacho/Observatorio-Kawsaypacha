@@ -95,6 +95,7 @@ VITE_API_URL=https://obs.predes.org.pe/api
 VITE_SEARCH_URL=https://obs.predes.org.pe/search
 VITE_TILES_URL=https://obs.predes.org.pe/tiles
 VITE_MEILI_SEARCH_KEY=<la imprime meili_setup; se rellena en el paso 4>
+VITE_CARTO_KEY=<la llave de la cuenta de CARTO; sin ella el mapa sale con marca de agua>
 ```
 
 > `SITE_DOMAIN` y `API_DOMAIN` son las que consume nginx. Compose las exige con `:?`, así que un

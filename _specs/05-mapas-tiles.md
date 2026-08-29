@@ -317,9 +317,13 @@ Implementación de referencia ya validada en local: `prototype/scripts/ccpp_to_g
   | id | Nombre | maxzoom | Nota |
   |---|---|---|---|
   | `osm` | OpenStreetMap | 19 | **por defecto** |
-  | `claro` | Claro (CARTO light) | 20 | fondo neutro, el que mejor deja leer el semáforo |
+  | `claro` | Claro (CARTO `light_all`) | 20 | fondo neutro, el que mejor deja leer el semáforo; **exige llave** |
   | `satelite` | Satélite (Esri World Imagery) | 19 | la URL es `/{z}/{y}/{x}`, no `/{z}/{x}/{y}` |
   | `topografico` | Topográfico (OpenTopoMap) | 17 | relieve; útil para huaycos y movimientos en masa |
+
+  **CARTO exige llave desde 08/2026**, y sin ella estampa una marca de agua en diagonal sobre cada tesela (medido: 1.6 % de los píxeles, agrupados en la banda central). La llave viaja en `VITE_CARTO_KEY` —artefacto de *build*, como la de Meilisearch— y las URL se arman en un solo sitio, `frontend/src/lib/mapasBase.ts`, porque la ficha del centro poblado usa este mismo fondo y duplicar la credencial es duplicar dónde se olvida de actualizarla. Sin llave las URL quedan idénticas a las de antes (no un `?key=` colgando) y el mapa sigue pintando, con la marca.
+
+  **El estilo es `light_all` y no se cambia a `voyager`**, aunque sea lo que CARTO recomienda en su aviso de la llave: `voyager` va a color y este visor está construido sobre el gris casi liso —es lo que deja leer el semáforo, y `MapaPeligros` afina el halo de los puntos a 0.5 px **solo** sobre este fondo por eso mismo—. Comprobado que `light_all` con llave responde 200 y sin marca: no hay ninguna razón para cambiar de estilo.
 
   `maxzoom` por fuente hace que MapLibre sobre-escale el último nivel disponible en vez de pedir teselas inexistentes. **OpenTopoMap es un servicio voluntario con política de uso restrictiva**: vale para el prototipo, pero en producción hay que sustituirlo por una fuente propia o con contrato. Los cuatro envían cabeceras CORS, así que la exportación PNG funciona con todos (comprobado); aun así el control captura `SecurityError` y avisa al usuario, porque las capas son administrables y el catálogo puede crecer.
 - Al montar, `GET /api/mapas/capas/` → por cada capa: `addSource(slug, { type: "vector", url: "pmtiles://" + VITE_TILES_URL + "/" + slug + ".pmtiles" })` + layer con paint derivado de `estilo` (JSON del admin → reemplazo de capas sin tocar código, requisito TDR). Esto vale para las capas de contexto; la fuente `ccpp`, siempre presente, es aparte y de tipo `geojson` agrupado (ver arriba).

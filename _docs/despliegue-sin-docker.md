@@ -379,6 +379,7 @@ VITE_API_URL=https://obs.predes.org.pe/api
 VITE_SEARCH_URL=https://obs.predes.org.pe/search
 VITE_TILES_URL=https://obs.predes.org.pe/tiles
 VITE_MEILI_SEARCH_KEY=<la que imprimió meili_setup>
+VITE_CARTO_KEY=<la llave de la cuenta de CARTO; sin ella el mapa sale con marca de agua>
 EOF
 
 npm ci && npm run build

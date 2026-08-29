@@ -34,6 +34,7 @@ import { Siren } from "lucide-react";
 /** Clave interna con la que viaja el glifo de emergencias por el mismo canal que los peligros. */
 const SLUG_EMERGENCIAS = "__emergencias__";
 import { buscarLugares } from "@/lib/search";
+import { CARTO_CLARO } from "@/lib/mapasBase";
 import { registrarProtocoloPmtiles } from "@/lib/pmtiles";
 import {
   BuscarLugarControl,
@@ -191,14 +192,9 @@ const MAPAS_BASE: MapaBase[] = [
   {
     id: "claro",
     nombre: "Claro",
-    tiles: [
-      "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
-      "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
-      "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
-    ],
-    atribucion:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    maxzoom: 20,
+    // Las URL llevan la llave de CARTO dentro y viven en `lib/mapasBase.ts`, porque la ficha del
+    // centro poblado usa este mismo fondo. Ojo: el `id` «claro» lo mira el halo de más abajo.
+    ...CARTO_CLARO,
   },
   {
     id: "satelite",
