@@ -209,17 +209,39 @@ export type InversionEntidad = {
 };
 
 /**
+ * Cómo se identifica un ejercicio en cualquier payload de Inversión.
+ *
+ * Espejo exacto de `apps.inversion.consultas.datos_ejercicio`, y lo comparten los siete
+ * payloads que nombran un ejercicio. Estaba escrito a mano en cada uno, que es la forma segura
+ * de que un día una pantalla no pueda decir de qué año son las cifras que pinta.
+ *
+ * `es_parcial` dice qué **no** es el dato —su % de ejecución no se compara con el de un año
+ * completo—; `en_curso` y `corte_legible` dicen qué **es**.
+ */
+export type InversionEjercicio = {
+  anio: number;
+  /** "anual" o "AAAA-MM". Es el dato; para enseñarlo va `corte_legible`. */
+  corte: string;
+  /** El corte en palabras («junio de 2026»). Cadena vacía si el año está completo. */
+  corte_legible: string;
+  /** El devengado no cubre el año entero. */
+  es_parcial: boolean;
+  /**
+   * El año fiscal todavía no ha terminado. **No es sinónimo de `es_parcial`**: un corte a junio
+   * de un año ya pasado es parcial sin estar en curso, y llamarlo «en curso» sería mentir.
+   */
+  en_curso: boolean;
+};
+
+/**
  * Comparación de una municipalidad contra otro ejercicio.
  *
  * `comparable` es falso cuando los dos ejercicios tienen cortes distintos: un 47.7 % a junio
- * contra un 83 % de año cerrado no es una caída de ejecución. El Δ se muestra igual —así se
+ * contra un 83 % de un año completo no es una caída de ejecución. El Δ se muestra igual —así se
  * decidió— pero **siempre marcado**, y la marca viaja aquí para que ningún cliente tenga que
  * redescubrir la regla.
  */
-export type InversionComparacionFila = {
-  anio: number;
-  corte: string;
-  es_parcial: boolean;
+export type InversionComparacionFila = InversionEjercicio & {
   comparable: boolean;
   /** La municipalidad no tenía presupuesto del 0068 ese año: los deltas son null, no cero. */
   sin_presupuesto: boolean;
@@ -242,21 +264,14 @@ export type InversionProceso = {
   pct: number | null;
 };
 
-export type InversionPuntoTendencia = {
-  anio: number;
-  corte: string;
-  /** Corte a mitad de año: su % de ejecución no se compara con el de un año cerrado. */
-  es_parcial: boolean;
+export type InversionPuntoTendencia = InversionEjercicio & {
   fuente: string;
   pia: number;
   pim: number;
   devengado: number;
 };
 
-export type Inversion = {
-  anio: number;
-  corte: string;
-  es_parcial: boolean;
+export type Inversion = InversionEjercicio & {
   fuente: string;
   ambito: string;
   unidad: string;
@@ -289,12 +304,7 @@ export type Inversion = {
   comparacion?: InversionComparacionAgregada;
 };
 
-export type InversionEjercicio = { anio: number; corte: string; es_parcial: boolean };
-
-export type InversionComparacionAgregada = {
-  anio: number;
-  corte: string;
-  es_parcial: boolean;
+export type InversionComparacionAgregada = InversionEjercicio & {
   comparable: boolean;
   agregados: Inversion["agregados"];
   deltas: {
@@ -307,10 +317,7 @@ export type InversionComparacionAgregada = {
 };
 
 /** Un año de la historia de una municipalidad: `/api/inversion/entidades/{codigo}/`. */
-export type InversionSerieAnio = {
-  anio: number;
-  corte: string;
-  es_parcial: boolean;
+export type InversionSerieAnio = InversionEjercicio & {
   fuente: string;
   pia: number;
   pim: number;
@@ -338,7 +345,7 @@ export type InversionActividad = {
   pct_ejecucion: number | null;
 };
 
-export type InversionEntidadDetalle = {
+export type InversionEntidadDetalle = InversionEjercicio & {
   entidad: {
     codigo: string;
     nombre: string;
@@ -350,9 +357,6 @@ export type InversionEntidadDetalle = {
     /** No casa con el padrón de distritos: cuenta en los totales, pero no se cruza con él. */
     sin_territorio: boolean;
   };
-  anio: number;
-  corte: string;
-  es_parcial: boolean;
   fuente: string;
   serie: InversionSerieAnio[];
   procesos: InversionProceso[];
@@ -386,10 +390,7 @@ export type InversionMapaFila = {
 /** Las métricas que se pueden pintar. Las tres de dinero llevan cortes; el % los tiene fijos. */
 export type MetricaMapa = "pia" | "pim" | "devengado" | "pct_ejecucion";
 
-export type InversionMapa = {
-  anio: number;
-  corte: string;
-  es_parcial: boolean;
+export type InversionMapa = InversionEjercicio & {
   nivel: "distrital" | "provincial";
   ambito: string;
   filas: InversionMapaFila[];

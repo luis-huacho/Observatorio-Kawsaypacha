@@ -268,8 +268,12 @@ Con datos, el payload trae `agregados`, `procesos` (más `sin_clasificar`), `ten
 `por_entidad` y la lista de `ejercicios` publicados. Tres detalles que conviene no perder al
 consumirlo:
 
-- **`es_parcial` y `corte`** viajan en la raíz y en cada punto de la tendencia. El ejercicio en
-  curso llega a mitad de año y su % de ejecución se calcula contra un PIM anual.
+- **`es_parcial`, `corte`, `en_curso` y `corte_legible`** viajan en la raíz y en cada punto de la
+  tendencia. Los dos primeros dicen qué **no** es el dato: el ejercicio en curso llega a mitad de
+  año y su % de ejecución se calcula contra un PIM anual. Los dos últimos dicen qué **es**
+  (`"en_curso": true`, `"corte_legible": "junio de 2026"`), para que la interfaz lo nombre en vez
+  de que el lector lo deduzca por descarte. Ojo: `en_curso` **no** es un alias de `es_parcial` —un
+  corte a junio de un año ya pasado es parcial sin estar en curso—.
 - **Un porcentaje que no se puede calcular es `null`, no `0`** (`pct_ejecucion`,
   `pct_0068_institucional`, `pct_proyectos`).
 - **`pct_0068_institucional` de `agregados` solo suma entidades comparables**; por eso viene

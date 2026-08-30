@@ -143,9 +143,7 @@ def reunir_datos(
     return {
         "disponible": True,
         "generado_en": generado_en,
-        "anio": ejercicio.anio,
-        "corte": ejercicio.corte,
-        "es_parcial": ejercicio.es_parcial,
+        **consultas.datos_ejercicio(ejercicio),
         "fuente": ejercicio.get_fuente_display(),
         "ambito": ambito,
         "ambito_nombre": AMBITOS_NOMBRE.get(ambito, ambito),

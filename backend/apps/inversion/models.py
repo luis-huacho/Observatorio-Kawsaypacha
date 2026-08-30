@@ -11,9 +11,19 @@ Los derivados —saldo, variación PIA-PIM, % de ejecución, % sobre el instituc
 se guardan: se calculan en `consultas.py`, que es lo que garantiza que el API, el admin y el
 Excel digan lo mismo (mismo criterio que `apps.peligros.consultas`).
 """
+from datetime import date
+
 from django.db import models
 
 from apps.core.models import TimeStampedMixin
+
+#: Los meses en letra, para nombrar el corte en pantalla y en el PDF. Va como constante y no
+#: como `django.utils.dates.MONTHS` porque el reporte se arma fuera del ciclo de una petición
+#: y no hay locale activo garantizado: un mes traducido a medias es peor que uno fijo.
+MESES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
 
 
 class PorSlugManager(models.Manager):
@@ -136,6 +146,32 @@ class Ejercicio(TimeStampedMixin):
         ordering = ["-anio"]
         verbose_name = "ejercicio presupuestal"
         verbose_name_plural = "ejercicios presupuestales"
+
+    @property
+    def en_curso(self) -> bool:
+        """El año fiscal todavía no ha terminado.
+
+        **No es sinónimo de `es_parcial`**, aunque hoy coincidan. `es_parcial` dice *el devengado
+        no cubre el año entero*; esto dice *el año no ha terminado*. El día que se cargue un corte
+        a junio de un año ya pasado seguiría siendo parcial sin estar en curso, y llamarlo «en
+        curso» en pantalla y en el PDF sería afirmar algo falso en negrita.
+        """
+        return self.es_parcial and self.anio >= date.today().year
+
+    @property
+    def corte_legible(self) -> str:
+        """`"2026-06"` ⇒ `"junio de 2026"`. Un año completo no tiene corte que nombrar: `""`.
+
+        `corte` es un CharField libre que llena una persona en el admin, así que lo que no case
+        el formato se devuelve **crudo** en vez de reventar: el peor caso de una etiqueta mal
+        formateada es que se lea raro; el de una excepción, que la ventana entera desaparezca.
+        """
+        if not self.es_parcial or self.corte == "anual":
+            return ""
+        anio, _, mes = self.corte.partition("-")
+        if anio.isdigit() and mes.isdigit() and 1 <= int(mes) <= 12:
+            return f"{MESES[int(mes) - 1]} de {anio}"
+        return self.corte
 
     def __str__(self) -> str:
         return f"{self.anio}" + ("" if self.corte == "anual" else f" (corte {self.corte})")

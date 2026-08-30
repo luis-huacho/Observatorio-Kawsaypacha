@@ -107,7 +107,7 @@
       <td>{{ ambito_nombre|capfirst }}{% if provincia %} de la provincia de
           {{ provincia }}{% else %} de la región Cusco{% endif %}</td></tr>
   <tr><th>Ejercicio</th>
-      <td>{{ anio }}{% if es_parcial %} — corte a {{ corte }} (ejercicio en curso){% endif %}</td></tr>
+      <td>{{ anio }}{% if en_curso %}, año fiscal en curso{% elif es_parcial %}, datos parciales{% endif %}{% if es_parcial %} — corte a {{ corte_legible }}{% endif %}</td></tr>
   <tr><th>Fuente</th><td>{{ fuente }}</td></tr>
   <tr><th>Unidad de análisis</th>
       <td>La municipalidad (entidad ejecutora), no el distrito</td></tr>
@@ -118,10 +118,14 @@
 {% if es_parcial %}
   {% comment %} El aviso va junto a las cifras y no al pie: es el mismo criterio por el que el Excel lleva
      su columna «Comparabilidad» (ADR-D5). Un documento en papel viaja sin su pantalla. {% endcomment %}
+  {% comment %} «En curso» y «parcial» no son lo mismo: un corte a junio de un año ya pasado es
+     parcial sin estar en curso, y afirmarlo en negrita sería mentir. Lo decide `en_curso`. {% endcomment %}
   <p class="aviso" style="margin-top: 8pt">
-    <strong>El ejercicio {{ anio }} está en curso</strong> (corte a {{ corte }}). El porcentaje
-    de ejecución se calcula contra un PIM anual, así que no es comparable con el de un ejercicio
-    cerrado: un 50 % a mitad de año no es media ejecución perdida.
+    {% if en_curso %}<strong>El ejercicio {{ anio }} está en curso</strong>{% else %}
+    <strong>El ejercicio {{ anio }} tiene datos parciales</strong>{% endif %}
+    (corte a {{ corte_legible }}). El devengado no cubre el año completo, pero el porcentaje de
+    ejecución se calcula contra el PIM de todo el año: un 50 % a mitad de año no es media
+    ejecución perdida, y no se puede comparar con el de un año completo.
   </p>
 {% endif %}
 
@@ -235,8 +239,8 @@
     </tbody>
   </table>
   <div class="fino" style="margin-top: 2pt">
-    * Ejercicio con corte parcial: el devengado no cubre el año completo, así que su % de
-    ejecución no se compara con el de un año cerrado.
+    * Ejercicio en curso o con corte parcial: el devengado no cubre el año completo, así que su
+    % de ejecución no se compara con el de un año ya terminado.
   </div>
 </section>
 
