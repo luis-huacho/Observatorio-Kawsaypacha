@@ -1,0 +1,113 @@
+{% extends "unfold/layouts/base_simple.html" %}
+{% comment %}
+Paso 1 de la importación de normativa: subir el Excel. El paso 2 (confirmar.html) muestra qué
+entra y qué se omite; recién el 3 escribe. Las tres etapas comparten la misma URL, y la
+fontanería es la de `core.importacion_admin`, compartida con fichas ACC.
+
+Dos trampas de esta plantilla:
+
+- `{% comment %}` y no `{# … #}`: la sintaxis de almohadilla es de UNA sola línea y un
+  comentario de varias se pinta tal cual en la página.
+- **El CSS de Unfold viene precompilado**, así que solo funcionan las utilidades de Tailwind que
+  su propio build incluyó. Una clase ausente no da error: simplemente no hace nada. Por eso la
+  numeración de las columnas se pinta a mano en vez de con `list-decimal`, que no existe. Al
+  añadir una clase, comprobarla antes en `unfold/static/unfold/css/styles.css`.
+{% endcomment %}
+
+{% block title %}Importar normativa | Observatorio Kallpachakuy{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="font-semibold text-xl text-font-important-light dark:text-font-important-dark">
+    Importar normativa desde Excel
+  </h1>
+  <p class="text-sm text-font-subtle-light dark:text-font-subtle-dark mt-1">
+    Se añaden normas nuevas en borrador; las que ya están no se tocan y nada se publica solo.
+    Antes de guardar verás cuántas filas entran y cuáles se omiten, con el motivo de cada una.
+  </p>
+</div>
+
+{% if error %}
+  <div class="mb-6 rounded-lg border border-base-200 dark:border-base-800 bg-red-50 dark:bg-red-900 px-4 py-3 text-sm">
+    <div class="font-medium mb-2 text-red-700 dark:text-red-400">No se importó nada</div>
+    <div class="text-sm break-words">{{ error|linebreaksbr }}</div>
+  </div>
+{% endif %}
+
+<div class="rounded-lg border border-base-200 dark:border-base-800 mb-6">
+  <div class="px-4 py-3 border-b border-base-200 dark:border-base-800 font-medium">
+    El archivo
+  </div>
+  <form method="post" enctype="multipart/form-data" class="px-4 py-4">
+    {% csrf_token %}
+
+    {% if formulario.errors %}
+      <div class="mb-4 rounded-md border border-base-200 dark:border-base-800 bg-red-50 dark:bg-red-900 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+        {% for campo in formulario %}{% for e in campo.errors %}<div>{{ e }}</div>{% endfor %}{% endfor %}
+      </div>
+    {% endif %}
+
+    <label for="{{ formulario.archivo.id_for_label }}" class="block text-sm font-medium mb-2">
+      {{ formulario.archivo.label }}
+    </label>
+    {{ formulario.archivo }}
+    <p class="text-xs text-font-subtle-light dark:text-font-subtle-dark mt-2">
+      {{ formulario.archivo.help_text }}
+    </p>
+
+    <div class="flex flex-wrap gap-2 mt-4">
+      <button type="submit"
+              class="rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
+        Revisar el archivo
+      </button>
+      <a href="{{ url_plantilla }}"
+         class="rounded-md border border-base-200 dark:border-base-800 px-3 py-1.5 text-xs font-medium hover:bg-base-100 dark:hover:bg-base-900">
+        Descargar la plantilla
+      </a>
+      <a href="{{ url_listado }}"
+         class="rounded-md border border-base-200 dark:border-base-800 px-3 py-1.5 text-xs font-medium hover:bg-base-100 dark:hover:bg-base-900">
+        Volver al listado
+      </a>
+    </div>
+  </form>
+</div>
+
+<div class="rounded-lg border border-base-200 dark:border-base-800 mb-6">
+  <div class="px-4 py-3 border-b border-base-200 dark:border-base-800 font-medium">
+    Las {{ columnas|length }} columnas, en este orden
+  </div>
+  <div class="px-4 py-3">
+    <p class="text-sm text-font-subtle-light dark:text-font-subtle-dark mb-3">
+      La fila 1 debe traer estos títulos. El <strong>«Nombre»</strong> tiene que ser distinto en
+      cada norma, y distinto de las que ya están cargadas: al comparar no se distinguen mayúsculas
+      ni espacios sobrantes, y las filas que repitan un nombre no se cargan.
+    </p>
+    <ol class="text-sm">
+      {% for columna in columnas %}
+        <li class="flex gap-2 py-1">
+          <span class="text-font-subtle-light dark:text-font-subtle-dark w-6 shrink-0 text-right">{{ forloop.counter }}.</span>
+          <span>{{ columna }}</span>
+        </li>
+      {% endfor %}
+    </ol>
+  </div>
+</div>
+
+<div class="rounded-lg border border-base-200 dark:border-base-800">
+  <div class="px-4 py-3 border-b border-base-200 dark:border-base-800 font-medium">
+    Lo que el archivo no trae y se deduce
+  </div>
+  <div class="px-4 py-3 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+    <p class="mb-2">
+      <strong>El ámbito</strong> —nacional, regional o local— sale de la entidad autora, y
+      <strong>la fecha</strong> se fija al 1 de enero del año indicado, que es lo único que trae la
+      hoja. Los dos se ven en la pantalla de confirmación antes de que se guarde nada.
+    </p>
+    <p>
+      <strong>La entidad autora tiene que estar en el catálogo</strong> de entidades emisoras: el
+      importador no las da de alta. Si falta alguna, su fila se omite y se te dice cuál — créala y
+      vuelve a subir el archivo.
+    </p>
+  </div>
+</div>
+{% endblock %}

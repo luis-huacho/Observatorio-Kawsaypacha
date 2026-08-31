@@ -13,6 +13,52 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 31/08/2026 — normativa se puede importar desde Excel, y es el primer importador que deduce
+
+PREDES tiene las normas en una hoja con siete columnas —`N`, `Tipo de normativa`, `Nombre`,
+`Descripción`, `Entidad autora`, `Año de publicación`, `Link`— y hasta ahora solo se podían cargar
+a mano o desde una URL con IA. Entra el segundo carril de ADR-D9: importador propio del admin,
+aditivo, parcial por diseño y síncrono, con **vista previa de qué entra y qué se omite antes de
+escribir nada**. La unicidad al importar la decide **«Nombre»**, contra la base y dentro del propio
+archivo, recortado y en mayúsculas y **solo para comparar**.
+
+**La fontanería se generalizó en vez de copiarse.** Las tres etapas en una URL, el temporal en
+`IMPORTACIONES_TMP_DIR` y el token de sesión son ahora `core.importacion_admin.ImportadorExcelAdminMixin`,
+y lo usan los dos importadores. El motivo no es la estética: copiarlo habría copiado la guarda de
+`_ruta_temporal()`, que valida el token contra `[0-9a-f]{32}` porque uno con `../` leería fuera del
+directorio. Es el argumento con el que ADR-D8 generalizó `RedaccionIAMixin` —«duplicar habría
+duplicado la guarda anti-SSRF»—: una comprobación de seguridad duplicada se arregla un día en un
+sitio y no en el otro. Las 15 pruebas de fichas ACC son la red de que la extracción no cambió nada.
+
+**Lo nuevo es que aquí hay que deducir, y un valor deducido mal se ve igual que uno correcto.** En
+fichas ACC las 17 columnas *son* 17 `TextField`; aquí el modelo exige tres cosas que la hoja no
+trae, y las tres se resuelven fallando en alto:
+
+- **`tipo`** es una lista cerrada de cinco: tabla de sinónimos, y lo que no case **omite la fila**.
+- **`entidad_emisora`** casa contra el catálogo que ADR-D11 acaba de estrenar, por nombre o sigla.
+  **El importador nunca crea entidades**: ese ADR ya decidió que el catálogo lo mantiene una
+  persona, y crearlas al vuelo desde una hoja es exactamente cómo «PCM», «P.C.M.» y «Presidencia
+  del Consejo de Ministros» acaban siendo tres filas. Las que faltan **se agrupan en la pantalla**
+  para darlas de alta de una vez, en vez de descubrirlas de una en una.
+- **`ambito`** sale del **nombre canónico de la entidad ya casada**, no del texto del Excel: la
+  hoja puede traer la sigla, y «MPC» no dice que sea una municipalidad. Lo que las reglas no
+  cubran omite la fila — el catálogo lo amplía PREDES y colar un «nacional» por defecto
+  clasificaría mal la norma sin distinguirse de una correcta.
+- **`fecha`** se fija al 1 de enero del año indicado (ADR-D10 ya lo decidió), y un año ilegible
+  **no cae a hoy**: sería la única fecha del sistema que parece cierta sin serlo.
+
+Por eso la pantalla de confirmación de normativa lista **Tipo, Entidad, Ámbito y Fecha** de cada
+fila válida, y no solo el nombre como la de fichas: lo que hay que revisar antes de confirmar es
+justo la deducción.
+
+Dos cosas que se descubrieron construyéndolo. **El plan decía añadir un `entidad_autora` al
+modelo**, y al empezar resultó que otra sesión acababa de meter `EntidadEmisora` como catálogo:
+no hubo migración y la columna casa contra él, que es mejor de lo planeado. Y **los slugs hay que
+reservarlos en memoria**: `slug_unico()` consulta la base por candidato y no vería las colisiones
+dentro del mismo Excel, con lo que el `bulk_create` reventaría entero y no entraría ninguna norma.
+
+Todo entra en **borrador**: el importador trae datos, no decide qué se publica. Suite: **552 + 7**.
+
 ### Actualización 31/08/2026 — la norma no decía quién la emite, y el ámbito no es una institución (ADR-D11)
 
 `Norma` no tenía forma de nombrar a la entidad que la dicta. La ficha lo aproximaba derivándolo del

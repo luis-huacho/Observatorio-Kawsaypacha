@@ -1,0 +1,154 @@
+{% extends "unfold/layouts/base_simple.html" %}
+{% comment %}
+Paso 2 de la importación de normativa: qué entra y qué se omite. Nada se ha escrito todavía; el
+POST de este formulario es el que guarda.
+
+La diferencia con la pantalla de fichas ACC es la tabla de válidas: **enseña el tipo, el ámbito y
+la fecha**, porque los tres son deducidos —de la columna de tipo, de la entidad y del año— y
+quien confirma tiene que poder revisar la deducción antes de que se escriba. Allí no hace falta:
+las 17 columnas se guardan tal como vienen.
+
+Sobre las clases, vale lo mismo que en importar.html: el CSS de Unfold viene precompilado y una
+utilidad que su build no incluyó no hace nada, sin avisar.
+{% endcomment %}
+
+{% block title %}Confirmar importación de normativa | Observatorio Kallpachakuy{% endblock %}
+
+{% block content %}
+{% with validas=analisis.validas|length omitidas=analisis.omitidas|length %}
+<div class="mb-6">
+  <h1 class="font-semibold text-xl text-font-important-light dark:text-font-important-dark">
+    Revisa antes de importar
+  </h1>
+  <p class="text-sm text-font-subtle-light dark:text-font-subtle-dark mt-1">
+    Se {{ analisis.total|pluralize:"leyó,leyeron" }} {{ analisis.total }}
+    fila{{ analisis.total|pluralize:"s" }} de <strong>{{ nombre_archivo }}</strong>.
+    Todavía no se ha guardado nada.
+  </p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  <div class="rounded-lg border border-base-200 dark:border-base-800 p-4">
+    <div class="text-xs uppercase text-font-subtle-light dark:text-font-subtle-dark">
+      Se {{ validas|pluralize:"importará,importarán" }} en borrador
+    </div>
+    <div class="text-2xl font-semibold mt-1">{{ validas }}</div>
+  </div>
+  <div class="rounded-lg border border-base-200 dark:border-base-800 p-4">
+    <div class="text-xs uppercase text-font-subtle-light dark:text-font-subtle-dark">
+      Se {{ omitidas|pluralize:"omitirá,omitirán" }}
+    </div>
+    <div class="text-2xl font-semibold mt-1">{{ omitidas }}</div>
+  </div>
+</div>
+
+{% if analisis.entidades_desconocidas %}
+  <div class="rounded-lg border border-base-200 dark:border-base-800 mb-6">
+    <div class="px-4 py-3 border-b border-base-200 dark:border-base-800 bg-orange-50 dark:bg-base-900 font-medium text-orange-700 dark:text-orange-400">
+      {% with n=analisis.entidades_desconocidas|length %}Falta{{ n|pluralize:"n" }} {{ n }} entidad{{ n|pluralize:"es" }} en el catálogo{% endwith %}
+    </div>
+    <div class="px-4 py-3 text-sm">
+      <p class="text-font-subtle-light dark:text-font-subtle-dark mb-2">
+        El importador no da de alta entidades emisoras. Créalas en su pantalla y vuelve a subir el
+        archivo; sus filas entrarán entonces.
+      </p>
+      {% for entidad in analisis.entidades_desconocidas %}
+        <div class="py-0.5">· {{ entidad }}</div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+{% if analisis.omitidas %}
+  <div class="rounded-lg border border-base-200 dark:border-base-800 mb-6">
+    <div class="px-4 py-3 border-b border-base-200 dark:border-base-800 bg-orange-50 dark:bg-base-900 font-medium text-orange-700 dark:text-orange-400">
+      Est{{ omitidas|pluralize:"a,as" }} {{ omitidas }} fila{{ omitidas|pluralize:"s" }}
+      no se {{ omitidas|pluralize:"cargará,cargarán" }}
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-left text-xs uppercase text-font-subtle-light dark:text-font-subtle-dark">
+          <tr class="border-b border-base-200 dark:border-base-800">
+            <th class="px-4 py-2 w-16">Fila</th>
+            <th class="px-4 py-2">Nombre</th>
+            <th class="px-4 py-2">Por qué</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in analisis.omitidas %}
+            <tr class="border-b last:border-b-0 border-base-200 dark:border-base-800">
+              <td class="px-4 py-2 align-top">{{ fila.numero }}</td>
+              <td class="px-4 py-2 align-top break-words">{{ fila.nombre|default:"—" }}</td>
+              <td class="px-4 py-2 align-top break-words text-font-subtle-light dark:text-font-subtle-dark">{{ fila.motivo }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+
+{% if analisis.validas %}
+  <div class="rounded-lg border border-base-200 dark:border-base-800 mb-6">
+    <div class="px-4 py-3 border-b border-base-200 dark:border-base-800 font-medium">
+      Est{{ validas|pluralize:"a,as" }} {{ validas }} sí
+    </div>
+    <div class="px-4 pt-3 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+      El tipo, el ámbito y la fecha no vienen en el archivo: se deducen del tipo escrito, de la
+      entidad y del año. Revísalos aquí antes de confirmar.
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-left text-xs uppercase text-font-subtle-light dark:text-font-subtle-dark">
+          <tr class="border-b border-base-200 dark:border-base-800">
+            <th class="px-4 py-2 w-16">Fila</th>
+            <th class="px-4 py-2">Nombre</th>
+            <th class="px-4 py-2">Tipo</th>
+            <th class="px-4 py-2">Entidad</th>
+            <th class="px-4 py-2">Ámbito</th>
+            <th class="px-4 py-2">Fecha</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in analisis.validas %}
+            <tr class="border-b last:border-b-0 border-base-200 dark:border-base-800">
+              <td class="px-4 py-2 align-top">{{ fila.numero }}</td>
+              <td class="px-4 py-2 align-top break-words">
+                {{ fila.nombre }}
+                {% for aviso in fila.avisos %}
+                  <div class="text-xs text-orange-700 dark:text-orange-400">{{ aviso }}</div>
+                {% endfor %}
+              </td>
+              <td class="px-4 py-2 align-top">{{ fila.valores.tipo }}</td>
+              <td class="px-4 py-2 align-top break-words">{{ fila.valores.entidad_emisora }}</td>
+              <td class="px-4 py-2 align-top">{{ fila.valores.ambito }}</td>
+              <td class="px-4 py-2 align-top">{{ fila.valores.fecha|date:"Y-m-d" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="mb-6 rounded-lg border border-base-200 dark:border-base-800 px-4 py-3 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+    Ninguna fila del archivo se puede cargar. Corrige lo que dice la tabla de arriba y vuelve a
+    subirlo.
+  </div>
+{% endif %}
+
+<form method="post" class="flex flex-wrap gap-2">
+  {% csrf_token %}
+  <input type="hidden" name="confirmar" value="1">
+  {% if analisis.validas %}
+    <button type="submit"
+            class="rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
+      Importar {{ validas|pluralize:"la,las" }} {{ validas }} fila{{ validas|pluralize:"s" }} válida{{ validas|pluralize:"s" }}
+    </button>
+  {% endif %}
+  <a href="{{ url_listado }}"
+     class="rounded-md border border-base-200 dark:border-base-800 px-3 py-1.5 text-xs font-medium hover:bg-base-100 dark:hover:bg-base-900">
+    Cancelar
+  </a>
+</form>
+{% endwith %}
+{% endblock %}
