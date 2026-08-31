@@ -114,6 +114,108 @@ Suite: **514 + 7 deselected** en pytest (11 pruebas nuevas) y **2 casos e2e nuev
 `peligros` son **anteriores a esta rama** y ajenos a ella: la portada busca «Centros poblados
 monitoreados», una cadena que no existe en `frontend/src`.
 
+### Actualización 31/08/2026 — la caja necesitaba aire, y los dos pies del mapa sobraban casi enteros
+
+Continuación del anterior, con la caja ya en pantalla. Tres cosas, y una de ellas la había metido yo.
+
+**El recorte.** El `viewBox` de `CajaDistribucion` medía **78 px de alto** y las etiquetas de Q1 y Q3
+tenían su línea base en **`y = 78`**, justo el borde: se veían cortadas por abajo. Un texto que se
+sale del `viewBox` **no da ningún error**, así que ahora hay una prueba e2e que comprueba que cada
+`<text>` cabe. Alto a 96.
+
+**El apiñamiento, medido.** Bajo el mapa se apilaban **ocho bloques** con huecos de 6 a 16 px, y los
+tres últimos a 8, 8 y 6. La caja no estaba enmarcada, así que se leía como dos párrafos más de la
+lista en vez de como un gráfico. Ahora va en un recuadro —el encuadre que ya usa `FiltroTema` para un
+panel embebido— **con su declaración dentro**, y quedan seis bloques con 12-20 px.
+
+**Los dos pies, y por qué la decisión no fue simétrica.** El de `poligonos.motivo` se retira: dos
+líneas más arriba la leyenda ya trae un cuadro blanco rotulado «sin municipalidad (13)», y la frase
+solo añadía el porqué. El de `no_ubicado` **se queda**, porque es la consecuencia nº 1 de ADR-D6,
+escrita como «no opcional», y sin él faltaría el **19 % del presupuesto sin que nada se viera raro**
+— que es literalmente lo que fundó ese ADR.
+
+Pero se queda **arreglado**, porque no ayudaba por una razón concreta: **no contestaba lo que
+planteaba**. Decía qué falta y de quién es, y cerraba justificando una decisión metodológica —«se
+declara aparte en vez de repartirse»—, que es información para quien programa esto, no para quien lo
+lee. Lo que uno se pregunta es *dónde está entonces ese dinero*, y **el PDF lo decía y la pantalla
+no**. Ahora sale del `motivo` que redacta el backend y lo dicen los dos, y además llega **con su
+porcentaje**: «S/ 10.350.637 **(19 %)** no está en el mapa», porque un importe suelto obliga a ir a
+buscar el total para saber si es mucho o poco. `no_ubicado.pct` viaja por métrica —19 % del PIM,
+10,7 % del PIA, 17,2 % del devengado— con el denominador protegido: un ámbito sin nada que declarar
+da 0, no un 500.
+
+**Y una corrección a mitad de camino.** El plan decía que el pie de los polígonos se quedaba en el
+PDF porque «la leyenda del reporte no tiene el cuadro de sin municipalidad». **Era falso**: lo añade
+la plantilla justo después del bucle de tramos, no `_leyenda()`, y se vio al abrir el PDF generado en
+vez de leer solo el Python. Así que sale de los dos medios. El dato sigue en el payload para un
+cliente que dibuje este mapa sin nuestra leyenda. De paso, el PDF dejó de escribir a mano «Sí están
+contados en las cifras de cabecera y en la tabla» —ya entra en el `motivo`— y su párrafo de quintiles
+recibió el mismo recorte que el de la pantalla.
+
+**Y al final el pie se ocultó, que no es lo mismo que borrarlo.** Con la frase ya arreglada delante,
+el dueño del proyecto decidió que en pantalla no ayudaba: va con `hidden`. El contrato no se mueve
+—importe, porcentaje y motivo siguen en el payload y **el PDF lo sigue imprimiendo**, que es donde
+ADR-D6 más aprieta porque el documento viaja sin la página que lo explica— y hay una prueba e2e que
+exige que **siga en el DOM y oculto**. Borrarlo dejaría el mapa pintando el 81 % del presupuesto sin
+que nada lo dijera; oculto, vuelve quitando una clase.
+
+Suite: **520 + 7** y **81 casos e2e** (162 corridas), en verde.
+
+### Actualización 31/08/2026 — el mapa de /inversion se explicaba cuatro veces y no decía qué enseña
+
+La sección «¿Dónde está el presupuesto?» rodeaba el coroplético de **~150 palabras**: una entradilla
+encima, el párrafo de quintiles y dos pies. Y **los mismos 13 distritos capital salían explicados
+dos veces con palabras distintas** —«municipalidades provinciales cuyo presupuesto cubre toda su
+provincia» en un pie, «capitales de provincia cuya municipalidad es la provincial» en el otro—.
+Encima, dos de esos textos terminaban justificándose ante el lector: «los rangos van siempre en la
+leyenda **por eso mismo**» y «la advertencia va aquí y no solo arriba **porque este mapa se cita
+suelto**». Eso es un comentario de código impreso en la pantalla, y ahí es donde ha vuelto. Los
+`municipalidad(es)` con el plural entre paréntesis remataban el tono de circular.
+
+**Y faltaba lo principal: era el único gráfico de la página sin `Declaracion`.** Cuatro párrafos
+sobre lo que **no** se pinta y ninguno sobre lo que sí.
+
+**Un diagrama de caja, porque el coroplético no puede enseñar el reparto.** Los quintiles son la
+escala correcta para un mapa, pero su último tramo se traga toda la cola: con el PIM distrital de
+2026 arranca en S/ 216.445, así que **un distrito de 220 mil y otro de 9,3 millones se pintan del
+mismo color**. La mediana es S/ 73.510 y PICHARI, S/ 9.331.232 — **127 veces más**, con 14 atípicos
+de 99. La caja lo dice de un vistazo, y de paso explica por qué el mapa se ve tan plano.
+
+Cinco cosas que no son obvias:
+
+- **El dinero va en escala logarítmica y no es una preferencia.** Medido: en un eje lineal de 600 px
+  la caja del PIM ocupa **9 píxeles**. No es un diagrama de caja, es un punto. El % de ejecución va
+  lineal de 0 a 100, donde no hay cola que comprimir y un 0 % es un punto válido.
+- **Dos repliegues, los dos porque `log(0)` no existe.** Los ceros se excluyen del dibujo y **se
+  declaran** en la frase —«1 distrito con S/ 0 no entra en la escala»—; y si `q1` valiera 0 la
+  escala se repliega a lineal, porque si no el borde de la caja sería `-Infinity` y **el SVG no
+  pintaría nada sin dar ningún error**.
+- **Los cinco números los calcula el servidor**, junto a `cortes` y a los dos `motivo` (ADR-D6): el
+  día que la caja entre en el PDF, dos cálculos de la misma mediana acabarían discrepando. Es la
+  corrección que `e05c0a4` hizo con las cuatro declaraciones, aplicada antes de que hiciera falta.
+  Los **cuartiles van por índice, sin interpolar**, igual que `_cortes`: son estadísticos distintos
+  y no pueden coincidir, pero con métodos distintos nadie sabría si la diferencia es del dato o del
+  método.
+- **Tres fallos de redacción los encontró la salida real, no las pruebas con datos de muestra**: «la
+  mitad de **los** 13 provincias» (concordancia), «8 distritos **sin presupuesto**» para el
+  porcentaje —que además ni siquiera aplica, porque su eje es lineal y el 0 % cabe— y un pie que
+  encadenaba «…no aparecen en el mapa. **De** 13 municipalidades…», una frase partida. Los tres
+  tienen ahora su prueba.
+- **El SVG es a mano, no Recharts.** El proyecto no usa `ErrorBar`, `Scatter` ni `ComposedChart` en
+  ninguna parte, y el PDF construye sus gráficos con `rect`/`line`/`text`: el día que la caja pase
+  al papel se traduce casi línea a línea.
+
+De camino, una prueba e2e que no probaba lo que decía: contaba `p.border-l-2 >= 4` para verificar
+que cada gráfico declara, y **ese selector casaba también con los dos pies del mapa**, así que
+pasaba aunque faltara una declaración. Ahora cuenta por la clase completa y son cinco.
+
+La caja **no entra en el reporte PDF** (decisión del dueño del proyecto). Los estadísticos ya viajan
+en el payload, así que añadirla después es una función `caja()` en `apps/informes/graficos.py` y un
+`<section>` en la plantilla, sin recalcular nada. Los dos pies recortados **sí** llegan al papel, que
+es lo que se quería. Sin ADR: no cambia ninguna decisión, y ADR-D6 sigue mandando.
+
+Suite: **517 + 7** y **79 casos e2e** (158 corridas), en verde.
+
 ### Actualización 31/08/2026 — cuatro segundos de espera sin una sola señal en pantalla
 
 Pedir la ayuda memoria en `/peligros` tarda **3,7-4,0 s** —el PDF renderiza su mapa con un Chromium
