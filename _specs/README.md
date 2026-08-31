@@ -67,6 +67,41 @@ workers — se destraba solo a los 25 s con los PDF sin mapa, pero no está repr
 
 Sin ADR: no cambia ninguna decisión. Suite: **481 + 7** y **73 casos e2e** (146 corridas), en verde.
 
+### Actualización 31/08/2026 — la misma frase, redactada dos veces, es dos frases
+
+Las cuatro declaraciones de la entrada de abajo nacieron en TypeScript, y el encargo siguiente
+fue ponerlas también en el PDF. Duplicarlas en Python habría dejado **dos redacciones de la
+misma frase**: el día que se retoque una, la otra se queda atrás y nada avisa. Es exactamente lo
+que el proyecto ya había decidido dos veces —ADR-D6, «el payload lleva `no_ubicado` con **su
+motivo ya redactado**: la advertencia viaja con el dato, no con la interfaz», y el encabezado de
+`consultas.py`, «que los tres calculen el % de ejecución por su cuenta es la forma segura de que
+un día no coincidan»—.
+
+Así que la redacción **baja al backend**: `apps/inversion/declaraciones.py`. Viaja en
+`declaraciones` del payload, la SPA imprime la cadena y el PDF llama a las mismas funciones. Se
+comprobó que el texto salía **carácter por carácter idéntico** antes de borrar el TypeScript.
+
+**Lo único que no se comparte es la tipografía**, y por eso los formateadores entran por
+parámetro: el navegador escribe `53%` (es-PE, `Intl`) y el reporte `53.0 %` (sus filtros). La
+frase es una; cómo se escribe un porcentaje lo pone cada medio. Igualar los dos habría obligado
+a tocar todos los porcentajes de uno de los dos documentos.
+
+En el PDF, las cuatro frases van bajo su gráfico con la clase `.declaracion` que ya existía —de
+donde salió el registro— y llega además **el desglose de proyectos**, que el reporte no tenía en
+ninguna forma. Dos detalles de maquetación que no son cosméticos: la magnitud PIA-PIM **sube del
+párrafo de encima a la frase de debajo**, como ya hizo la pantalla, porque decirla dos veces en
+la misma tarjeta era repetirse; y **el cuadro va en su propia sección, fuera de `evitar-corte`**,
+con la clase `tabla-larga` que repite cabecera al partir — pegar a un gráfico una tabla que crece
+con el ámbito arrastraría el gráfico a la página siguiente dejando media en blanco.
+
+**Una prueba encontró una frase correcta y engañosa.** Con un reparto plano —cinco
+municipalidades con lo mismo— «las 4 primeras concentran el 80 %» es cierto por pura aritmética,
+y hace sonar concentrado justo lo que está repartido: lo contrario de lo que la frase viene a
+contar. No falla a la vista, porque la cifra es exacta. Ahora la concentración **solo se declara
+si las que se llevan el 80 % son minoría**. Salió de `test_declaraciones.py`, que prueba la
+redacción directamente en vez del texto renderizado: al ser la única redacción, un fallo de
+copy sale a la vez en la pantalla y en el documento, y se caza en un sitio.
+
 ### Actualización 31/08/2026 — los gráficos de `/inversion` se dejaban leer pero no concluían
 
 Cuatro gráficos y ninguno decía nada: la conclusión la tenía que sacar quien mirara. La ventana

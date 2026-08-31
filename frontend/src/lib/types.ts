@@ -322,6 +322,17 @@ export type Inversion = InversionEjercicio & {
     entidades: InversionEntidadProyectos[];
   };
   tendencia: InversionPuntoTendencia[];
+  /**
+   * Lo que cada gráfico dice, ya redactado (ADR-D6: la frase viaja con el dato).
+   * Se escribe en `apps/inversion/declaraciones.py` y la imprimen la SPA y el PDF; redactarla
+   * en el cliente dejaría dos versiones que un día no dirían lo mismo.
+   */
+  declaraciones: {
+    ejecucion: string | null;
+    procesos: string | null;
+    tendencia: string | null;
+    proyectos: string | null;
+  };
   ejercicios: InversionEjercicio[];
   /** Solo con `comparar_con`: los agregados del otro ejercicio y sus deltas. */
   comparacion?: InversionComparacionAgregada;

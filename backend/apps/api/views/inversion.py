@@ -22,7 +22,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.inversion import consultas
+from apps.inversion import consultas, declaraciones
 from apps.inversion.models import EntidadEjecutora
 
 from .. import exports
@@ -110,6 +110,11 @@ class InversionView(APIView):
                 for e in consultas.Ejercicio.objects.filter(visible=True).order_by("-anio")
             ],
         }
+        # Redactadas aquí y no en el cliente: las leen la SPA y el PDF, y que cada uno las
+        # escriba por su cuenta es la forma segura de que un día no digan lo mismo (ADR-D6, el
+        # mismo argumento del `motivo` del mapa). Van al final porque se calculan sobre el
+        # cuerpo ya montado.
+        cuerpo["declaraciones"] = declaraciones.todas(cuerpo)
         if comparado is not None:
             cuerpo["comparacion"] = consultas.comparacion_agregada(
                 ejercicio, comparado, ambito, provincia

@@ -283,6 +283,10 @@ Con datos:
   "tendencia": [ { "anio": 2022, "corte": "anual", "corte_legible": "", "es_parcial": false,
                    "en_curso": false, "fuente": "…",
                    "pia": 18060834, "pim": 48813109, "devengado": 37260987 } ],
+  "declaraciones": { "ejecucion": "El presupuesto creció S/ 37,836,611 (225.8%) entre lo aprobado…",
+                     "procesos": "Prevención y reducción concentra el 53%…",
+                     "tendencia": "Entre 2024 y 2025, los dos últimos ejercicios completos…",
+                     "proyectos": "24 de las 116 municipalidades del ámbito tienen presupuesto…" },
   "ejercicios": [ { "anio": 2026, "corte": "2026-06", "corte_legible": "junio de 2026",
                     "es_parcial": true, "en_curso": true } ]
 }
@@ -322,6 +326,23 @@ Con datos:
   "ejercicios": [ … ] }
 ```
 
+> **`declaraciones` es lo que cada gráfico DICE, ya redactado.** Un gráfico se deja leer pero no
+> concluye, y la ventana la usan autoridades, periodistas y universidades. Las cuatro frases se
+> escriben en **`apps/inversion/declaraciones.py`, un solo sitio**, y las imprimen la SPA —que
+> las recibe aquí— y el PDF, que llama a las mismas funciones con sus propios filtros. Es la
+> misma decisión de ADR-D6 (`no_ubicado` viaja con «su motivo ya redactado») y el argumento del
+> encabezado de `consultas.py`: dos redacciones de la misma frase acaban no diciendo lo mismo.
+> Lo único que no comparten es la tipografía —`53%` en el navegador, `53.0 %` en el reporte—,
+> y por eso los formateadores entran por parámetro. Una clave puede ser `null`: sin datos que
+> declarar no se pinta un filete con una frase vacía debajo del gráfico.
+>
+> Tres cosas que la redacción codifica y un refactor puede deshacer sin que nada falle a la
+> vista: **la de la tendencia compara los dos últimos ejercicios COMPLETOS** —contra el corte
+> parcial daría una caída del devengado que solo mide medio año contra doce meses—; **no dice
+> «cerrado»**, que es jerga contable con una prueba e2e que lo fija; y **la concentración solo
+> se declara si las que se llevan el 80 % son minoría**, porque con un reparto plano cuatro de
+> cinco suman el 80 % por aritmética y decirlo haría sonar concentrado lo que está repartido.
+>
 > **`proyectos` desglosa lo que `agregados.pim_proyectos` solo cuenta.** Un «40 % en proyectos
 > de inversión» se lee como si las municipalidades estuvieran haciendo obra por toda la región,
 > y no es eso: en 2026 **24 de las 116** tienen presupuesto en obra y cinco concentran el 81 %.

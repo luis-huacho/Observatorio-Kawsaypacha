@@ -166,11 +166,9 @@
 {% endcomment %}
 <section class="evitar-corte" style="margin-top: 10pt">
   <h2>¿Se ejecuta lo proyectado? — {{ anio }}</h2>
-  <p class="fino">
-    De lo aprobado al abrir el año (PIA) a lo gastado. La variación PIA-PIM del ámbito es de
-    {{ agregados.variacion_pia_pim|soles }}.
-  </p>
+  <p class="fino">De lo aprobado al abrir el año (PIA) a lo gastado.</p>
   {{ grafico_ejecucion|safe }}
+  {% if declaraciones.ejecucion %}<p class="declaracion">{{ declaraciones.ejecucion }}</p>{% endif %}
 </section>
 
 <section class="evitar-corte" style="margin-top: 8pt">
@@ -180,6 +178,7 @@
     comunes» y los proyectos se llevan tres cuartas partes y el gráfico no dice nada.
   </p>
   {{ grafico_procesos|safe }}
+  {% if declaraciones.procesos %}<p class="declaracion">{{ declaraciones.procesos }}</p>{% endif %}
 </section>
 
 {# --- Proyectos vs actividades --- #}
@@ -193,14 +192,51 @@
     <span class="punto" style="background: {{ color_actividades }}"></span>Actividades ·
     {{ agregados.pim_actividades|soles }}
   </div>
-  {% if sin_clasificar.pim %}
-    <p class="declaracion">
-      {{ sin_clasificar.pim|soles }} ({{ sin_clasificar.pct|pct }}) cuelgan de códigos que el
-      catálogo aún no imputa a ningún proceso. No se reparten entre los demás ni se ocultan:
-      es la medida de lo que le falta al catálogo.
-    </p>
-  {% endif %}
+  {% if declaraciones.proyectos %}<p class="declaracion">{{ declaraciones.proyectos }}</p>{% endif %}
 </section>
+
+{% comment %} El cuadro va en SU PROPIA sección y no dentro de la de arriba: `evitar-corte` pega
+   el gráfico a su leyenda y a su frase, que es lo que tiene que viajar junto, pero una tabla que
+   crece con el ámbito no se puede pegar a nada — con más municipalidades con obra no cabría en
+   una página y arrastraría el gráfico a la siguiente dejando media en blanco.
+
+   La barra sola dice cuánto va a obra, nunca de quién es, y un 40 % se lee como si todas las
+   municipalidades estuvieran construyendo. Casi ninguna lo está: son 24 de 116, y la mitad del
+   dinero está en tres obras. Van todas, sin recortar a un top N — un «y otras N» no lo podría
+   comprobar quien recibe esto en papel. {% endcomment %}
+{% if proyectos.entidades %}
+  <section style="margin-top: 4pt">
+    {# `tabla-larga`: puede partir entre páginas y repite la cabecera, como la de municipalidades. #}
+    <table class="datos tabla-larga">
+      <thead>
+        <tr>
+          <th>Municipalidad</th>
+          <th style="width: 28mm">Provincia</th>
+          <th class="num" style="width: 24mm">PIM en proyectos</th>
+          <th class="num" style="width: 18mm">% de su PIM</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in proyectos.entidades %}
+          <tr>
+            <td>{{ e.entidad }}</td>
+            <td>{{ e.provincia|default:"—" }}</td>
+            <td class="num">{{ e.pim_proyectos|soles }}</td>
+            <td class="num">{{ e.pct_proyectos|pct }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endif %}
+
+{% if sin_clasificar.pim %}
+  <p class="declaracion">
+    {{ sin_clasificar.pim|soles }} ({{ sin_clasificar.pct|pct }}) cuelgan de códigos que el
+    catálogo aún no imputa a ningún proceso. No se reparten entre los demás ni se ocultan:
+    es la medida de lo que le falta al catálogo.
+  </p>
+{% endif %}
 
 {# --- Tendencia --- #}
 <section class="evitar-corte" style="margin-top: 8pt">
@@ -210,6 +246,7 @@
     año, lo que quedó tras las modificaciones y lo que se llegó a gastar. El PIA va punteado.
   </p>
   {{ grafico_tendencia|safe }}
+  {% if declaraciones.tendencia %}<p class="declaracion">{{ declaraciones.tendencia }}</p>{% endif %}
   <table class="datos" style="margin-top: 5pt">
     <thead>
       <tr>

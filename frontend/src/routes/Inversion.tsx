@@ -19,10 +19,6 @@ import type {
 import { formatNumber, formatPct, formatSoles } from "@/lib/semaforo";
 import {
   PIE_EJERCICIO_PARCIAL,
-  declaracionEjecucion,
-  declaracionProcesos,
-  declaracionProyectos,
-  declaracionTendencia,
   estadoEjercicio,
   etiquetaEjercicio,
   mesDelCorte,
@@ -378,14 +374,7 @@ export default function InversionView() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <Declaracion>
-                  {declaracionEjecucion(
-                    a,
-                    d.es_parcial ? mesDelCorte(d) : "",
-                    formatSoles,
-                    formatPct,
-                  )}
-                </Declaracion>
+                <Declaracion>{d.declaraciones.ejecucion}</Declaracion>
               </div>
 
               <div className="card p-5">
@@ -416,9 +405,7 @@ export default function InversionView() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <Declaracion>
-                  {declaracionProcesos(d.procesos, d.sin_clasificar, formatSoles, formatPct)}
-                </Declaracion>
+                <Declaracion>{d.declaraciones.procesos}</Declaracion>
               </div>
             </section>
 
@@ -440,7 +427,7 @@ export default function InversionView() {
                 actividades={a.pim_actividades}
                 pct={a.pct_proyectos}
               />
-              <Declaracion>{declaracionProyectos(d.proyectos, formatSoles, formatPct)}</Declaracion>
+              <Declaracion>{d.declaraciones.proyectos}</Declaracion>
               <TablaProyectos proyectos={d.proyectos} params={params} />
             </section>
 
@@ -483,7 +470,7 @@ export default function InversionView() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-              <Declaracion>{declaracionTendencia(d.tendencia, formatSoles, formatPct)}</Declaracion>
+              <Declaracion>{d.declaraciones.tendencia}</Declaracion>
 
               <div className="overflow-x-auto mt-5">
                 <table className="w-full text-sm min-w-[44rem]">
@@ -695,9 +682,11 @@ export default function InversionView() {
  * La frase que dice lo que el gráfico de encima enseña.
  *
  * Mismo registro que las `.declaracion` del PDF —filete a la izquierda, texto pequeño y gris—
- * porque es el mismo tipo de afirmación. **Sin verde ni rojo a propósito**: `Delta` colorea
- * porque compara dos ejercicios que alguien eligió; aquí más presupuesto no es de suyo una
- * buena noticia, y pintarlo de verde sería opinar por el lector.
+ * porque es literalmente la misma frase: **la redacta el backend** y viaja en el payload
+ * (`apps/inversion/declaraciones.py`), que es lo que impide que la pantalla y el documento
+ * acaben diciendo cosas distintas. Aquí solo se pinta. **Sin verde ni rojo a propósito**:
+ * `Delta` colorea porque compara dos ejercicios que alguien eligió; aquí más presupuesto no es
+ * de suyo una buena noticia, y pintarlo de verde sería opinar por el lector.
  *
  * Devuelve `null` con contenido vacío, para que un ámbito sin datos no deje un filete huérfano.
  */
