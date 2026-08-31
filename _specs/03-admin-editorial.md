@@ -79,6 +79,27 @@ Motivos de omisión, todos en español y citando la fila: falta algún campo obl
 
 Lo único que aborta el archivo entero es la **cabecera**: con las columnas corridas cada texto caería en el campo de al lado y la ficha se vería llena estando mal. El mensaje muestra qué se esperaba y qué se encontró.
 
+### Normativa — el segundo importador, y el primero que deduce (ADR-D9)
+
+El listado de `Norma` lleva los mismos dos botones y el mismo trámite de tres pasos. **La fontanería es literalmente la misma**: `core.importacion_admin.ImportadorExcelAdminMixin` —vista de tres etapas, temporal en `IMPORTACIONES_TMP_DIR`, token en sesión validado contra `[0-9a-f]{32}`, barrido y caducidad—. Se generalizó en vez de copiarse por el argumento de ADR-D8: copiar habría copiado la guarda anti-*path traversal*, y una comprobación de seguridad duplicada se arregla un día en un sitio y no en el otro.
+
+La cabecera son **siete columnas** y la fija el cliente, así que aquí sí es una constante literal (`COLUMNAS`) y no `verbose_name` derivados:
+
+`N` · `Tipo de normativa` · `Nombre` · `Descripción` · `Entidad autora` · `Año de publicación` · `Link`
+
+**La unicidad al importar la decide «Nombre»**, con el mismo criterio que las fichas —recortado y en mayúsculas, contra la base y dentro del propio archivo, y solo para comparar—. Va en el importador y **no** como `UniqueConstraint`: es un validador de importación, no una regla del modelo.
+
+**Lo nuevo es que aquí hay que deducir.** En fichas ACC las 17 columnas son 17 `TextField`; aquí el modelo exige tres cosas que la hoja no trae, y las tres se ven en la pantalla de confirmación —que por eso lista **Tipo, Entidad, Ámbito y Fecha** de cada fila válida, y no solo el nombre:
+
+- **`tipo`** es una lista cerrada de cinco. Tabla de sinónimos (`decreto supremo`/`d.s.` → DS, …) y lo que no case **omite la fila**: replegar a una opción por defecto dejaría la norma clasificada como algo que nadie decidió.
+- **`entidad_emisora`** casa contra el catálogo de ADR-D11, por nombre o por sigla. **El importador nunca crea entidades** —ese ADR ya decidió que el catálogo lo mantiene una persona—, así que las que faltan **se agrupan en la pantalla** para darlas de alta de una vez y volver a subir, en vez de descubrirlas de una en una.
+- **`ambito`** sale del **nombre canónico de la entidad ya casada**, no del texto libre: la hoja puede traer la sigla, y «MPC» no dice que sea una municipalidad. Lo que las reglas no cubran omite la fila — el catálogo lo amplía PREDES y colar un «nacional» por defecto clasificaría mal la norma sin que se distinguiera de una correcta.
+- **`fecha`** se fija al **1 de enero** del año indicado, que es lo que ya decidió ADR-D10 cuando solo hay año. Un año fuera de 1900-2100 omite la fila y **nunca se repliega a hoy**, que sería la única fecha del sistema que parece cierta sin serlo.
+
+Dos detalles más: la descripción se **recorta** a los 700 de `resumen` y la fila entra con el aviso a la vista —omitirla perdería una norma buena por un tope de campo—, y los **slugs se reservan en memoria** porque `slug_unico()` consulta la base por candidato y no vería las colisiones dentro del mismo archivo, con lo que el `bulk_create` reventaría entero.
+
+Todo entra en **borrador**: el importador trae datos, no decide qué se publica.
+
 ### Qué va al log sin abortar
 
 Auditado contra los archivos reales; el importador debe reconocer estos casos por nombre, no fallar ni silenciarlos (ver los conteos en `01-modelo-datos.md`):

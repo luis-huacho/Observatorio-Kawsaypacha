@@ -271,6 +271,38 @@ La ficha autónoma y su importación por Excel (ADR-D9). Quince pruebas, y las q
 
 Una fixture `autouse` manda `IMPORTACIONES_TMP_DIR` a `tmp_path`. Sin ella la suite deja Excel dentro del repositorio: el barrido del admin solo se lleva los de más de seis horas, así que se acumulan entre corridas sin que nadie los mire.
 
+### `test_normativa_importacion.py`
+
+El segundo importador (ADR-D9), y el primero que **deduce**. Treinta y ocho pruebas; las siete que
+cubren lo que no se ve son las de las deducciones, porque un valor deducido mal **tiene el mismo
+aspecto que uno correcto**:
+
+1. **Un tipo fuera del catálogo omite la fila**, y el motivo dice cuál era. Si replegara a una
+   opción por defecto, la norma quedaría clasificada como algo que nadie decidió.
+2. **Una entidad que no está en el catálogo omite la fila y NO la crea.** Se comprueba el conteo
+   del catálogo después: crear entidades al vuelo desde una hoja es cómo «PCM», «P.C.M.» y
+   «Presidencia del Consejo de Ministros» acaban siendo tres filas (ADR-D11).
+3. **El ámbito sale del nombre canónico y no del texto del Excel**, con las tres entidades
+   escritas por sigla — «MPC» no dice que sea una municipalidad.
+4. **Una entidad del catálogo cuyo ámbito no se deduce omite la fila.** El catálogo lo amplía
+   PREDES, así que este caso llegará; la prueba fija que falla en alto y no coloca un «nacional».
+5. **El año ilegible omite la fila y no cae a hoy**, comprobado explícitamente contra
+   `date.today()`: sería la única fecha del sistema que parece cierta sin serlo.
+6. **Los slugs no chocan** entre dos filas del mismo archivo ni contra los que ya existen —
+   `slug_unico()` consulta la base por candidato y no vería las del propio Excel, con lo que el
+   `bulk_create` reventaría entero y no entraría ninguna norma.
+7. **Todo entra en borrador.** El importador trae datos; qué se publica lo decide una persona.
+
+Más las mismas garantías que las fichas ACC —la previa no escribe, el duplicado por «Nombre» con
+recorte y mayúsculas contra la base y dentro del archivo, el nombre se guarda tal como vino, la
+cabecera aborta pero tolera tildes, el temporal se consume una vez, la plantilla se puede
+reimportar y sin permiso de alta es 403— y una de concordancia: **«Faltan 1 entidad» es el
+descuido que delata una pantalla generada**, y con una sola entidad ausente es el caso más
+probable.
+
+Y una prueba que no está en este archivo pero lo custodia: `test_fichas_acc.py` entero, que es la
+red de que mover la fontanería a `core.importacion_admin` no cambió nada.
+
 ### Las cuatro que vigilan lo que no da síntomas
 
 Estos cuatro archivos existían sin figurar aquí, y son justo los que encajan con la regla del documento: cada uno cubre un fallo que no se ve.
@@ -351,7 +383,7 @@ Y dos cosas que las pruebas mismas enseñaron: que las dos muestras de Excel tie
 
 ## Criterio de "listo para entregar"
 
-- `pytest` completo (incluido `-m lento`) en verde: 520 + 7 pruebas.
+- `pytest` completo (incluido `-m lento`) en verde: 569 + 7 pruebas.
 - `npm run lint && npm run build` sin errores.
 - `npx playwright test` en verde **dos veces**: contra el dev server y contra el bundle servido por nginx (`E2E_URL=http://localhost`). La segunda es la que vale.
 - Las cinco comprobaciones manuales hechas y documentadas.
