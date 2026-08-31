@@ -164,8 +164,11 @@ ficha es uno solo para los dos, y depende de que el estado y el candado se llame
   en un `clean()`: `estado` está excluido del formulario y publicar no pasa por ninguno. Su
   hermano `avisos_al_publicar()` es lo que no impide publicar pero hay que mirar una vez.
 - **Los `enum` del esquema se construyen desde los catálogos vivos**, no escritos a mano: los nueve
-  slugs salen de `peligros.catalogo` y las dos taxonomías de `Medida`. Añadir un peligro no puede
-  dejar el esquema atrás, y el síntoma sería una clasificación vacía sin explicación.
+  slugs salen de `peligros.catalogo`, las dos taxonomías de `Medida` y —desde 31/08/2026— el `tipo`
+  de `Noticia`, que era el único que seguía escrito a mano. Añadir un peligro, o un tipo, no puede
+  dejar el esquema atrás, y el síntoma sería una clasificación vacía sin explicación. En noticias el
+  síntoma era peor y más callado: `_normalizar` ya validaba contra `Noticia.Tipo`, así que una opción
+  nueva quedaba disponible para el editor y **la IA no podía proponerla nunca**.
 - **Dos campos de Norma que la IA NO escribe, y no por olvido**: `analisis_predes` es la voz
   institucional que firma la organización en el listado, y `url_oficial` presenta un enlace como
   publicación oficial — no puede acabar apuntando a lo que el editor pegó arriba. El `log_ia` se lo

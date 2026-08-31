@@ -322,6 +322,51 @@ def test_la_descarga_expone_su_nombre_de_archivo_al_otro_dominio(api, norma, set
     assert "attachment; filename=" in respuesta["Content-Disposition"]
 
 
+# --- Tipos de noticia y su ilustración --------------------------------------
+
+
+def test_TODO_tipo_de_noticia_tiene_ilustracion_declarada():
+    """El valor crudo del tipo **es el nombre del archivo** `/img/default/<tipo>.svg`.
+
+    Un tipo nuevo sin ilustración daba un 404 de imagen en toda noticia sin portada propia, y nada
+    lo delataba. El archivo en sí no se puede comprobar desde aquí —vive en `frontend/public/` y el
+    contenedor solo monta `./backend`—, así que lo que se fija es la declaración, que es el olvido
+    probable.
+    """
+    from apps.api import imagenes
+    from apps.contenidos.models import Noticia
+
+    assert set(Noticia.Tipo.values) <= imagenes.CLAVES_NOTICIA
+
+
+def test_un_tipo_sin_ilustracion_repliega_en_vez_de_dar_404():
+    """Mismo criterio que `clave_medida`: la genérica es preferible a una imagen rota."""
+    from apps.api import imagenes
+
+    assert imagenes.clave_noticia("publicacion") == "publicacion"
+    assert imagenes.clave_noticia("un_tipo_que_no_existe") == "noticia"
+    assert imagenes.clave_noticia(None) == "noticia"
+
+
+def test_una_noticia_de_tipo_nuevo_sirve_SU_ilustracion(api, db):
+    import datetime
+
+    from apps.contenidos.models import Noticia
+
+    Noticia.objects.create(
+        slug="informe-de-brechas",
+        titulo="Informe de brechas de información",
+        tipo=Noticia.Tipo.PUBLICACION,
+        fecha=datetime.date(2026, 6, 12),
+        bajada="Qué se sabe y qué no.",
+        estado=Noticia.Estado.PUBLICADO,
+    )
+
+    fila = api.get("/api/noticias/?tipo=publicacion").json()
+    assert fila["count"] == 1
+    assert fila["results"][0]["imagen_portada"].endswith("/img/default/publicacion.svg")
+
+
 # --- Contenidos y biblioteca ------------------------------------------------
 
 

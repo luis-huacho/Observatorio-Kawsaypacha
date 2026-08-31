@@ -42,8 +42,7 @@ class NoticiaAdmin(RedaccionIAAdminMixin, WorkflowAdmin, ModelAdmin):
         ("Contenido", {"fields": ("cuerpo", "palabras_clave")}),
         ("Portada", {
             "fields": ("imagen_portada", "imagen_titulo"),
-            "description": "Vacía = ilustración institucional del tipo de contenido "
-                           "(noticia, artículo u opinión).",
+            "description": "Vacía = ilustración institucional del tipo de contenido.",
         }),
         ("Estado editorial", {
             "fields": ("estado_badge", "nota_revision", "publicado_en", "creado_por",

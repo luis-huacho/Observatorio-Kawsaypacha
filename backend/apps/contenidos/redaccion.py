@@ -38,42 +38,57 @@ from apps.core.services import openrouter, salida_ia
 #: Lo que se le manda al modelo. Recortar aquí es lo que mantiene barata la llamada.
 MAXIMO_CARACTERES = 24_000
 
-ESQUEMA = {
-    "name": "noticia",
-    "strict": True,
-    "schema": {
-        "type": "object",
-        "additionalProperties": False,
-        "required": ["titulo", "bajada", "cuerpo", "tipo", "autor", "fecha", "palabras_clave",
-                     "imagen_titulo"],
-        "properties": {
-            "titulo": {"type": "string", "description": "Titular en español, máximo 250 caracteres."},
-            "bajada": {
-                "type": "string",
-                "description": "Resumen de 1 o 2 frases, máximo 500 caracteres. Sin repetir el titular.",
-            },
-            "cuerpo": {
-                "type": "string",
-                "description": (
-                    "Cuerpo en HTML simple: solo <p>, <h2>, <h3>, <ul>, <ol>, <li>, <strong>, "
-                    "<em> y <blockquote>. Sin <html>, <head>, <script> ni atributos de estilo."
-                ),
-            },
-            "tipo": {"type": "string", "enum": ["noticia", "articulo", "opinion"]},
-            "autor": {"type": "string", "description": "Firma del artículo, o cadena vacía."},
-            "fecha": {"type": "string", "description": "Fecha de publicación en formato AAAA-MM-DD."},
-            "palabras_clave": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Entre 3 y 6 términos del dominio de GRD/ACC, máximo 60 caracteres.",
-            },
-            "imagen_titulo": {
-                "type": "string",
-                "description": "Pie para la imagen principal, con su crédito si aparece. Puede ir vacío.",
+
+def _esquema() -> dict:
+    """El esquema se arma al vuelo para que el `enum` de `tipo` salga de los choices del modelo.
+
+    Estaba escrito a mano, y eso son dos fuentes de verdad para lo mismo: `_normalizar` ya validaba
+    contra `Noticia.Tipo`, así que añadir una opción al modelo y olvidarse de aquí dejaba un tipo
+    que la IA **no podía proponer nunca** y ninguna prueba fallaba. Mismo mecanismo que
+    `apps/medidas/redaccion.py`.
+    """
+    from apps.contenidos.models import Noticia
+
+    return {
+        "name": "noticia",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["titulo", "bajada", "cuerpo", "tipo", "autor", "fecha", "palabras_clave",
+                         "imagen_titulo"],
+            "properties": {
+                "titulo": {"type": "string", "description": "Titular en español, máximo 250 caracteres."},
+                "bajada": {
+                    "type": "string",
+                    "description": "Resumen de 1 o 2 frases, máximo 500 caracteres. Sin repetir el titular.",
+                },
+                "cuerpo": {
+                    "type": "string",
+                    "description": (
+                        "Cuerpo en HTML simple: solo <p>, <h2>, <h3>, <ul>, <ol>, <li>, <strong>, "
+                        "<em> y <blockquote>. Sin <html>, <head>, <script> ni atributos de estilo."
+                    ),
+                },
+                "tipo": {
+                    "type": "string",
+                    "enum": [opcion for opcion, _ in Noticia.Tipo.choices],
+                },
+                "autor": {"type": "string", "description": "Firma del artículo, o cadena vacía."},
+                "fecha": {"type": "string", "description": "Fecha de publicación en formato AAAA-MM-DD."},
+                "palabras_clave": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Entre 3 y 6 términos del dominio de GRD/ACC, máximo 60 caracteres.",
+                },
+                "imagen_titulo": {
+                    "type": "string",
+                    "description": "Pie para la imagen principal, con su crédito si aparece. Puede ir vacío.",
+                },
             },
         },
-    },
-}
+    }
+
 
 INSTRUCCIONES = (
     "Eres editor del Observatorio Kallpachakuy de PREDES, sobre gestión del riesgo de desastres y "
@@ -82,8 +97,10 @@ INSTRUCCIONES = (
     "dominio (GRD, ACC, ubigeo, centro poblado, EVAR). "
     "No inventes datos: si un campo no se puede deducir del texto, déjalo vacío. "
     "El cuerpo debe resumir y reorganizar la información, no copiarla literalmente. "
-    "Clasifica como 'opinion' solo si el texto está firmado como columna o editorial, y como "
-    "'articulo' si es un análisis extenso; en cualquier otro caso, 'noticia'."
+    "Clasifica como 'opinion' solo si el texto está firmado como columna o editorial; como "
+    "'articulo' si es un análisis extenso; como 'publicacion' si la pieza anuncia o presenta un "
+    "documento —un informe, una guía, una sistematización—; y como 'base_datos' si lo que se "
+    "publica es un conjunto de datos o una capa de información. En cualquier otro caso, 'noticia'."
 )
 
 
@@ -124,7 +141,7 @@ def redactar(url: str, *, con_imagen: bool = True) -> Redaccion:
         # Extraer campos de un texto no mejora razonando y sí se paga. `None` no valdría: el modelo
         # por defecto razona salvo que se le diga que no.
         razonamiento=False,
-        response_format={"type": "json_schema", "json_schema": ESQUEMA},
+        response_format={"type": "json_schema", "json_schema": _esquema()},
         # Sin esto OpenRouter puede enrutar a un proveedor sin salida estructurada y la llamada
         # falla de forma intermitente. Ver el encabezado del módulo.
         extra_body={"provider": {"require_parameters": True}},

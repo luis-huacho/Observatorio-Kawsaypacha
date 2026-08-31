@@ -205,7 +205,7 @@ Fuente y consolidación: `scripts/consolidar_pp0068.py` (serie 2022-2026, mezcla
 ### contenidos
 | Modelo | Campos |
 |---|---|
-| `Noticia (Workflow)` | `slug` unique, `titulo`, `bajada`, `cuerpo` rich, `imagen_portada` ImageField **null**, `imagen_titulo` char null (pie de imagen), `palabras_clave` ArrayField(char), `fecha` (index desc); [+] `destacada` bool (home), `tipo` (noticia\|articulo\|opinion), `autor`. Redacción asistida (ADR-D7): los cuatro campos vienen de `core.RedaccionIAMixin` —`url_origen` URLField(500) blank, `ia_estado` (pendiente\|procesando\|ok\|error), `log_ia` Text, `redactada_por_ia` bool **= el candado, una sola vez por registro**—, compartido con `Norma` desde ADR-D8. Orden `-destacada, -fecha, -id` —el remate único lo exige la paginación— e índice `(estado, -destacada, -fecha)` |
+| `Noticia (Workflow)` | `slug` unique, `titulo`, `bajada`, `cuerpo` rich, `imagen_portada` ImageField **null**, `imagen_titulo` char null (pie de imagen), `palabras_clave` ArrayField(char), `fecha` (index desc); [+] `destacada` bool (home), `tipo` (noticia\|articulo\|opinion\|publicacion\|base_datos), `autor`. Redacción asistida (ADR-D7): los cuatro campos vienen de `core.RedaccionIAMixin` —`url_origen` URLField(500) blank, `ia_estado` (pendiente\|procesando\|ok\|error), `log_ia` Text, `redactada_por_ia` bool **= el candado, una sola vez por registro**—, compartido con `Norma` desde ADR-D8. Orden `-destacada, -fecha, -id` —el remate único lo exige la paginación— e índice `(estado, -destacada, -fecha)` |
 | `Video (Workflow)` | `titulo`, `descripcion`, `url` (YouTube/Vimeo), `fecha`; [+] `thumbnail_override`, `duracion`, FK `tema` (TipoPeligro) null |
 | `Evento (Workflow)` | `titulo`, `descripcion`, `inicio` datetime (index), `fin` null, `lugar`; [+] `modalidad` (presencial|virtual|mixta), `url_inscripcion`, `organizador`, `imagen` |
 
@@ -214,7 +214,7 @@ Fuente y consolidación: `scripts/consolidar_pp0068.py` (serie 2022-2026, mezcla
 `imagen_portada` e `imagen_titulo` son **nullables y no se rellenan al crear**. Cuando faltan, la plataforma resuelve la portada contra una **ilustración institucional por tipo de contenido**, servida como estático versionado:
 
 ```
-static/img/default/{noticia|articulo|opinion|norma}.svg
+static/img/default/{noticia|articulo|opinion|publicacion|base_datos|norma}.svg
 ```
 
 Son SVG de 600×400 construidas con el lenguaje visual del favicon (cordillera, sol) y la paleta de marca, así que pesan unos pocos KB y escalan sin pérdida. El prototipo ya las tiene en `prototype/public/img/default/` y resuelve el default en `prototype/src/lib/imagenes.ts`.
@@ -222,6 +222,7 @@ Son SVG de 600×400 construidas con el lenguaje visual del favicon (cordillera, 
 Reglas que conviene no perder al implementarlo:
 
 - **El default se elige por el tipo de contenido, no por la pieza.** Es lo que lo hace un default: no depende de una decisión editorial artículo por artículo.
+- **El valor crudo del tipo ES el nombre del archivo**, así que añadir una opción a `Noticia.Tipo` es también añadir un SVG. Un tipo sin ilustración daba un **404 de imagen** en toda noticia sin portada propia y nada lo delataba; `imagenes.clave_noticia()` repliega ahora a `noticia.svg`, como ya hacía `clave_medida` con los peligros. El backend **no puede comprobar que el archivo exista** —los SVG viven en el bundle del frontend—, así que hay dos redes: una prueba fija que todo `Noticia.Tipo` esté declarado en `CLAVES_NOTICIA`, y un caso e2e comprueba que las ilustraciones **decodifican**. Por el código de estado no se ve: el `try_files $uri /index.html` de la SPA responde **200 con HTML** a un archivo que no está.
 - **Sin pie propio se usa uno genérico** que dice que es una ilustración. El pie no debe hacer pasar el gráfico por una fotografía de un hecho real; cuando el editor sube una foto, pone su propio pie.
 - **El campo del admin debe explicar el comportamiento** ("si lo dejas vacío se usa la imagen institucional"), o el editor lo leerá como un dato faltante.
 - **La resolución vive en el serializer** (ver 02): el API entrega `imagen_portada` ya resuelta y ningún cliente replica la regla.

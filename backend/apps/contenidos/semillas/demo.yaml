@@ -114,3 +114,40 @@ noticias:
   - visor
   - capas SIG
   destacada: false
+# Las dos piezas de abajo existen sobre todo para que los tipos «publicación» y «base de datos»
+# tengan representación en desarrollo: van SIN portada propia a propósito, que es lo que ejercita
+# su ilustración institucional (`/img/default/<tipo>.svg`).
+- slug: informe-brechas-informacion-grd-cusco
+  titulo: 'Informe: las brechas de información para la gestión del riesgo en Cusco'
+  bajada: Un balance de qué se sabe y qué no sobre exposición, emergencias e inversión en los 112
+    distritos de la región, y qué haría falta para cerrar cada vacío.
+  cuerpo: |-
+    <p>El documento reúne lo que el observatorio encontró al integrar las fuentes disponibles: la base de exposición de SIGRID-CENEPRED, el registro histórico de emergencias por distrito y la ejecución del programa presupuestal 0068.</p>
+    <p>El hallazgo que ordena el informe es que las tres fuentes miden unidades distintas —el centro poblado, el distrito y la municipalidad— y que sumarlas entre sí produce cifras que parecen precisas y no lo son. Cada capítulo declara la unidad con la que trabaja antes de dar un número.</p>
+    <p>El último capítulo es una lista de vacíos con destinatario: qué información falta, quién la produce y qué decisión concreta está esperando por ella.</p>
+  tipo: publicacion
+  autor: Equipo del Observatorio Kallpachakuy
+  fecha: '2026-06-12'
+  imagen_titulo: ''
+  palabras_clave:
+  - brechas de información
+  - GRD
+  - diagnóstico
+  destacada: false
+- slug: base-exposicion-centros-poblados-descarga
+  titulo: Disponible para descarga la base de exposición por centro poblado
+  bajada: Las 10,978 clasificaciones de peligro sobre 3,238 centros poblados, en un solo archivo,
+    con el diccionario de campos y la fuente de cada columna.
+  cuerpo: |-
+    <p>El observatorio publica el conjunto de datos que alimenta el visor de exposición: una fila por centro poblado y peligro evaluado, con el nivel asignado, el ubigeo del distrito y la fuente de la que proviene la clasificación.</p>
+    <p>El archivo se acompaña de un diccionario de campos y de una nota metodológica con las dos unidades que conviven en la base —el centro poblado y la clasificación— y por qué no son intercambiables: un mismo centro poblado aporta una fila por cada peligro evaluado.</p>
+    <p>Los 5,730 centros poblados sin clasificación también están en el archivo, con el campo vacío. No tener dato es un dato, y omitirlos daría una cobertura aparente que la base no tiene.</p>
+  tipo: base_datos
+  autor: Equipo del Observatorio Kallpachakuy
+  fecha: '2026-05-20'
+  imagen_titulo: ''
+  palabras_clave:
+  - datos abiertos
+  - exposición
+  - centros poblados
+  destacada: false

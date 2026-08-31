@@ -477,7 +477,7 @@ export type Noticia = {
   titulo: string;
   bajada: string;
   fecha: string;
-  tipo: "noticia" | "articulo" | "opinion";
+  tipo: "noticia" | "articulo" | "opinion" | "publicacion" | "base_datos";
   autor: string;
   /** Ya resuelta por el servidor (propia o ilustración institucional del tipo). */
   imagen_portada: string;
@@ -490,6 +490,8 @@ export const TIPOS_NOTICIA: Record<Noticia["tipo"], string> = {
   noticia: "Noticia",
   articulo: "Artículo",
   opinion: "Opinión",
+  publicacion: "Publicación",
+  base_datos: "Base de datos",
 };
 
 /** Espejo de `NormaSerializer`: `/api/normativa/`. */

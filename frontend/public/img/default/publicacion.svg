@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Imagen por defecto para publicaciones de tipo "publicación".
+       Un documento sellado sobre el territorio: lo publicado es un cuerpo de trabajo cerrado,
+       no una nota. Las dos hojas de atrás dicen que hay más de una página. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+
+  <!-- Hojas de atrás, apenas asomadas -->
+  <rect x="214" y="52" width="196" height="252" rx="6" fill="#FFFFFF" opacity="0.55"
+        stroke="#009257" stroke-width="2.5"/>
+  <rect x="204" y="62" width="196" height="252" rx="6" fill="#FFFFFF" opacity="0.75"
+        stroke="#009257" stroke-width="2.5"/>
+
+  <!-- Hoja principal -->
+  <rect x="194" y="72" width="196" height="252" rx="6" fill="#FFFFFF"
+        stroke="#009257" stroke-width="3"/>
+
+  <!-- Titular y cuerpo del documento -->
+  <g fill="#009257">
+    <rect x="216" y="102" width="120" height="11" rx="4"/>
+    <rect x="216" y="122" width="86" height="11" rx="4"/>
+  </g>
+  <g fill="#009257" opacity="0.32">
+    <rect x="216" y="156" width="152" height="7" rx="3.5"/>
+    <rect x="216" y="174" width="152" height="7" rx="3.5"/>
+    <rect x="216" y="192" width="126" height="7" rx="3.5"/>
+    <rect x="216" y="210" width="152" height="7" rx="3.5"/>
+    <rect x="216" y="228" width="98" height="7" rx="3.5"/>
+  </g>
+
+  <!-- El sello: es lo que separa una publicación de un borrador.
+       Va sobre el valle de la cordillera (x≈250, donde la cresta baja a y≈312) y no sobre un
+       pico: ahí lo cortaba por la mitad y parecía un fallo de recorte. -->
+  <circle cx="250" cy="268" r="28" fill="#F1DCC0"/>
+  <circle cx="250" cy="268" r="28" fill="none" stroke="#B8753C" stroke-width="3"/>
+  <circle cx="250" cy="268" r="17.5" fill="none" stroke="#B8753C" stroke-width="2" opacity="0.7"/>
+  <path d="M239 268 l7.5 8.5 l16 -18" fill="none" stroke="#B8753C" stroke-width="4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Cordillera de cierre -->
+  <path d="M0 400 L0 322 L128 246 L242 318 L352 232 L470 322 L600 254 L600 400 Z" fill="#009257"/>
+  <path d="M0 400 L0 368 L160 348 L330 372 L480 346 L600 364 L600 400 Z" fill="#0B3B26"/>
+</svg>
