@@ -2,16 +2,20 @@ from django.contrib import admin
 from django.db.models import Count
 from django_ckeditor_5.widgets import CKEditor5Widget
 from unfold.admin import ModelAdmin
+from unfold.decorators import action
 
 from apps.core.admin_ia import RedaccionIAAdminMixin
 from apps.core.admin_workflow import WorkflowAdmin
+from apps.core.importacion_admin import ImportadorExcelAdminMixin
 
-from .forms import NormaForm
+from . import importacion
+from .forms import NormaForm, SubirNormasForm
 from .models import EntidadEmisora, Norma
 
 
 @admin.register(Norma)
-class NormaAdmin(RedaccionIAAdminMixin, WorkflowAdmin, ModelAdmin):
+class NormaAdmin(ImportadorExcelAdminMixin, RedaccionIAAdminMixin, WorkflowAdmin,
+                 ModelAdmin):
     """La norma puede nacer del enlace a su publicación oficial (ADR-D8).
 
     El mecanismo entero —insignia, campos de solo lectura, provisionales, encolado y el JS que
@@ -21,6 +25,18 @@ class NormaAdmin(RedaccionIAAdminMixin, WorkflowAdmin, ModelAdmin):
 
     campos_rich = ["contenido"]
     form = NormaForm
+
+    actions_list = ["importar_excel", "descargar_plantilla"]
+
+    # La fontanería de las tres etapas es la de `core.importacion_admin`, compartida con fichas
+    # ACC (ADR-D9). Aquí solo se declara qué cambia.
+    importacion_modulo = importacion
+    importacion_form = SubirNormasForm
+    importacion_clave_sesion = "normativa_importacion"
+    importacion_plantillas = "admin/normativa/norma"
+    importacion_titulo = "Importar normativa desde Excel"
+    importacion_archivo_plantilla = "plantilla-normativa.xlsx"
+    importacion_sustantivo = ("norma", "normas")
 
     list_display = ("titulo", "tipo", "entidad_emisora", "ambito", "fecha", "acceso", "ia_badge")
     list_filter = ("estado", "tipo", "ambito", "entidad_emisora", "estado_vigencia", "ia_estado")
@@ -73,6 +89,27 @@ class NormaAdmin(RedaccionIAAdminMixin, WorkflowAdmin, ModelAdmin):
         if db_field.name in self.campos_rich:
             kwargs["widget"] = CKEditor5Widget(config_name="default")
         return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+    # --- Importación desde Excel ------------------------------------------------------------
+    #
+    # Unfold rutea `actions_list` desde su propio `get_urls()`. Las acciones se declaran aquí y
+    # no en el mixin porque Unfold arma el nombre de la URL con el `app_label` y el modelo.
+
+    @action(description="Importar desde Excel", url_path="importar", icon="upload_file",
+            permissions=["add"])
+    def importar_excel(self, request):
+        return self.vista_importar(request)
+
+    @action(description="Descargar plantilla", url_path="plantilla", icon="download",
+            permissions=["add"])
+    def descargar_plantilla(self, request):
+        return self.vista_plantilla(request)
+
+    def contexto_importacion(self, request, extra):
+        """Las siete columnas, que la pantalla de subida lista para poder compararlas."""
+        return super().contexto_importacion(
+            request, {"columnas": list(importacion.COLUMNAS), **extra}
+        )
 
     def encolar_ia(self, obj) -> None:
         from apps.normativa.tasks import redactar_norma_desde_url
