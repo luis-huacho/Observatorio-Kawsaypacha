@@ -383,17 +383,25 @@ Alimenta el coroplético de `/inversion`, y su contrato **es ADR-D6**: se pinta 
                "entidades": 1, "pia": 123997, "pim": 9331232, "devengado": 7178924,
                "saldo": 2152308, "pct_ejecucion": 0.769 } ],
   "cortes": { "pia": [...4], "pim": [28750, 55000, 94740, 216445], "devengado": [...4] },
+  "distribucion": { "pim": { "n": 99, "ceros": 1,
+                             "q1": 38000, "mediana": 73510, "q3": 179422,
+                             "bigote_min": 0, "bigote_max": 370009,
+                             "atipicos": [ { "nombre": "PICHARI", "valor": 9331232 }, … ],
+                             "frase": "La mitad de los 99 distritos está entre…" },
+                    "pia": {…}, "devengado": {…}, "pct_ejecucion": {…} },
   "no_ubicado": { "pia": …, "pim": 10350637, "devengado": …, "entidades": 17,
-                  "motivo": "No se pinta el presupuesto de 13 municipalidad(es) provincial(es)…" },
-  "poligonos": { "pintados": 99, "sin_dato": 13, "motivo": "Distritos sin municipalidad…" } }
+                  "motivo": "Son de 13 municipalidades provinciales —su presupuesto es de…" },
+  "poligonos": { "pintados": 99, "sin_dato": 13,
+                 "motivo": "Sin municipalidad distrital con presupuesto este año…" } }
 ```
 
-Cuatro cosas que no son detalles de implementación:
+Cinco cosas que no son detalles de implementación:
 
 - **`ubigeo` casa directamente con el tile**: seis dígitos = `UBIGEO` de `limites-distritales`, cuatro = `IDPROV` de `limites-provinciales`. No hay traducción intermedia.
 - **Las cuatro métricas viajan en cada fila.** Conmutar entre PIA, PIM, devengado y % de ejecución no dispara otra petición, así que dos métricas del mismo mapa no pueden acabar viniendo de ejercicios distintos si alguien cambia la visibilidad entre medias.
 - **`suma(filas) + no_ubicado == el total del ámbito`, siempre.** Es la contabilidad completa del mapa, y hay dos pruebas que la fijan: un mapa al que le falta dinero se ve exactamente igual que uno correcto.
 - **`poligonos.sin_dato`** cuenta los polígonos sin municipalidad —a nivel distrital son las 13 capitales de provincia— y es distinto de una municipalidad con PIM cero, que **sí** aparece en `filas` con sus ceros y su `pct_ejecucion: null`.
+- **`distribucion` es lo que el coroplético no puede enseñar.** Los quintiles son la escala correcta para un mapa, pero su último tramo se traga toda la cola: con el PIM distrital de 2026 arranca en S/ 216.445, así que un distrito de 220 mil y otro de 9,3 millones **se pintan del mismo color**. La mediana es S/ 73.510 y el máximo, 127 veces más. Los cinco números salen del servidor por lo mismo que `cortes` y los dos `motivo` (ADR-D6): dos cálculos de la misma mediana acaban discrepando. Tres reglas: los **cuartiles van por índice, sin interpolar**, igual que `cortes` —son estadísticos distintos y no pueden coincidir, pero con métodos distintos nadie sabría si la diferencia es del dato o del método—; los **ceros cuentan para el cuartil y se cuentan aparte**, porque no caben en el eje logarítmico que el cliente dibuja y hay que poder declararlos; y **`pct_ejecucion` descarta los nulos**, que no son un 0 %. Las cuatro métricas viajan juntas por el mismo motivo que las de `filas`.
 
 ### El reporte — `GET /api/inversion/reporte.pdf`
 

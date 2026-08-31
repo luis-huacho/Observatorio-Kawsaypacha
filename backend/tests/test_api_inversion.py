@@ -616,6 +616,130 @@ def test_los_cortes_de_la_escala_son_crecientes_y_no_revientan_con_pocas_filas(
         assert valores == sorted(valores), metrica
 
 
+def test_los_cuartiles_salen_por_indice_igual_que_los_quintiles_del_mapa(api, inversion_cargada):
+    """La caja y la leyenda del mapa tienen que medir con la misma regla.
+
+    Son estadísticos distintos —quintiles el coroplético, cuartiles la caja— y no pueden dar el
+    mismo número. Pero calculados con métodos distintos, uno por índice y otro interpolando,
+    nadie sabría si la diferencia es del dato o del método. `_cortes` no interpola; esto tampoco.
+    """
+    from apps.inversion import consultas
+
+    filas = [{"nombre": f"D{i}", "pim": float(i)} for i in range(1, 9)]  # 1..8
+
+    d = consultas.distribucion(filas, "pim")
+
+    # Por índice sobre [1..8]: n*k//4 = 2, 4, 6 ⇒ los valores 3, 5 y 7.
+    assert (d["q1"], d["mediana"], d["q3"]) == (3.0, 5.0, 7.0)
+    assert d["n"] == 8
+
+
+def test_una_serie_constante_no_produce_atipicos_ni_revienta(api, inversion_cargada):
+    """IQR cero es el caso que rompe un boxplot escrito a la ligera.
+
+    Con todos los valores iguales, el rango intercuartílico vale 0 y la regla de Tukey deja los
+    bigotes pegados a la caja: **cero atípicos**, no todos ellos.
+    """
+    from apps.inversion import consultas
+
+    d = consultas.distribucion([{"nombre": f"D{i}", "pim": 500.0} for i in range(6)], "pim")
+
+    assert d["q1"] == d["mediana"] == d["q3"] == 500.0
+    assert d["bigote_min"] == d["bigote_max"] == 500.0
+    assert d["atipicos"] == []
+
+
+def test_los_ceros_se_cuentan_en_vez_de_desaparecer(api, inversion_cargada):
+    """Un cero no cabe en un eje logarítmico, y descartarlo en silencio falsea la caja.
+
+    Los cuartiles se calculan sobre **todos** los valores, ceros incluidos, porque un distrito
+    sin presupuesto es un dato; lo que el dibujo no puede es colocarlo, así que se cuenta aparte
+    para poder declararlo.
+    """
+    from apps.inversion import consultas
+
+    filas = [{"nombre": "A", "pim": 0.0}, {"nombre": "B", "pim": 0.0}] + [
+        {"nombre": f"D{i}", "pim": float(i * 100)} for i in range(1, 7)
+    ]
+
+    d = consultas.distribucion(filas, "pim")
+
+    assert d["n"] == 8
+    assert d["ceros"] == 2
+
+
+def test_el_porcentaje_de_ejecucion_ignora_los_nulos_y_no_los_toma_por_cero(
+    api, inversion_cargada
+):
+    """`pct_ejecucion` es `None` cuando el PIM es 0: no hay avance que calcular.
+
+    Contarlo como 0 % metería en la caja distritos que no tienen porcentaje, y la mediana
+    bajaría sin que nada fallara — el fallo silencioso de este endpoint.
+    """
+    from apps.inversion import consultas
+
+    filas = [
+        {"nombre": "A", "pct_ejecucion": None},
+        {"nombre": "B", "pct_ejecucion": 0.4},
+        {"nombre": "C", "pct_ejecucion": 0.6},
+    ]
+
+    d = consultas.distribucion(filas, "pct_ejecucion")
+
+    assert d["n"] == 2
+    assert d["ceros"] == 0
+
+
+def test_los_atipicos_vienen_con_nombre_y_de_mayor_a_menor(api, inversion_cargada):
+    """Un punto suelto en el gráfico no dice nada; con el nombre, dice quién es PICHARI."""
+    from apps.inversion import consultas
+
+    filas = [{"nombre": f"D{i}", "pim": 10.0} for i in range(10)]
+    filas += [{"nombre": "GRANDE", "pim": 5_000.0}, {"nombre": "ENORME", "pim": 90_000.0}]
+
+    d = consultas.distribucion(filas, "pim")
+
+    assert [a["nombre"] for a in d["atipicos"]] == ["ENORME", "GRANDE"]
+    assert d["atipicos"][0]["valor"] == 90_000.0
+
+
+def test_el_mapa_publica_la_distribucion_de_las_cuatro_metricas(api, inversion_cargada):
+    """Cambiar de métrica no dispara otra petición, así que las cuatro cajas viajan juntas.
+
+    Y `n + ceros` no sale de la nada: es la misma cuenta de polígonos que el mapa dice haber
+    pintado. Si divergieran, la caja describiría un conjunto distinto del que enseña el mapa.
+    """
+    cuerpo = api.get("/api/inversion/mapa/?anio=2026&nivel=distrital").json()
+
+    assert set(cuerpo["distribucion"]) == {"pia", "pim", "devengado", "pct_ejecucion"}
+    pim = cuerpo["distribucion"]["pim"]
+    assert set(pim) >= {"n", "ceros", "q1", "mediana", "q3", "bigote_min", "bigote_max",
+                        "atipicos", "frase"}
+    assert pim["n"] == cuerpo["poligonos"]["pintados"]
+    assert pim["q1"] <= pim["mediana"] <= pim["q3"]
+    assert pim["frase"]
+
+
+def test_los_pies_del_mapa_no_dicen_dos_veces_lo_mismo(api, inversion_cargada):
+    """Los 13 distritos capital salían explicados en los dos pies, con palabras distintas.
+
+    Junto al párrafo de quintiles y a la entradilla eran ~150 palabras alrededor de un mapa, y
+    el lector no llegaba al final. Cada pie dice ahora **su** hecho: uno el dinero que no se
+    pinta, otro los polígonos en blanco.
+    """
+    cuerpo = api.get("/api/inversion/mapa/?anio=2026&nivel=distrital").json()
+    no_ubicado = cuerpo["no_ubicado"]["motivo"]
+    poligonos = cuerpo["poligonos"]["motivo"]
+
+    # El plural entre paréntesis leía como una circular administrativa.
+    assert "(es)" not in no_ubicado and "(es)" not in poligonos
+    # Qué gestiona una municipalidad provincial se explica UNA vez, en el pie del dinero.
+    assert "provincia" in no_ubicado
+    assert "gestiona" not in poligonos
+    assert len(no_ubicado.split()) <= 32
+    assert len(poligonos.split()) <= 20
+
+
 def test_el_mapa_se_acota_por_provincia(api, inversion_cargada):
     cuerpo = api.get("/api/inversion/mapa/?anio=2026&nivel=distrital&provincia=CUSCO").json()
 

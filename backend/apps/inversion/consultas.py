@@ -22,6 +22,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, NullIf
 
+from apps.inversion import declaraciones
 from apps.inversion.models import (
     Ejercicio,
     EntidadEjecutora,
@@ -622,6 +623,62 @@ def _cortes(valores: list[float]) -> list[float]:
     return [float(ordenados[min(n - 1, n * k // 5)]) for k in (1, 2, 3, 4)]
 
 
+def distribucion(filas: list[dict], metrica: str) -> dict:
+    """Los cinco números de un diagrama de caja, más los atípicos con su nombre.
+
+    **El coroplético no puede enseñar el reparto y esto sí.** Los quintiles son la escala
+    correcta para un mapa, pero su último tramo se traga toda la cola: con el PIM distrital de
+    2026 empieza en S/ 216.445, así que un distrito de 220 mil y otro de 9,3 millones salen del
+    mismo color. La mediana es S/ 73.510 y el máximo, 127 veces más.
+
+    Se calcula en el servidor por lo mismo que `cortes` y los dos `motivo` (ADR-D6): el día que
+    la caja entre en el PDF, dos cálculos de la misma mediana acabarían discrepando.
+
+    Tres decisiones que un refactor puede deshacer sin que nada falle:
+
+    - **Los cuartiles van por índice, sin interpolar**, igual que `_cortes`. Son estadísticos
+      distintos y no pueden coincidir, pero con métodos distintos nadie sabría si la diferencia
+      es del dato o del método.
+    - **Los ceros cuentan para los cuartiles y se cuentan aparte.** Un distrito sin presupuesto
+      es un dato; lo que no puede es dibujarse en un eje logarítmico, así que el cliente
+      necesita saber cuántos deja fuera para declararlo en vez de encogerse la caja en silencio.
+    - **`pct_ejecucion` nulo se descarta, no vale 0.** Sin PIM no hay avance que calcular, y
+      contarlo como cero bajaría la mediana sin que nada fallara.
+    """
+    pares = [
+        (f["nombre"], float(f[metrica])) for f in filas if f.get(metrica) is not None
+    ]
+    if not pares:
+        return {"n": 0, "ceros": 0, "q1": 0.0, "mediana": 0.0, "q3": 0.0,
+                "bigote_min": 0.0, "bigote_max": 0.0, "atipicos": []}
+
+    valores = sorted(v for _, v in pares)
+    n = len(valores)
+    q1, mediana, q3 = (float(valores[min(n - 1, n * k // 4)]) for k in (1, 2, 3))
+
+    # Tukey. Con IQR 0 —todos los valores iguales— los límites colapsan sobre la caja y no sale
+    # ningún atípico, que es lo correcto: una serie constante no tiene nada que destacar.
+    iqr = q3 - q1
+    limite_bajo, limite_alto = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+    dentro = [v for v in valores if limite_bajo <= v <= limite_alto]
+    atipicos = sorted(
+        ({"nombre": nombre, "valor": valor}
+         for nombre, valor in pares
+         if valor < limite_bajo or valor > limite_alto),
+        key=lambda a: -a["valor"],
+    )
+    return {
+        "n": n,
+        "ceros": sum(1 for v in valores if v == 0),
+        "q1": q1,
+        "mediana": mediana,
+        "q3": q3,
+        "bigote_min": float(dentro[0]) if dentro else valores[0],
+        "bigote_max": float(dentro[-1]) if dentro else valores[-1],
+        "atipicos": atipicos,
+    }
+
+
 def mapa(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="", nivel=NIVEL_POR_DEFECTO) -> dict:
     """El coroplético: el presupuesto del ámbito, sobre el polígono al que se le puede atribuir.
 
@@ -693,17 +750,19 @@ def mapa(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="", nivel=NIVEL_POR_DEF
         if provincia:
             campo = "provincia__ubigeo" if provincia.isdigit() else "provincia__nombre__iexact"
             alcance = alcance.filter(**{campo: provincia})
+        # Dice SU hecho —polígonos en blanco— y no repite qué gestiona una municipalidad
+        # provincial: eso ya lo cuenta el pie de `no_ubicado`, que va justo encima. Decirlo dos
+        # veces con palabras distintas es lo que hacía ilegible el pie del mapa.
         motivo_sin_dato = (
-            "Distritos sin municipalidad distrital con presupuesto en este ejercicio. Los "
-            "trece que son capital de provincia no la tienen: su municipalidad es la "
-            "provincial, y gestiona el presupuesto de toda la provincia."
+            "Sin municipalidad distrital con presupuesto este año: las capitales de provincia "
+            "no la tienen."
         )
     else:
         alcance = Provincia.objects.all()
         if provincia:
             campo = "ubigeo" if provincia.isdigit() else "nombre__iexact"
             alcance = alcance.filter(**{campo: provincia})
-        motivo_sin_dato = "Provincias sin ninguna municipalidad con presupuesto en este ejercicio."
+        motivo_sin_dato = "Sin ninguna municipalidad con presupuesto este año."
 
     return {
         "nivel": nivel,
@@ -712,6 +771,13 @@ def mapa(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="", nivel=NIVEL_POR_DEF
         # Los cortes se calculan sobre lo pintado, así que el color es relativo a la vista. Es
         # el precio de los quintiles, y se paga imprimiendo los rangos en soles en la leyenda.
         "cortes": {m: _cortes([f[m] for f in filas]) for m in ("pia", "pim", "devengado")},
+        # Las cuatro a la vez: cambiar de métrica no dispara otra petición, así que la caja de
+        # cada una tiene que venir en la misma respuesta que el mapa que describe.
+        "distribucion": {
+            m: {**(d := distribucion(filas, m)),
+                "frase": declaraciones.distribucion(d, m, nivel)}
+            for m in ("pia", "pim", "devengado", "pct_ejecucion")
+        },
         "no_ubicado": {
             "pia": float(resto["pia"]),
             "pim": float(resto["pim"]),
@@ -735,18 +801,20 @@ def _motivo_no_ubicado(nivel: str, provinciales: int, sin_geografia: int) -> str
     """
     if not (provinciales or sin_geografia):
         return ""
+    # Empieza por «Son de» y no por «De» porque la interfaz lo encadena tras «S/ X no aparecen
+    # en el mapa.», y un complemento suelto tras un punto se lee como una frase partida.
     partes = []
     if provinciales:
+        cuales = "municipalidad provincial" if provinciales == 1 else "municipalidades provinciales"
         partes.append(
-            f"{provinciales} municipalidad(es) provincial(es), cuyo presupuesto cubre toda su "
-            "provincia y no un distrito"
+            f"{provinciales} {cuales} —su presupuesto es de toda la provincia—"
         )
     if sin_geografia:
         donde = "distrito" if nivel == "distrital" else "provincia"
-        partes.append(f"{sin_geografia} entidad(es) que el padrón no ubica en ningún {donde}")
+        cuales = "entidad" if sin_geografia == 1 else "entidades"
+        partes.append(f"{sin_geografia} {cuales} sin {donde} en el padrón")
     return (
-        "No se pinta el presupuesto de " + " y ".join(partes) + ". Su importe se declara aparte "
-        "en vez de repartirse."
+        "Son de " + " y de ".join(partes) + ". Su importe se declara aparte en vez de repartirse."
     )
 
 

@@ -3,6 +3,8 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { registrarProtocoloPmtiles } from "@/lib/pmtiles";
 import { formatPct, formatSoles } from "@/lib/semaforo";
+import CajaDistribucion from "./CajaDistribucion";
+import Declaracion from "./Declaracion";
 import type { CapaMapa, InversionMapa, InversionMapaFila, MetricaMapa } from "@/lib/types";
 
 /**
@@ -310,19 +312,30 @@ export default function MapaInversion({
         </span>
       </div>
 
+      {/* El reparto, que es lo que el color no puede enseñar: los quintiles son la escala
+          correcta para un mapa, pero su último tramo se traga la cola. Va aquí y no en
+          `Inversion.tsx` para quedar pegada a la leyenda que explica, y antes de los pies, que
+          hablan de lo que NO se pinta. */}
+      <CajaDistribucion
+        caja={datos.distribucion[metrica]}
+        metrica={metrica}
+        unidad={CAPAS[datos.nivel].etiqueta.toLowerCase()}
+        etiquetaMetrica={nombreMetrica}
+      />
+      <Declaracion>{datos.distribucion[metrica].frase}</Declaracion>
+
       {metrica === "pct_ejecucion" && datos.es_parcial && (
+        // Se repite aquí y no solo arriba porque este mapa se cita suelto, fuera de la página.
         <p className="text-xs text-ink-600 mt-2 border-l-2 border-level-2 pl-3">
-          El ejercicio {datos.anio} va al corte {datos.corte}, pero el % se calcula contra un PIM
-          anual: un 50 % a mitad de año no es media ejecución perdida. La advertencia va aquí y no
-          solo arriba porque este mapa se cita suelto.
+          El ejercicio {datos.anio} va al corte {datos.corte_legible || datos.corte}, pero el % se
+          calcula contra un PIM anual: un 50 % a mitad de año no es media ejecución perdida.
         </p>
       )}
 
       {metrica !== "pct_ejecucion" && (
         <p className="text-[11px] text-ink-600 mt-2">
-          Los cinco tramos son quintiles de lo que se está viendo, así que el color es relativo a
-          esta vista: al acotar por provincia, un mismo distrito puede cambiar de tono. Los rangos
-          en soles van siempre en la leyenda por eso mismo.
+          Los cinco tramos son quintiles de esta vista: al acotar por provincia, un mismo distrito
+          puede cambiar de tono.
         </p>
       )}
 

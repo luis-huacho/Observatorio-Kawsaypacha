@@ -24,6 +24,7 @@ import {
   mesDelCorte,
 } from "@/lib/inversion";
 import BotonDescarga from "@/components/BotonDescarga";
+import Declaracion from "@/components/Declaracion";
 import EmptyState from "@/components/EmptyState";
 import KPI from "@/components/KPI";
 import MapaInversion from "@/components/MapaInversion";
@@ -530,11 +531,9 @@ export default function InversionView() {
               <h2 className="font-display font-semibold text-mountain-900 mb-2">
                 ¿Dónde está el presupuesto? — {d.anio}
               </h2>
-              <p className="text-xs text-ink-600 mb-4">
-                El presupuesto es de municipalidades, no de territorios, así que cada polígono
-                muestra solo el dinero que se le puede atribuir sin repartirlo. Lo que no cabe en
-                el nivel elegido se declara debajo del mapa.
-              </p>
+              {/* Sin entradilla: «el presupuesto es de municipalidades, no de territorios» ya
+                  lo dice la línea de alcance de arriba, y qué no se pinta lo dice el pie. Eran
+                  ~150 palabras alrededor de un mapa y el lector no llegaba al final. */}
               {mapaDatos && capasMapa.status === "ok" ? (
                 <MapaInversion
                   datos={mapaDatos}
@@ -678,27 +677,6 @@ export default function InversionView() {
  * porcentaje sin forma no deja ver que en algunos ámbitos la obra pública se come casi todo el
  * programa mientras la gestión corriente se queda sin nada.
  */
-/**
- * La frase que dice lo que el gráfico de encima enseña.
- *
- * Mismo registro que las `.declaracion` del PDF —filete a la izquierda, texto pequeño y gris—
- * porque es literalmente la misma frase: **la redacta el backend** y viaja en el payload
- * (`apps/inversion/declaraciones.py`), que es lo que impide que la pantalla y el documento
- * acaben diciendo cosas distintas. Aquí solo se pinta. **Sin verde ni rojo a propósito**:
- * `Delta` colorea porque compara dos ejercicios que alguien eligió; aquí más presupuesto no es
- * de suyo una buena noticia, y pintarlo de verde sería opinar por el lector.
- *
- * Devuelve `null` con contenido vacío, para que un ámbito sin datos no deje un filete huérfano.
- */
-function Declaracion({ children }: { children: string | null }) {
-  if (!children) return null;
-  return (
-    <p className="mt-4 border-l-2 border-earth-500 pl-3 text-xs leading-relaxed text-ink-600">
-      {children}
-    </p>
-  );
-}
-
 /**
  * Quién tiene los proyectos de inversión.
  *

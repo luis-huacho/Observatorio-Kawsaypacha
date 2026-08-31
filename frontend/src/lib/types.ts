@@ -431,6 +431,14 @@ export type InversionMapa = InversionEjercicio & {
   /** Cuatro quintiles por métrica de dinero. Pueden repetirse: la leyenda dibuja el tramo vacío. */
   cortes: Record<"pia" | "pim" | "devengado", number[]>;
   /**
+   * Los cinco números del diagrama de caja, uno por métrica — cambiar de métrica no dispara otra
+   * petición, así que las cuatro viajan juntas.
+   *
+   * Los calcula el servidor por lo mismo que `cortes` y los dos `motivo` (ADR-D6): dos cálculos
+   * de la misma mediana acaban discrepando. El cliente solo dibuja.
+   */
+  distribucion: Record<MetricaMapa, InversionDistribucion>;
+  /**
    * Lo que este nivel no puede atribuir a ningún polígono (ADR-D6). No se reparte: se declara.
    * `motivo` viene redactado del backend para que la advertencia viaje con el dato.
    */
@@ -442,6 +450,30 @@ export type InversionMapa = InversionEjercicio & {
     motivo: string;
   };
   poligonos: { pintados: number; sin_dato: number; motivo: string };
+};
+
+/**
+ * Un diagrama de caja: lo que el coroplético no puede enseñar.
+ *
+ * Los quintiles son la escala correcta para un mapa, pero su último tramo se traga la cola —con
+ * el PIM distrital de 2026 arranca en S/ 216.445, así que un distrito de 220 mil y otro de 9,3
+ * millones salen del mismo color—. Aquí se ve el sesgo entero.
+ */
+export type InversionDistribucion = {
+  /** Polígonos con dato. `pct_ejecucion` excluye los nulos: sin PIM no hay avance que calcular. */
+  n: number;
+  /** Cuántos valen 0. **No caben en un eje logarítmico**, así que se declaran en vez de perderse. */
+  ceros: number;
+  q1: number;
+  mediana: number;
+  q3: number;
+  /** Los bigotes llegan al último valor que NO es atípico (Tukey, 1,5·IQR). */
+  bigote_min: number;
+  bigote_max: number;
+  /** Con su nombre: un punto suelto no dice nada; «PICHARI» sí. De mayor a menor. */
+  atipicos: Array<{ nombre: string; valor: number }>;
+  /** La frase que va debajo, redactada en el backend como las del tablero. */
+  frase: string | null;
 };
 
 export type InversionMapaResponse =

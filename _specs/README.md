@@ -13,6 +13,61 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 31/08/2026 — el mapa de /inversion se explicaba cuatro veces y no decía qué enseña
+
+La sección «¿Dónde está el presupuesto?» rodeaba el coroplético de **~150 palabras**: una entradilla
+encima, el párrafo de quintiles y dos pies. Y **los mismos 13 distritos capital salían explicados
+dos veces con palabras distintas** —«municipalidades provinciales cuyo presupuesto cubre toda su
+provincia» en un pie, «capitales de provincia cuya municipalidad es la provincial» en el otro—.
+Encima, dos de esos textos terminaban justificándose ante el lector: «los rangos van siempre en la
+leyenda **por eso mismo**» y «la advertencia va aquí y no solo arriba **porque este mapa se cita
+suelto**». Eso es un comentario de código impreso en la pantalla, y ahí es donde ha vuelto. Los
+`municipalidad(es)` con el plural entre paréntesis remataban el tono de circular.
+
+**Y faltaba lo principal: era el único gráfico de la página sin `Declaracion`.** Cuatro párrafos
+sobre lo que **no** se pinta y ninguno sobre lo que sí.
+
+**Un diagrama de caja, porque el coroplético no puede enseñar el reparto.** Los quintiles son la
+escala correcta para un mapa, pero su último tramo se traga toda la cola: con el PIM distrital de
+2026 arranca en S/ 216.445, así que **un distrito de 220 mil y otro de 9,3 millones se pintan del
+mismo color**. La mediana es S/ 73.510 y PICHARI, S/ 9.331.232 — **127 veces más**, con 14 atípicos
+de 99. La caja lo dice de un vistazo, y de paso explica por qué el mapa se ve tan plano.
+
+Cinco cosas que no son obvias:
+
+- **El dinero va en escala logarítmica y no es una preferencia.** Medido: en un eje lineal de 600 px
+  la caja del PIM ocupa **9 píxeles**. No es un diagrama de caja, es un punto. El % de ejecución va
+  lineal de 0 a 100, donde no hay cola que comprimir y un 0 % es un punto válido.
+- **Dos repliegues, los dos porque `log(0)` no existe.** Los ceros se excluyen del dibujo y **se
+  declaran** en la frase —«1 distrito con S/ 0 no entra en la escala»—; y si `q1` valiera 0 la
+  escala se repliega a lineal, porque si no el borde de la caja sería `-Infinity` y **el SVG no
+  pintaría nada sin dar ningún error**.
+- **Los cinco números los calcula el servidor**, junto a `cortes` y a los dos `motivo` (ADR-D6): el
+  día que la caja entre en el PDF, dos cálculos de la misma mediana acabarían discrepando. Es la
+  corrección que `e05c0a4` hizo con las cuatro declaraciones, aplicada antes de que hiciera falta.
+  Los **cuartiles van por índice, sin interpolar**, igual que `_cortes`: son estadísticos distintos
+  y no pueden coincidir, pero con métodos distintos nadie sabría si la diferencia es del dato o del
+  método.
+- **Tres fallos de redacción los encontró la salida real, no las pruebas con datos de muestra**: «la
+  mitad de **los** 13 provincias» (concordancia), «8 distritos **sin presupuesto**» para el
+  porcentaje —que además ni siquiera aplica, porque su eje es lineal y el 0 % cabe— y un pie que
+  encadenaba «…no aparecen en el mapa. **De** 13 municipalidades…», una frase partida. Los tres
+  tienen ahora su prueba.
+- **El SVG es a mano, no Recharts.** El proyecto no usa `ErrorBar`, `Scatter` ni `ComposedChart` en
+  ninguna parte, y el PDF construye sus gráficos con `rect`/`line`/`text`: el día que la caja pase
+  al papel se traduce casi línea a línea.
+
+De camino, una prueba e2e que no probaba lo que decía: contaba `p.border-l-2 >= 4` para verificar
+que cada gráfico declara, y **ese selector casaba también con los dos pies del mapa**, así que
+pasaba aunque faltara una declaración. Ahora cuenta por la clase completa y son cinco.
+
+La caja **no entra en el reporte PDF** (decisión del dueño del proyecto). Los estadísticos ya viajan
+en el payload, así que añadirla después es una función `caja()` en `apps/informes/graficos.py` y un
+`<section>` en la plantilla, sin recalcular nada. Los dos pies recortados **sí** llegan al papel, que
+es lo que se quería. Sin ADR: no cambia ninguna decisión, y ADR-D6 sigue mandando.
+
+Suite: **517 + 7** y **79 casos e2e** (158 corridas), en verde.
+
 ### Actualización 31/08/2026 — cuatro segundos de espera sin una sola señal en pantalla
 
 Pedir la ayuda memoria en `/peligros` tarda **3,7-4,0 s** —el PDF renderiza su mapa con un Chromium

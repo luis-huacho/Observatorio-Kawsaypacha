@@ -185,8 +185,13 @@ test.describe("Inversión (PP 0068)", () => {
 
     // Un gráfico se deja leer pero no concluye. Estas frases son lo que un periodista copia, y
     // sin una prueba se pierden en el siguiente retoque de maquetación sin que nada falle.
-    const declaraciones = page.locator("p.border-l-2");
-    expect(await declaraciones.count()).toBeGreaterThanOrEqual(4);
+    //
+    // Se cuentan por su clase COMPLETA y no por `p.border-l-2` a secas: ese selector casaba
+    // también con los dos pies del mapa, así que la cuenta pasaba aunque faltara una
+    // declaración —justo el fallo que esta prueba existe para ver—. Son cinco desde que el
+    // mapa tiene la suya: era el único gráfico de la página sin una.
+    const declaraciones = page.locator("p.border-earth-500.border-l-2");
+    expect(await declaraciones.count()).toBeGreaterThanOrEqual(5);
 
     await expect(page.getByText(/entre lo aprobado al abrir el año y lo vigente hoy/i)).toBeVisible();
     await expect(page.getByText(/concentra .* del presupuesto vigente/i).first()).toBeVisible();
@@ -238,6 +243,87 @@ test.describe("Inversión (PP 0068)", () => {
     expect(mapa.no_ubicado.entidades).toBeGreaterThan(0);
     await expect(visor.getByText(/no aparecen en el mapa/i)).toBeVisible();
     await expect(visor.getByText(/sin municipalidad \(\d+\)/)).toBeVisible();
+  });
+
+  test("el diagrama de caja enseña el reparto que el color aplana", async ({ page }) => {
+    // Los quintiles son la escala correcta para un mapa, pero su último tramo se traga la cola:
+    // con el PIM distrital de 2026 arranca en S/ 216.445, así que un distrito de 220 mil y otro
+    // de 9,3 millones salen del mismo color. La caja es lo que dice que la mediana es S/ 73.510.
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    const caja = visor.locator("figure svg");
+    await expect(caja).toBeVisible();
+
+    // Un punto suelto a la derecha no dice nada; con el nombre dice quién es. Los `<title>` del
+    // SVG dan el tooltip sin una línea de JavaScript.
+    const atipicos = mapa.distribucion.pim.atipicos;
+    await expect(caja.locator("circle")).toHaveCount(atipicos.length);
+    if (atipicos.length) {
+      await expect(caja.locator("title").first()).toHaveText(
+        new RegExp(atipicos[0].nombre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      );
+    }
+    // Y la frase, que es lo que se copia a un informe.
+    await expect(visor.getByText(/La mitad de los \d+ distritos está entre/)).toBeVisible();
+  });
+
+  test("el porcentaje de ejecución cambia la caja de escala y de unidades", async ({ page }) => {
+    // El dinero va en escala logarítmica —en un eje lineal la caja del PIM mide 9 píxeles— pero
+    // un porcentaje no tiene cola que comprimir: va lineal de 0 a 100 y el 0 % sí cabe, así que
+    // no debe arrastrar la advertencia de los valores que no entran en la escala.
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    await expect(visor.getByText(/escala logarítmica/i)).toBeVisible();
+
+    await visor.getByRole("button", { name: "% de ejecución" }).click();
+
+    await expect(visor.getByText(/escala logarítmica/i)).toHaveCount(0);
+    await expect(visor.getByText(/no entran? en la escala/i)).toHaveCount(0);
+    // La frase pasa a hablar en porcentajes, no en soles.
+    await expect(visor.getByText(/La mitad de los \d+ distritos está entre \d/)).toBeVisible();
+  });
+
+  test("a nivel provincial la caja se recalcula sobre las trece provincias", async ({ page }) => {
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion?nivel=provincial");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    // Concuerda en género: «los 13 provincias» es el descuido que delata una frase generada.
+    await expect(visor.getByText(/La mitad de las \d+ provincias está entre/)).toBeVisible();
+    await expect(visor.locator("figure svg circle")).toHaveCount(
+      mapa.distribucion.pim.atipicos.length
+    );
+  });
+
+  test("el pie del mapa no explica dos veces lo mismo", async ({ page }) => {
+    // Eran ~150 palabras alrededor del mapa, con los 13 distritos capital explicados en los dos
+    // pies con palabras distintas. El lector no llegaba al final.
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+
+    // La entradilla que había encima del mapa se retiró: lo que decía ya está en la línea de
+    // alcance de la cabecera y en el pie de «no aparecen en el mapa».
+    await expect(visor.getByText(/no es de territorios|no de territorios/i)).toHaveCount(0);
+    // Y las dos frases que se justificaban a sí mismas ante el lector.
+    await expect(visor.getByText(/por eso mismo/i)).toHaveCount(0);
+    await expect(visor.getByText(/porque este mapa se cita suelto/i)).toHaveCount(0);
+    // El plural entre paréntesis leía como una circular.
+    await expect(visor.getByText(/\(es\)/)).toHaveCount(0);
+    expect(mapa.no_ubicado.motivo).not.toContain("(es)");
   });
 
   test("cambiar el visor a provincia no deja nada fuera del mapa", async ({ page }) => {
