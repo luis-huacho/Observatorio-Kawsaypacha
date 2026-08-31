@@ -86,6 +86,29 @@ formulario o desde la lista, marcando las filas y eligiendo la acción:
 - **Archivar** — lo retira del sitio sin borrarlo. **Archivar es lo correcto para retirar algo**;
   borrar destruye el historial y las direcciones que ya se hayan compartido.
 
+### Adjuntar enlaces y archivos a una noticia
+
+Al final del formulario de una noticia, debajo de todo, hay dos bloques donde se añaden filas:
+
+- **Enlaces** — un título y una dirección. El título es obligatorio y es lo que se lee en el
+  sitio: una dirección pelada no la puede leer en voz alta ni citar nadie. Se abren en una pestaña
+  nueva.
+- **Archivos** — el documento y su título. Se ven al pie de la noticia como una tarjeta con el
+  formato y el peso («PDF · 2,3 MB»).
+
+El campo **Orden** decide cuál va antes; si se dejan todos en cero, salen en el orden en que se
+dieron de alta. Se pueden repetir números sin que pase nada.
+
+Se aceptan PDF, Word, Excel, PowerPoint, CSV, texto, ZIP e imágenes, **hasta 20 MB**. Si el
+archivo es de otro tipo o pesa más, el formulario lo dice al guardar y no se pierde el resto de lo
+escrito. Las páginas web guardadas (`.html`) y los gráficos vectoriales (`.svg`) **no se admiten a
+propósito**, por seguridad: son archivos que el navegador ejecuta.
+
+> **Un archivo adjunto queda accesible en cuanto guardas, aunque la noticia siga en borrador.** No
+> es como el texto, que no se ve hasta publicar: el archivo vive en una dirección propia y quien
+> la tenga puede abrirlo. La dirección no se puede adivinar —lleva un código aleatorio— pero se
+> puede compartir. **No subas ahí nada reservado o bajo embargo** hasta que puedas publicarlo.
+
 ### Ejercicio de la capacitación
 
 Crear una noticia, publicarla y comprobar que aparece en

@@ -67,3 +67,37 @@ class AlmacenamientoContenido(FileSystemStorage):
         if reducida is not content:
             name = imagenes.renombrar(name, imagenes.FORMATO_EDITOR)
         return super()._save(name, reducida)
+
+
+def ruta_adjunto(instancia, nombre: str) -> str:
+    """`adjuntos/<app>/<aaaa>/<mm>/<token>/<nombre original>` para los archivos que se adjuntan
+    a una ficha editorial.
+
+    **El segmento aleatorio existe porque nginx sirve `/media/` entero como estático público.** Sin
+    él, la URL del anexo de un borrador se deduce del título —`…/2026/08/informe-final.pdf`— y un
+    informe todavía no publicado se filtra sin que nadie tenga que hacer nada raro. Con el token,
+    hay que tener la URL.
+
+    **No es control de acceso, y confundirlo sería peor que no tenerlo:** quien tenga el enlace
+    entra siempre, esté la ficha publicada o retirada, y borrar la fila no borra el archivo. Cierra
+    lo adivinable, que es la parte barata del problema; la cara —sacar `/media/` del servido
+    estático y pasar cada descarga por gunicorn— no se paga por un anexo de noticia.
+
+    **El token va como CARPETA y no pegado al nombre**, que es lo que uno escribiría primero: el
+    atributo `download` de un `<a>` **se ignora cuando el enlace es cross-origin**, y la SPA y el
+    API están en dominios distintos (ADR-A14). O sea que el visitante guarda el archivo con el
+    nombre que traiga la URL, y `a3f9…-informe.pdf` es un nombre peor que `informe.pdf`.
+
+    Ojo al mover o renombrar esta función: `upload_to` se serializa en la migración **por su ruta
+    de importación**, así que las migraciones históricas dejarían de importar.
+    """
+    from uuid import uuid4
+
+    return str(
+        PurePosixPath("adjuntos")
+        / instancia._meta.app_label
+        / timezone.localdate().strftime("%Y/%m")
+        / uuid4().hex
+        # Solo el basename: un nombre con `../` no puede salir de la carpeta.
+        / PurePosixPath(str(nombre or "").replace("\\", "/")).name
+    )

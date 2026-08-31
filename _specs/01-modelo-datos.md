@@ -209,9 +209,19 @@ Fuente y consolidación: `scripts/consolidar_pp0068.py` (serie 2022-2026, mezcla
 ### contenidos
 | Modelo | Campos |
 |---|---|
-| `Noticia (Workflow)` | `slug` unique, `titulo`, `bajada`, `cuerpo` rich, `imagen_portada` ImageField **null**, `imagen_titulo` char null (pie de imagen), `palabras_clave` ArrayField(char), `fecha` (index desc); [+] `destacada` bool (home), `tipo` (noticia\|articulo\|opinion\|publicacion\|base_datos), `autor`. Redacción asistida (ADR-D7): los cuatro campos vienen de `core.RedaccionIAMixin` —`url_origen` URLField(500) blank, `ia_estado` (pendiente\|procesando\|ok\|error), `log_ia` Text, `redactada_por_ia` bool **= el candado, una sola vez por registro**—, compartido con `Norma` desde ADR-D8. Orden `-destacada, -fecha, -id` —el remate único lo exige la paginación— e índice `(estado, -destacada, -fecha)` |
+| `Noticia (Workflow)` | `slug` unique, `titulo`, `bajada`, `cuerpo` rich, `imagen_portada` ImageField **null**, `imagen_titulo` char null (pie de imagen), `palabras_clave` ArrayField(char), `fecha` (index desc), `destacada` bool (home), `tipo` (noticia\|articulo\|opinion\|publicacion\|base_datos), `autor`, y los modelos hijos **`NoticiaEnlace`** y **`NoticiaArchivo`**. Redacción asistida (ADR-D7): los cuatro campos vienen de `core.RedaccionIAMixin` —`url_origen` URLField(500) blank, `ia_estado` (pendiente\|procesando\|ok\|error), `log_ia` Text, `redactada_por_ia` bool **= el candado, una sola vez por registro**—, compartido con `Norma` desde ADR-D8. Orden `-destacada, -fecha, -id` —el remate único lo exige la paginación— e índice `(estado, -destacada, -fecha)` |
+| `NoticiaEnlace` | FK `noticia` (related_name `enlaces`, CASCADE), `titulo` (obligatorio), `url` URLField(500), `orden` PositiveSmallInt |
+| `NoticiaArchivo` | FK `noticia` (related_name `archivos`, CASCADE), `archivo` FileField (`upload_to=core.almacenamiento.ruta_adjunto`, validado por `core.validadores.validar_adjunto`), `titulo` (obligatorio), `orden`, `peso_bytes` PositiveBigInt `editable=False` |
 | `Video (Workflow)` | `titulo`, `descripcion`, `url` (YouTube/Vimeo), `fecha`; [+] `thumbnail_override`, `duracion`, FK `tema` (TipoPeligro) null |
 | `Evento (Workflow)` | `titulo`, `descripcion`, `inicio` datetime (index), `fin` null, `lugar`; [+] `modalidad` (presencial|virtual|mixta), `url_inscripcion`, `organizador`, `imagen` |
+
+**Los anexos de una noticia son dos tablas, no un `JSONField` ni un M2M a `biblioteca.Documento`.** `Medida.enlaces` resuelve lo mismo con JSON y su admin es un textarea de JSON crudo, sin widget ni validación; aquí quien escribe es un editor. Y un anexo **no es una publicación del repositorio**: pasar por `Documento` obligaría a un alta con categoría, resumen y flujo editorial propios por cada PDF que acompaña a una nota. **El contrato del API no cambia por eso**: `enlaces` sale como `[{titulo, url}]` en los dos modelos y el frontend comparte `EnlaceExterno` y `ListaEnlaces`.
+
+Tres detalles que no son obvios:
+
+- **Ninguno lleva `unique (noticia, orden)`**, que es lo que sí tiene `MedidaImagen`. Con `orden` a `default=0` y un inline de `extra=1`, añadir dos filas sin tocar el número **violaría la restricción**: es una trampa que `MedidaImagen` arrastra y que no se hereda. `orden` es una preferencia de presentación, no identidad. Lo que sí hace falta es que el orden sea **total** — `ordering = ["orden", "id"]` — porque con el empate como norma el desempate lo elegiría el planificador y los anexos se barajarían entre recargas sin que nada fallara.
+- **`peso_bytes` se guarda, no se lee al serializar.** `archivo.size` toca el almacenamiento en cada petición y **lanza si el archivo desapareció del disco**: sería un 500 en una página pública por una etiqueta decorativa. Se calcula en `save()` y solo cuando el `FieldFile` trae contenido nuevo (`_committed`), igual que `ImagenOptimizadaMixin`.
+- **`CASCADE` borra la fila, no el archivo.** Django nunca borra el fichero; queda huérfano en `MEDIA_ROOT`, como con todos los `FileField` del proyecto.
 
 ### Imagen por defecto del contenido editorial (decisión del dueño del proyecto)
 

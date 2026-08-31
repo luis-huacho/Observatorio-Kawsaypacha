@@ -9,6 +9,8 @@ from apps.core.models import (
     WorkflowMixin,
     permiso_publicar,
 )
+from apps.core.almacenamiento import ruta_adjunto
+from apps.core.validadores import extension_de, validar_adjunto
 
 
 class Noticia(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, ImagenOptimizadaMixin,
@@ -65,6 +67,91 @@ class Noticia(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, ImagenOptimizadaMi
     @property
     def anio(self) -> int:
         return self.fecha.year
+
+
+class NoticiaEnlace(models.Model):
+    """Un enlace externo que acompaña a la noticia.
+
+    Es una tabla y no el `JSONField` con el que `Medida` resuelve lo mismo: aquel se administra
+    como un textarea de JSON crudo —sin widget ni validación— y aquí quien escribe es un editor,
+    no un programador. **El contrato del API no cambia por eso**: los dos salen como
+    `[{"titulo": …, "url": …}]` y el frontend no puede distinguirlos.
+    """
+
+    noticia = models.ForeignKey("contenidos.Noticia", on_delete=models.CASCADE,
+                                related_name="enlaces")
+    titulo = models.CharField(max_length=200, help_text="Lo que se lee en la ficha.")
+    url = models.URLField(max_length=500)
+    orden = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        # **Orden total, y no es adorno.** `orden` tiene `default=0`, así que el empate es la
+        # norma: sin el remate por `id` el desempate lo elige el planificador de Postgres y dos
+        # peticiones seguidas pueden devolver los anexos en orden distinto sin que nada falle.
+        #
+        # Y **no lleva `unique (noticia, orden)`**, que es lo que sí tiene `MedidaImagen`: con
+        # `default=0` y un inline de `extra=1`, añadir dos filas sin tocar el número violaría la
+        # restricción. Esa trampa no se hereda.
+        ordering = ["orden", "id"]
+        verbose_name = "enlace de la noticia"
+        verbose_name_plural = "enlaces"
+
+    def __str__(self) -> str:
+        return self.titulo
+
+
+class NoticiaArchivo(models.Model):
+    """Un archivo adjunto de la noticia: el informe, el comunicado o la resolución que la nota
+    acompaña.
+
+    **No es un `biblioteca.Documento`**: aquello es el repositorio de publicaciones, con categoría,
+    resumen y flujo editorial propios, y un anexo no tiene por qué aparecer ahí. Tampoco se indexa
+    en el buscador.
+
+    **El archivo es público desde que se guarda, aunque la noticia siga en borrador**: nginx sirve
+    `/media/` entero como estático. Servirlo por una vista que comprobara el estado costaría una
+    ruta, tumbaría el servido estático y pasaría cada descarga por gunicorn; se acepta y se avisa
+    en el `help_text`.
+    """
+
+    noticia = models.ForeignKey("contenidos.Noticia", on_delete=models.CASCADE,
+                                related_name="archivos")
+    archivo = models.FileField(
+        # `ruta_adjunto` mete un segmento aleatorio para que la URL no se pueda deducir del
+        # título. Cierra lo adivinable, no el acceso: ver su docstring.
+        upload_to=ruta_adjunto,
+        validators=[validar_adjunto],
+        help_text="Queda accesible por su URL en cuanto guardas, aunque la noticia siga en "
+                  "borrador. No subas aquí nada reservado.",
+    )
+    titulo = models.CharField(max_length=200, help_text="Lo que se lee en la ficha.")
+    orden = models.PositiveSmallIntegerField(default=0)
+    #: Se guarda en vez de leerse al serializar: `archivo.size` toca el almacenamiento en cada
+    #: petición y **lanza excepción si el archivo desapareció del disco**, o sea un 500 en una
+    #: página pública por un anexo perdido. Guardado, la fila sigue pintando y lo que falla es la
+    #: descarga, que se ve.
+    peso_bytes = models.PositiveBigIntegerField(default=0, editable=False)
+
+    class Meta:
+        ordering = ["orden", "id"]  # total, por lo mismo que en NoticiaEnlace
+        verbose_name = "archivo de la noticia"
+        verbose_name_plural = "archivos"
+
+    def __str__(self) -> str:
+        return self.titulo
+
+    @property
+    def extension(self) -> str:
+        return extension_de(self.archivo.name) if self.archivo else ""
+
+    def save(self, *args, **kwargs):
+        # **`_committed` es la pregunta correcta**, no si hay archivo: dice si este `FieldFile`
+        # trae contenido nuevo sin escribir todavía. Volver a guardar la fila para corregir el
+        # título no tiene por qué ir al almacenamiento a remedir lo mismo. Mismo criterio que
+        # `ImagenOptimizadaMixin`.
+        if self.archivo and not self.archivo._committed:
+            self.peso_bytes = self.archivo.size
+        super().save(*args, **kwargs)
 
 
 class Video(TimeStampedMixin, WorkflowMixin):

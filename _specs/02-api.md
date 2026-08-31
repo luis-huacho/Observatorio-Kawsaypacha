@@ -195,7 +195,7 @@ Notas del contrato:
 | `GET /api/normativa/{slug}/` | — | ficha con `contenido` desarrollado |
 | `GET /api/normativa/export.xlsx` | ídem que el listado | |
 | `GET /api/noticias/` | `tipo`, `destacada`, `tema`, `page` | orden `-destacada, -fecha, -id`: las destacadas encabezan y dentro de cada grupo manda la fecha. El remate por `id` no es cosmético — `fecha` es un `DateField` y el listado se pagina |
-| `GET /api/noticias/{slug}/` | — | |
+| `GET /api/noticias/{slug}/` | — | además del listado, incluye `cuerpo` (HTML saneado), **`enlaces`** anidados (`{titulo, url}`, mismo tipo que los de medida) y **`archivos`** (`{titulo, archivo, extension, peso_bytes}`). Las dos colecciones **solo en el detalle**: el listado no las pinta y traerlas sería una consulta por tarjeta. `archivo` viaja **absoluta** contra `BACKEND_URL` — relativa se resolvería contra el dominio de la SPA, cuyo `try_files` responde 200 con el `index.html`, o sea un enlace que se pulsa, no falla y no descarga nada. `extension` y `peso_bytes` los pone el servidor: deducir el formato del nombre en el cliente rompe con `Informe FINAL.PDF`, y el peso no se sabe sin descargar |
 
 `tema` filtra por coincidencia exacta en `palabras_clave`; es lo que alimenta los chips navegables de las fichas (`?tema=…` en el frontend).
 

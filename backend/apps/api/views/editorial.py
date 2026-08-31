@@ -118,6 +118,14 @@ class NoticiaViewSet(viewsets.ReadOnlyModelViewSet):
             return serializers.NoticiaDetalleSerializer
         return serializers.NoticiaListaSerializer
 
+    def get_queryset(self):
+        # El prefetch va **solo en el detalle**, que es el único que serializa las colecciones.
+        # En el listado serían dos consultas por página para datos que no se pintan.
+        qs = super().get_queryset()
+        if self.action == "retrieve":
+            qs = qs.prefetch_related("enlaces", "archivos")
+        return qs
+
 
 class VideoViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Video.publicados.select_related("tema")

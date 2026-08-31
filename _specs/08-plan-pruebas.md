@@ -15,7 +15,7 @@ Comandos:
 ```bash
 DC="docker compose -f compose.yaml -f compose.dev.yml"
 
-$DC exec backend pytest                 # suite backend (475 pruebas, ~80 s)
+$DC exec backend pytest                 # suite backend (608 pruebas, ~120 s)
                                         # la cifra sale de `pytest --collect-only -q`, no de la memoria
 $DC exec backend pytest -m lento        # 7 más: los Excel completos y el PDF con mapa (~35 s)
 cd frontend && npm run lint && npm run build    # tipos + build
@@ -154,6 +154,38 @@ de la carpeta; y un archivo que no es imagen **no rompe la subida**.
 - Las claves emitidas coinciden exactamente con los slugs de `TipoPeligro`, con guion bajo.
 - `nivel_max` es el máximo de los niveles presentes.
 - Cada feature lleva lo que el popup necesita —se pinta **desde el tile**, sin pedir nada al API— y `poblacion` va como entero: con `null`, MapLibre descarta el punto al interpolar el radio.
+
+### `test_noticias_adjuntos.py`
+
+Los enlaces y los archivos de una noticia (25 casos). Lo que protege son fallos que **no dan
+error**:
+
+- **La URL del adjunto es absoluta** contra `BACKEND_URL`. Relativa, el navegador la resuelve
+  contra el dominio de la SPA y su `try_files` devuelve el `index.html` con un 200: un enlace que
+  se pulsa, no falla y no descarga nada.
+- **El orden es total.** `orden` tiene `default=0`, o sea que el empate es la norma; sin el remate
+  por `id` el desempate lo elige el planificador y los anexos se barajan entre recargas.
+- **Sin anexos la clave viaja como `[]`**, no ausente ni en `null` — que es lo que rompe el
+  `.map()` del cliente.
+- **Un adjunto borrado del disco no tumba la ficha**, ni al servirla ni al reguardar la fila. Son
+  los dos casos que justifican guardar `peso_bytes` y poner el `try/except` en el validador:
+  `full_clean()` corre los validadores en **cada** guardado, también sobre el archivo ya escrito,
+  y ahí `.size` lanza `FileNotFoundError`, no `ValidationError`.
+- **El validador rechaza `.html`, `.svg`, `.js` y `.exe`** — XSS almacenado en el dominio del
+  admin, ver spec 03— y lo que pasa del tope.
+- **La ruta no se puede adivinar**: dos archivos con el mismo nombre de origen acaban en carpetas
+  distintas y ninguna lleva el slug de la noticia.
+- **La IA no escribe las colecciones**, comprobado por los dos lados: ni en `CAMPOS_REDACTADOS`
+  ni en las `properties` del esquema estricto. El olvido probable es al revés — alguien las añade
+  «para que la IA rellene también los enlaces» y nada avisa.
+
+En e2e, `noticias.spec.ts` gana tres casos, y el importante es **que el anexo devuelva el archivo
+y no el HTML de la SPA**: es la misma trampa que el caso de las ilustraciones mide con
+`naturalWidth`, porque el `try_files` responde **200 con HTML** a lo que no existe y el código de
+estado da verde siempre. Se comprueba el `content-type`, la firma `%PDF` de los primeros bytes y
+que el tamaño casa con `peso_bytes`. Para que midan algo, **la semilla de demo lleva ahora una
+noticia con dos enlaces y un adjunto** —el PDF lo genera `seed` con WeasyPrint, no está en el
+repositorio—: sin datos, los tres casos harían `test.skip` y saldrían en verde sin comprobar nada.
 
 ### `test_noticias_ia.py`, `test_normativa_ia.py`, `test_medidas_ia.py`, `test_lectura_web.py` y `test_openrouter.py`
 
@@ -314,7 +346,7 @@ Estos cuatro archivos existían sin figurar aquí, y son justo los que encajan c
 
 ## Casos obligatorios — E2E (Playwright)
 
-Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. **81 casos, que Playwright ejecuta 162 veces** —uno por proyecto—, ~1.4 min. `npx playwright test --list` cuenta lo segundo: al escribir una cifra aquí hay que decir cuál de las dos es, o la siguiente persona la «corrige» a la otra.
+Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. **88 casos, que Playwright ejecuta 176 veces** —uno por proyecto—, ~1.4 min. `npx playwright test --list` cuenta lo segundo: al escribir una cifra aquí hay que decir cuál de las dos es, o la siguiente persona la «corrige» a la otra.
 
 | Spec | Comprueba |
 |---|---|
@@ -383,7 +415,7 @@ Y dos cosas que las pruebas mismas enseñaron: que las dos muestras de Excel tie
 
 ## Criterio de "listo para entregar"
 
-- `pytest` completo (incluido `-m lento`) en verde: 583 + 7 pruebas.
+- `pytest` completo (incluido `-m lento`) en verde: 608 + 7 pruebas.
 - `npm run lint && npm run build` sin errores.
 - `npx playwright test` en verde **dos veces**: contra el dev server y contra el bundle servido por nginx (`E2E_URL=http://localhost`). La segunda es la que vale.
 - Las cinco comprobaciones manuales hechas y documentadas.

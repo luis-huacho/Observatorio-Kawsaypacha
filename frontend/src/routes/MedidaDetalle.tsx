@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { ExternalLink, Link2, MapPin, PlayCircle } from "lucide-react";
+import { MapPin, PlayCircle } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { useApi } from "@/lib/api";
 import type { MedidaDetalle as TMedida } from "@/lib/types";
@@ -10,6 +10,7 @@ import GaleriaMedida from "@/components/GaleriaMedida";
 import Video from "@/components/Video";
 import PalabrasClave from "@/components/PalabrasClave";
 import Compartir from "@/components/Compartir";
+import ListaEnlaces from "@/components/ListaEnlaces";
 import { RESULTADO_ESTILO } from "@/routes/Medidas";
 import { useMetaPagina } from "@/lib/meta";
 
@@ -89,29 +90,7 @@ export default function MedidaDetalle() {
           </section>
         )}
 
-        {m.enlaces.length > 0 && (
-          <section className="mt-8">
-            <h2 className="flex items-center gap-2 font-display font-semibold text-mountain-900 mb-3">
-              <Link2 className="w-4 h-4 text-mountain-700" />
-              Enlaces relacionados
-            </h2>
-            <ul className="space-y-2">
-              {m.enlaces.map((e) => (
-                <li key={e.url}>
-                  <a
-                    href={e.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm"
-                  >
-                    {e.titulo}
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        <ListaEnlaces enlaces={m.enlaces} />
 
         <PalabrasClave palabras={m.palabras_clave} base="/medidas" />
         <Compartir titulo={m.titulo} etiqueta="Compartir esta experiencia" />

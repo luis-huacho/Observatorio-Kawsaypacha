@@ -10,6 +10,8 @@ Meilisearch v1.15 en contenedor propio (`meilisearch` en compose), volumen `meil
 | `normativa` | Normas publicadas | titulo, resumen, analisis_predes, numero, entidad | tipo, ambito, entidad, anio | fecha |
 | `documentos` | Documentos publicados | titulo, resumen, autor_institucion | categoria, anio | fecha |
 | `noticias` | Noticias publicadas | titulo, bajada, cuerpo_texto | tipo, anio | fecha |
+
+> **Los anexos de una noticia no se indexan**, ni sus enlaces ni sus archivos: buscar el título de un informe adjunto no encuentra la noticia que lo lleva. Es lo mismo que ya ocurre con la galería y los enlaces de una medida, y se acepta — reindexar la noticia al tocar una fila hija exigiría una señal por modelo hijo que hoy no tiene ningún caso en el proyecto.
 | `videos` | Videos publicados | titulo, descripcion | tema | fecha |
 | `eventos` | Eventos publicados | titulo, descripcion, lugar | modalidad, mes | inicio |
 | `ccpp` | 8,968 centros poblados | nombre, distrito, provincia | provincia, distrito, categoria | — |

@@ -24,6 +24,15 @@ noticias:
   - exposición
   - datos abiertos
   destacada: true
+  # Los anexos van en la destacada porque es la primera de la ficha en `/noticias`, que es donde
+  # entra el e2e. Sin datos aquí, sus casos harían `test.skip` y no medirían nada.
+  enlaces:
+  - titulo: SIGRID — Sistema de Información para la Gestión del Riesgo de Desastres
+    url: https://sigrid.cenepred.gob.pe/sigridv3/
+  - titulo: CENEPRED — Centro Nacional de Estimación, Prevención y Reducción del Riesgo
+    url: https://www.gob.pe/cenepred
+  archivos:
+  - titulo: Nota metodológica de la carga 2026
 - slug: mesa-tecnica-quispicanchi
   titulo: Mesa técnica en Quispicanchi revisa la exposición a movimientos en masa
   bajada: Autoridades de seis distritos analizaron con PREDES los centros poblados en nivel alto y

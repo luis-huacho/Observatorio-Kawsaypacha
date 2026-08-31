@@ -1,12 +1,45 @@
 from django.contrib import admin
 from django_ckeditor_5.widgets import CKEditor5Widget
-from unfold.admin import ModelAdmin
+from unfold.admin import ModelAdmin, TabularInline
 
 from apps.core.admin_ia import RedaccionIAAdminMixin
 from apps.core.admin_workflow import WorkflowAdmin
 
 from .forms import NoticiaForm
-from .models import Evento, Noticia, Video
+from .models import Evento, Noticia, NoticiaArchivo, NoticiaEnlace, Video
+
+
+class NoticiaEnlaceInline(TabularInline):
+    """Enlaces externos que acompañan a la noticia.
+
+    `TabularInline` es el de **`unfold.admin`**, no el de `django.contrib.admin`: el del admin
+    clásico se pinta sin los estilos de Unfold.
+    """
+
+    model = NoticiaEnlace
+    extra = 1
+    fields = ("titulo", "url", "orden")
+    ordering = ("orden", "id")
+
+
+class NoticiaArchivoInline(TabularInline):
+    """Anexos descargables. Ojo: `peso_bytes` es `editable=False`, así que **no puede ir en
+    `fields`** — se enseña con un método de solo lectura, como la vista previa de la galería de
+    medidas."""
+
+    model = NoticiaArchivo
+    extra = 1
+    fields = ("archivo", "titulo", "peso_legible", "orden")
+    readonly_fields = ("peso_legible",)
+    ordering = ("orden", "id")
+
+    @admin.display(description="peso")
+    def peso_legible(self, obj):
+        if not obj.pk or not obj.peso_bytes:
+            return "—"
+        if obj.peso_bytes < 1024 * 1024:
+            return f"{obj.peso_bytes / 1024:.0f} KB"
+        return f"{obj.peso_bytes / (1024 * 1024):.1f} MB".replace(".", ",")
 
 
 @admin.register(Noticia)
@@ -20,6 +53,9 @@ class NoticiaAdmin(RedaccionIAAdminMixin, WorkflowAdmin, ModelAdmin):
 
     campos_rich = ["cuerpo"]
     form = NoticiaForm
+    # Los inlines se pintan **debajo de todos los fieldsets**, o sea tras «Estado editorial»,
+    # que es donde tienen que estar: son material de apoyo, no parte de la nota.
+    inlines = (NoticiaEnlaceInline, NoticiaArchivoInline)
 
     list_display = ("titulo", "tipo", "fecha", "autor", "destacada", "ia_badge")
     list_filter = ("estado", "tipo", "destacada", "ia_estado")

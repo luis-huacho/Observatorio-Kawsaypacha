@@ -13,6 +13,73 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 31/08/2026 — una noticia no podía llevar ni un enlace ni un archivo
+
+Todo el material de apoyo de una nota tenía que ir **dentro del cuerpo** de CKEditor, y un PDF
+sencillamente no cabía: los `FileField` del proyecto estaban en `biblioteca`, `datasets` y `mapas`,
+ninguno alcanzable desde la ficha. `Noticia` gana dos colecciones hijas, `NoticiaEnlace` y
+`NoticiaArchivo`, con inline en el admin y dos bloques al pie de la ficha pública.
+
+**Dos tablas y no el `JSONField` de `Medida.enlaces`**, que resuelve lo mismo: su admin es un
+textarea de JSON crudo, sin widget ni validación, y aquí quien escribe es un editor. Tampoco un
+M2M a `biblioteca.Documento` — un anexo no es una publicación del repositorio, y pasar por ahí
+obligaba a un alta con categoría, resumen y flujo editorial por cada PDF que acompaña a una nota.
+**El contrato del API no cambia por eso**: `enlaces` sale como `[{titulo, url}]` en los dos
+modelos, así que `EnlaceExterno` sirve a las dos fichas y el bloque de pintado —que estaba suelto
+dentro de `MedidaDetalle`— se extrajo a `ListaEnlaces` y ahora lo comparten.
+
+Seis cosas que no eran obvias, y ninguna da error cuando está mal:
+
+- **No se copia el `UniqueConstraint(medida, orden)` de `MedidaImagen`.** Con `orden` a `default=0`
+  y un inline de `extra=1`, la acción más frecuente del editor —pegar dos filas y guardar sin tocar
+  el número— lo viola. Es una trampa que la galería de medidas arrastra hoy. Lo que sí hace falta
+  es que el orden sea **total** (`["orden", "id"]`): con el empate como norma, el desempate lo
+  elegiría el planificador y los anexos se barajarían entre recargas sin fallar.
+- **`peso_bytes` se guarda, no se lee al serializar.** `archivo.size` toca el almacenamiento en
+  cada petición y **lanza si el archivo desapareció del disco** — un 500 en una página pública por
+  una etiqueta que dice «2,3 MB». Se calcula en `save()` y solo con el `FieldFile` sin escribir
+  (`_committed`), igual que `ImagenOptimizadaMixin`.
+- **La lista blanca de extensiones es una guarda de seguridad, no un capricho de formato.** nginx
+  sirve `/media/` entero como estático **en el dominio del API**, que es el mismo donde vive la
+  sesión del admin: un `.html` o un `.svg` subido ahí ejecuta JavaScript en ese origen — XSS
+  almacenado. El `nosniff` de `seguridad-comun.inc` no lo cubre, porque impide *adivinar* el tipo,
+  no que nginx sirva un `.html` como `text/html`. Por eso el validador vive en `core` y no en
+  `contenidos`: es el mismo argumento con el que ADR-D8 generalizó `RedaccionIAMixin` y con el que
+  se extrajo `core.importacion_admin`.
+- **Y es una función, no `FileExtensionValidator(allowed_extensions=[…])`.** `validators` entra en
+  `Field.deconstruct()`, así que la lista de un validador parametrizado queda congelada en la
+  migración y aceptar un formato nuevo sería un `AlterField` y un despliegue. Una función se
+  serializa por su ruta de importación y ampliar `EXTENSIONES_ADJUNTO` no emite nada. El tope de
+  20 MB va **por debajo del `client_max_body_size 80M`** de nginx, o pasarse daría un 413 crudo en
+  vez de un error de campo.
+- **`full_clean()` corre los validadores en cada guardado**, también sobre el archivo ya escrito.
+  Si ese archivo desapareció del disco, `.size` lanza `FileNotFoundError` y no `ValidationError`:
+  el editor vería un 500 al corregir un título, sin relación aparente con lo que hacía. De ahí el
+  `try/except` que devuelve sin quejarse — un archivo ausente no es un archivo demasiado grande.
+- **El adjunto de un borrador ya es público**, y con `upload_to="…/%Y/%m/"` su URL se deducía del
+  título. `ruta_adjunto` mete un segmento aleatorio, que cierra lo adivinable por seis líneas;
+  **no es control de acceso** y así queda escrito en el spec 07. El token va como **carpeta** y no
+  pegado al nombre: el atributo `download` de un `<a>` se ignora cross-origin —y la SPA y el API
+  están en dominios distintos—, así que el visitante guarda el archivo con el nombre de la URL, y
+  `a3f9…-informe.pdf` sería peor que `informe.pdf`.
+
+En la ficha pública, el adjunto es un `<a href download>` y **no `BotonDescarga`**: aquel existe
+por los cuatro segundos que tarda el servidor en *generar* un PDF y por el 429 del límite de
+30/hora, y un archivo estático no tiene ni lo uno ni lo otro. **El estado vacío no se declara**:
+sin anexos no se pinta ni el encabezado, porque nadie prometió que una noticia los tuviera y
+anunciar la ausencia insinuaría un olvido del editor.
+
+Y una que se descubrió al escribir las pruebas: **la semilla tuvo que ganar una noticia con
+anexos**. Los tres casos e2e nuevos hacen `test.skip` cuando no hay datos, así que sin eso habrían
+salido en verde sin comprobar nada — que es peor que no escribirlos. El PDF lo genera `seed` con
+WeasyPrint y no entra al repositorio. El caso que importa comprueba que el anexo **devuelva el
+archivo y no el HTML de la SPA**, mirando el `content-type` y la firma `%PDF`: es la misma trampa
+del `naturalWidth` de las ilustraciones, porque el `try_files` responde 200 con HTML a lo que no
+existe y el código de estado da verde siempre.
+
+`pytest`: 608 en verde (25 nuevas). Playwright: 88 casos (tres nuevos). Sin ADR — es el patrón de
+`MedidaImagen` aplicado a otra ficha, y ADR-D9 ya no tiene nada que decir aquí.
+
 ### Actualización 31/08/2026 — el tipo de norma era una lista cerrada, y ampliarla exigía desplegar
 
 `Norma.tipo` eran cinco opciones escritas en el modelo. Añadir una —un acuerdo de concejo, una

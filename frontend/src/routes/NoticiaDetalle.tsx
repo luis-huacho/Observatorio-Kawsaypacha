@@ -10,6 +10,8 @@ import Portada from "@/components/Portada";
 import ContenidoRico from "@/components/ContenidoRico";
 import PalabrasClave from "@/components/PalabrasClave";
 import Compartir from "@/components/Compartir";
+import ListaEnlaces from "@/components/ListaEnlaces";
+import ListaArchivos from "@/components/ListaArchivos";
 import { useMetaPagina } from "@/lib/meta";
 
 export default function NoticiaDetalle() {
@@ -69,6 +71,11 @@ export default function NoticiaDetalle() {
             tamaño a los encabezados y viñetas a las listas —que el Preflight de Tailwind
             resetea— y convierte el `<oembed>` del editor en un iframe. */}
         <ContenidoRico html={n.cuerpo} className="mt-4" />
+
+        {/* Los anexos van después del cuerpo y antes de las palabras clave, que es donde la
+            ficha de medida coloca los suyos. Cada bloque se pinta solo si tiene contenido. */}
+        <ListaEnlaces enlaces={n.enlaces} />
+        <ListaArchivos archivos={n.archivos} />
 
         <PalabrasClave palabras={n.palabras_clave} base="/noticias" />
         <Compartir titulo={n.titulo} />

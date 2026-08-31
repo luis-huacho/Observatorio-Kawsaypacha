@@ -607,10 +607,27 @@ export const TIPOS_PELIGRO = PELIGROS.map((p) => p.nombre) as readonly string[];
 export type TipoPeligro = (typeof PELIGROS)[number]["nombre"];
 export type SlugPeligro = (typeof PELIGROS)[number]["slug"];
 
-/** `/api/noticias/{slug}/` — el cuerpo solo viaja en el detalle. */
+/** Espejo de `NoticiaArchivoSerializer`: un anexo descargable de la noticia. */
+export type ArchivoAdjunto = {
+  titulo: string;
+  /** URL absoluta contra `BACKEND_URL`: la SPA vive en otro dominio (ADR-A14). */
+  archivo: string;
+  /** En minúscula y sin punto (`pdf`). La deduce el servidor del nombre real, no el cliente. */
+  extension: string;
+  peso_bytes: number;
+};
+
+/** `/api/noticias/{slug}/` — el cuerpo y los anexos solo viajan en el detalle. */
 export type NoticiaDetalle = Noticia & {
   /** HTML de CKEditor ya saneado en servidor. */
   cuerpo: string;
+  /**
+   * Mismo tipo que `MedidaDetalle.enlaces` aunque el backend los guarde distinto —allí un
+   * JSONField, aquí una tabla—: el API entrega las mismas dos claves y `ListaEnlaces` sirve
+   * a las dos fichas.
+   */
+  enlaces: EnlaceExterno[];
+  archivos: ArchivoAdjunto[];
 };
 
 // --- Territorio -------------------------------------------------------------

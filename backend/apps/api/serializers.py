@@ -8,7 +8,7 @@ from django.conf import settings
 from rest_framework import serializers
 
 from apps.biblioteca.models import CategoriaDocumento, Documento
-from apps.contenidos.models import Evento, Noticia, Video
+from apps.contenidos.models import Evento, Noticia, NoticiaArchivo, NoticiaEnlace, Video
 from apps.mapas.models import CapaCartografica
 from apps.medidas.models import Medida, MedidaImagen
 from apps.normativa.models import EntidadEmisora, Norma, TipoNorma
@@ -267,9 +267,49 @@ class NoticiaListaSerializer(PortadaMixin, serializers.ModelSerializer):
         return imagenes.clave_noticia(obj.tipo)
 
 
+class NoticiaEnlaceSerializer(serializers.ModelSerializer):
+    """Espejo de `EnlaceExterno` en el frontend, que ya existía para `Medida.enlaces`.
+
+    Aquello es un `JSONField` y esto una tabla, y **el cliente no puede notarlo**: los dos salen
+    con las mismas dos claves. `orden` no viaja — la `Meta.ordering` del modelo ya entrega la
+    lista ordenada, y exponerlo solo invitaría a reordenar otra vez en el navegador.
+    """
+
+    class Meta:
+        model = NoticiaEnlace
+        fields = ["titulo", "url"]
+
+
+class NoticiaArchivoSerializer(serializers.ModelSerializer):
+    """Un anexo descargable de la noticia.
+
+    `extension` y `peso_bytes` los pone el servidor porque la ficha pinta «PDF · 2,3 MB»: deducir
+    el formato del nombre en el cliente rompe con `Informe FINAL.PDF` o con una URL que lleve
+    parámetros, y el peso no está en ningún sitio del que el navegador pueda sacarlo sin
+    descargar el archivo.
+    """
+
+    archivo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = NoticiaArchivo
+        fields = ["titulo", "archivo", "extension", "peso_bytes"]
+
+    def get_archivo(self, obj) -> str | None:
+        # Absoluta contra `BACKEND_URL`: la SPA vive en otro dominio (ADR-A14) y una URL relativa
+        # apuntaría a la propia SPA, cuyo `try_files` responde 200 con el `index.html`. O sea, un
+        # enlace que se pulsa, no falla y no descarga nada.
+        return imagenes.url_absoluta(obj.archivo)
+
+
 class NoticiaDetalleSerializer(NoticiaListaSerializer):
+    enlaces = NoticiaEnlaceSerializer(many=True, read_only=True)
+    archivos = NoticiaArchivoSerializer(many=True, read_only=True)
+
     class Meta(NoticiaListaSerializer.Meta):
-        fields = NoticiaListaSerializer.Meta.fields + ["cuerpo"]
+        # Las dos colecciones solo en el detalle: el listado no las pinta y traerlas sería una
+        # consulta por tarjeta para nada.
+        fields = NoticiaListaSerializer.Meta.fields + ["cuerpo", "enlaces", "archivos"]
 
 
 class VideoSerializer(serializers.ModelSerializer):

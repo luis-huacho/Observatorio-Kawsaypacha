@@ -26,7 +26,21 @@ Separar el sitio público del backend deja el admin y el API fuera del dominio q
 | `certbot` | `certbot/certbot` | emisión y renovación de certificados (webroot) |
 | `backup` | `prodrigestivill/postgres-backup-local` | `pg_dump` diario, retención 7d/4w/6m, volumen `backups` |
 
-Volúmenes: `pgdata`, `meili_data`, `media` (incluye `media/tiles/`, `media/datasets/`, `media/informes/`, `media/contenido/`), `static` (estáticos del admin tras `collectstatic`), `web_dist`, `certbot_conf`, `certbot_www`, `backups`.
+Volúmenes: `pgdata`, `meili_data`, `media` (incluye `media/tiles/`, `media/datasets/`, `media/informes/`, `media/contenido/`, `media/adjuntos/`), `static` (estáticos del admin tras `collectstatic`), `web_dist`, `certbot_conf`, `certbot_www`, `backups`.
+
+> **`/media/` es público entero, y lo que se sube ahí hay que mirarlo con esa lente.** No hay
+> control de acceso: el `location /media/` de nginx sirve el volumen como estático, así que **el
+> adjunto de una noticia en borrador es alcanzable por su URL** desde que se guarda, y borrar la
+> fila no borra el archivo. Se acepta —sacar `/media/` del servido estático significaría pasar
+> cada descarga por gunicorn con un `X-Accel-Redirect` y su `location internal`— y se cierra solo
+> la parte barata: `core.almacenamiento.ruta_adjunto` mete un segmento aleatorio para que la URL
+> no se deduzca del título. **Eso no es control de acceso**, y confundirlo sería peor que no
+> tenerlo. Lo que sí es una guarda es la lista blanca de extensiones de
+> `core.validadores.validar_adjunto`: el dominio que sirve `/media/` es el mismo donde vive la
+> sesión del admin, así que un `.html` o un `.svg` ahí sería XSS almacenado contra un editor, y el
+> `nosniff` de `seguridad-comun.inc` no lo evita —impide *adivinar* el tipo, no que nginx sirva un
+> `.html` como `text/html`—. Por lo mismo `IA_LOGS_DIR` e `IMPORTACIONES_TMP_DIR` viven **fuera**
+> de `MEDIA_ROOT`.
 
 **ADR-A6bis — nginx en contenedor sustituye a Caddy.** El spec original usaba Caddy por el HTTPS automático. Se cambia a nginx + certbot por decisión del dueño del proyecto: es lo que PREDES y su proveedor de hosting ya saben operar, y el ahorro de Caddy (un fichero de configuración más corto) no compensa introducir una pieza que nadie más en la organización sabe depurar. El coste asumido es explícito: la renovación de certificados deja de ser automática por diseño y pasa a depender del contenedor `certbot` y de su cron.
 

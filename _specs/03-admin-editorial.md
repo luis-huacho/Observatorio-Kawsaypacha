@@ -313,6 +313,22 @@ Los cuatro campos rich —`Medida.contenido`, `Norma.contenido`, `Noticia.cuerpo
   script— metía el HTML sin filtrar, aunque el `help_text` del campo prometiera lo contrario. El
   `campos_rich` del admin queda solo para elegir el widget de CKEditor.
 - **`MedidaImagen` como inline** en el admin de Medida, con `pie` obligatorio y campo `orden`.
+- **`NoticiaEnlace` y `NoticiaArchivo` como inlines** en el admin de Noticia, debajo de los
+  fieldsets. Los dos exigen `titulo` —una URL desnuda no se lee en voz alta ni se cita— y ordenan
+  con `orden`, **sin restricción de unicidad**: con `default=0` y `extra=1`, añadir dos filas sin
+  tocar el número reventaría (la trampa que `MedidaImagen` sí arrastra).
+  - El adjunto se valida con `core.validadores.validar_adjunto`: **lista blanca de extensiones** y
+    tope de 20 MB. La lista es una guarda de seguridad, no un capricho de formato — nginx sirve
+    `/media/` entero como estático **en el dominio del API**, que es donde vive la sesión del
+    admin, así que un `.html` o un `.svg` subido ahí ejecutaría JavaScript en ese origen. El
+    `nosniff` de `seguridad-comun.inc` no lo cubre: impide *adivinar* el tipo, no que nginx sirva
+    un `.html` como `text/html`. El tope va por debajo del `client_max_body_size 80M` de nginx
+    para que pasarse dé un error de campo y no un 413 crudo.
+  - **El archivo es público en cuanto se guarda, aunque la noticia siga en borrador.** Lo dice el
+    `help_text` del campo. `ruta_adjunto` mete un segmento aleatorio en la ruta para que la URL no
+    se deduzca del título — cierra lo adivinable, **no es control de acceso**.
+  - `peso_bytes` es `editable=False`, así que **no puede ir en `fields`**: se enseña con un método
+    de solo lectura, como la vista previa de la galería.
 - El editor debe ver que **dejar `imagen_portada` vacía usa la ilustración institucional** del
   peligro de la medida, para que no lo lea como un dato faltante.
 - `HeroSlide` con vista previa de imagen y `orden` editable en la lista. Pasa por el mismo flujo

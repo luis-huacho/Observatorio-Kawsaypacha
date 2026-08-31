@@ -58,6 +58,16 @@ export function formatSoles(n: number): string {
   }).format(n);
 }
 
+/**
+ * Bytes a «847 KB» / «2,3 MB».
+ *
+ * Se corta en KB por abajo: un anexo se mide en KB o MB, y «7.084 B» no le dice nada a nadie.
+ */
+export function formatPeso(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${new Intl.NumberFormat("es-PE", { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024))} MB`;
+}
+
 export function formatPct(n: number): string {
   return new Intl.NumberFormat("es-PE", {
     style: "percent",

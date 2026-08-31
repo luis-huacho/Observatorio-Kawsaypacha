@@ -391,12 +391,62 @@ class Command(BaseCommand):
         self._ok(f"normas: {creados} nuevas, {existentes} ya existían")
 
         datos = semilla.leer(APPS / "contenidos/semillas/demo.yaml")
-        registros = [
-            {**n, "estado": Noticia.Estado.PUBLICADO, "publicado_en": ahora}
-            for n in datos["noticias"]
-        ]
+        # Las dos colecciones hijas se apartan antes de sembrar: `sembrar` escribe campos del
+        # modelo y `enlaces`/`archivos` son relaciones inversas.
+        anexos = {}
+        registros = []
+        for n in datos["noticias"]:
+            fila = dict(n)
+            anexos[fila["slug"]] = (fila.pop("enlaces", []), fila.pop("archivos", []))
+            registros.append({**fila, "estado": Noticia.Estado.PUBLICADO, "publicado_en": ahora})
         creados, existentes = semilla.sembrar(Noticia, registros, "slug")
         self._ok(f"noticias: {creados} nuevas, {existentes} ya existían")
+        self._sembrar_anexos_de_noticias(anexos)
+
+    def _sembrar_anexos_de_noticias(self, anexos):
+        """Enlaces y adjuntos de demostración de las noticias.
+
+        Existen para que los casos e2e de `/noticias` midan algo: sin un adjunto real en la
+        semilla harían `test.skip` siempre y saldrían en verde sin comprobar nada.
+
+        **El PDF no está en el repositorio, se genera aquí** con WeasyPrint, que ya es dependencia
+        del backend por los informes. Así no entra un binario al control de versiones y el adjunto
+        es un PDF de verdad, con su cabecera `%PDF`, que es justo lo que el e2e comprueba.
+        """
+        from django.core.files.base import ContentFile
+
+        from apps.contenidos.models import Noticia, NoticiaArchivo, NoticiaEnlace
+
+        nuevos = 0
+        for slug, (enlaces, archivos) in anexos.items():
+            noticia = Noticia.objects.filter(slug=slug).first()
+            # Idempotente y sin pisar lo editado: si la noticia ya tiene anexos, se deja como está.
+            if noticia is None or noticia.enlaces.exists() or noticia.archivos.exists():
+                continue
+            for orden, enlace in enumerate(enlaces):
+                NoticiaEnlace.objects.create(noticia=noticia, orden=orden, **enlace)
+                nuevos += 1
+            for orden, archivo in enumerate(archivos):
+                NoticiaArchivo.objects.create(
+                    noticia=noticia,
+                    orden=orden,
+                    titulo=archivo["titulo"],
+                    archivo=ContentFile(
+                        self._pdf_de_demostracion(archivo["titulo"]), name="nota-metodologica.pdf"
+                    ),
+                )
+                nuevos += 1
+        if nuevos:
+            self._ok(f"anexos de noticias: {nuevos} nuevos")
+
+    @staticmethod
+    def _pdf_de_demostracion(titulo: str) -> bytes:
+        from weasyprint import HTML
+
+        return HTML(
+            string=f"<h1>{titulo}</h1><p>Documento de demostración del Observatorio "
+                   f"Kallpachakuy. No es una publicación real.</p>"
+        ).write_pdf()
 
     # -- Tiles -------------------------------------------------------------
     def _generar_tiles(self):
