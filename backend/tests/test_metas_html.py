@@ -32,6 +32,14 @@ INDEX = """<!doctype html>
 """
 
 
+
+def _tipo_ds():
+    """El tipo del catálogo, que siembra `seed --solo-catalogos` para toda la sesión."""
+    from apps.normativa.models import TipoNorma
+
+    return TipoNorma.objects.get(slug="ds")
+
+
 @pytest.fixture(autouse=True)
 def spa(settings, tmp_path):
     """Un `dist/` de mentira, porque en desarrollo no existe: la SPA la sirve Vite."""
@@ -129,7 +137,7 @@ def test_una_norma_encabeza_con_su_numero(cliente):
 
     Norma.objects.create(
         slug="ds-048-2011-pcm", titulo="Reglamento de la Ley 29664, Ley del SINAGERD",
-        numero="DS 048-2011-PCM", tipo="DS", ambito="nacional",
+        numero="DS 048-2011-PCM", tipo=_tipo_ds(), ambito="nacional",
         fecha=datetime.date(2011, 5, 26), resumen="Aprueba el reglamento.", estado="publicado",
     )
 
@@ -144,7 +152,7 @@ def test_un_titulo_larguisimo_se_recorta_por_palabras(cliente):
 
     Norma.objects.create(
         slug="larga", titulo="Decreto Supremo que declara el Estado de Emergencia " * 5,
-        tipo="DS", ambito="nacional", fecha=datetime.date(2026, 1, 1),
+        tipo=_tipo_ds(), ambito="nacional", fecha=datetime.date(2026, 1, 1),
         resumen="x", estado="publicado",
     )
 

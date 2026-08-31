@@ -248,14 +248,35 @@ class WorkflowMixin(models.Model):
         abstract = True
 
     # -- Flujo editorial ---------------------------------------------------
+    #: Sin estos campos no se publica. Lo declara cada modelo; vacío = sin condiciones.
+    CAMPOS_PARA_PUBLICAR: tuple[str, ...] = ()
+
     def faltantes_para_publicar(self) -> list[str]:
         """Qué **impide** publicar este registro. Vacío = nada.
 
-        Lo redefine el modelo que tenga condiciones. Existe porque `estado` está excluido del
+        Los declara el modelo en `CAMPOS_PARA_PUBLICAR`. Existe porque `estado` está excluido del
         formulario (`WorkflowAdmin.get_exclude`), así que publicar no pasa por ningún `clean()`:
         la única puerta es `transicionar()`, y ahí es donde tiene que estar la guarda.
+
+        El bucle vivía en `Medida` y subió aquí cuando `Norma` necesitó lo mismo (ADR-D11): la
+        alternativa era copiarlo, y una guarda duplicada es una guarda que se queda a medias en
+        una de las dos copias. Resuelve solo las claves foráneas —comprobar `campo` en vez de
+        `campo_id` dispara una consulta por campo— y trata el **título provisional como
+        faltante**, porque publicar «(redactando) …» se ve idéntico a un acierto.
         """
-        return []
+        faltan = []
+        provisional_prefijo = getattr(self, "PREFIJO_PROVISIONAL", None)
+        for nombre in self.CAMPOS_PARA_PUBLICAR:
+            campo = self._meta.get_field(nombre)
+            valor = getattr(self, f"{nombre}_id" if campo.is_relation else nombre)
+            provisional = (
+                nombre == "titulo"
+                and provisional_prefijo is not None
+                and str(valor or "").startswith(provisional_prefijo)
+            )
+            if not valor or provisional:
+                faltan.append(str(campo.verbose_name))
+        return faltan
 
     def avisos_al_publicar(self) -> list[str]:
         """Lo que **no** impide publicar pero hay que mirar una vez.

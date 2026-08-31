@@ -98,6 +98,38 @@ def test_el_catalogo_de_entidades_NO_pisa_lo_que_renombro_predes(db):
     assert EntidadEmisora.objects.get(slug="midagri").nombre == "Ministerio de Agricultura"
 
 
+def test_el_catalogo_de_tipos_NO_pisa_lo_que_renombro_predes(db):
+    """Es dato editable, no código: `sembrar` sin `actualizar=True`."""
+    from apps.normativa.models import TipoNorma
+
+    _seed("--solo-catalogos")
+    TipoNorma.objects.filter(slug="ds").update(nombre="Decreto Supremo (DS)")
+
+    _seed("--solo-catalogos")
+
+    assert TipoNorma.objects.get(slug="ds").nombre == "Decreto Supremo (DS)"
+
+
+def test_los_sinonimos_del_catalogo_cubren_las_variantes_que_reconocia_el_importador(db):
+    """Los quince sinónimos vivían en una tabla fija de `importacion.py`.
+
+    Si la semilla no los trasladara, el importador dejaría de reconocer «D.S.» u «Ordenanza
+    Regional» y esas filas pasarían a omitirse — un archivo que ayer entraba, hoy no, y el motivo
+    diría que el tipo no está en el catálogo cuando sí está.
+    """
+    from apps.normativa.importacion import _catalogo_tipos, _clave
+
+    _seed("--solo-catalogos")
+    catalogo = _catalogo_tipos()
+
+    for escrito, slug in [
+        ("D.S.", "ds"), ("R.M.", "rm"), ("R.J.", "rj"),
+        ("Ordenanza Regional", "ordenanza"), ("Ordenanza Municipal", "ordenanza"),
+        ("Ordenanza Provincial", "ordenanza"), ("Ordenanza Distrital", "ordenanza"),
+    ]:
+        assert catalogo[_clave(escrito)].slug == slug, escrito
+
+
 def test_borrar_una_entidad_en_uso_no_vacia_las_normas_en_silencio(db):
     """La FK es PROTECT aunque el campo sea opcional.
 
@@ -108,14 +140,14 @@ def test_borrar_una_entidad_en_uso_no_vacia_las_normas_en_silencio(db):
 
     from django.db.models import ProtectedError
 
-    from apps.normativa.models import EntidadEmisora, Norma
+    from apps.normativa.models import EntidadEmisora, Norma, TipoNorma
 
     _seed("--solo-catalogos")
     entidad = EntidadEmisora.objects.get(slug="pcm")
     Norma.objects.create(
         slug="ds-de-prueba",
         titulo="Norma que cita a la entidad",
-        tipo=Norma.Tipo.DS,
+        tipo=TipoNorma.objects.get(slug="ds"),
         ambito=Norma.Ambito.NACIONAL,
         entidad_emisora=entidad,
         fecha=datetime.date(2024, 1, 1),

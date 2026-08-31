@@ -140,23 +140,6 @@ class Medida(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, ImagenOptimizadaMix
         return self.titulo
 
     # -- Flujo editorial ---------------------------------------------------
-    def faltantes_para_publicar(self) -> list[str]:
-        """Lo que impide publicar, nombrado como se ve en pantalla.
-
-        El título provisional cuenta como faltante: publicar «(redactando) Cosecha de agua» es
-        exactamente el fallo que se ve idéntico a un acierto.
-        """
-        faltan = []
-        for nombre in self.CAMPOS_PARA_PUBLICAR:
-            campo = self._meta.get_field(nombre)
-            valor = getattr(self, f"{nombre}_id" if campo.is_relation else nombre)
-            provisional = nombre == "titulo" and str(valor or "").startswith(
-                self.PREFIJO_PROVISIONAL
-            )
-            if not valor or provisional:
-                faltan.append(str(campo.verbose_name))
-        return faltan
-
     def tiene_bloque_de_contacto(self) -> bool:
         """¿El contenido todavía lleva los datos de contacto que venían de la ficha ACC?"""
         return self.CLASE_CONTACTO in (self.contenido or "")

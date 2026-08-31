@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, Download, FileText } from "lucide-react";
 import { urlApi, useApi, useApiPaginado } from "@/lib/api";
 import { registrarExport } from "@/lib/metricas";
-import type { EntidadEmisora, Norma } from "@/lib/types";
+import type { EntidadEmisora, Norma, TipoNorma } from "@/lib/types";
 import { formatFecha } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
@@ -19,6 +19,7 @@ export default function NormativaView() {
 
   // El catálogo lo mantiene PREDES, así que las opciones no se pueden escribir aquí como las de
   // tipo y ámbito. Solo llegan las entidades con alguna norma publicada.
+  const tipos = useApi<TipoNorma[]>("/normativa/tipos/");
   const entidades = useApi<EntidadEmisora[]>("/normativa/entidades/");
 
   const filtros = { tipo, ambito, entidad, tema };
@@ -45,16 +46,19 @@ export default function NormativaView() {
       />
       <div className="container-page py-8">
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6 max-w-3xl">
-        <select
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value)}
-          className="control"
-        >
-          <option value="">Todos los tipos</option>
-          {["Ley", "DS", "RM", "RJ", "Ordenanza"].map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
+        {!!tipos.data?.length && (
+          <select
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value)}
+            className="control"
+            aria-label="Tipo"
+          >
+            <option value="">Todos los tipos</option>
+            {tipos.data.map((t) => (
+              <option key={t.slug} value={t.slug}>{t.nombre}</option>
+            ))}
+          </select>
+        )}
         <select
           value={ambito}
           onChange={(e) => setAmbito(e.target.value)}
@@ -99,9 +103,14 @@ export default function NormativaView() {
                 <FileText className="w-5 h-5 text-mountain-700 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
-                      {n.tipo}
-                    </span>
+                    {n.tipo && (
+                      <span
+                        className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20"
+                        title={n.tipo.nombre}
+                      >
+                        {n.tipo.abreviatura || n.tipo.nombre}
+                      </span>
+                    )}
                     {/* El número es lo que identifica la norma —«DS 048-2011-PCM»— y viaja en el
                         serializer desde siempre sin pintarse en ninguna parte. Aquí gana su sitio:
                         es lo que deja recortar el título sin que el usuario pierda de qué norma se

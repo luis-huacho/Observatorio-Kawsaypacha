@@ -250,6 +250,10 @@ class NormaFilter(TemaFilterMixin):
     # Por slug y no por pk, como en `VideoFilter`: la URL de un filtro se comparte y se guarda,
     # y un id autoincremental no sobrevive a una recarga de la base.
     entidad = django_filters.CharFilter(field_name="entidad_emisora__slug")
+    # `iexact` y no `exact`: el slug es `ds` pero durante meses el filtro viajó como `?tipo=DS`,
+    # y esos enlaces están compartidos y guardados. Sin esto dejarían de filtrar en silencio —
+    # devolviendo el listado entero, que se ve igual que un filtro sin resultados.
+    tipo = django_filters.CharFilter(field_name="tipo__slug", lookup_expr="iexact")
 
     class Meta:
         model = Norma

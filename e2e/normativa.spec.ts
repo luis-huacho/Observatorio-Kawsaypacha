@@ -20,6 +20,7 @@ const LISTADO = /\/api\/normativa\/(\?|$)/;
 
 type Norma = {
   slug: string;
+  tipo: { slug: string; nombre: string; abreviatura: string } | null;
   entidad_emisora: { slug: string; nombre: string; sigla: string } | null;
 };
 
@@ -80,5 +81,39 @@ test.describe("Normativa", () => {
     }
 
     if (!con && !sin) test.skip(true, "no hay normas para comprobar los dos estados");
+  });
+
+  test("el desplegable de tipos filtra, y el valor viejo de la URL sigue valiendo", async ({
+    page,
+  }) => {
+    const datos = await (await irEsperando(page, "/normativa", LISTADO)).json();
+    if (datos.count === 0) test.skip(true, "no hay normativa publicada (seed sin --demo)");
+
+    const conTipo = (datos.results as Norma[]).filter((n) => n.tipo);
+    if (conTipo.length === 0) test.skip(true, "ninguna norma publicada tiene tipo");
+
+    const tipo = conTipo[0].tipo!;
+    const select = page.getByLabel("Tipo");
+    await expect(select).toBeVisible();
+
+    const respuesta = esperarApi(page, `tipo=${tipo.slug}`);
+    await select.selectOption(tipo.slug);
+    const filtrado = await (await respuesta).json();
+
+    expect(filtrado.count).toBeGreaterThan(0);
+    for (const n of filtrado.results as Norma[]) {
+      expect(n.tipo?.slug).toBe(tipo.slug);
+    }
+
+    // El slug es minúscula desde que el tipo es catálogo, pero el filtro viajó meses como
+    // `?tipo=DS` y esos enlaces están compartidos. Se comprueba contra el API porque en pantalla
+    // un filtro que no filtra se ve igual que uno sin resultados.
+    const viejo = (tipo.abreviatura || tipo.nombre).toUpperCase();
+    const respuestaVieja = await page.request.get(
+      `${new URL(page.url()).origin.replace(":5173", ":8000")}/api/normativa/?tipo=${viejo}`,
+    );
+    if (respuestaVieja.ok()) {
+      expect((await respuestaVieja.json()).count).toBe(filtrado.count);
+    }
   });
 });

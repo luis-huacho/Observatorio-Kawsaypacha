@@ -13,6 +13,46 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 31/08/2026 — el tipo de norma era una lista cerrada, y ampliarla exigía desplegar
+
+`Norma.tipo` eran cinco opciones escritas en el modelo. Añadir una —un acuerdo de concejo, una
+directiva— pedía tocar el código, migrar y desplegar. Pasa a `TipoNorma`, con pantalla propia y el
+«+» en el formulario, que es ADR-D11 aplicado a un segundo campo.
+
+- **La diferencia con la entidad emisora es que este campo ya tenía datos.** La conversión va en
+  tres migraciones —crear, mapear, borrar— y se probó la ida y la vuelta completas: los cinco
+  valores originales se recuperan intactos. Importa porque **el fallo sería mudo**: normas sin tipo
+  se ven exactamente igual que normas que nunca lo tuvieron.
+- **La marcha atrás no funcionaba al primer intento, y el motivo es instructivo.** Al deshacer, el
+  `RemoveField` recrea la columna tal como estaba: `NOT NULL` y sin default. Postgres la rechaza
+  sobre una tabla con filas —«column "tipo" contains null values»— y la reversión moría **antes** de
+  llegar al paso que sabía devolver los valores. Se relaja la columna a `blank` con default vacío
+  justo antes de quitarla; sin eso, el reverso escrito con cuidado en la migración de datos no se
+  habría ejecutado nunca.
+- **El slug es `ds`, pero durante meses el filtro viajó como `?tipo=DS`.** Esos enlaces están
+  compartidos y guardados. El filtro compara con `iexact`, y hay una prueba que lo fija: sin eso el
+  enlace responde **200 con el listado entero**, que es indistinguible de un filtro sin resultados y
+  que por tanto nadie reporta.
+- **Los quince sinónimos del importador también son catálogo ahora.** Dejarlos en la tabla fija de
+  `importacion.py` habría hecho que dar de alta un tipo desde el admin no sirviera para importar: el
+  formulario y la IA lo verían, el importador seguiría omitiendo sus filas, y nada relacionaría las
+  dos cosas. Hay una prueba que recorre las siete variantes que no son ni el nombre ni la sigla.
+- **La FK admite nulo y publicar sin tipo se bloquea.** Una clave foránea no guarda la cadena vacía
+  que la IA usa para «no lo sé». El bucle de `CAMPOS_PARA_PUBLICAR` **subió de `Medida` a
+  `WorkflowMixin`** en vez de copiarse, y no emitió migración. De paso cierra un agujero que ya
+  existía: una norma redactada por IA con el tipo en blanco **sí se podía publicar**, y salía en el
+  listado con el chip vacío.
+- **Era el último `enum` del proyecto escrito a mano** (`redaccion.py`), justo debajo de un docstring
+  que argumentaba por qué eso está mal. Ahora sale del catálogo vivo, como los demás.
+- **Ganancia colateral: la ficha dice «Decreto Supremo» donde decía «DS».** Convivían dos
+  vocabularios —el crudo en el API y el frontend, el legible en el Excel, en Meilisearch y en el
+  buscador— y el catálogo los unifica. La tarjeta sigue con la abreviatura, donde no cabe el nombre.
+- **Y un aviso para quien siga**: en el frontend **no hay red de compilación** para este campo. No
+  existe ningún `Record<Norma["tipo"], …>`, así que `tsc` no habría dicho nada; las tres pantallas se
+  comprobaron a ojo.
+
+Suite: **583 + 7 deselected** (11 pruebas nuevas) y **1 caso e2e nuevo**.
+
 ### Actualización 31/08/2026 — dos tipos más de noticia, y el valor crudo era el nombre de un archivo
 
 PREDES necesitaba **«Publicación»** y **«Base de datos»** en el desplegable «Tipo» del formulario de

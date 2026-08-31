@@ -259,6 +259,8 @@ UNFOLD = {
                      "link": lambda r: reverse_lazy("admin:medidas_medidafichaacc_changelist")},
                     {"title": "Normativa", "icon": "gavel",
                      "link": lambda r: reverse_lazy("admin:normativa_norma_changelist")},
+                    {"title": "Normativa - Tipos", "icon": "category",
+                     "link": lambda r: reverse_lazy("admin:normativa_tiponorma_changelist")},
                     {"title": "Normativa - Entidades emisoras", "icon": "account_balance",
                      "link": lambda r: reverse_lazy(
                          "admin:normativa_entidademisora_changelist")},

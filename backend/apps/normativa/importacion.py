@@ -42,7 +42,7 @@ from django.utils.text import slugify
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
 
-from .models import EntidadEmisora, Norma
+from .models import EntidadEmisora, Norma, TipoNorma
 
 #: La cabecera exacta, en orden. Constante literal y no `verbose_name` derivados —al revés que en
 #: fichas ACC—: esta hoja la define el cliente y no tiene por qué parecerse a los campos.
@@ -66,26 +66,6 @@ COLUMNAS_OBLIGATORIAS = ("Tipo de normativa", "Nombre", "Descripción", "Entidad
 
 HOJA_DATOS = "Normativa"
 HOJA_INSTRUCCIONES = "Instrucciones"
-
-#: Cómo se escribe cada tipo por ahí fuera. La clave va normalizada (sin tildes, en mayúsculas y
-#: con los espacios colapsados) por `_clave`.
-SINONIMOS_TIPO = {
-    "LEY": Norma.Tipo.LEY,
-    "DECRETO SUPREMO": Norma.Tipo.DS,
-    "DS": Norma.Tipo.DS,
-    "D.S.": Norma.Tipo.DS,
-    "RESOLUCION MINISTERIAL": Norma.Tipo.RM,
-    "RM": Norma.Tipo.RM,
-    "R.M.": Norma.Tipo.RM,
-    "RESOLUCION JEFATURAL": Norma.Tipo.RJ,
-    "RJ": Norma.Tipo.RJ,
-    "R.J.": Norma.Tipo.RJ,
-    "ORDENANZA": Norma.Tipo.ORDENANZA,
-    "ORDENANZA REGIONAL": Norma.Tipo.ORDENANZA,
-    "ORDENANZA MUNICIPAL": Norma.Tipo.ORDENANZA,
-    "ORDENANZA PROVINCIAL": Norma.Tipo.ORDENANZA,
-    "ORDENANZA DISTRITAL": Norma.Tipo.ORDENANZA,
-}
 
 #: Qué prefijo del nombre canónico de la entidad la sitúa en cada nivel de gobierno. Se recorre en
 #: orden y gana el primero que aparezca dentro del nombre.
@@ -183,20 +163,47 @@ class Analisis:
         return len(self.validas) + len(self.omitidas)
 
     @property
+    def tipos_desconocidos(self) -> list[str]:
+        """Los tipos que hay que dar de alta para que esas filas entren. Ver `_desconocidos`."""
+        return self._desconocidos("no está en el catálogo de tipos de norma: ")
+
+    @property
     def entidades_desconocidas(self) -> list[str]:
         """Las que hay que dar de alta en el catálogo para que esas filas entren.
 
         Se agrupan para poder crearlas de una vez y volver a subir el archivo, en vez de
         descubrirlas de una en una.
         """
-        vistas: list[str] = []
+        return self._desconocidos("no está en el catálogo de entidades emisoras: ")
+
+    def _desconocidos(self, marca: str) -> list[str]:
+        """Los nombres que aparecen tras `marca` en los motivos, sin repetir y en orden de
+        aparición. Uno solo por valor: la misma entidad ausente puede omitir veinte filas."""
+        vistos: list[str] = []
         for fila in self.omitidas:
-            marca = "no está en el catálogo de entidades emisoras: "
             if marca in fila.motivo:
                 nombre = fila.motivo.split(marca, 1)[1].strip(" «».")
-                if nombre and nombre not in vistas:
-                    vistas.append(nombre)
-        return vistas
+                if nombre and nombre not in vistos:
+                    vistos.append(nombre)
+        return vistos
+
+
+def _catalogo_tipos() -> dict[str, "TipoNorma"]:
+    """El catálogo indexado por nombre, abreviatura **y cada sinónimo**, todos normalizados.
+
+    Los sinónimos son lo que hace administrable la deducción: eran una tabla fija de quince
+    entradas en este archivo, y con ella un tipo dado de alta desde el admin entraba en el
+    formulario y en la IA pero el importador seguía omitiendo sus filas, sin que nada relacionara
+    las dos cosas.
+    """
+    catalogo: dict[str, TipoNorma] = {}
+    for tipo in TipoNorma.objects.all():
+        catalogo[_clave(tipo.nombre)] = tipo
+        if tipo.abreviatura:
+            catalogo.setdefault(_clave(tipo.abreviatura), tipo)
+        for sinonimo in tipo.sinonimos or []:
+            catalogo.setdefault(_clave(sinonimo), tipo)
+    return catalogo
 
 
 def _catalogo_entidades() -> dict[str, EntidadEmisora]:
@@ -289,6 +296,7 @@ def analizar(origen) -> Analisis:
             )
 
         analisis = Analisis()
+        tipos = _catalogo_tipos()
         catalogo = _catalogo_entidades()
         # Lo que ya está en la base y lo que va entrando del propio archivo: un nombre repetido
         # dentro del Excel es tan duplicado como uno que choca contra una norma existente.
@@ -321,12 +329,11 @@ def analizar(origen) -> Analisis:
                 omitir(f"el nombre está repetido: {vistos[clave]}.")
                 continue
 
-            tipo = SINONIMOS_TIPO.get(_clave(celdas["Tipo de normativa"]))
+            tipo = tipos.get(_clave(celdas["Tipo de normativa"]))
             if tipo is None:
                 omitir(
-                    f"el tipo «{celdas['Tipo de normativa']}» no está en el catálogo "
-                    "(Ley, Decreto Supremo, Resolución Ministerial, Resolución Jefatural, "
-                    "Ordenanza)."
+                    "no está en el catálogo de tipos de norma: "
+                    f"«{celdas['Tipo de normativa']}»."
                 )
                 continue
 
@@ -398,6 +405,19 @@ def importar(analisis: Analisis) -> int:
     return len(normas)
 
 
+def _tipos_admitidos() -> str:
+    """La ayuda de la columna «Tipo», escrita desde el catálogo.
+
+    A mano, la lista se queda corta el día que PREDES da de alta un tipo, y la plantilla es
+    precisamente el papel donde el cliente mira qué le está permitido escribir.
+    """
+    nombres = list(TipoNorma.objects.order_by("orden", "nombre").values_list("nombre", flat=True))
+    if not nombres:
+        return "El catálogo de tipos está vacío: dalos de alta antes de importar."
+    listado = ", ".join(nombres[:-1]) + (f" o {nombres[-1]}" if len(nombres) > 1 else nombres[0])
+    return f"{listado}. Se aceptan las abreviaturas y variantes del catálogo (DS, D.S., RM…)."
+
+
 def plantilla_xlsx() -> bytes:
     """Excel vacío con la cabecera exacta y una hoja de instrucciones.
 
@@ -410,8 +430,7 @@ def plantilla_xlsx() -> bytes:
 
     ayuda = {
         "N": "Correlativo del archivo. No se importa: está para que puedas referirte a una fila.",
-        "Tipo de normativa": "Ley, Decreto Supremo, Resolución Ministerial, Resolución Jefatural "
-                             "u Ordenanza. Se aceptan abreviaturas (DS, RM, RJ).",
+        "Tipo de normativa": _tipos_admitidos(),
         "Nombre": "Título de la norma. NO puede repetirse: es lo que decide si una fila ya está "
                   "cargada.",
         "Descripción": f"De qué trata, en un párrafo. Máximo {_TOPE_RESUMEN} caracteres.",

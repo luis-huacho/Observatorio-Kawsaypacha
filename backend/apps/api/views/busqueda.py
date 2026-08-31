@@ -93,7 +93,7 @@ class BusquedaView(APIView):
         )[:limite]
         return [
             {"titulo": n.titulo, "detalle": n.resumen[:180],
-             "extra": f"{n.get_tipo_display()} · {n.fecha.year}", "url": f"/normativa/{n.slug}"}
+             "extra": f"{n.tipo.nombre if n.tipo_id else ''} · {n.fecha.year}".strip(" ·"), "url": f"/normativa/{n.slug}"}
             for n in qs
         ]
 

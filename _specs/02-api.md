@@ -189,7 +189,8 @@ Notas del contrato:
 |---|---|---|
 | `GET /api/medidas/` | `peligro`, `ambito`, `resultado`, `distrito`, `tema`, `page` | facetado fino vía Meilisearch (04); este endpoint es la fuente canónica |
 | `GET /api/medidas/{slug}/` | — | incluye `contenido` HTML saneado, `galeria` anidada y `enlaces` |
-| `GET /api/normativa/` | `tipo`, `ambito`, `entidad`, `anio`, `tema`, `page` | `entidad` es el **slug** de la entidad emisora |
+| `GET /api/normativa/` | `tipo`, `ambito`, `entidad`, `anio`, `tema`, `page` | `tipo` y `entidad` son **slugs** de su catálogo. `tipo` compara con `iexact`: el slug es `ds` pero los enlaces viejos traen `?tipo=DS` |
+| `GET /api/normativa/tipos/` | — | catálogo para el desplegable, mismas reglas que `entidades/` |
 | `GET /api/normativa/entidades/` | — | catálogo para el desplegable: solo las entidades **con alguna norma publicada**, sin paginar. Ofrecer el catálogo entero sería ofrecer filtros que devuelven cero resultados |
 | `GET /api/normativa/{slug}/` | — | ficha con `contenido` desarrollado |
 | `GET /api/normativa/export.xlsx` | ídem que el listado | |
@@ -197,6 +198,8 @@ Notas del contrato:
 | `GET /api/noticias/{slug}/` | — | |
 
 `tema` filtra por coincidencia exacta en `palabras_clave`; es lo que alimenta los chips navegables de las fichas (`?tema=…` en el frontend).
+
+**`tipo` viaja como objeto anidado** (`{slug, nombre, abreviatura}`) desde que es catálogo. Es `null` solo en borradores: publicar sin tipo está bloqueado en el servidor.
 
 **`entidad_emisora` viaja como objeto anidado** (`{slug, nombre, sigla}`) o `null`, que es un estado real y frecuente: no toda norma tiene entidad, y la ficha repliega entonces al nivel de gobierno que se deduce de `ambito`. Objeto y no cadena porque los tres consumidores piden cosas distintas —el listado pinta la sigla, la ficha el nombre completo, el filtro viaja por slug— y salen del mismo sitio.
 

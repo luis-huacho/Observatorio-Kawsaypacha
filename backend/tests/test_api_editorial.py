@@ -34,12 +34,12 @@ def medida(db):
 def norma(db):
     import datetime
 
-    from apps.normativa.models import Norma
+    from apps.normativa.models import Norma, TipoNorma
 
     return Norma.objects.create(
         slug="ordenanza-grd-cusco-2024",
         titulo="Ordenanza regional de gestión del riesgo",
-        tipo=Norma.Tipo.choices[0][0],
+        tipo=TipoNorma.objects.get(slug="ley"),
         ambito=Norma.Ambito.choices[0][0],
         fecha=datetime.date(2024, 5, 20),
         resumen="Crea el grupo de trabajo regional de GRD.",
@@ -208,12 +208,12 @@ def test_normativa_se_filtra_por_anio(api, norma):
 
 def test_el_export_de_normativa_solo_lleva_lo_publicado(api, norma, sin_throttling):
     """El Excel es una copia del listado: si arrastrara borradores, sería una fuga de contenido."""
-    from apps.normativa.models import Norma
+    from apps.normativa.models import Norma, TipoNorma
 
     Norma.objects.create(
         slug="borrador-interno",
         titulo="Proyecto de ordenanza en discusión",
-        tipo=Norma.Tipo.choices[0][0],
+        tipo=TipoNorma.objects.get(slug="ley"),
         ambito=Norma.Ambito.choices[0][0],
         fecha=norma.fecha,
         resumen="No debe salir del admin.",
@@ -422,6 +422,66 @@ def test_una_noticia_de_tipo_nuevo_sirve_SU_ilustracion(api, db):
     fila = api.get("/api/noticias/?tipo=publicacion").json()
     assert fila["count"] == 1
     assert fila["results"][0]["imagen_portada"].endswith("/img/default/publicacion.svg")
+
+
+def test_el_tipo_viaja_como_objeto_con_su_abreviatura(api, norma):
+    fila = api.get("/api/normativa/").json()["results"][0]
+
+    assert fila["tipo"] == {"slug": "ley", "nombre": "Ley", "abreviatura": ""}
+
+
+def test_el_filtro_por_tipo_SIGUE_ACEPTANDO_el_valor_viejo(api, norma):
+    """El slug es `ds`, pero durante meses el filtro viajó como `?tipo=DS`.
+
+    Esos enlaces están compartidos y guardados. Sin el `iexact` seguirían respondiendo 200 con el
+    listado entero, que es indistinguible de un filtro sin resultados: nadie reportaría el fallo.
+    """
+    from apps.normativa.models import Norma, TipoNorma
+
+    norma.tipo = TipoNorma.objects.get(slug="ds")
+    norma.save()
+
+    assert api.get("/api/normativa/?tipo=ds").json()["count"] == 1
+    assert api.get("/api/normativa/?tipo=DS").json()["count"] == 1
+    assert api.get("/api/normativa/?tipo=Ley").json()["count"] == 0
+
+
+def test_el_catalogo_de_tipos_solo_lista_los_que_TIENEN_normas_publicadas(api, norma):
+    from apps.normativa.models import TipoNorma
+
+    assert TipoNorma.objects.count() > 1
+    assert [t["slug"] for t in api.get("/api/normativa/tipos/").json()] == ["ley"]
+
+
+def test_borrar_un_tipo_en_uso_no_desclasifica_las_normas_en_silencio(api, norma):
+    """La FK es PROTECT: con SET_NULL, borrar un tipo desde su pantalla vaciaría la clasificación
+    de todas sus normas sin que nada lo dijera."""
+    from django.db.models import ProtectedError
+
+    with pytest.raises(ProtectedError):
+        norma.tipo.delete()
+
+
+def test_no_se_puede_publicar_una_norma_SIN_TIPO(db):
+    """El campo admite nulo desde que es clave foránea —la IA y el importador lo necesitan—, así
+    que la garantía se devuelve en el único punto donde importa.
+
+    Cierra además un agujero anterior: una norma que la IA dejó con el tipo en blanco sí se podía
+    publicar, y salía en el listado con el chip vacío.
+    """
+    import datetime
+
+    from apps.normativa.models import Norma
+
+    borrador = Norma.objects.create(
+        slug="sin-tipo-todavia",
+        titulo="Norma a medio clasificar",
+        ambito=Norma.Ambito.NACIONAL,
+        fecha=datetime.date(2026, 1, 1),
+        resumen="El editor aún no eligió el tipo.",
+    )
+
+    assert borrador.faltantes_para_publicar() == ["tipo"]
 
 
 # --- Contenidos y biblioteca ------------------------------------------------

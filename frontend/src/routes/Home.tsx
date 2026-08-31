@@ -282,9 +282,14 @@ function NormaPreview({ norma: n }: { norma: Norma }) {
       className="card block p-5 hover:shadow-md transition no-underline"
     >
       <div className="flex flex-wrap items-center gap-2 mb-1">
-        <span className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
-          {n.tipo}
-        </span>
+        {n.tipo && (
+          <span
+            className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20"
+            title={n.tipo.nombre}
+          >
+            {n.tipo.abreviatura || n.tipo.nombre}
+          </span>
+        )}
         {n.entidad_emisora && (
           <span
             className="chip bg-earth-200/40 text-earth-700 border border-earth-500/20"

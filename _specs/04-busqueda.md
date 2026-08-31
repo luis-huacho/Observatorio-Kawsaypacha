@@ -100,7 +100,7 @@ Cliente Python: paquete `meilisearch` en `core/services/meili.py`.
 
 Si Meilisearch está caído, el frontend degrada a los endpoints DRF con filtros (`/api/medidas/?…`, `/api/ccpp/?buscar=`) — sin facetas ni typo-tolerance, pero funcional. Implementar como catch en `search.ts`.
 
-**`entidad` se indexa con el NOMBRE, no con el slug**, igual que `tipo` y `ambito`, que van con su
+**`tipo` y `entidad` se indexan con el NOMBRE, no con el slug**, igual que `tipo` y `ambito`, que van con su
 `display`. Es lo que el visitante lee y lo que teclea en el buscador. La asimetría con el API DRF
 —que filtra por el valor crudo (`?entidad=pcm`)— es la de siempre y no es un descuido: son dos
 consumidores con dos públicos. El documento lo construye `_doc_norma` con `select_related`

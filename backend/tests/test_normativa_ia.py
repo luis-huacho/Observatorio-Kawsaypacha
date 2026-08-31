@@ -22,7 +22,7 @@ import pytest
 
 from apps.core.models import EstadoIA
 from apps.normativa import redaccion
-from apps.normativa.models import EntidadEmisora, Norma
+from apps.normativa.models import EntidadEmisora, Norma, TipoNorma
 
 pytestmark = pytest.mark.django_db
 
@@ -43,7 +43,7 @@ PDF = b"%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF"
 FICHA = {
     "titulo": "Reglamento de la Ley 29664, Ley del SINAGERD",
     "numero": "DS 048-2011-PCM",
-    "tipo": "DS",
+    "tipo": "ds",
     "ambito": "nacional",
     "fecha": "2011-05-26",
     "resumen": "Aprueba el reglamento de la Ley del SINAGERD y fija las competencias de los "
@@ -120,7 +120,7 @@ def _norma_en_proceso(**extra):
     campos = {
         "slug": "elperuano-pe-abcd1234",
         "titulo": "(redactando) busquedas.elperuano.pe",
-        "tipo": "",
+        "tipo": None,
         "ambito": "",
         "fecha": datetime.date.today(),
         "resumen": "",
@@ -166,7 +166,8 @@ def test_una_norma_ya_redactada_no_puede_volver_a_pedir_la_ia(formulario):
     norma = _norma_en_proceso(redactada_por_ia=True, ia_estado=EstadoIA.OK)
     form = formulario(
         {**BASE, "procesar_con_ia": "on", "titulo": "Reglamento", "slug": "reglamento",
-         "tipo": "DS", "ambito": "nacional", "fecha": "2011-05-26", "resumen": "x",
+         "tipo": TipoNorma.objects.get(slug="ds").pk, "ambito": "nacional",
+         "fecha": "2011-05-26", "resumen": "x",
          "palabras_clave": ""},
         instance=norma,
     )
@@ -189,7 +190,7 @@ def test_la_tarea_rellena_los_campos_y_cierra_el_candado(ia):
 
     assert norma.titulo == FICHA["titulo"]
     assert norma.numero == "DS 048-2011-PCM"
-    assert norma.tipo == Norma.Tipo.DS
+    assert norma.tipo.slug == "ds"
     assert norma.ambito == Norma.Ambito.NACIONAL
     assert norma.fecha == datetime.date(2011, 5, 26)
     assert norma.estado_vigencia == "vigente"
@@ -217,7 +218,9 @@ def test_un_fallo_deja_el_candado_ABIERTO(ia):
 
 def test_la_tarea_no_pisa_lo_que_escribio_una_persona(ia):
     ia()
-    norma = _norma_en_proceso(titulo="Título que escribió el editor", tipo=Norma.Tipo.LEY)
+    norma = _norma_en_proceso(
+        titulo="Título que escribió el editor", tipo=TipoNorma.objects.get(slug="ley")
+    )
 
     from apps.normativa.tasks import redactar_norma_desde_url
 
@@ -225,7 +228,7 @@ def test_la_tarea_no_pisa_lo_que_escribio_una_persona(ia):
     norma.refresh_from_db()
 
     assert norma.titulo == "Título que escribió el editor"
-    assert norma.tipo == Norma.Tipo.LEY
+    assert norma.tipo.slug == "ley"
     # Lo que estaba vacío sí se rellena.
     assert norma.ambito == Norma.Ambito.NACIONAL
     assert "titulo" in norma.log_ia and "tipo" in norma.log_ia
@@ -361,18 +364,45 @@ def test_una_pagina_sin_texto_se_rechaza_con_un_motivo_util(ia):
 # --- Normalización ----------------------------------------------------------
 
 
-@pytest.mark.parametrize("campo", ["tipo", "ambito"])
-def test_un_tipo_o_un_ambito_inventado_se_deja_VACIO(ia, campo):
+def test_un_ambito_inventado_se_deja_VACIO(ia):
     """Sin repliegue inventado: un valor fuera del catálogo se deja vacío para que el editor elija.
 
     Replegar a una opción cualquiera pondría una clasificación falsa que nadie revisaría, porque
     el campo se vería lleno.
     """
-    ia({**FICHA, campo: "Decreto de Urgencia"})
+    ia({**FICHA, "ambito": "supranacional"})
 
     propuesta = redaccion.redactar("https://busquedas.elperuano.pe/normas/x")
 
-    assert getattr(propuesta, campo) == ""
+    assert propuesta.ambito == ""
+
+
+def test_un_tipo_inventado_se_deja_VACIO_y_lo_avisa(ia):
+    """Misma doctrina que el ámbito, pero el vacío de una clave foránea es `None`, no `""`.
+
+    Y además se dice en la bitácora, porque el editor tiene que poder ampliar el catálogo: es la
+    diferencia entre «la IA no supo» y «este tipo todavía no existe».
+    """
+    ia({**FICHA, "tipo": "decreto-de-urgencia"})
+
+    propuesta = redaccion.redactar("https://busquedas.elperuano.pe/normas/x")
+
+    assert propuesta.tipo is None
+    assert any("decreto-de-urgencia" in aviso for aviso in propuesta.avisos)
+    assert not TipoNorma.objects.filter(slug="decreto-de-urgencia").exists()
+
+
+def test_el_enum_de_tipos_sale_del_CATALOGO_VIVO(ia):
+    """Era el último `enum` del proyecto escrito a mano; un tipo nuevo no lo puede dejar atrás."""
+    llamadas = ia()
+    TipoNorma.objects.create(slug="acuerdo-de-concejo", nombre="Acuerdo de Concejo", orden=9)
+
+    redaccion.redactar("https://busquedas.elperuano.pe/normas/x")
+
+    esquema = llamadas[0]["response_format"]["json_schema"]
+    opciones = esquema["schema"]["properties"]["tipo"]["enum"]
+    assert set(opciones) == set(TipoNorma.objects.values_list("slug", flat=True)) | {""}
+    assert "acuerdo-de-concejo" in opciones
 
 
 def test_la_entidad_del_catalogo_se_resuelve_a_su_fila(ia, entidades):

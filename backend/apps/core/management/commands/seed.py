@@ -93,6 +93,7 @@ class Command(BaseCommand):
         self._sitio()
         self._capas()
         self._categorias_documento()
+        self._tipos_norma()
         self._entidades_emisoras()
 
         self._titulo("Grupos y superusuario")
@@ -239,6 +240,13 @@ class Command(BaseCommand):
         creados, existentes = semilla.sembrar(CapaCartografica, datos["capas"], "slug")
         self._ok(f"capas: {creados} nuevas, {existentes} ya existían")
 
+    def _tipos_norma(self):
+        from apps.normativa.models import TipoNorma
+
+        datos = semilla.leer(APPS / "normativa/semillas/tipos.yaml")
+        creados, existentes = semilla.sembrar(TipoNorma, datos["tipos"], "slug")
+        self._ok(f"tipos de norma: {creados} nuevos, {existentes} ya existían")
+
     def _entidades_emisoras(self):
         from apps.normativa.models import EntidadEmisora
 
@@ -344,7 +352,7 @@ class Command(BaseCommand):
     def _demo(self):
         from apps.contenidos.models import Noticia
         from apps.medidas.models import Medida
-        from apps.normativa.models import EntidadEmisora, Norma
+        from apps.normativa.models import EntidadEmisora, Norma, TipoNorma
         from apps.peligros.models import TipoPeligro
         from apps.territorio.models import Distrito
 
@@ -367,12 +375,15 @@ class Command(BaseCommand):
 
         datos = semilla.leer(APPS / "normativa/semillas/demo.yaml")
         entidades = {e.slug: e for e in EntidadEmisora.objects.all()}
+        # El YAML trae el tipo por slug; en la base es una fila del catálogo.
+        tipos = {t.slug: t for t in TipoNorma.objects.all()}
         registros = []
         for n in datos["normas"]:
             fila = dict(n)
             # Una de las cinco va sin entidad a propósito: su municipalidad distrital no está en
             # el catálogo de arranque, y así en desarrollo se ve también la ficha sin ella.
             fila["entidad_emisora"] = entidades.get(fila.pop("entidad", None))
+            fila["tipo"] = tipos.get(fila.pop("tipo", None))
             fila["estado"] = Norma.Estado.PUBLICADO
             fila["publicado_en"] = ahora
             registros.append(fila)

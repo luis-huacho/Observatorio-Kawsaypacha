@@ -58,9 +58,10 @@ def _esquema() -> dict:
     institución desde el admin, y las dos copias se desincronizarían el primer día. Es el mismo
     mecanismo que usa `apps/medidas/redaccion.py` con los nueve peligros.
     """
-    from apps.normativa.models import EntidadEmisora
+    from apps.normativa.models import EntidadEmisora, TipoNorma
 
     entidades = list(EntidadEmisora.objects.values_list("slug", flat=True))
+    tipos = list(TipoNorma.objects.values_list("slug", flat=True))
 
     return {
         "name": "norma",
@@ -85,7 +86,14 @@ def _esquema() -> dict:
                         '"Ordenanza Regional 123-2020-CR/GRC.CUSCO". Vacío si no aparece.'
                     ),
                 },
-                "tipo": {"type": "string", "enum": ["Ley", "DS", "RM", "RJ", "Ordenanza"]},
+                "tipo": {
+                    "type": "string",
+                    "enum": [*tipos, ""],
+                    "description": (
+                        "Clase de norma, elegida de la lista. Cadena vacía si no es ninguna de "
+                        "ellas: no elijas la más parecida."
+                    ),
+                },
                 "ambito": {
                     "type": "string",
                     "enum": ["nacional", "regional", "local"],
@@ -164,7 +172,7 @@ class Redaccion:
 
     titulo: str
     numero: str
-    tipo: str
+    tipo: object | None
     ambito: str
     entidad_emisora: object | None
     fecha: date
@@ -285,11 +293,9 @@ def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
     from apps.normativa.models import Norma
 
     avisos: list[str] = []
-    tipos = {opcion for opcion, _ in Norma.Tipo.choices}
     ambitos = {opcion for opcion, _ in Norma.Ambito.choices}
     vigencias = {"vigente", "derogada", "modificada"}
 
-    tipo = str(datos.get("tipo") or "").strip()
     ambito = str(datos.get("ambito") or "").strip().lower()
     vigencia = str(datos.get("estado_vigencia") or "").strip().lower()
 
@@ -302,9 +308,9 @@ def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
     return Redaccion(
         titulo=str(datos.get("titulo") or "").strip()[:300],
         numero=str(datos.get("numero") or "").strip()[:80],
-        # Sin repliegue inventado: si el tipo o el ámbito no cuadran con el catálogo se dejan
-        # vacíos, que es lo que el modelo permite y lo que hace que el editor lo vea y lo elija.
-        tipo=tipo if tipo in tipos else "",
+        # Sin repliegue inventado: lo que no cuadra con el catálogo se deja vacío, que es lo que
+        # hace que el editor lo vea y lo elija.
+        tipo=_resolver_tipo(datos.get("tipo"), avisos),
         ambito=ambito if ambito in ambitos else "",
         entidad_emisora=_resolver_entidad(datos.get("entidad_emisora"), avisos),
         fecha=_a_fecha(datos.get("fecha")),
@@ -317,6 +323,27 @@ def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
         costo=costo,
         avisos=avisos,
     )
+
+
+def _resolver_tipo(slug, avisos: list[str]):
+    """El tipo se elige del catálogo o se deja vacío; nunca se crea desde aquí.
+
+    Misma doctrina y mismas dos guardas que `_resolver_entidad`: el `enum` ya lo restringe, pero la
+    salida estructurada falla de vez en cuando y un slug inventado reventaría al guardar **dentro
+    del worker**, donde el editor no lo ve.
+    """
+    from apps.normativa.models import TipoNorma
+
+    slug = str(slug or "").strip()
+    if not slug:
+        return None
+    tipo = TipoNorma.objects.filter(slug=slug).first()
+    if tipo is None:
+        avisos.append(
+            f"«{slug}» no está en el catálogo de tipos de norma: elígelo a mano, o créalo "
+            f"desde «Normativa - Tipos»."
+        )
+    return tipo
 
 
 def _resolver_entidad(slug, avisos: list[str]):

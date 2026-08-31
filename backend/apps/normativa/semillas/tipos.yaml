@@ -1,0 +1,33 @@
+# Tipos de norma. Datos, no código: PREDES puede añadir, renombrar o reordenar desde el admin y el
+# seed no vuelve a tocarlos.
+#
+# `sinonimos` es lo que el importador de Excel consulta para reconocer cómo viene escrito el tipo
+# en la hoja. Son los quince que la tabla fija de `importacion.py` reconocía antes de que el
+# catálogo existiera: se trasladan tal cual para no perder ni una variante.
+
+tipos:
+  - slug: ley
+    nombre: Ley
+    abreviatura: ''
+    orden: 1
+    sinonimos: []
+  - slug: ds
+    nombre: Decreto Supremo
+    abreviatura: DS
+    orden: 2
+    sinonimos: ['D.S.']
+  - slug: rm
+    nombre: Resolución Ministerial
+    abreviatura: RM
+    orden: 3
+    sinonimos: ['R.M.']
+  - slug: rj
+    nombre: Resolución Jefatural
+    abreviatura: RJ
+    orden: 4
+    sinonimos: ['R.J.']
+  - slug: ordenanza
+    nombre: Ordenanza
+    abreviatura: ''
+    orden: 5
+    sinonimos: ['Ordenanza Regional', 'Ordenanza Municipal', 'Ordenanza Provincial', 'Ordenanza Distrital']
