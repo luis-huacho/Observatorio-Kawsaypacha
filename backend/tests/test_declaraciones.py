@@ -175,3 +175,94 @@ def test_si_el_reparto_es_plano_no_se_declara_una_concentracion_falsa():
     frase = declaraciones.proyectos(_bloque(*([100] * 5)))
     assert "concentran" not in frase
     assert "5 de las 116" in frase
+
+
+# --- La distribución del mapa ----------------------------------------------
+
+
+def _dist(**extra):
+    base = {
+        "n": 99, "ceros": 1, "q1": 38_000.0, "mediana": 73_510.0, "q3": 179_422.0,
+        "bigote_min": 2_300.0, "bigote_max": 370_009.0,
+        "atipicos": [{"nombre": "PICHARI", "valor": 9_331_232.0}],
+    }
+    return {**base, **extra}
+
+
+def test_la_frase_del_mapa_dice_donde_esta_la_mitad_y_quien_se_sale():
+    """El coroplético no puede enseñar el reparto: su último tramo se come toda la cola.
+
+    Con la mediana en S/ 73.510 y PICHARI en 9,3 M —127 veces— un distrito de 220 mil y otro de
+    nueve millones salen del mismo color. La frase es lo que dice en palabras lo que el color
+    aplana, así que tiene que traer el rango central, cuántos se salen y el mayor con su nombre.
+    """
+    frase = declaraciones.distribucion(_dist(), "pim", "distrital")
+
+    assert "S/ 38,000" in frase and "S/ 179,422" in frase
+    assert "99 distritos" in frase
+    assert "PICHARI" in frase and "S/ 9,331,232" in frase
+
+
+def test_sin_atipicos_la_frase_no_inventa_ninguno():
+    """El % de ejecución no tiene cola: 98 distritos entre 0 y 100 % y ni un valor fuera de rango.
+
+    Una frase que dijera «0 quedan fuera» sería ruido; la que se calla es la correcta.
+    """
+    frase = declaraciones.distribucion(
+        _dist(n=98, ceros=0, q1=0.267, mediana=0.469, q3=0.705, atipicos=[]),
+        "pct_ejecucion",
+        "distrital",
+    )
+
+    assert "26.7%" in frase and "70.5%" in frase
+    assert "fuera" not in frase
+    # Y el porcentaje no se escribe en soles, que es el fallo que no rompe nada.
+    assert "S/" not in frase
+
+
+def test_los_ceros_se_cuentan_en_la_frase_porque_no_caben_en_la_escala():
+    """Nueve distritos con devengado 0 no se pueden dibujar en un eje logarítmico.
+
+    Excluirlos del dibujo está bien; excluirlos **sin decirlo** deja una caja calculada sobre 99
+    valores encima de un gráfico que enseña 90, sin que nada falle.
+
+    Y se dicen «con S/ 0», no «sin presupuesto»: en el devengado eso sería falso —un distrito
+    puede tener PIM y no haber gastado un sol— y es el tipo de frase que se lee como un dato.
+    """
+    frase = declaraciones.distribucion(_dist(ceros=9), "devengado", "distrital")
+
+    assert "9 distritos con S/ 0" in frase
+    assert "sin presupuesto" not in frase
+
+
+def test_el_porcentaje_no_habla_de_la_escala_porque_el_cero_si_cabe():
+    """El % de ejecución se dibuja en una escala lineal de 0 a 100: un 0 % es un punto válido.
+
+    Arrastrar aquí la advertencia del eje logarítmico contaría una limitación que no existe.
+    """
+    frase = declaraciones.distribucion(
+        _dist(ceros=8, q1=0.268, mediana=0.469, q3=0.705, atipicos=[]),
+        "pct_ejecucion",
+        "distrital",
+    )
+
+    assert "escala" not in frase
+    assert "S/" not in frase
+
+
+def test_la_frase_concuerda_en_genero_con_lo_que_cuenta():
+    """«los 13 provincias» es el descuido que delata una frase generada por una máquina."""
+    assert "las 13 provincias" in declaraciones.distribucion(_dist(n=13), "pim", "provincial")
+    assert "los 99 distritos" in declaraciones.distribucion(_dist(), "pim", "distrital")
+
+
+def test_una_distribucion_vacia_no_deja_una_frase_a_medias():
+    """Un ámbito sin filas: mejor ninguna frase que «La mitad de los 0 distritos está entre…»."""
+    assert declaraciones.distribucion(_dist(n=0), "pim", "distrital") is None
+
+
+def test_a_nivel_provincial_la_frase_habla_de_provincias():
+    frase = declaraciones.distribucion(_dist(n=13), "pim", "provincial")
+
+    assert "las 13 provincias" in frase
+    assert "distritos" not in frase

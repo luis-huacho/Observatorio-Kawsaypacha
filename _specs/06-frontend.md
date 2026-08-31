@@ -130,6 +130,64 @@ porque es lo que permite recortar el título sin que el usuario pierda de qué n
 el hueco, y **no** `loading="lazy"`: es la imagen LCP de su propia página. En los listados sí se
 difiere.
 
+## El mapa de Inversión y su diagrama de caja
+
+La sección «¿Dónde está el presupuesto?» tenía **~150 palabras** de prosa alrededor del mapa —una
+entradilla, el párrafo de quintiles y dos pies— con **los mismos 13 distritos capital explicados
+dos veces con palabras distintas**, y dos frases que se justificaban a sí mismas ante el lector
+(«los rangos van siempre en la leyenda por eso mismo», «la advertencia va aquí porque este mapa se
+cita suelto»), que son comentarios de código impresos en la pantalla. Hoy quedan ~60 palabras: se
+retiró la entradilla —lo que decía ya está en la línea de alcance de la cabecera— y cada pie dice
+**su** hecho, uno el dinero que no se pinta y otro los polígonos en blanco. **Siguen siendo dos**:
+hoy coinciden en los mismos 13 distritos, pero uno cuya municipalidad no tenga presupuesto este año
+caería solo en el segundo, y fundirlos sería una simplificación que un día es falsa.
+
+Y el mapa era **el único gráfico de la página sin `Declaracion`**: cuatro párrafos sobre lo que no
+se pinta y ninguno sobre lo que sí. Ahora lleva la suya, y debajo un **diagrama de caja**
+(`components/CajaDistribucion.tsx`) de la métrica y el nivel que estén seleccionados — el mapa dice
+*dónde* está el dinero; la caja, *cómo de repartido* está.
+
+- **Es SVG a mano, no Recharts.** El proyecto no usa `ErrorBar`, `Scatter` ni `ComposedChart` en
+  ninguna parte, y componer un diagrama de caja con barras apiladas es más frágil que dibujarlo. El
+  precedente ya existía (`ProyectosVsActividades`) y el PDF construye sus SVG con `rect`/`line`/
+  `text`, así que el día que la caja pase al papel se traduce casi línea a línea.
+- **El dinero va en escala logarítmica, y no es una preferencia**: medido, en un eje lineal de
+  600 px la caja del PIM distrital ocupa **9 píxeles**. El % de ejecución va lineal de 0 a 100 —no
+  hay cola que comprimir— y ahí un 0 % es un punto válido.
+- **Dos repliegues, los dos porque `log(0)` no existe**: los ceros se excluyen del dibujo y **se
+  declaran** en la frase; y si `q1` valiera 0 la escala se repliega a lineal. Sin lo segundo el
+  borde de la caja sería `-Infinity` y el SVG no pintaría nada, **sin dar ningún error**.
+- **Los atípicos llevan su nombre en un `<title>`**, que da tooltip nativo sin una línea de JS: un
+  punto suelto a la derecha no dice nada, «PICHARI» sí.
+- Los tres cuartiles van **escritos** bajo la caja: la forma enseña el sesgo, pero leer un número no
+  puede depender de medir píxeles, y menos en logarítmica.
+
+Los cinco números **no se calculan aquí**: vienen del payload junto a `cortes` (ver 02). `Declaracion`
+salió de `Inversion.tsx` a `components/` al ganar un quinto usuario.
+
+**La caja va enmarcada y con su frase dentro**, con el encuadre que ya usa `FiltroTema` para un panel
+embebido. Apilada al mismo nivel que los demás párrafos se leía como dos apartados sueltos más de una
+lista de ocho bloques separados por 6-16 px; ahora son seis, con 12-20. Y el `viewBox` mide 96 y no
+78: **las etiquetas de los cuartiles tenían su línea base justo en el borde y se veían cortadas**, que
+es un fallo que no da ningún error — lo vigila una prueba e2e que comprueba que cada `<text>` cabe.
+
+Bajo el mapa **no queda ningún pie visible**. El de `poligonos.motivo` se retiró de los dos medios:
+pantalla y PDF traen en su leyenda el cuadro blanco «sin municipalidad (N)», así que la frase solo
+repetía el porqué.
+
+Y el de ADR-D6 —«S/ 10.350.637 **(19 %)** no está en el mapa. Es de 13 municipalidades provinciales y
+4 entidades sin distrito. Sí cuenta en el total del ámbito y en la tabla.»— **va oculto con `hidden`,
+no borrado**. Es una decisión editorial del dueño del proyecto tomada con la frase delante: en
+pantalla no ayudaba. Lo que **no** cambia es el contrato — el importe, su porcentaje y su motivo
+siguen en el payload y **siguen imprimiéndose en el PDF**, que es donde ADR-D6 más aprieta porque el
+documento viaja sin la página que lo explica. Se queda en el DOM para volver quitando una clase, y
+hay una prueba e2e que comprueba que **sigue ahí y oculto**: borrarlo dejaría el mapa pintando el
+81 % del presupuesto sin que nada lo dijera, que es literalmente lo que fundó el ADR.
+
+De paso, la frase se arregló antes de ocultarla: cerraba justificando una decisión metodológica —«se
+declara aparte en vez de repartirse»— en vez de contestar lo que el lector se pregunta, que es dónde
+está entonces ese dinero.
+
 ## Descargas (`BotonDescarga`)
 
 Las cuatro descargas del sitio —ayuda memoria y Excel de `/peligros`, reporte y Excel de

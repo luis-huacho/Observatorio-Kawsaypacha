@@ -306,8 +306,8 @@
         </div>
         {% if metrica != "pct_ejecucion" %}
           <div class="fino" style="margin-top: 5pt">
-            Los cinco tramos son quintiles de lo que se está viendo, así que el color es relativo
-            a este recorte. Por eso los rangos van en soles.
+            Los cinco tramos son quintiles de este recorte: al acotar por provincia, un mismo
+            distrito puede cambiar de tono.
           </div>
         {% endif %}
       </td>
@@ -321,13 +321,15 @@
      sin la página que lo explica, así que esto NO es opcional. {% endcomment %}
   {% if mapa.no_ubicado.entidades %}
     <p class="declaracion">
-      <strong>{{ mapa.no_ubicado.pim|soles }} no aparecen en el mapa.</strong>
-      {{ mapa.no_ubicado.motivo }} Sí están contados en las cifras de cabecera y en la tabla.
+      {% comment %} El «sí cuenta en el total» ya no se escribe aquí: entró en el `motivo` que
+         redacta el backend, y decirlo también en la plantilla lo imprimiría dos veces. {% endcomment %}
+      <strong>{{ mapa.no_ubicado.pim|soles }} ({{ mapa.no_ubicado.pct.pim|pct }}) no está
+      en el mapa.</strong> {{ mapa.no_ubicado.motivo }}
     </p>
   {% endif %}
-  {% if mapa.poligonos.sin_dato %}
-    <p class="declaracion" style="border-left-color: #D1D5DB">{{ mapa.poligonos.motivo }}</p>
-  {% endif %}
+  {% comment %} El pie de `mapa.poligonos.motivo` se retiró: la leyenda de aquí arriba ya trae su
+     cuadro blanco con «sin municipalidad (N)», y la frase solo repetía el porqué. Sigue en el
+     payload por si un cliente dibuja este mapa sin nuestra leyenda. {% endcomment %}
 </section>
 
 {# --- Tabla de municipalidades --- #}
