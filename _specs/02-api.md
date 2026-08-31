@@ -189,13 +189,16 @@ Notas del contrato:
 |---|---|---|
 | `GET /api/medidas/` | `peligro`, `ambito`, `resultado`, `distrito`, `tema`, `page` | facetado fino vía Meilisearch (04); este endpoint es la fuente canónica |
 | `GET /api/medidas/{slug}/` | — | incluye `contenido` HTML saneado, `galeria` anidada y `enlaces` |
-| `GET /api/normativa/` | `tipo`, `ambito`, `anio`, `tema`, `page` | |
+| `GET /api/normativa/` | `tipo`, `ambito`, `entidad`, `anio`, `tema`, `page` | `entidad` es el **slug** de la entidad emisora |
+| `GET /api/normativa/entidades/` | — | catálogo para el desplegable: solo las entidades **con alguna norma publicada**, sin paginar. Ofrecer el catálogo entero sería ofrecer filtros que devuelven cero resultados |
 | `GET /api/normativa/{slug}/` | — | ficha con `contenido` desarrollado |
 | `GET /api/normativa/export.xlsx` | ídem que el listado | |
 | `GET /api/noticias/` | `tipo`, `destacada`, `tema`, `page` | orden `-destacada, -fecha, -id`: las destacadas encabezan y dentro de cada grupo manda la fecha. El remate por `id` no es cosmético — `fecha` es un `DateField` y el listado se pagina |
 | `GET /api/noticias/{slug}/` | — | |
 
 `tema` filtra por coincidencia exacta en `palabras_clave`; es lo que alimenta los chips navegables de las fichas (`?tema=…` en el frontend).
+
+**`entidad_emisora` viaja como objeto anidado** (`{slug, nombre, sigla}`) o `null`, que es un estado real y frecuente: no toda norma tiene entidad, y la ficha repliega entonces al nivel de gobierno que se deduce de `ambito`. Objeto y no cadena porque los tres consumidores piden cosas distintas —el listado pinta la sigla, la ficha el nombre completo, el filtro viaja por slug— y salen del mismo sitio.
 
 **`url_oficial` va en el listado y en el detalle**, no solo en el detalle: el acceso a la publicación oficial se ofrece en los dos sitios (ver 01). Si la norma tiene `documento` adjunto, el serializer devuelve la URL del PDF alojado y no la externa — el portal del organismo puede haber movido la suya.
 
@@ -229,6 +232,8 @@ Notas del contrato:
 // GET /api/normativa/?tipo=Ley   (forma = normativa.mock.json)
 { "count": 1, "results": [ {
   "id": 1, "titulo": "Ley N° 29664 — SINAGERD", "tipo": "Ley", "ambito": "nacional",
+  "entidad_emisora": {"slug": "congreso", "nombre": "Congreso de la República",
+                      "sigla": "Congreso"},
   "fecha": "2011-02-19", "resumen": "Crea el SINAGERD…",
   "url_oficial": "https://…", "analisis_predes": null
 } ] }

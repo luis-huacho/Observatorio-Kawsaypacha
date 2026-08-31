@@ -114,7 +114,7 @@ function aResultado(indice: string, doc: Record<string, unknown>): ResultadoBusq
   };
   const extraPorIndice: Record<string, string> = {
     medidas: texto("peligro"),
-    normativa: [texto("tipo"), texto("anio")].filter(Boolean).join(" · "),
+    normativa: [texto("tipo"), texto("entidad"), texto("anio")].filter(Boolean).join(" · "),
     noticias: texto("tipo"),
     documentos: texto("categoria"),
     videos: texto("tema"),

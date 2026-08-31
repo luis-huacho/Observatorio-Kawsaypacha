@@ -11,7 +11,7 @@ from apps.biblioteca.models import CategoriaDocumento, Documento
 from apps.contenidos.models import Evento, Noticia, Video
 from apps.mapas.models import CapaCartografica
 from apps.medidas.models import Medida, MedidaImagen
-from apps.normativa.models import Norma
+from apps.normativa.models import EntidadEmisora, Norma
 from apps.peligros.models import ClasificacionPeligro, TipoPeligro
 from apps.sitio.models import BloqueTexto, ConfiguracionSitio, EnlaceMenu, HeroSlide
 from apps.territorio.models import CentroPoblado, Distrito, Provincia
@@ -197,6 +197,15 @@ class MedidaDetalleSerializer(MedidaListaSerializer):
         ]
 
 
+class EntidadEmisoraSerializer(serializers.ModelSerializer):
+    """La institución que dicta la norma. Objeto y no cadena: el listado pinta la sigla, la ficha
+    el nombre completo y el filtro viaja por slug, y los tres salen del mismo sitio."""
+
+    class Meta:
+        model = EntidadEmisora
+        fields = ["slug", "nombre", "sigla"]
+
+
 class NormaSerializer(PortadaMixin, serializers.ModelSerializer):
     clave_portada = "norma"
     anio = serializers.IntegerField(read_only=True)
@@ -204,11 +213,14 @@ class NormaSerializer(PortadaMixin, serializers.ModelSerializer):
     # expediente entra al repositorio a por el documento, y obligarle a abrir la ficha añade
     # un paso. Los tres estados —PDF alojado, portal, sin enlace— son reales.
     documento_url = serializers.SerializerMethodField()
+    # `null` cuando no consta, que es un estado real: la ficha repliega entonces al nivel de
+    # gobierno que se deduce del ámbito.
+    entidad_emisora = EntidadEmisoraSerializer(read_only=True)
 
     class Meta:
         model = Norma
         fields = [
-            "slug", "titulo", "tipo", "ambito", "fecha", "anio", "resumen",
+            "slug", "titulo", "tipo", "ambito", "entidad_emisora", "fecha", "anio", "resumen",
             "analisis_predes", "url_oficial", "documento_url",
             "imagen_portada", "imagen_titulo", "palabras_clave", "numero", "estado_vigencia",
         ]

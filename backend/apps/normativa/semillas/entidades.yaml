@@ -1,0 +1,20 @@
+# Entidades que emiten normas de GRD/ACC con incidencia en Cusco. Datos, no código: PREDES puede
+# añadir, renombrar o reordenar desde el admin y el seed no vuelve a tocarlas.
+#
+# El arranque son las que ya aparecen en el marco vigente —SINAGERD y su reglamento, el PP 0068,
+# las ordenanzas regionales—. Las municipalidades distritales no se listan una por una: son 108 y
+# la mayoría no ha emitido nada; se dan de alta cuando aparece su primera norma.
+
+entidades:
+  - {slug: congreso, nombre: "Congreso de la República", sigla: Congreso, orden: 1}
+  - {slug: pcm, nombre: "Presidencia del Consejo de Ministros", sigla: PCM, orden: 2}
+  - {slug: cenepred, nombre: "Centro Nacional de Estimación, Prevención y Reducción del Riesgo de Desastres", sigla: CENEPRED, orden: 3}
+  - {slug: indeci, nombre: "Instituto Nacional de Defensa Civil", sigla: INDECI, orden: 4}
+  - {slug: minam, nombre: "Ministerio del Ambiente", sigla: MINAM, orden: 5}
+  - {slug: mef, nombre: "Ministerio de Economía y Finanzas", sigla: MEF, orden: 6}
+  - {slug: midagri, nombre: "Ministerio de Desarrollo Agrario y Riego", sigla: MIDAGRI, orden: 7}
+  - {slug: mvcs, nombre: "Ministerio de Vivienda, Construcción y Saneamiento", sigla: MVCS, orden: 8}
+  - {slug: senamhi, nombre: "Servicio Nacional de Meteorología e Hidrología del Perú", sigla: SENAMHI, orden: 9}
+  - {slug: ana, nombre: "Autoridad Nacional del Agua", sigla: ANA, orden: 10}
+  - {slug: gore-cusco, nombre: "Gobierno Regional de Cusco", sigla: GORE Cusco, orden: 11}
+  - {slug: mpc, nombre: "Municipalidad Provincial del Cusco", sigla: MPC, orden: 12}

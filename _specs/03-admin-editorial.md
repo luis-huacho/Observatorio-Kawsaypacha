@@ -6,7 +6,7 @@ Admin Django con **django-unfold** (ADR-A8). Objetivo TDR: que PREDES administre
 
 1. **Panel** — dashboard con métricas (ver abajo).
 2. **Datos** — Cargas de datos (DatasetUpload), Centros poblados, Clasificaciones, Frecuencia de emergencias, Inversión.
-3. **Contenido** — Medidas, Normativa, Noticias, Videos, Eventos, Biblioteca.
+3. **Contenido** — Medidas, Normativa, Normativa - Entidades emisoras, Noticias, Videos, Eventos, Biblioteca.
 4. **Mapa** — Capas cartográficas.
 5. **Sitio** — Configuración, Bloques de texto, Hero, Menú.
 6. **Usuarios** — usuarios y grupos.
@@ -105,6 +105,12 @@ Auditado contra los archivos reales; el importador debe reconocer estos casos po
 
 El `log` del `DatasetUpload` es lo que PREDES lee para saber qué corregir en su Excel, así que los mensajes van en español y citan hoja y fila.
 
+### Catálogo de entidades emisoras
+
+`EntidadEmisora` tiene pantalla propia bajo «Normativa - Entidades emisoras», con una columna que cuenta cuántas normas usan cada una: es lo que distingue una entidad viva de una que sobra, y lo que avisa antes de intentar borrar una en uso (la FK es `PROTECT`, así que el admin se planta en vez de vaciar la atribución en silencio). Desde el formulario de la norma se da de alta una entidad sin salir de la pantalla, con el «+» del desplegable — el botón sale gratis: Unfold reencamina el `RelatedFieldWidgetWrapper` de Django, y el permiso `add` lo concede el seed porque `normativa` está en `APPS_EDITORIALES`.
+
+A diferencia de `ClasificacionActividad`, aquí **no hay ninguna regla de precedencia que declarar**: ningún importador escribe este catálogo. Lo siembran `entidades.yaml` y la migración `normativa.0005`, las dos con `get_or_create` por slug, y a partir de ahí manda el admin.
+
 ### Catálogo de procesos de la GRD
 
 `ClasificacionActividad` es el único catálogo del proyecto que PREDES edita y que el importador también escribe, así que la regla de precedencia es explícita: **al guardarlo desde el admin se desmarca `automatico`, y a partir de ahí ni la semilla ni ninguna importación vuelven a tocar la fila**. El listado filtra por «asignado automáticamente» y por proceso vacío, y hay una acción para marcar como revisadas sin cambiar nada.
@@ -139,8 +145,8 @@ ficha es uno solo para los dos, y depende de que el estado y el candado se llame
   - **Noticia** (`redactar_noticia_desde_url`): título, bajada, cuerpo (HTML), tipo, autor, fecha,
     palabras clave y **la portada** desde la `og:image`, reducida al mismo ancho que las del editor.
     Obligatorios que se relajan: `titulo`, `slug`, `bajada`, `fecha`.
-  - **Norma** (`redactar_norma_desde_url`): título, número, tipo, ámbito, fecha, resumen, contenido
-    (HTML), palabras clave, estado de vigencia y la portada. Obligatorios que se relajan: `titulo`,
+  - **Norma** (`redactar_norma_desde_url`): título, número, tipo, ámbito, **entidad emisora**,
+    fecha, resumen, contenido (HTML), palabras clave, estado de vigencia y la portada. Obligatorios que se relajan: `titulo`,
     `slug`, `tipo`, `ambito`, `fecha`, `resumen`.
   - **Medida** (`redactar_medida_desde_ficha`): título, resumen corto, tipo de peligro, alcance,
     resultado, distrito, comunidad, contenido (HTML), palabras clave, actores, fecha de
@@ -164,11 +170,16 @@ ficha es uno solo para los dos, y depende de que el estado y el candado se llame
   en un `clean()`: `estado` está excluido del formulario y publicar no pasa por ninguno. Su
   hermano `avisos_al_publicar()` es lo que no impide publicar pero hay que mirar una vez.
 - **Los `enum` del esquema se construyen desde los catálogos vivos**, no escritos a mano: los nueve
-  slugs salen de `peligros.catalogo`, las dos taxonomías de `Medida` y —desde 31/08/2026— el `tipo`
-  de `Noticia`, que era el único que seguía escrito a mano. Añadir un peligro, o un tipo, no puede
-  dejar el esquema atrás, y el síntoma sería una clasificación vacía sin explicación. En noticias el
-  síntoma era peor y más callado: `_normalizar` ya validaba contra `Noticia.Tipo`, así que una opción
-  nueva quedaba disponible para el editor y **la IA no podía proponerla nunca**.
+  slugs salen de `peligros.catalogo`, las dos taxonomías de `Medida`, **las entidades emisoras de
+  `Norma`** —que PREDES da de alta desde el admin— y, desde el 31/08/2026, el `tipo` de `Noticia`,
+  que era el último que seguía escrito a mano. Añadir un peligro, una entidad o un tipo no puede
+  dejar el esquema atrás, y el síntoma sería una clasificación vacía sin explicación. En noticias
+  era peor y más callado: `_normalizar` ya validaba contra `Noticia.Tipo`, así que una opción nueva
+  quedaba disponible para el editor y **la IA no podía proponerla nunca**.
+- **La IA elige entidad emisora del catálogo, nunca la crea.** Una que no reconozca se deja vacía y
+  se dice en el `log_ia`, igual que un `tipo` o un `ambito` fuera de catálogo. Crear la que falta
+  llenaría la taxonomía de variantes del mismo nombre —«MINAM» y «Ministerio del Ambiente» como dos
+  filas—, que es justo lo que un catálogo existe para evitar (ADR-D11).
 - **Dos campos de Norma que la IA NO escribe, y no por olvido**: `analisis_predes` es la voz
   institucional que firma la organización en el listado, y `url_oficial` presenta un enlace como
   publicación oficial — no puede acabar apuntando a lo que el editor pegó arriba. El `log_ia` se lo
