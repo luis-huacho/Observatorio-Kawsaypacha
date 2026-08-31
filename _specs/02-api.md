@@ -263,7 +263,7 @@ Con datos:
 {
   "disponible": true, "anio": 2026, "corte": "2026-06", "corte_legible": "junio de 2026",
   "es_parcial": true, "en_curso": true,
-  "fuente": "Base PP 0068 entregada por PREDES",
+  "fuente": "Base PP 0068 desarrollada por PREDES",
   "ambito": "municipal", "unidad": "municipalidad (entidad ejecutora), no distrito",
   "agregados": { "pia": 16754644, "pim": 54591255, "devengado": 26064745,
                  "pct_ejecucion": 0.4775, "saldo": 28526510, "variacion_pia_pim": 37836611,

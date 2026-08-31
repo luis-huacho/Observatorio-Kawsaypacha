@@ -120,7 +120,7 @@ class Ejercicio(TimeStampedMixin):
 
     class Fuente(models.TextChoices):
         MEF = "MEF", "Consulta Amigable / comparativo del MEF"
-        CLIENTE = "BASE_PP0068", "Base PP 0068 entregada por PREDES"
+        CLIENTE = "BASE_PP0068", "Base PP 0068 desarrollada por PREDES"
 
     anio = models.PositiveSmallIntegerField("año", unique=True)
     corte = models.CharField(
