@@ -185,8 +185,13 @@ test.describe("Inversión (PP 0068)", () => {
 
     // Un gráfico se deja leer pero no concluye. Estas frases son lo que un periodista copia, y
     // sin una prueba se pierden en el siguiente retoque de maquetación sin que nada falle.
-    const declaraciones = page.locator("p.border-l-2");
-    expect(await declaraciones.count()).toBeGreaterThanOrEqual(4);
+    //
+    // Se cuentan por su clase COMPLETA y no por `p.border-l-2` a secas: ese selector casaba
+    // también con los dos pies del mapa, así que la cuenta pasaba aunque faltara una
+    // declaración —justo el fallo que esta prueba existe para ver—. Son cinco desde que el
+    // mapa tiene la suya: era el único gráfico de la página sin una.
+    const declaraciones = page.locator("p.border-earth-500.border-l-2");
+    expect(await declaraciones.count()).toBeGreaterThanOrEqual(5);
 
     await expect(page.getByText(/entre lo aprobado al abrir el año y lo vigente hoy/i)).toBeVisible();
     await expect(page.getByText(/concentra .* del presupuesto vigente/i).first()).toBeVisible();
@@ -236,8 +241,142 @@ test.describe("Inversión (PP 0068)", () => {
     // ADR-D6: a nivel distrital las municipalidades provinciales no se pintan, y su importe se
     // declara. Que el pie exista es lo que impide que el mapa se lea como el total del programa.
     expect(mapa.no_ubicado.entidades).toBeGreaterThan(0);
-    await expect(visor.getByText(/no aparecen en el mapa/i)).toBeVisible();
+    // **El pie va oculto con CSS, no borrado.** Es una decisión editorial: en pantalla no estaba
+    // ayudando. Pero el aviso tiene que seguir EXISTIENDO —en el DOM, en el payload y en el
+    // PDF—, porque borrarlo dejaría el mapa pintando el 81 % del presupuesto sin que nada lo
+    // dijera, que es literalmente lo que fundó ADR-D6. Y así vuelve quitando una clase.
+    const pie = visor.getByText(/no está en el mapa/i);
+    await expect(pie).toHaveCount(1);
+    await expect(pie).toBeHidden();
+    await expect(pie).toContainText(/S\/[\s\d,.]+\(\d+(\.\d+)?%\)/);
+    // El dato de los polígonos en blanco sí se ve, y vive en la LEYENDA: es donde se mira el color.
     await expect(visor.getByText(/sin municipalidad \(\d+\)/)).toBeVisible();
+  });
+
+  test("el diagrama de caja enseña el reparto que el color aplana", async ({ page }) => {
+    // Los quintiles son la escala correcta para un mapa, pero su último tramo se traga la cola:
+    // con el PIM distrital de 2026 arranca en S/ 216.445, así que un distrito de 220 mil y otro
+    // de 9,3 millones salen del mismo color. La caja es lo que dice que la mediana es S/ 73.510.
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    const caja = visor.locator("figure svg");
+    await expect(caja).toBeVisible();
+
+    // Un punto suelto a la derecha no dice nada; con el nombre dice quién es. Los `<title>` del
+    // SVG dan el tooltip sin una línea de JavaScript.
+    const atipicos = mapa.distribucion.pim.atipicos;
+    await expect(caja.locator("circle")).toHaveCount(atipicos.length);
+    if (atipicos.length) {
+      await expect(caja.locator("title").first()).toHaveText(
+        new RegExp(atipicos[0].nombre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      );
+    }
+    // Y la frase, que es lo que se copia a un informe.
+    await expect(visor.getByText(/La mitad de los \d+ distritos está entre/)).toBeVisible();
+  });
+
+  test("la caja va enmarcada, con su frase dentro y sin cifras cortadas", async ({ page }) => {
+    // Apilada al mismo nivel que los demás párrafos, la caja se leía como dos apartados sueltos
+    // más de una lista de ocho bloques con 6-16 px entre ellos.
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    const recuadro = visor.locator("div.rounded-xl:has(figure svg)");
+    await expect(recuadro).toBeVisible();
+    // La frase que describe la caja va CON la caja, no suelta entre los pies del mapa.
+    await expect(recuadro.getByText(/La mitad de los \d+ distritos está entre/)).toBeVisible();
+
+    // Las etiquetas de los cuartiles se dibujan por debajo de la caja, y su línea base caía
+    // justo en el borde del `viewBox`: se veían cortadas. Un texto que se sale **no da ningún
+    // error**, así que esto es lo único que lo vigila.
+    const dentro = await recuadro.locator("svg").evaluate((svg) => {
+      const alto = Number(svg.getAttribute("viewBox").split(" ")[3]);
+      return [...svg.querySelectorAll("text")].every(
+        (t) => Number(t.getAttribute("y")) + 4 <= alto
+      );
+    });
+    expect(dentro, "una etiqueta del diagrama se sale del viewBox").toBe(true);
+  });
+
+  test("el pie que repetía la leyenda ya no está en pantalla", async ({ page }) => {
+    // «Sin municipalidad distrital con presupuesto este año…» iba dos líneas debajo de un cuadro
+    // blanco rotulado «sin municipalidad (13)». Se retiró la frase, **no el dato**.
+    //
+    // Sale también del PDF, por lo mismo: su leyenda **sí** trae el cuadro «sin municipalidad»
+    // —lo añade la plantilla, no `_leyenda()`—, así que allí la frase también repetía. Lo fija
+    // `test_el_reporte_dice_una_sola_vez_donde_esta_el_dinero_que_no_pinta`.
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    await expect(visor.getByText(/Sin municipalidad distrital/i)).toHaveCount(0);
+    await expect(visor.getByText(/sin municipalidad \(\d+\)/)).toBeVisible();
+    // Y el payload lo sigue trayendo, que es de donde lo toma el papel.
+    expect(mapa.poligonos.motivo).toBeTruthy();
+  });
+
+  test("el porcentaje de ejecución cambia la caja de escala y de unidades", async ({ page }) => {
+    // El dinero va en escala logarítmica —en un eje lineal la caja del PIM mide 9 píxeles— pero
+    // un porcentaje no tiene cola que comprimir: va lineal de 0 a 100 y el 0 % sí cabe, así que
+    // no debe arrastrar la advertencia de los valores que no entran en la escala.
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    await expect(visor.getByText(/escala logarítmica/i)).toBeVisible();
+
+    await visor.getByRole("button", { name: "% de ejecución" }).click();
+
+    await expect(visor.getByText(/escala logarítmica/i)).toHaveCount(0);
+    await expect(visor.getByText(/no entran? en la escala/i)).toHaveCount(0);
+    // La frase pasa a hablar en porcentajes, no en soles.
+    await expect(visor.getByText(/La mitad de los \d+ distritos está entre \d/)).toBeVisible();
+  });
+
+  test("a nivel provincial la caja se recalcula sobre las trece provincias", async ({ page }) => {
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion?nivel=provincial");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    // Concuerda en género: «los 13 provincias» es el descuido que delata una frase generada.
+    await expect(visor.getByText(/La mitad de las \d+ provincias está entre/)).toBeVisible();
+    await expect(visor.locator("figure svg circle")).toHaveCount(
+      mapa.distribucion.pim.atipicos.length
+    );
+  });
+
+  test("el pie del mapa no explica dos veces lo mismo", async ({ page }) => {
+    // Eran ~150 palabras alrededor del mapa, con los 13 distritos capital explicados en los dos
+    // pies con palabras distintas. El lector no llegaba al final.
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+
+    // La entradilla que había encima del mapa se retiró: lo que decía ya está en la línea de
+    // alcance de la cabecera y en el pie de «no aparecen en el mapa».
+    await expect(visor.getByText(/no es de territorios|no de territorios/i)).toHaveCount(0);
+    // Y las dos frases que se justificaban a sí mismas ante el lector.
+    await expect(visor.getByText(/por eso mismo/i)).toHaveCount(0);
+    await expect(visor.getByText(/porque este mapa se cita suelto/i)).toHaveCount(0);
+    // El plural entre paréntesis leía como una circular.
+    await expect(visor.getByText(/\(es\)/)).toHaveCount(0);
+    expect(mapa.no_ubicado.motivo).not.toContain("(es)");
   });
 
   test("cambiar el visor a provincia no deja nada fuera del mapa", async ({ page }) => {
@@ -250,7 +389,9 @@ test.describe("Inversión (PP 0068)", () => {
     // cubre el ámbito entero y el pie de «no aparecen» desaparece.
     expect(mapa.no_ubicado.entidades).toBe(0);
     const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
-    await expect(visor.getByText(/no aparecen en el mapa/i)).toHaveCount(0);
+    // Aquí ni siquiera se renderiza —`entidades === 0`—, que es distinto de estar oculto: a este
+    // nivel no hay nada que declarar, y el mapa cubre el ámbito entero.
+    await expect(visor.getByText(/no está en el mapa/i)).toHaveCount(0);
   });
 
   test("una municipalidad que no existe no deja la página en blanco", async ({ page }) => {

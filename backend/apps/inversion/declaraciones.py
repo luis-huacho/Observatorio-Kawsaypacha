@@ -196,3 +196,54 @@ def todas(cuerpo: dict, soles=soles_web, pct=pct_web) -> dict[str, str | None]:
         "tendencia": tendencia(cuerpo["tendencia"], soles, pct),
         "proyectos": proyectos(cuerpo["proyectos"], soles, pct),
     }
+
+
+#: Cómo se llama cada polígono del mapa, con su artículo: «provincia» es femenino y «los 13
+#: provincias» es exactamente el descuido que delata una frase generada.
+_POLIGONO = {
+    "distrital": ("distrito", "distritos", "los"),
+    "provincial": ("provincia", "provincias", "las"),
+}
+
+
+def distribucion(caja: dict, metrica: str, nivel: str, soles=soles_web, pct=pct_web) -> str | None:
+    """Lo que el diagrama de caja enseña y el coroplético no puede.
+
+    El mapa reparte el color en cinco tramos y el último se traga toda la cola: con el PIM
+    distrital de 2026 arranca en S/ 216.445, así que un distrito de 220 mil y otro de 9,3
+    millones salen del mismo color. Esta frase dice dónde está la mitad de los polígonos, cuántos
+    se salen del rango y quién es el mayor — que es exactamente lo que el color aplana.
+
+    Se calla lo que no tiene: sin atípicos no se escribe «0 quedan fuera», que sería ruido.
+    """
+    if not caja.get("n"):
+        return None
+
+    es_dinero = metrica != "pct_ejecucion"
+    formato = soles if es_dinero else pct
+    singular, plural, articulo = _POLIGONO.get(nivel, _POLIGONO["distrital"])
+    partes = [
+        f"La mitad de {articulo} {caja['n']} {plural} está entre {formato(caja['q1'])} y "
+        f"{formato(caja['q3'])}."
+    ]
+
+    atipicos = caja.get("atipicos") or []
+    if atipicos:
+        mayor = atipicos[0]
+        cuantos = (
+            "Uno queda fuera de ese rango" if len(atipicos) == 1
+            else f"{len(atipicos)} quedan fuera de ese rango"
+        )
+        partes.append(f"{cuantos}; el mayor, {mayor['nombre']}, con {formato(mayor['valor'])}.")
+
+    # Los ceros solo estorban en el eje logarítmico del dinero: el % de ejecución se dibuja en
+    # una escala lineal de 0 a 100 y un 0 % cabe perfectamente. Y se dicen «con S/ 0» y no «sin
+    # presupuesto», que sería falso en el devengado: un distrito puede tener PIM y no haber
+    # gastado nada.
+    if es_dinero and caja.get("ceros"):
+        cuantos = caja["ceros"]
+        cual = singular if cuantos == 1 else plural
+        partes.append(
+            f"{cuantos} {cual} con S/ 0 no entra{'' if cuantos == 1 else 'n'} en la escala."
+        )
+    return " ".join(partes)
