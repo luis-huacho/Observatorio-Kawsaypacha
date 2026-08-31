@@ -264,6 +264,54 @@ test.describe("Inversión (PP 0068)", () => {
     }
   });
 
+  test("el Excel avisa mientras se prepara y no deja el botón bloqueado", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name === "movil", "las descargas se comprueban en escritorio");
+
+    // El Excel de /inversion es la descarga **rápida** del sitio (~0,1 s), y está aquí a
+    // propósito: el mismo componente tiene que servir para los 4 s del PDF y para esto, sin
+    // dejar un botón atenuado ni un aviso colgado cuando el servidor responde al instante.
+    const cuerpo = await abrir(page, "/inversion");
+    test.skip(!cuerpo.disponible, "sin ejercicio publicado");
+
+    const descarga = page.waitForEvent("download", { timeout: 60_000 });
+    await page.getByRole("link", { name: /^Excel$/i }).click();
+    const archivo = await descarga;
+
+    // El nombre real lo pone `Content-Disposition`, que cross-origin solo se lee si el servidor
+    // la expone (`CORS_EXPOSE_HEADERS`). Sin ella el archivo se guardaría con el id del blob.
+    expect(archivo.suggestedFilename()).toMatch(/\.xlsx$/);
+    await expect(page.getByRole("link", { name: /^Excel$/i })).toBeVisible();
+    await expect(page.locator("#avisos-descarga").getByRole("status")).toHaveCount(0);
+  });
+
+  test("Ctrl+clic en una descarga sigue abriendo en otra pestaña", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "movil", "no hay Ctrl+clic en un teléfono");
+
+    // El botón se pide con `fetch` para poder enseñar el estado, pero **sigue siendo un `<a>`** y
+    // los clics con modificador se dejan pasar al navegador. Con un `<button>` se habrían
+    // perdido «abrir en pestaña nueva» y «guardar enlace como», que hoy funcionan.
+    const cuerpo = await abrir(page, "/inversion");
+    test.skip(!cuerpo.disponible, "sin ejercicio publicado");
+
+    const enlace = page.getByRole("link", { name: /Reporte \(PDF\)/i });
+    await expect(enlace).toHaveAttribute("href", /\/inversion\/reporte\.pdf/);
+
+    // Que se abra una pestaña es la prueba: significa que el `onClick` del componente dejó pasar
+    // el clic en vez de hacer `preventDefault()`. **No se afirma sobre su URL**: el reporte se
+    // sirve con `Content-Disposition: attachment`, así que el navegador lo descarga y la pestaña
+    // se queda en `about:blank`. Es el comportamiento correcto y no dice nada de este cambio.
+    const nueva = page.context().waitForEvent("page", { timeout: 30_000 });
+    await enlace.click({ modifiers: ["ControlOrMeta"] });
+    const pestana = await nueva;
+
+    // Y el componente NO se activó: el clic no era suyo.
+    await expect(page.getByRole("link", { name: /Generando PDF/i })).toHaveCount(0);
+    await expect(page.locator("#avisos-descarga").getByRole("status")).toHaveCount(0);
+    await pestana.close();
+  });
+
   test("el reporte en PDF se ofrece y se descarga de verdad", async ({ page, request }) => {
     const cuerpo = await abrir(page, "/inversion");
     test.skip(!cuerpo.disponible, "sin ejercicio publicado");

@@ -130,6 +130,42 @@ porque es lo que permite recortar el título sin que el usuario pierda de qué n
 el hueco, y **no** `loading="lazy"`: es la imagen LCP de su propia página. En los listados sí se
 difiere.
 
+## Descargas (`BotonDescarga`)
+
+Las cuatro descargas del sitio —ayuda memoria y Excel de `/peligros`, reporte y Excel de
+`/inversion`— pasan por **`components/BotonDescarga.tsx`**, y ninguna es un `<a href>` a pelo. El
+servidor tarda: la ayuda memoria **3,7-4,0 s** y el reporte de inversión **4,4 s**, porque los dos
+renderizan su mapa con un Chromium headless. Con el enlace directo la página no cambiaba en
+absoluto durante esos segundos —en escritorio salvaba el indicador del navegador; en móvil, que es
+donde el TDR pide que el sitio sirva, no se veía nada— y el visitante volvía a pulsar.
+
+- **El archivo se pide con `fetch` y se entrega desde un blob**, que es lo que permite tener estado
+  real. No se finge con un temporizador: diría «listo» cuando no lo está.
+- **Sigue siendo un `<a href>`, no un `<button>`.** El `onClick` intercepta el clic normal, pero
+  Ctrl/Cmd/Shift/Alt y el botón central **se dejan pasar al navegador**: con un `<button>` se
+  perderían «abrir en pestaña nueva» y «guardar enlace como», que hoy funcionan.
+- **El estado se cuenta dos veces, y no sobra ninguna.** En el botón (icono girando, «Generando
+  PDF…», `aria-disabled`) y en un aviso fijo abajo a la derecha (`AvisoDescarga.tsx`), porque los
+  botones viven en el `PageHeader` y **dejan de verse en cuanto se baja a la tabla o al mapa**. El
+  aviso de «generando» se retira solo —la descarga es la confirmación—; el de error **se queda
+  hasta que se cierra**, porque un error que se autodestruye a los tres segundos no lo lee nadie.
+- **El `aria-live` va en el aviso, no en el botón.** Con los dos, un lector de pantalla lo
+  anunciaría dos veces. Los avisos se apilan en un contenedor único portado a `document.body`: dos
+  descargas simultáneas son posibles (cada botón solo se bloquea a sí mismo) y sin él se pintarían
+  encima. No hace falta un proveedor global de notificaciones para dos casos.
+- **El 429 se explica.** El límite es de 30/hora **por IP** y una oficina entera comparte IP detrás
+  de un NAT, así que no es hipotético: antes se veía como una pestaña con JSON crudo, o como nada.
+- **El nombre del archivo sale de `Content-Disposition`, y eso exige `CORS_EXPOSE_HEADERS` en el
+  backend** (ver 07). Sin esa cabecera no falla nada: el archivo se guarda con el identificador del
+  blob, sin extensión. Por eso cada botón declara además un `nombreDeReserva` — un bundle nuevo
+  contra un backend viejo es un estado real durante un despliegue.
+
+Lo que **no** se hizo, y por qué: encolar la generación en django-tasks y sondear el estado. Para
+cuatro segundos añade dos peticiones, una fila de BD y **un archivo que hay que guardar en algún
+sitio** — y `MEDIA_ROOT` lo sirve nginx entero como estático público, así que una ayuda memoria
+filtrada quedaría accesible por URL. El mecanismo se guarda para la generación por lotes, que sí
+lo pide.
+
 ## Métricas (beacon)
 
 Hook `useMetrica()`: pageview en cada cambio de ruta (`navigator.sendBeacon` a `/api/metricas/evento/`), y eventos en descargas (PDF, Excel, documento) y búsquedas. Sin cookies, sin PII.
