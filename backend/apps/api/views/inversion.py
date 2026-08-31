@@ -22,7 +22,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.inversion import consultas
+from apps.inversion import consultas, declaraciones
 from apps.inversion.models import EntidadEjecutora
 
 from .. import exports
@@ -101,12 +101,20 @@ class InversionView(APIView):
             "unidad": "municipalidad (entidad ejecutora), no distrito",
             "agregados": consultas.agregados(ejercicio, ambito, provincia),
             **consultas.procesos(ejercicio, ambito, provincia),
+            # El desglose de quién tiene los proyectos viaja con el agregado que lo necesita:
+            # `agregados.pim_proyectos` solo se entiende sabiendo en cuántas manos está.
+            "proyectos": consultas.proyectos_por_entidad(ejercicio, ambito, provincia),
             "tendencia": consultas.tendencia(ambito, provincia),
             "ejercicios": [
                 consultas.datos_ejercicio(e)
                 for e in consultas.Ejercicio.objects.filter(visible=True).order_by("-anio")
             ],
         }
+        # Redactadas aquí y no en el cliente: las leen la SPA y el PDF, y que cada uno las
+        # escriba por su cuenta es la forma segura de que un día no digan lo mismo (ADR-D6, el
+        # mismo argumento del `motivo` del mapa). Van al final porque se calculan sobre el
+        # cuerpo ya montado.
+        cuerpo["declaraciones"] = declaraciones.todas(cuerpo)
         if comparado is not None:
             cuerpo["comparacion"] = consultas.comparacion_agregada(
                 ejercicio, comparado, ambito, provincia

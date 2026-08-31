@@ -67,6 +67,104 @@ workers — se destraba solo a los 25 s con los PDF sin mapa, pero no está repr
 
 Sin ADR: no cambia ninguna decisión. Suite: **481 + 7** y **73 casos e2e** (146 corridas), en verde.
 
+### Actualización 31/08/2026 — la misma frase, redactada dos veces, es dos frases
+
+Las cuatro declaraciones de la entrada de abajo nacieron en TypeScript, y el encargo siguiente
+fue ponerlas también en el PDF. Duplicarlas en Python habría dejado **dos redacciones de la
+misma frase**: el día que se retoque una, la otra se queda atrás y nada avisa. Es exactamente lo
+que el proyecto ya había decidido dos veces —ADR-D6, «el payload lleva `no_ubicado` con **su
+motivo ya redactado**: la advertencia viaja con el dato, no con la interfaz», y el encabezado de
+`consultas.py`, «que los tres calculen el % de ejecución por su cuenta es la forma segura de que
+un día no coincidan»—.
+
+Así que la redacción **baja al backend**: `apps/inversion/declaraciones.py`. Viaja en
+`declaraciones` del payload, la SPA imprime la cadena y el PDF llama a las mismas funciones. Se
+comprobó que el texto salía **carácter por carácter idéntico** antes de borrar el TypeScript.
+
+**Lo único que no se comparte es la tipografía**, y por eso los formateadores entran por
+parámetro: el navegador escribe `53%` (es-PE, `Intl`) y el reporte `53.0 %` (sus filtros). La
+frase es una; cómo se escribe un porcentaje lo pone cada medio. Igualar los dos habría obligado
+a tocar todos los porcentajes de uno de los dos documentos.
+
+En el PDF, las cuatro frases van bajo su gráfico con la clase `.declaracion` que ya existía —de
+donde salió el registro— y llega además **el desglose de proyectos**, que el reporte no tenía en
+ninguna forma. Dos detalles de maquetación que no son cosméticos: la magnitud PIA-PIM **sube del
+párrafo de encima a la frase de debajo**, como ya hizo la pantalla, porque decirla dos veces en
+la misma tarjeta era repetirse; y **el cuadro va en su propia sección, fuera de `evitar-corte`**,
+con la clase `tabla-larga` que repite cabecera al partir — pegar a un gráfico una tabla que crece
+con el ámbito arrastraría el gráfico a la página siguiente dejando media en blanco.
+
+**Una prueba encontró una frase correcta y engañosa.** Con un reparto plano —cinco
+municipalidades con lo mismo— «las 4 primeras concentran el 80 %» es cierto por pura aritmética,
+y hace sonar concentrado justo lo que está repartido: lo contrario de lo que la frase viene a
+contar. No falla a la vista, porque la cifra es exacta. Ahora la concentración **solo se declara
+si las que se llevan el 80 % son minoría**. Salió de `test_declaraciones.py`, que prueba la
+redacción directamente en vez del texto renderizado: al ser la única redacción, un fallo de
+copy sale a la vez en la pantalla y en el documento, y se caza en un sitio.
+
+### Actualización 31/08/2026 — los gráficos de `/inversion` se dejaban leer pero no concluían
+
+Cuatro gráficos y ninguno decía nada: la conclusión la tenía que sacar quien mirara. La ventana
+la van a usar autoridades, periodistas y universidades, y lo que esa gente necesita es **la
+frase que se puede copiar**. Cada gráfico lleva ahora debajo una `Declaracion` que dice, en
+tercera persona y sin adjetivos, cuánto subió o bajó en soles y en porcentaje, o dónde se
+concentra el dinero.
+
+**No se inventó un registro nuevo: ya existía.** El PDF tiene una clase `.declaracion` —filete
+izquierdo, texto pequeño y gris— y la usa para exactamente esto («S/ X **no aparecen en el
+mapa**», «S/ X **cuelgan de** códigos que el catálogo aún no imputa»). Las cuatro frases copian
+ese registro y el componente replica el filete. Se redactan en `lib/inversion.ts`, como
+funciones puras, para poder probarlas sin montar React y para que las cuatro suenen igual.
+
+**Sin verde ni rojo, a propósito.** `Delta` colorea las subidas y las bajadas y ahí está bien,
+porque compara dos ejercicios que alguien eligió. Aquí no: más presupuesto no es de suyo una
+buena noticia, y teñir de verde un incremento es opinar por el lector.
+
+**La frase de la tendencia compara los dos últimos ejercicios COMPLETOS.** El devengado a junio
+de 2026 (26.1 M) contra el de 2025 entero (64.0 M) daría un «bajó 59.3 %» que no mide una caída:
+mide medio año contra un año entero. El corte parcial se nombra aparte, sin variación, que es la
+única forma de que la frase no tenga que desmentirse a renglón seguido. Y no dice «cerrado»,
+sino «completo»: hay una prueba e2e que fija que esa jerga no vuelve.
+
+## «Este monto parece alto» — y el supuesto de quién lo gasta era falso
+
+El encargo venía con una hipótesis: que el 40 % en proyectos de inversión «principalmente es del
+Gobierno Regional». **No lo es, y comprobarlo antes de escribir evitó publicar algo falso.** El
+tablero sirve el ámbito `municipal` y el frontend nunca manda otro: el GORE **no entra**. Ese
+40 % es íntegramente municipal (S/ 22,217,511); el Gobierno Regional tiene su propio 78.8 %, en
+otro ámbito que esta pantalla no muestra.
+
+Lo que sí explica la cifra es la **concentración**: de las 116 municipalidades, **24 tienen
+presupuesto en obra** y cinco se llevan el 81.6 %. La Convención sola reúne el 74.7 %. Eso es lo
+que ahora se ve: «Proyectos de inversión frente a actividades» pasa a ser sección propia —tenía
+media tarjeta prestada de «¿En qué se invierte?»— con su barra, su frase y **el cuadro de qué
+municipalidades tienen obra**, con cuánto y qué porcentaje de su propio PIM es.
+
+La frase remata diciendo que el Gobierno Regional no está en el ámbito. Se dice porque es
+exactamente la lectura que tuvo el dueño del proyecto, y si la tuvo él la tendrá un periodista.
+
+Cuatro decisiones del desglose que no son obvias:
+
+- **Va en el payload del tablero, no en la tabla paginada.** `pim_proyectos` se calcula en
+  Python **después** de paginar, así que ordenar la tabla por él exigiría anotarlo en SQL. Con
+  24 filas como mucho, el desglose viaja entero y `ORDENES` no se toca.
+- **Solo entran las que tienen PIM de proyectos > 0.** Una fila en cero las haría contar como si
+  tuvieran obra, y «24 de 116» es justo la frase que el cuadro sostiene.
+- **La lista no se recorta a un top N.** Un «y otras N» no lo podría comprobar nadie.
+- **Hay una prueba de que la suma del desglose es exactamente `agregados.pim_proyectos`**, la
+  misma disciplina que `test_el_mapa_no_pierde_ni_inventa_un_sol`: un desglose al que le falta
+  dinero se ve idéntico a uno correcto.
+
+**Dos cosas que el e2e cazó y que no habrían fallado a la vista.** Los enlaces del cuadro nuevo
+no arrastraban los filtros, así que volver de una ficha devolvía al ejercicio por defecto en vez
+de al que se estaba mirando. Y la prueba de la ficha usaba un `table tbody tr` **sin acotar**,
+que con la tercera tabla de la página pasó a leer el desglose en vez del ranking: se acotó con
+`tablaDeMunicipalidades`, el helper que existe para eso desde que apareció la segunda.
+
+**Lo que no entra**: el PDF no recibe estas frases. Ya lleva su propia prosa y sus
+`.declaracion`, y sus gráficos son SVG generados en servidor; añadirlas ahí es un encargo
+aparte, no un efecto secundario de este.
+
 ### Actualización 31/08/2026 — el contexto de `/inversion` se identificaba dos veces y se explicaba tres
 
 La entrada de abajo, de ayer, arregló que el aviso del ejercicio parcial **nombrara** el

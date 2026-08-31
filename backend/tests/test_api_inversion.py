@@ -267,6 +267,48 @@ def test_lo_que_el_catalogo_no_clasifica_se_declara_aparte(api, inversion_cargad
     )
 
 
+def test_el_desglose_de_proyectos_no_pierde_ni_inventa_un_sol(api, inversion_cargada):
+    """La suma del desglose es exactamente el agregado que la barra pinta.
+
+    Es el mismo problema del mapa: un desglose al que le falta dinero se ve idéntico a uno
+    correcto. La barra dice «X % en proyectos» y el cuadro de debajo dice de quién es; si las
+    dos cifras se calcularan por caminos que un día divergen, nadie lo notaría en pantalla.
+    """
+    cuerpo = api.get("/api/inversion/?anio=2026").json()
+    proyectos = cuerpo["proyectos"]
+
+    assert sum(e["pim_proyectos"] for e in proyectos["entidades"]) == proyectos["pim"]
+    assert proyectos["pim"] == cuerpo["agregados"]["pim_proyectos"]
+    assert proyectos["con_proyectos"] == len(proyectos["entidades"])
+    assert proyectos["de"] == cuerpo["agregados"]["entidades_en_ambito"]
+
+
+def test_el_desglose_de_proyectos_solo_trae_a_quien_tiene_obra(api, inversion_cargada):
+    """Una municipalidad sin proyectos no aparece con un cero: no aparece.
+
+    «24 de 116» es la frase que la ventana quiere poder decir, y solo se sostiene si la lista
+    son las que sí tienen. Una fila en cero la haría contar como si tuviera obra.
+    """
+    proyectos = api.get("/api/inversion/?anio=2026").json()["proyectos"]
+
+    assert proyectos["entidades"], "la muestra tiene al menos un proyecto de inversión"
+    assert all(e["pim_proyectos"] > 0 for e in proyectos["entidades"])
+    assert proyectos["con_proyectos"] <= proyectos["de"]
+    # Orden total: importe descendente, y el código desempata para que no baile entre peticiones.
+    llaves = [(-e["pim_proyectos"], e["codigo"]) for e in proyectos["entidades"]]
+    assert llaves == sorted(llaves)
+
+
+def test_el_desglose_de_proyectos_respeta_el_filtro_de_provincia(api, inversion_cargada):
+    """Filtrar por provincia acota el desglose y su denominador, no solo la tabla."""
+    cuerpo = api.get("/api/inversion/?anio=2026&provincia=0801").json()
+    proyectos = cuerpo["proyectos"]
+
+    assert proyectos["de"] == cuerpo["agregados"]["entidades_en_ambito"]
+    assert proyectos["pim"] == cuerpo["agregados"]["pim_proyectos"]
+    assert all(e["provincia"] == "CUSCO" for e in proyectos["entidades"])
+
+
 def test_filtra_por_provincia(api, inversion_cargada):
     filas = api.get("/api/inversion/entidades/?anio=2026&provincia=CUSCO").json()["results"]
 

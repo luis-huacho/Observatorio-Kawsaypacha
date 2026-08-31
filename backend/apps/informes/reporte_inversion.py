@@ -17,7 +17,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 
 from apps.informes import escalas, graficos
-from apps.inversion import consultas
+from apps.informes.templatetags import informes
+from apps.inversion import consultas, declaraciones
 
 MOTIVO_SIN_DATOS = "PREDES está consolidando los datos de inversión del PP 0068."
 
@@ -128,6 +129,7 @@ def reunir_datos(
     reparto = consultas.procesos(ejercicio, ambito, provincia)
     tendencia = consultas.tendencia(ambito, provincia)
     mapa = consultas.mapa(ejercicio, ambito=ambito, provincia=provincia, nivel=nivel)
+    proyectos = consultas.proyectos_por_entidad(ejercicio, ambito, provincia)
     filas = consultas.por_entidad(
         consultas.listado(ejercicio, ambito=ambito, provincia=provincia, ordenar=ordenar)
     )
@@ -140,7 +142,7 @@ def reunir_datos(
             ("Sin clasificar", reparto["sin_clasificar"]["pim"], COLOR_SIN_CLASIFICAR)
         )
 
-    return {
+    contexto = {
         "disponible": True,
         "generado_en": generado_en,
         **consultas.datos_ejercicio(ejercicio),
@@ -161,6 +163,7 @@ def reunir_datos(
         "anio_hasta": tendencia[-1]["anio"] if tendencia else ejercicio.anio,
         "filas": filas,
         "mapa": mapa,
+        "proyectos": proyectos,
         "metrica": metrica,
         "metrica_nombre": escalas.METRICAS[metrica],
         "nivel": mapa["nivel"],
@@ -192,6 +195,15 @@ def reunir_datos(
         "color_devengado": COLOR_DEVENGADO,
         "firma": _bloque("informe.firma"),
     }
+
+    # Las frases que van bajo cada gráfico. **Se redactan una sola vez, en `inversion`**, y las
+    # imprimen tanto la pantalla —que las recibe en el payload— como este documento (ADR-D6: la
+    # advertencia viaja con el dato). Lo único que no comparten es la tipografía: aquí se pasan
+    # los filtros del reporte, que escriben «53.0 %» donde el navegador escribe «53%».
+    contexto["declaraciones"] = declaraciones.todas(
+        contexto, soles=informes.soles, pct=informes.pct
+    )
+    return contexto
 
 
 def _leyenda(metrica: str, cortes_por_metrica: dict) -> list[dict]:

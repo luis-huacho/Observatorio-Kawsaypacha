@@ -275,9 +275,18 @@ Con datos:
   "procesos": [ { "slug": "prevencion_reduccion", "nombre": "Prevención y reducción",
                   "color": "#009257", "pim": 28909461, "devengado": 0, "pct": 0.53 } ],
   "sin_clasificar": { "pim": 0, "devengado": 0, "pct": 0 },
+  "proyectos": { "pim": 22217511, "con_proyectos": 24, "de": 116,
+                 "entidades": [ { "codigo": "301027", "entidad": "MUNICIPALIDAD DISTRITAL DE PICHARI",
+                                  "ambito": "distrital", "provincia": "LA CONVENCION",
+                                  "pim": 9327510, "pim_proyectos": 6455719,
+                                  "pct_proyectos": 0.692 } ] },
   "tendencia": [ { "anio": 2022, "corte": "anual", "corte_legible": "", "es_parcial": false,
                    "en_curso": false, "fuente": "…",
                    "pia": 18060834, "pim": 48813109, "devengado": 37260987 } ],
+  "declaraciones": { "ejecucion": "El presupuesto creció S/ 37,836,611 (225.8%) entre lo aprobado…",
+                     "procesos": "Prevención y reducción concentra el 53%…",
+                     "tendencia": "Entre 2024 y 2025, los dos últimos ejercicios completos…",
+                     "proyectos": "24 de las 116 municipalidades del ámbito tienen presupuesto…" },
   "ejercicios": [ { "anio": 2026, "corte": "2026-06", "corte_legible": "junio de 2026",
                     "es_parcial": true, "en_curso": true } ]
 }
@@ -316,6 +325,39 @@ Con datos:
                      "pia": 0, "pim": 6150969, "devengado": 6150968, "pct_ejecucion": 1.0 } ],
   "ejercicios": [ … ] }
 ```
+
+> **`declaraciones` es lo que cada gráfico DICE, ya redactado.** Un gráfico se deja leer pero no
+> concluye, y la ventana la usan autoridades, periodistas y universidades. Las cuatro frases se
+> escriben en **`apps/inversion/declaraciones.py`, un solo sitio**, y las imprimen la SPA —que
+> las recibe aquí— y el PDF, que llama a las mismas funciones con sus propios filtros. Es la
+> misma decisión de ADR-D6 (`no_ubicado` viaja con «su motivo ya redactado») y el argumento del
+> encabezado de `consultas.py`: dos redacciones de la misma frase acaban no diciendo lo mismo.
+> Lo único que no comparten es la tipografía —`53%` en el navegador, `53.0 %` en el reporte—,
+> y por eso los formateadores entran por parámetro. Una clave puede ser `null`: sin datos que
+> declarar no se pinta un filete con una frase vacía debajo del gráfico.
+>
+> Tres cosas que la redacción codifica y un refactor puede deshacer sin que nada falle a la
+> vista: **la de la tendencia compara los dos últimos ejercicios COMPLETOS** —contra el corte
+> parcial daría una caída del devengado que solo mide medio año contra doce meses—; **no dice
+> «cerrado»**, que es jerga contable con una prueba e2e que lo fija; y **la concentración solo
+> se declara si las que se llevan el 80 % son minoría**, porque con un reparto plano cuatro de
+> cinco suman el 80 % por aritmética y decirlo haría sonar concentrado lo que está repartido.
+>
+> **`proyectos` desglosa lo que `agregados.pim_proyectos` solo cuenta.** Un «40 % en proyectos
+> de inversión» se lee como si las municipalidades estuvieran haciendo obra por toda la región,
+> y no es eso: en 2026 **24 de las 116** tienen presupuesto en obra y cinco concentran el 81 %.
+> `de` es el total de entidades del ámbito —sin él, «24» no dice nada—, y solo entran las que
+> tienen PIM de proyectos **> 0**: una fila en cero las haría contar como si tuvieran obra. La
+> lista **va entera y no recortada a un top N**, porque son 24 en la región y 9 en la provincia
+> más cargada, y un «y otras N» no lo podría comprobar nadie. El orden es total (importe
+> descendente, código de desempate) para que no baile entre peticiones. Hay una prueba que fija
+> que la suma del desglose es exactamente `agregados.pim_proyectos`: un desglose al que le falta
+> dinero se ve idéntico a uno correcto.
+>
+> **No está en `ORDENES` de la tabla paginada, y es a propósito.** `pim_proyectos` se calcula en
+> Python después de paginar; ordenar por él exigiría anotarlo en SQL con una subconsulta sobre
+> `PresupuestoActividad`. Con 24 filas como mucho, el desglose viaja completo en el tablero.
+
 
 La `serie` **omite los ejercicios sin presupuesto** en vez de rellenarlos con ceros: no participar del programa un año no es participar con cero soles. Las `actividades` no se paginan —3 de media por entidad y ejercicio, 50 en el máximo real—, con el mismo criterio por el que no se paginan los 112 distritos.
 

@@ -319,6 +319,61 @@ def _reparto_por_origen(ejercicio, queryset_entidades) -> dict[str, dict[str, De
     return reparto
 
 
+def proyectos_por_entidad(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="") -> dict:
+    """Quién tiene el PIM de proyectos de inversión, entidad por entidad.
+
+    `agregados()` dice cuánto del ámbito va a proyectos —hoy el 40 % del PIM municipal— y esa
+    cifra sola se lee como si el programa se gastara en obra por todas partes. No es lo que
+    pasa: **casi todas las municipalidades no tienen ni un proyecto**, y el monto son unas
+    pocas obras grandes. Sin el desglose, la barra invita a una conclusión falsa.
+
+    Va en el payload del tablero y no en la tabla paginada por dos razones. `pim_proyectos` no
+    es una anotación del queryset —se calcula en Python, después de paginar, en `por_entidad`—,
+    así que ordenar la tabla por él exigiría una subconsulta nueva; y son pocas filas: 24 en
+    toda la región y 9 en la provincia más cargada. Van completas, sin recortar a un top N que
+    obligaría a redactar un «y otras N» que nadie podría comprobar.
+
+    Solo entran las que tienen PIM de proyectos > 0. `de` es el total de entidades del ámbito,
+    que es el que da sentido a «24 de 116»: sin él, 24 no dice nada.
+    """
+    queryset_entidades = entidades(ambito, provincia)
+    reparto = _reparto_por_origen(ejercicio, queryset_entidades)
+    presupuestos = (
+        PresupuestoEntidad.objects.filter(ejercicio=ejercicio, entidad__in=queryset_entidades)
+        .select_related("entidad", "entidad__provincia")
+    )
+
+    filas = []
+    total = CERO
+    for presupuesto in presupuestos:
+        entidad = presupuesto.entidad
+        pim_proyectos = reparto.get(entidad.codigo, {}).get("proyecto", CERO)
+        if pim_proyectos <= CERO:
+            continue
+        total += pim_proyectos
+        filas.append({
+            "codigo": entidad.codigo,
+            "entidad": entidad.nombre,
+            "ambito": entidad.ambito,
+            "provincia": entidad.provincia.nombre if entidad.provincia_id else "",
+            "pim": float(presupuesto.pim),
+            "pim_proyectos": float(pim_proyectos),
+            # Cuánto de SU presupuesto del 0068 es obra. Es lo que distingue a una
+            # municipalidad que hace una obra y poco más de otra que reparte en actividades.
+            "pct_proyectos": _porcentaje(pim_proyectos, presupuesto.pim),
+        })
+
+    # Orden total: el importe manda y el código desempata. Sin el desempate, dos municipalidades
+    # con el mismo PIM de proyectos podrían salir en un orden distinto en cada petición.
+    filas.sort(key=lambda f: (-f["pim_proyectos"], f["codigo"]))
+    return {
+        "pim": float(total),
+        "con_proyectos": len(filas),
+        "de": queryset_entidades.count(),
+        "entidades": filas,
+    }
+
+
 def por_entidad(presupuestos, ejercicio_comparado=None) -> list[dict]:
     """Convierte una **página** de `PresupuestoEntidad` en filas de la tabla.
 
