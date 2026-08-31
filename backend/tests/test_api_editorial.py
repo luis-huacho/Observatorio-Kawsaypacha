@@ -300,6 +300,28 @@ def test_las_descargas_estan_limitadas(api, norma, monkeypatch, settings):
     assert api.get("/api/normativa/export.xlsx").status_code == 429
 
 
+def test_la_descarga_expone_su_nombre_de_archivo_al_otro_dominio(api, norma, settings):
+    """La SPA y el API viven en dominios distintos (ADR-A14), y el nombre viaja en una cabecera.
+
+    Desde que la interfaz pide los archivos con `fetch` en vez de navegar a ellos —para poder
+    enseñar que está generando y explicar un 429—, el navegador **solo deja leer las cabeceras
+    que el servidor autoriza**. Sin `Access-Control-Expose-Headers`, `Content-Disposition` no se
+    ve desde la SPA y el archivo se guarda con el nombre del blob: un identificador aleatorio sin
+    extensión, en vez de `ayuda-memoria-sicuani-20260830.pdf`.
+
+    No falla nada al quitarlo: la descarga sigue funcionando y solo se pierde el nombre, que es
+    exactamente el tipo de avería que nadie reporta y todo el mundo sufre.
+    """
+    origen = settings.CORS_ALLOWED_ORIGINS[0]
+
+    respuesta = api.get("/api/normativa/export.xlsx", HTTP_ORIGIN=origen)
+
+    assert respuesta.status_code == 200
+    assert "Content-Disposition" in respuesta["Access-Control-Expose-Headers"]
+    # Y el nombre sigue estando: exponer la cabecera no sirve de nada si deja de escribirse.
+    assert "attachment; filename=" in respuesta["Content-Disposition"]
+
+
 # --- Contenidos y biblioteca ------------------------------------------------
 
 

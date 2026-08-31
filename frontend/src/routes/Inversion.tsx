@@ -22,6 +22,7 @@ import {
   etiquetaEjercicio,
   mesDelCorte,
 } from "@/lib/inversion";
+import BotonDescarga from "@/components/BotonDescarga";
 import EmptyState from "@/components/EmptyState";
 import KPI from "@/components/KPI";
 import MapaInversion from "@/components/MapaInversion";
@@ -188,24 +189,33 @@ export default function InversionView() {
         descripcion={`¿Están las municipalidades de Cusco ejecutando el presupuesto que se les aprobó para reducir el riesgo de desastres? Programa Presupuestal 0068 — ejercicio ${d.anio}.`}
         badge={
           <div className="flex flex-wrap gap-2">
-            <a
-              href={urlReporte}
-              onClick={() => registrar("descarga_pdf", "/inversion", String(d.anio))}
+            {/* El reporte tarda ~4 s: renderiza el mapa con un navegador headless. El botón
+                lleva su estado y saca un aviso fijo, porque el `PageHeader` deja de verse en
+                cuanto se baja a los gráficos. Ver `BotonDescarga`. */}
+            <BotonDescarga
+              url={urlReporte}
+              onDescargar={() => registrar("descarga_pdf", "/inversion", String(d.anio))}
               title="Reporte del tablero con los filtros actuales: gráficas, mapa y la tabla completa"
+              descripcion={`el reporte de inversión ${d.anio}`}
+              etiquetaEnCurso="Generando PDF…"
+              nombreDeReserva="reporte-inversion-pp0068.pdf"
+              icono={<FileText className="w-4 h-4" />}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-mountain-900 text-sm font-medium transition hover:bg-mountain-100 no-underline"
             >
-              <FileText className="w-4 h-4" />
               Reporte (PDF)
-            </a>
-            <a
-              href={urlExport}
-              onClick={() => registrarExport("/inversion", String(d.anio))}
+            </BotonDescarga>
+            <BotonDescarga
+              url={urlExport}
+              onDescargar={() => registrarExport("/inversion", String(d.anio))}
               title="Descarga la tabla de municipalidades con los filtros actuales"
+              descripcion="el Excel de municipalidades"
+              etiquetaEnCurso="Preparando Excel…"
+              nombreDeReserva="inversion-pp0068.xlsx"
+              icono={<Download className="w-4 h-4" />}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 text-white text-sm font-medium border border-white/25 transition hover:bg-white/25 no-underline"
             >
-              <Download className="w-4 h-4" />
               Excel
-            </a>
+            </BotonDescarga>
           </div>
         }
       />

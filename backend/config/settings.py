@@ -211,6 +211,12 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:4173"],
 )
 CORS_ALLOW_CREDENTIALS = False
+# El nombre del archivo viaja en `Content-Disposition`, y un `fetch` cross-origin **solo lee las
+# cabeceras que el servidor autoriza**. La interfaz pide las descargas con `fetch` —para poder
+# enseñar que está generando y explicar un 429 en vez de abrir una pestaña con JSON crudo—, así
+# que sin esto todos los archivos se guardarían con el nombre del blob: un identificador
+# aleatorio y sin extensión. No rompe nada al faltar, solo pierde el nombre.
+CORS_EXPOSE_HEADERS = ["Content-Disposition"]
 
 # --- Admin (django-unfold, ADR-A8) -----------------------------------------
 # El sidebar reproduce los seis grupos del spec 03. El orden no es alfabético: es el orden en

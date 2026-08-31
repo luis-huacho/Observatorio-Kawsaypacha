@@ -489,9 +489,80 @@ test.describe("Visor de exposición a peligros", () => {
     await enlace.click();
     const archivo = await descarga;
 
-    expect(archivo.suggestedFilename()).toMatch(/\.pdf$/);
+    // **El nombre real, no el del blob.** Desde que el archivo se pide con `fetch` y se entrega
+    // desde un `URL.createObjectURL`, el nombre sale de `Content-Disposition`, y esa cabecera
+    // solo se puede leer cross-origin si el servidor la expone (`CORS_EXPOSE_HEADERS`). Sin ella
+    // no falla nada: el archivo se guardaría con un identificador aleatorio sin extensión, que es
+    // exactamente la avería que nadie reporta.
+    expect(archivo.suggestedFilename()).toMatch(/^ayuda-memoria-.+\.pdf$/);
     const ruta = await archivo.path();
     expect(ruta).toBeTruthy();
+  });
+
+  test("mientras genera el PDF lo dice, y el aviso sobrevive al desplazarse", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name === "movil", "se comprueba en escritorio, como la descarga");
+
+    // El servidor tarda ~4 s en la ayuda memoria (renderiza el mapa con un navegador headless) y
+    // antes la página no cambiaba en absoluto: el visitante volvía a pulsar.
+    await irEsperando(page, "/peligros", "/api/territorio/distritos/");
+    await page.getByLabel("Provincia").selectOption({ index: 1 });
+    await esperarApi(page, "provincia=");
+    await page.getByLabel("Distrito").selectOption({ index: 1 });
+    await esperarApi(page, "distrito=");
+
+    const descarga = page.waitForEvent("download", { timeout: 90_000 });
+    await page.getByRole("link", { name: /Ayuda memoria/i }).first().click();
+
+    // El botón se declara ocupado y deja de admitir clics.
+    const ocupado = page.getByRole("link", { name: /Generando PDF/i });
+    await expect(ocupado).toBeVisible();
+    await expect(ocupado).toHaveAttribute("aria-disabled", "true");
+
+    // Y el aviso fijo, que es la razón de todo esto: el botón vive en la cabecera y desaparece
+    // en cuanto se baja a la tabla, así que el estado tiene que seguir estando en pantalla.
+    const aviso = page.locator("#avisos-descarga").getByRole("status");
+    await expect(aviso).toContainText(/Generando la ayuda memoria de/i);
+    await page.mouse.wheel(0, 4000);
+    await expect(ocupado).not.toBeInViewport();
+    await expect(aviso).toBeInViewport();
+
+    await descarga;
+    // Al terminar, todo vuelve a su sitio: ni botón bloqueado ni aviso colgado.
+    await expect(page.getByRole("link", { name: /Ayuda memoria \(PDF\)/i })).toBeVisible();
+    await expect(page.locator("#avisos-descarga").getByRole("status")).toHaveCount(0);
+  });
+
+  test("un límite de descargas se explica en pantalla y no se autodestruye", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name === "movil", "se comprueba en escritorio, como la descarga");
+
+    // El throttle es de 30/hora POR IP y una oficina entera comparte IP detrás de un NAT, así que
+    // el 429 no es hipotético. Con el `<a href>` de antes se veía como una pestaña con JSON crudo
+    // o como nada en absoluto; nadie le decía al visitante que esperase.
+    await irEsperando(page, "/peligros", "/api/territorio/distritos/");
+    await page.getByLabel("Provincia").selectOption({ index: 1 });
+    await esperarApi(page, "provincia=");
+    await page.getByLabel("Distrito").selectOption({ index: 1 });
+    await esperarApi(page, "distrito=");
+
+    await page.route(/ayuda-memoria\.pdf/, (ruta) =>
+      ruta.fulfill({ status: 429, contentType: "application/json", body: '{"detail":"…"}' })
+    );
+    await page.getByRole("link", { name: /Ayuda memoria/i }).first().click();
+
+    const aviso = page.locator("#avisos-descarga").getByRole("alert");
+    await expect(aviso).toContainText(/demasiadas descargas/i);
+    // No se va solo: un error que se autodestruye es un error que nadie llega a leer.
+    await page.waitForTimeout(3_000);
+    await expect(aviso).toBeVisible();
+
+    // Y el botón vuelve a estar disponible, para poder reintentar.
+    await expect(page.getByRole("link", { name: /Ayuda memoria \(PDF\)/i })).toBeVisible();
+    await aviso.getByRole("button", { name: /cerrar/i }).click();
+    await expect(page.locator("#avisos-descarga").getByRole("alert")).toHaveCount(0);
   });
 
   test("el selector de mapa base conmuta sin romper el mapa", async ({ page }) => {

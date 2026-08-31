@@ -16,6 +16,7 @@ import type {
 import { iconoDe } from "@/lib/iconosPeligro";
 import { NIVEL_BG, NIVEL_COLOR, NIVEL_LABEL, formatNumber } from "@/lib/semaforo";
 import GeoSelector from "@/components/GeoSelector";
+import BotonDescarga from "@/components/BotonDescarga";
 import ChecklistFiltro from "@/components/ChecklistFiltro";
 import ResultadosExposicion from "@/components/ResultadosExposicion";
 import ListaPeligrosCcpp from "@/components/ListaPeligrosCcpp";
@@ -209,36 +210,40 @@ export default function Peligros() {
         descripcion="Explora el mapa e identifica el nivel de exposición de los centros poblados ante peligros climáticos y geodinámicos en Cusco, basado en datos provenientes del SIGRID – CENEPRED."
         badge={
           <div className="flex flex-wrap gap-2">
-            {urlAyudaMemoria ? (
-              <a
-                href={urlAyudaMemoria}
-                // La métrica lleva el ubigeo: es la que dice a PREDES qué distritos se están
-                // llevando a mesas técnicas (spec 06).
-                onClick={() => registrarAyudaMemoria(ubigeoDistrito)}
-                title={`Ayuda memoria del distrito de ${distrito} con los filtros actuales`}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-mountain-900 text-sm font-medium transition hover:bg-mountain-100 no-underline"
-              >
-                <FileText className="w-4 h-4" />
-                Ayuda memoria (PDF)
-              </a>
-            ) : (
-              <span
-                title="Selecciona un distrito para generar la ayuda memoria"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/25 text-white/70 text-sm font-medium cursor-not-allowed"
-              >
-                <FileText className="w-4 h-4" />
-                Ayuda memoria (PDF)
-              </span>
-            )}
-            <a
-              href={urlExport}
-              onClick={() => registrarExport("/peligros", ubigeoDistrito || provincia || "region")}
+            {/* El servidor tarda ~4 s en la ayuda memoria (renderiza el mapa con un navegador
+                headless), así que el botón lleva su estado y saca un aviso fijo: el `PageHeader`
+                deja de verse en cuanto se baja a la tabla. Ver `BotonDescarga`. */}
+            <BotonDescarga
+              url={urlAyudaMemoria}
+              // La métrica lleva el ubigeo: es la que dice a PREDES qué distritos se están
+              // llevando a mesas técnicas (spec 06).
+              onDescargar={() => registrarAyudaMemoria(ubigeoDistrito)}
+              deshabilitado={!urlAyudaMemoria}
+              motivo="Selecciona un distrito para generar la ayuda memoria"
+              title={`Ayuda memoria del distrito de ${distrito} con los filtros actuales`}
+              descripcion={`la ayuda memoria de ${distrito || "el distrito"}`}
+              etiquetaEnCurso="Generando PDF…"
+              nombreDeReserva="ayuda-memoria.pdf"
+              icono={<FileText className="w-4 h-4" />}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-mountain-900 text-sm font-medium transition hover:bg-mountain-100 no-underline"
+              claseDeshabilitado="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/25 text-white/70 text-sm font-medium cursor-not-allowed"
+            >
+              Ayuda memoria (PDF)
+            </BotonDescarga>
+            <BotonDescarga
+              url={urlExport}
+              onDescargar={() =>
+                registrarExport("/peligros", ubigeoDistrito || provincia || "region")
+              }
               title="Descarga los centros poblados clasificados con los filtros actuales"
+              descripcion="el Excel de centros poblados"
+              etiquetaEnCurso="Preparando Excel…"
+              nombreDeReserva="centros-poblados.xlsx"
+              icono={<Download className="w-4 h-4" />}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 text-white text-sm font-medium border border-white/25 transition hover:bg-white/25 no-underline"
             >
-              <Download className="w-4 h-4" />
               Excel
-            </a>
+            </BotonDescarga>
           </div>
         }
       />

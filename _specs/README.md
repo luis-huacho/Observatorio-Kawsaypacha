@@ -13,6 +13,60 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 31/08/2026 — cuatro segundos de espera sin una sola señal en pantalla
+
+Pedir la ayuda memoria en `/peligros` tarda **3,7-4,0 s** —el PDF renderiza su mapa con un Chromium
+headless— y el reporte de `/inversion`, 4,4 s. Durante esos segundos **la interfaz no cambiaba en
+absoluto**: los cuatro botones de descarga del sitio eran `<a href>` a pelo y el navegador se
+llevaba la petición sin que la página se enterara. En escritorio salvaba el indicador del propio
+navegador; en móvil, que es donde el TDR pide que el sitio sirva, no se veía nada y el visitante
+volvía a pulsar.
+
+**Y no era solo la espera. Había dos fallos invisibles debajo.** El límite de descargas es de
+**30/hora por IP** (`DescargaThrottle`) y una oficina entera comparte IP detrás de un NAT: al
+pasarse, el 429 se veía como una pestaña con JSON crudo, o como nada. Y la captura del mapa no
+propaga errores a propósito (`mapa.py:131-133`) —un documento sin mapa sirve; uno que no se genera,
+no—, así que lo único que llegaba al cliente era el 5xx, que tampoco se veía.
+
+Ahora las cuatro pasan por `components/BotonDescarga.tsx`: se piden con `fetch`, se entregan desde
+un blob, y el estado es real. Cuatro decisiones que no son evidentes:
+
+- **Sigue siendo un `<a href>`, no un `<button>`.** El `onClick` intercepta el clic normal pero
+  **deja pasar Ctrl/Cmd/Shift/Alt y el botón central**: con un `<button>` se habrían perdido «abrir
+  en pestaña nueva» y «guardar enlace como», que hoy funcionan. Hay una prueba e2e que lo fija, y
+  **no afirma sobre la URL de la pestaña nueva**: el reporte se sirve como `attachment`, así que el
+  navegador lo descarga y la pestaña se queda en `about:blank`.
+- **El estado se cuenta dos veces y no sobra ninguna.** En el botón y en un aviso fijo abajo a la
+  derecha (`AvisoDescarga.tsx`), porque los botones viven en el `PageHeader` y **dejan de verse en
+  cuanto se baja a la tabla o al mapa**. El de «generando» se retira solo —la descarga es la
+  confirmación—; el de error **se queda hasta que se cierra**, porque un error que se autodestruye
+  a los tres segundos no lo lee nadie. El `aria-live` va en el aviso y **no** en el botón: con los
+  dos, un lector de pantalla lo anunciaría dos veces.
+- **Hizo falta `CORS_EXPOSE_HEADERS = ["Content-Disposition"]`.** La SPA y el API viven en dominios
+  distintos (ADR-A14) y un `fetch` cross-origin **solo lee las cabeceras que el servidor autoriza**;
+  no había ninguna expuesta. Sin esa línea no falla nada: el archivo se guarda con el identificador
+  del blob, sin extensión, en vez de `ayuda-memoria-accha-20260830.pdf`. Tiene prueba a los dos
+  lados —una de backend sobre `Access-Control-Expose-Headers` y una e2e sobre
+  `suggestedFilename()`— y cada botón lleva además un `nombreDeReserva`, porque un bundle nuevo
+  contra un backend viejo es un estado real durante un despliegue.
+- **`URL.revokeObjectURL` no se llama en el mismo tick que el `click()`**, que puede abortar la
+  descarga antes de que el navegador llegue a leer el blob.
+
+**Lo que NO se hizo, y por qué.** Encolar la generación en django-tasks y sondear el estado es la
+respuesta arquitectónica obvia y aquí es la equivocada: para cuatro segundos añade dos peticiones,
+una fila de BD y **un archivo que hay que guardar en algún sitio** — y `MEDIA_ROOT` lo sirve nginx
+entero como estático público, así que una ayuda memoria filtrada quedaría accesible por URL a quien
+la adivinara. El mecanismo se guarda para la generación por lotes, que sí lo pide. Tampoco se finge
+el estado con un temporizador: diría «listo» cuando no lo está.
+
+De camino salieron dos cosas que quedan **anotadas en `_docs/deuda-tecnica.md`, no arregladas**: el
+Excel de normativa tiene endpoint, límite y prueba pero **ningún botón que lo pida**
+(`Normativa.tsx:24` calcula la URL y no la pinta; `noUnusedLocals` está en `false`, por eso nada
+avisó), y el visor headless pide su página **al mismo gunicorn** que genera el PDF con solo tres
+workers — se destraba solo a los 25 s con los PDF sin mapa, pero no está reproducido.
+
+Sin ADR: no cambia ninguna decisión. Suite: **481 + 7** y **73 casos e2e** (146 corridas), en verde.
+
 ### Actualización 30/08/2026 — `/inversion` decía qué NO era el dato y nunca qué era
 
 La ventana del PP 0068 abría con una sola frase sobre el ejercicio que estaba mostrando: «**Corte a
