@@ -11,7 +11,7 @@ from apps.biblioteca.models import CategoriaDocumento, Documento
 from apps.contenidos.models import Evento, Noticia, Video
 from apps.mapas.models import CapaCartografica
 from apps.medidas.models import Medida, MedidaImagen
-from apps.normativa.models import EntidadEmisora, Norma
+from apps.normativa.models import EntidadEmisora, Norma, TipoNorma
 from apps.peligros.models import ClasificacionPeligro, TipoPeligro
 from apps.sitio.models import BloqueTexto, ConfiguracionSitio, EnlaceMenu, HeroSlide
 from apps.territorio.models import CentroPoblado, Distrito, Provincia
@@ -197,6 +197,15 @@ class MedidaDetalleSerializer(MedidaListaSerializer):
         ]
 
 
+class TipoNormaSerializer(serializers.ModelSerializer):
+    """La clase de norma. Objeto y no cadena por lo mismo que la entidad: la tarjeta pinta la
+    abreviatura, la ficha el nombre completo y el filtro viaja por slug."""
+
+    class Meta:
+        model = TipoNorma
+        fields = ["slug", "nombre", "abreviatura"]
+
+
 class EntidadEmisoraSerializer(serializers.ModelSerializer):
     """La institución que dicta la norma. Objeto y no cadena: el listado pinta la sigla, la ficha
     el nombre completo y el filtro viaja por slug, y los tres salen del mismo sitio."""
@@ -216,6 +225,9 @@ class NormaSerializer(PortadaMixin, serializers.ModelSerializer):
     # `null` cuando no consta, que es un estado real: la ficha repliega entonces al nivel de
     # gobierno que se deduce del ámbito.
     entidad_emisora = EntidadEmisoraSerializer(read_only=True)
+    # `null` mientras la norma esté en borrador sin clasificar; publicar sin tipo se
+    # bloquea desde `CAMPOS_PARA_PUBLICAR`, así que en el sitio público siempre viene.
+    tipo = TipoNormaSerializer(read_only=True)
 
     class Meta:
         model = Norma

@@ -529,6 +529,14 @@ export const TIPOS_NOTICIA: Record<Noticia["tipo"], string> = {
 };
 
 /** Espejo de `NormaSerializer`: `/api/normativa/`. */
+/** Espejo de `TipoNormaSerializer`: qué clase de norma es. */
+export type TipoNorma = {
+  slug: string;
+  nombre: string;
+  /** Sigla ("DS"). Vacía en «Ley» u «Ordenanza», que ya son cortas. */
+  abreviatura: string;
+};
+
 /** Espejo de `EntidadEmisoraSerializer`: la institución que dicta la norma. */
 export type EntidadEmisora = {
   slug: string;
@@ -540,7 +548,11 @@ export type EntidadEmisora = {
 export type Norma = {
   slug: string;
   titulo: string;
-  tipo: "Ley" | "DS" | "RM" | "RJ" | "Ordenanza";
+  /**
+   * Clase de norma. `null` solo puede darse en borradores: publicar sin tipo está bloqueado en
+   * el servidor (`CAMPOS_PARA_PUBLICAR`), así que en el sitio público siempre viene.
+   */
+  tipo: TipoNorma | null;
   ambito: "nacional" | "regional" | "local";
   /**
    * Institución que la dicta. `null` es un estado real y frecuente —no todas las fichas lo

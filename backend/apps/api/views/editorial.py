@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 from apps.biblioteca.models import Documento
 from apps.contenidos.models import Evento, Noticia, Video
 from apps.medidas.models import Medida
-from apps.normativa.models import EntidadEmisora, Norma
+from apps.normativa.models import EntidadEmisora, Norma, TipoNorma
 
 from .. import exports, serializers
 from ..filters import DocumentoFilter, MedidaFilter, NoticiaFilter, NormaFilter, VideoFilter
@@ -39,7 +39,7 @@ class MedidaViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class NormaViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Norma.publicados.select_related("documento", "entidad_emisora")
+    queryset = Norma.publicados.select_related("documento", "entidad_emisora", "tipo")
     filterset_class = NormaFilter
     lookup_field = "slug"
 
@@ -64,20 +64,31 @@ class NormaViewSet(viewsets.ReadOnlyModelViewSet):
         )
         return Response(serializers.EntidadEmisoraSerializer(entidades, many=True).data)
 
+    @extend_schema(responses={200: serializers.TipoNormaSerializer(many=True)})
+    @action(detail=False, methods=["get"], pagination_class=None)
+    def tipos(self, request):
+        """Los tipos que alimentan el desplegable de `/normativa`. Ver `entidades`."""
+        tipos = (
+            TipoNorma.objects.filter(normas__estado=Norma.Estado.PUBLICADO)
+            .distinct()
+            .order_by("orden", "nombre")
+        )
+        return Response(serializers.TipoNormaSerializer(tipos, many=True).data)
+
 
 class NormaExportView(APIView):
     throttle_classes = [DescargaThrottle]
 
     @extend_schema(responses={200: bytes})
     def get(self, request):
-        queryset = Norma.publicados.select_related("documento", "entidad_emisora")
+        queryset = Norma.publicados.select_related("documento", "entidad_emisora", "tipo")
         filtro = NormaFilter(request.query_params, queryset=queryset, request=request)
 
         def filas():
             for n in filtro.qs.order_by("-fecha"):
                 yield [
                     n.titulo,
-                    n.get_tipo_display(),
+                    n.tipo.nombre if n.tipo_id else "",
                     n.numero,
                     n.get_ambito_display(),
                     n.entidad_emisora.nombre if n.entidad_emisora_id else "",

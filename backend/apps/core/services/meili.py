@@ -125,7 +125,7 @@ def _doc_norma(n) -> dict:
         "analisis_predes": n.analisis_predes or "",
         "contenido_texto": a_texto_plano(n.contenido),
         "numero": n.numero,
-        "tipo": n.get_tipo_display(),
+        "tipo": n.tipo.nombre if n.tipo_id else "",
         "ambito": n.get_ambito_display(),
         # El nombre y no el slug, igual que `tipo` y `ambito`: lo que se indexa es lo que el
         # visitante lee y escribe en el buscador.
@@ -232,7 +232,7 @@ INDICES: dict[str, Indice] = {
         filterable=["tipo", "ambito", "entidad", "anio", "palabras_clave"],
         sortable=["fecha"],
         documento=_doc_norma,
-        select_related=["entidad_emisora"],
+        select_related=["entidad_emisora", "tipo"],
     ),
     "noticias": Indice(
         slug="noticias",

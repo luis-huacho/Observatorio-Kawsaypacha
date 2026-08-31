@@ -10,7 +10,7 @@ from apps.core.importacion_admin import ImportadorExcelAdminMixin
 
 from . import importacion
 from .forms import NormaForm, SubirNormasForm
-from .models import EntidadEmisora, Norma
+from .models import EntidadEmisora, Norma, TipoNorma
 
 
 @admin.register(Norma)
@@ -42,7 +42,7 @@ class NormaAdmin(ImportadorExcelAdminMixin, RedaccionIAAdminMixin, WorkflowAdmin
     list_filter = ("estado", "tipo", "ambito", "entidad_emisora", "estado_vigencia", "ia_estado")
     search_fields = ("titulo", "numero", "resumen", "slug")
     prepopulated_fields = {"slug": ("titulo",)}
-    autocomplete_fields = ("documento", "entidad_emisora")
+    autocomplete_fields = ("documento", "entidad_emisora", "tipo")
     date_hierarchy = "fecha"
 
     fieldsets = (
@@ -57,7 +57,7 @@ class NormaAdmin(ImportadorExcelAdminMixin, RedaccionIAAdminMixin, WorkflowAdmin
         (None, {"fields": ("titulo", "slug", "numero", "resumen")}),
         ("Clasificación", {
             "fields": ("entidad_emisora", "tipo", "ambito", "fecha", "estado_vigencia"),
-            "description": "Si la entidad que la emite no está en la lista, créala con el «+» sin salir de aquí.",
+            "description": "Si el tipo o la entidad no están en la lista, créalos con el «+» sin salir de aquí.",
         }),
         ("Análisis", {"fields": ("analisis_predes", "contenido", "palabras_clave")}),
         ("Acceso a la publicación oficial", {
@@ -137,4 +137,33 @@ class EntidadEmisoraAdmin(ModelAdmin):
     def total_normas(self, obj) -> int:
         """Cuántas la usan. Es lo que distingue una entidad viva de una que sobra —y la que
         avisa, antes de intentarlo, de que borrarla va a dar error de protección."""
+        return obj._normas
+
+
+@admin.register(TipoNorma)
+class TipoNormaAdmin(ModelAdmin):
+    """Pantalla de mantenimiento del catálogo de tipos.
+
+    `search_fields` no es cosmético: sin él, el `autocomplete_fields` de `NormaAdmin` revienta.
+    """
+
+    list_display = ("nombre", "abreviatura", "slug", "orden", "total_normas")
+    list_editable = ("orden",)
+    search_fields = ("nombre", "abreviatura")
+    prepopulated_fields = {"slug": ("nombre",)}
+    ordering = ("orden", "nombre")
+    fieldsets = (
+        (None, {"fields": ("nombre", "abreviatura", "slug", "orden")}),
+        ("Importación", {
+            "fields": ("sinonimos",),
+            "description": "Cómo llega escrito este tipo en los Excel que se importan. Sin el "
+                           "sinónimo, esas filas se omiten aunque el tipo exista aquí.",
+        }),
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(_normas=Count("normas"))
+
+    @admin.display(description="normas", ordering="_normas")
+    def total_normas(self, obj) -> int:
         return obj._normas

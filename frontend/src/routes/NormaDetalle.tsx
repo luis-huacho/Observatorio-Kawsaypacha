@@ -46,7 +46,7 @@ export default function NormaDetalle() {
   return (
     <>
       <PageHeader
-        eyebrow={n.tipo}
+        eyebrow={n.tipo?.nombre}
         titulo={n.titulo}
         backTo="/normativa"
         backLabel="Volver a normativa"

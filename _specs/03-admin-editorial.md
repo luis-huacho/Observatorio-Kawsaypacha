@@ -126,6 +126,12 @@ Auditado contra los archivos reales; el importador debe reconocer estos casos po
 
 El `log` del `DatasetUpload` es lo que PREDES lee para saber qué corregir en su Excel, así que los mensajes van en español y citan hoja y fila.
 
+### Catálogo de tipos de norma
+
+`TipoNorma` tiene pantalla propia bajo «Normativa - Tipos», con la columna de uso y el «+» en el formulario de la norma, igual que las entidades. Lo propio suyo es **`sinonimos`**: la lista de cómo llega escrito el tipo en los Excel que se importan. Estaba en una tabla fija de `importacion.py` con quince entradas, y dejarla ahí habría hecho que dar de alta un tipo desde el admin no sirviera para importar — el formulario y la IA lo verían, el importador no, y nada relacionaría las dos cosas.
+
+**El texto de ayuda de la plantilla xlsx también sale del catálogo.** Enumeraba los cinco tipos a mano, y la plantilla es justo el papel donde el cliente mira qué le está permitido escribir.
+
 ### Catálogo de entidades emisoras
 
 `EntidadEmisora` tiene pantalla propia bajo «Normativa - Entidades emisoras», con una columna que cuenta cuántas normas usan cada una: es lo que distingue una entidad viva de una que sobra, y lo que avisa antes de intentar borrar una en uso (la FK es `PROTECT`, así que el admin se planta en vez de vaciar la atribución en silencio). Desde el formulario de la norma se da de alta una entidad sin salir de la pantalla, con el «+» del desplegable — el botón sale gratis: Unfold reencamina el `RelatedFieldWidgetWrapper` de Django, y el permiso `add` lo concede el seed porque `normativa` está en `APPS_EDITORIALES`.
@@ -191,7 +197,7 @@ ficha es uno solo para los dos, y depende de que el estado y el candado se llame
   en un `clean()`: `estado` está excluido del formulario y publicar no pasa por ninguno. Su
   hermano `avisos_al_publicar()` es lo que no impide publicar pero hay que mirar una vez.
 - **Los `enum` del esquema se construyen desde los catálogos vivos**, no escritos a mano: los nueve
-  slugs salen de `peligros.catalogo`, las dos taxonomías de `Medida`, **las entidades emisoras de
+  slugs salen de `peligros.catalogo`, las dos taxonomías de `Medida`, **el tipo y las entidades emisoras de
   `Norma`** —que PREDES da de alta desde el admin— y, desde el 31/08/2026, el `tipo` de `Noticia`,
   que era el último que seguía escrito a mano. Añadir un peligro, una entidad o un tipo no puede
   dejar el esquema atrás, y el síntoma sería una clasificación vacía sin explicación. En noticias

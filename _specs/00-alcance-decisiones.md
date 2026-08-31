@@ -216,6 +216,8 @@ Complementan a las ventanas: portada (hero administrable), buscador global, noti
 >
 > **Lo que no se hizo**: ni M2M para normas cofirmadas —una norma la emite una entidad, y el caso de dos es raro y se resuelve nombrando la principal—, ni un catálogo compartido con `biblioteca.Documento.autor_institucion`, que es texto libre y de otra naturaleza; unificarlos es una migración de datos que nadie ha pedido.
 >
+> **Ampliación 31/08/2026: la doctrina ya cubre dos campos.** `Norma.tipo` era un `TextChoices` de cinco opciones y pasa al mismo molde (`TipoNorma`). Tres cosas que este segundo caso enseñó y el primero no podía enseñar: **convertir un campo que ya tiene datos va en tres migraciones** —crear, mapear, borrar—, y la de borrado necesita relajar la columna vieja a `blank` con default antes de quitarla, o la marcha atrás muere al recrearla `NOT NULL` sobre una tabla con filas, justo antes del paso que sabría rellenarla; **el slug nuevo no puede romper los enlaces viejos**, así que el filtro compara con `iexact` y `?tipo=DS` sigue valiendo contra el slug `ds` —sin eso el enlace responde 200 con el listado entero, que se ve igual que un filtro sin resultados—; y **si un importador deduce ese campo, sus sinónimos también son catálogo**, o dar de alta un tipo desde el admin lo dejaría disponible en el formulario y en la IA mientras el importador sigue omitiendo sus filas.
+>
 > Decisión del dueño del proyecto.
 
 ## Fuera de alcance (esta fase)

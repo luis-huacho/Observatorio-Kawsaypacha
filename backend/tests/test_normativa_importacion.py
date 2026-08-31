@@ -19,7 +19,7 @@ import openpyxl
 import pytest
 
 from apps.normativa import importacion
-from apps.normativa.models import EntidadEmisora, Norma
+from apps.normativa.models import EntidadEmisora, Norma, TipoNorma
 
 pytestmark = pytest.mark.django_db
 
@@ -31,6 +31,12 @@ URL_PLANTILLA = reverse("admin:normativa_norma_descargar_plantilla")
 def temporal_aislado(settings, tmp_path):
     """El Excel a medio importar va a un directorio de la prueba, no al del proyecto."""
     settings.IMPORTACIONES_TMP_DIR = tmp_path / "importaciones"
+
+
+
+def _tipo(slug: str) -> TipoNorma:
+    """El tipo del catálogo, que siembra `seed --solo-catalogos` para toda la sesión."""
+    return TipoNorma.objects.get(slug=slug)
 
 
 @pytest.fixture
@@ -119,7 +125,7 @@ def test_lo_importado_queda_en_borrador_y_con_todo_lo_deducido(admin_client, tmp
     norma = Norma.objects.get()
     assert norma.estado == Norma.Estado.BORRADOR
     assert norma.titulo == "DS 048-2011-PCM"
-    assert norma.tipo == Norma.Tipo.DS
+    assert norma.tipo.slug == "ds"
     assert norma.ambito == Norma.Ambito.NACIONAL
     assert norma.entidad_emisora == entidades["nacional"]
     assert norma.fecha == dt.date(2011, 1, 1)
@@ -135,7 +141,7 @@ def test_un_nombre_que_ya_existe_se_omite_aunque_cambien_mayusculas_y_espacios(
     admin_client, tmp_path, entidades
 ):
     Norma.objects.create(
-        titulo="Ley N° 29664", slug="ley-29664", tipo=Norma.Tipo.LEY,
+        titulo="Ley N° 29664", slug="ley-29664", tipo=_tipo("ley"),
         ambito=Norma.Ambito.NACIONAL, fecha=dt.date(2011, 2, 19), resumen="…",
     )
     ruta = _excel(tmp_path, [_fila("  ley n° 29664  "), _fila("DS 048-2011-PCM")])
@@ -217,36 +223,40 @@ def test_las_filas_en_blanco_del_final_no_cuentan_como_error(admin_client, tmp_p
 
 
 @pytest.mark.parametrize(
-    "escrito,esperado",
+    "escrito,slug_esperado",
     [
-        ("Ley", Norma.Tipo.LEY),
-        ("Decreto Supremo", Norma.Tipo.DS),
-        ("D.S.", Norma.Tipo.DS),
-        ("decreto  supremo", Norma.Tipo.DS),
-        ("Resolución Ministerial", Norma.Tipo.RM),
-        ("RESOLUCION JEFATURAL", Norma.Tipo.RJ),
-        ("Ordenanza Regional", Norma.Tipo.ORDENANZA),
-        ("Ordenanza Municipal", Norma.Tipo.ORDENANZA),
+        ("Ley", "ley"),
+        ("Decreto Supremo", "ds"),
+        ("D.S.", "ds"),
+        ("decreto  supremo", "ds"),
+        ("Resolución Ministerial", "rm"),
+        ("RESOLUCION JEFATURAL", "rj"),
+        ("Ordenanza Regional", "ordenanza"),
+        ("Ordenanza Municipal", "ordenanza"),
     ],
 )
 def test_el_tipo_se_reconoce_sin_tildes_ni_mayusculas(
-    admin_client, tmp_path, entidades, escrito, esperado
+    admin_client, tmp_path, entidades, escrito, slug_esperado
 ):
+    """Las ocho variantes salen del catálogo: nombre, abreviatura y sinónimos.
+
+    Las cuatro que no son ni el nombre ni la sigla —«D.S.», «Ordenanza Regional»…— dependen de que
+    la semilla haya trasladado los sinónimos que antes vivían en una tabla fija del importador.
+    """
     ruta = _excel(tmp_path, [_fila("Una norma", **{"Tipo de normativa": escrito})])
 
     analisis = _subir(admin_client, ruta).context["analisis"]
 
-    assert analisis.validas[0].valores["tipo"] == esperado
+    assert analisis.validas[0].valores["tipo"].slug == slug_esperado
 
 
 def test_un_tipo_fuera_del_catalogo_omite_la_fila_en_vez_de_elegir_uno(
     admin_client, tmp_path, entidades
 ):
-    """`tipo` es una lista cerrada de cinco; replegar a una opción falsa clasificaría mal la norma.
+    """Replegar a una opción falsa clasificaría la norma como algo que nadie decidió.
 
     Se omite y se dice cuál era, para poder decidir con el archivo delante si hay que ampliar el
-    catálogo. Es la misma regla de ADR-D8: antes vacío que una opción inventada — y como aquí el
-    campo no admite vacío, antes fuera que dentro y mal.
+    catálogo. Es la misma regla de ADR-D8: antes vacío que una opción inventada.
     """
     ruta = _excel(tmp_path, [_fila("Una norma", **{"Tipo de normativa": "Acuerdo de Concejo"})])
 
@@ -441,7 +451,7 @@ def test_dos_filas_con_el_mismo_slug_base_no_chocan(admin_client, tmp_path, enti
     transacción entera y no entra ninguna norma.
     """
     Norma.objects.create(
-        titulo="Ley 29664", slug="ley-29664", tipo=Norma.Tipo.LEY,
+        titulo="Ley 29664", slug="ley-29664", tipo=_tipo("ley"),
         ambito=Norma.Ambito.NACIONAL, fecha=dt.date(2011, 1, 1), resumen="…",
     )
     ruta = _excel(tmp_path, [_fila("Ley 29664!"), _fila("¿Ley 29664?")])
