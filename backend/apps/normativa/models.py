@@ -11,6 +11,36 @@ from apps.core.models import (
 )
 
 
+class EntidadEmisora(TimeStampedMixin):
+    """Institución que dicta la norma: PCM, un gobierno regional, una municipalidad.
+
+    Es catálogo y no texto libre por una razón muy concreta: escrito a mano, «PCM»,
+    «Presidencia del Consejo de Ministros» y «P.C.M.» serían tres valores distintos y el filtro
+    del listado no serviría para nada. PREDES lo mantiene desde su propia pantalla del admin, y
+    también puede dar de alta una entidad sin salir del formulario de la norma, con el «+» del
+    desplegable.
+    """
+
+    nombre = models.CharField(max_length=200, unique=True)
+    sigla = models.CharField(
+        max_length=20, blank=True,
+        help_text='Abreviatura con la que se la conoce, p. ej. "PCM" o "MINAM". Es lo que se '
+                  "muestra en las tarjetas del listado, donde no cabe el nombre completo.",
+    )
+    slug = models.SlugField(max_length=80, unique=True)
+    orden = models.PositiveSmallIntegerField(
+        default=0, help_text="Las de menor número salen primero en el desplegable."
+    )
+
+    class Meta:
+        ordering = ["orden", "nombre"]
+        verbose_name = "entidad emisora"
+        verbose_name_plural = "entidades emisoras"
+
+    def __str__(self) -> str:
+        return self.nombre
+
+
 class Norma(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, ImagenOptimizadaMixin,
             RedaccionIAMixin):
     """Norma del marco GRD/ACC, con ficha propia en /normativa/{slug}.
@@ -39,6 +69,15 @@ class Norma(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, ImagenOptimizadaMixi
 
     slug = models.SlugField(max_length=120, unique=True)
     titulo = models.CharField(max_length=300)
+    entidad_emisora = models.ForeignKey(
+        EntidadEmisora,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="normas",
+        verbose_name="entidad emisora",
+        help_text="Institución que la dicta. Vacío si no consta.",
+    )
     tipo = models.CharField(max_length=12, choices=Tipo.choices)
     ambito = models.CharField("ámbito", max_length=10, choices=Ambito.choices, db_index=True)
     fecha = models.DateField(db_index=True)

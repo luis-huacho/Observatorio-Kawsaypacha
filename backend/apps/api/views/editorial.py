@@ -8,13 +8,14 @@ from datetime import date, timedelta
 from django.utils.dateparse import parse_date
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.biblioteca.models import Documento
 from apps.contenidos.models import Evento, Noticia, Video
 from apps.medidas.models import Medida
-from apps.normativa.models import Norma
+from apps.normativa.models import EntidadEmisora, Norma
 
 from .. import exports, serializers
 from ..filters import DocumentoFilter, MedidaFilter, NoticiaFilter, NormaFilter, VideoFilter
@@ -38,7 +39,7 @@ class MedidaViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class NormaViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Norma.publicados.select_related("documento")
+    queryset = Norma.publicados.select_related("documento", "entidad_emisora")
     filterset_class = NormaFilter
     lookup_field = "slug"
 
@@ -47,13 +48,29 @@ class NormaViewSet(viewsets.ReadOnlyModelViewSet):
             return serializers.NormaDetalleSerializer
         return serializers.NormaSerializer
 
+    @extend_schema(responses={200: serializers.EntidadEmisoraSerializer(many=True)})
+    @action(detail=False, methods=["get"], pagination_class=None)
+    def entidades(self, request):
+        """Las entidades que alimentan el desplegable de `/normativa`.
+
+        Solo las que tienen alguna norma publicada: ofrecer el resto sería ofrecer filtros que
+        devuelven cero resultados. Va como acción del router y no como ruta suelta porque así
+        se registra antes que `/<slug>/` y no puede chocar con una norma llamada «entidades».
+        """
+        entidades = (
+            EntidadEmisora.objects.filter(normas__estado=Norma.Estado.PUBLICADO)
+            .distinct()
+            .order_by("orden", "nombre")
+        )
+        return Response(serializers.EntidadEmisoraSerializer(entidades, many=True).data)
+
 
 class NormaExportView(APIView):
     throttle_classes = [DescargaThrottle]
 
     @extend_schema(responses={200: bytes})
     def get(self, request):
-        queryset = Norma.publicados.select_related("documento")
+        queryset = Norma.publicados.select_related("documento", "entidad_emisora")
         filtro = NormaFilter(request.query_params, queryset=queryset, request=request)
 
         def filas():
@@ -63,6 +80,7 @@ class NormaExportView(APIView):
                     n.get_tipo_display(),
                     n.numero,
                     n.get_ambito_display(),
+                    n.entidad_emisora.nombre if n.entidad_emisora_id else "",
                     n.fecha,
                     n.get_estado_vigencia_display() if n.estado_vigencia else "",
                     n.resumen,
@@ -72,9 +90,10 @@ class NormaExportView(APIView):
         return exports.respuesta_excel(
             "normativa-grd-acc.xlsx",
             "Normativa",
-            ["Título", "Tipo", "Número", "Ámbito", "Fecha", "Vigencia", "Resumen", "Enlace"],
+            ["Título", "Tipo", "Número", "Ámbito", "Entidad emisora", "Fecha", "Vigencia",
+             "Resumen", "Enlace"],
             filas(),
-            [60, 18, 20, 12, 12, 14, 70, 40],
+            [60, 18, 20, 12, 38, 12, 14, 70, 40],
         )
 
 

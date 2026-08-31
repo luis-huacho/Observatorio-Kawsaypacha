@@ -202,6 +202,22 @@ Complementan a las ventanas: portada (hero administrable), buscador global, noti
 >
 > **Riesgos aceptados por el dueño del proyecto**, los mismos de ADR-D7, D8 y A10, más uno propio: los **datos personales** del bloque de contacto, cuya publicación queda a criterio del editor con el aviso delante. La mitigación de todos es la misma — **es una propuesta, no un resultado**, y ninguna publicación depende de ella. Decisión del dueño del proyecto.
 
+> **ADR-D11 — Quién emite la norma es un catálogo con pantalla propia, y la IA lo elige pero no lo escribe.** Una `Norma` no decía quién la dicta: la ficha lo aproximaba derivándolo del ámbito («Publicada por el Gobierno Nacional»), que es un nivel de gobierno y no una institución. Quien arma un expediente busca «todo lo del MINAM» o «las ordenanzas del Gobierno Regional de Cusco», y eso no se podía pedir. Entra `normativa.EntidadEmisora` (nombre, sigla, slug, orden) y una FK opcional desde `Norma`, con filtro en `/normativa`, faceta en el buscador y columna en el Excel.
+>
+> **Taxonomía y no un `CharField`, que es toda la decisión.** Escrito a mano, «PCM», «Presidencia del Consejo de Ministros» y «P.C.M.» son tres valores distintos: el desplegable ofrece tres opciones para lo mismo y ninguna devuelve el conjunto completo. Un campo de texto habría sido dos líneas de código y un filtro inservible el día que hubiera cien normas.
+>
+> Consecuencias que no son opcionales:
+>
+> 1. **La FK es `PROTECT` aunque el campo sea opcional.** Se aparta del `SET_NULL` de `Video.tema` por dónde se edita este catálogo: tiene pantalla de mantenimiento propia, y con `SET_NULL` borrar una entidad desde ahí vaciaría la atribución de todas sus normas **sin que nada lo dijera**. Con `PROTECT` el admin se planta, y el listado del catálogo lleva una columna con cuántas normas usan cada fila para que el aviso llegue antes del intento.
+> 2. **La IA elige del catálogo y nunca crea.** El `enum` del esquema se arma al vuelo desde las entidades vivas —como los nueve peligros de ADR-D10—, así que dar de alta una institución en el admin la pone a disposición del modelo sin tocar el prompt. Lo que no reconoce se deja **vacío y se dice en el `log_ia`**, igual que un `tipo` fuera de catálogo (ADR-D8). Dejar que creara la que falta habría llenado la taxonomía de variantes del mismo nombre, que es exactamente lo que un catálogo existe para evitar. La guarda es doble: el `enum` restringe, y `_resolver_entidad` vuelve a comprobarlo porque la salida estructurada falla de vez en cuando y un slug inventado reventaría **dentro del worker**, donde el editor no lo ve.
+> 3. **El catálogo se siembra dos veces, y las dos hacen falta.** `entidades.yaml` para el seed y una migración de datos (`normativa.0005`) para las bases ya creadas, porque **`seed` no corre en el despliegue**. Solo el YAML habría dejado el catálogo vacío en todos los servidores, sin ningún error: el desplegable no se pinta y nadie sabe por qué. Es la lección de `sitio.0007`, aplicada antes de repetirla.
+> 4. **El endpoint del desplegable solo lista entidades con normas publicadas.** Servir las doce del catálogo de arranque ofrecería filtros que devuelven cero resultados, que se lee como que el sitio no tiene contenido. Va como acción del router (`/api/normativa/entidades/`) y no como ruta suelta, porque así se registra antes que `/<slug>/` y no puede chocar con una norma llamada «entidades».
+> 5. **La ficha repliega, no desaparece.** Sin entidad se sigue diciendo «Publicada por el Gobierno …» a partir del ámbito. Es el estado de todas las normas ya cargadas —el campo es opcional y nadie lo ha rellenado aún—, y quitar la línea les habría restado un dato en vez de sumarlo.
+>
+> **Lo que no se hizo**: ni M2M para normas cofirmadas —una norma la emite una entidad, y el caso de dos es raro y se resuelve nombrando la principal—, ni un catálogo compartido con `biblioteca.Documento.autor_institucion`, que es texto libre y de otra naturaleza; unificarlos es una migración de datos que nadie ha pedido.
+>
+> Decisión del dueño del proyecto.
+
 ## Fuera de alcance (esta fase)
 
 - Ventana Prioridades (ADR-P1).

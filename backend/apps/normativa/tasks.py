@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 #: firma la organización en el listado. Tampoco `url_oficial`, que presenta un enlace como
 #: publicación oficial y no puede acabar apuntando a un blog que el editor pegó a mano.
 CAMPOS_REDACTADOS = (
-    "titulo", "numero", "tipo", "ambito", "fecha", "resumen", "contenido",
-    "palabras_clave", "estado_vigencia",
+    "titulo", "numero", "tipo", "ambito", "entidad_emisora", "fecha", "resumen",
+    "contenido", "palabras_clave", "estado_vigencia",
 )
 
 
@@ -96,7 +96,9 @@ def _lo_escribio_una_persona(norma, campo) -> bool:
 
     Quedan las dos excepciones de siempre, que son las que puso el admin para poder guardar.
     """
-    valor = getattr(norma, campo)
+    # Por `_id` en la FK: `norma.entidad_emisora` dispararía una consulta solo para saber si
+    # está vacía.
+    valor = getattr(norma, f"{campo}_id" if campo == "entidad_emisora" else campo)
     if campo == "titulo":
         return bool(valor) and not str(valor).startswith(norma.PREFIJO_PROVISIONAL)
     if campo == "fecha":

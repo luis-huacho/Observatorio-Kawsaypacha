@@ -285,6 +285,14 @@ function NormaPreview({ norma: n }: { norma: Norma }) {
         <span className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
           {n.tipo}
         </span>
+        {n.entidad_emisora && (
+          <span
+            className="chip bg-earth-200/40 text-earth-700 border border-earth-500/20"
+            title={n.entidad_emisora.nombre}
+          >
+            {n.entidad_emisora.sigla || n.entidad_emisora.nombre}
+          </span>
+        )}
         <span className="chip bg-sky-200/40 text-sky-700 border border-sky-500/20 capitalize">
           {n.ambito}
         </span>

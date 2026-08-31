@@ -127,6 +127,9 @@ def _doc_norma(n) -> dict:
         "numero": n.numero,
         "tipo": n.get_tipo_display(),
         "ambito": n.get_ambito_display(),
+        # El nombre y no el slug, igual que `tipo` y `ambito`: lo que se indexa es lo que el
+        # visitante lee y escribe en el buscador.
+        "entidad": n.entidad_emisora.nombre if n.entidad_emisora_id else "",
         "anio": n.fecha.year,
         "palabras_clave": list(n.palabras_clave or []),
         "fecha": _marca_tiempo(n.fecha),
@@ -224,10 +227,12 @@ INDICES: dict[str, Indice] = {
         slug="normativa",
         etiqueta="Normativa",
         modelo="normativa.Norma",
-        searchable=["titulo", "resumen", "analisis_predes", "numero", "contenido_texto"],
-        filterable=["tipo", "ambito", "anio", "palabras_clave"],
+        searchable=["titulo", "resumen", "analisis_predes", "numero", "contenido_texto",
+                    "entidad"],
+        filterable=["tipo", "ambito", "entidad", "anio", "palabras_clave"],
         sortable=["fecha"],
         documento=_doc_norma,
+        select_related=["entidad_emisora"],
     ),
     "noticias": Indice(
         slug="noticias",

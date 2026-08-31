@@ -7,7 +7,7 @@ Meilisearch v1.15 en contenedor propio (`meilisearch` en compose), volumen `meil
 | Índice | Documentos | searchableAttributes | filterable/facetas | sortable |
 |---|---|---|---|---|
 | `medidas` | Medidas publicadas | titulo, resumen_corto, contenido_texto, comunidad, tags | peligro, ambito, resultado, provincia, distrito | fecha |
-| `normativa` | Normas publicadas | titulo, resumen, analisis_predes, numero | tipo, ambito, anio | fecha |
+| `normativa` | Normas publicadas | titulo, resumen, analisis_predes, numero, entidad | tipo, ambito, entidad, anio | fecha |
 | `documentos` | Documentos publicados | titulo, resumen, autor_institucion | categoria, anio | fecha |
 | `noticias` | Noticias publicadas | titulo, bajada, cuerpo_texto | tipo, anio | fecha |
 | `videos` | Videos publicados | titulo, descripcion | tema | fecha |
@@ -99,3 +99,9 @@ Cliente Python: paquete `meilisearch` en `core/services/meili.py`.
 ## Fallback
 
 Si Meilisearch está caído, el frontend degrada a los endpoints DRF con filtros (`/api/medidas/?…`, `/api/ccpp/?buscar=`) — sin facetas ni typo-tolerance, pero funcional. Implementar como catch en `search.ts`.
+
+**`entidad` se indexa con el NOMBRE, no con el slug**, igual que `tipo` y `ambito`, que van con su
+`display`. Es lo que el visitante lee y lo que teclea en el buscador. La asimetría con el API DRF
+—que filtra por el valor crudo (`?entidad=pcm`)— es la de siempre y no es un descuido: son dos
+consumidores con dos públicos. El documento lo construye `_doc_norma` con `select_related`
+declarado en el `Indice`, o un rebuild haría una consulta por norma.

@@ -50,81 +50,102 @@ MAXIMO_CARACTERES = 40_000
 #: se paga como tokens de entrada: un boletín entero del diario oficial no es lo que se quiere leer.
 MAXIMO_BYTES_PDF = 8 * 1024 * 1024
 
-ESQUEMA = {
-    "name": "norma",
-    "strict": True,
-    "schema": {
-        "type": "object",
-        "additionalProperties": False,
-        "required": ["titulo", "numero", "tipo", "ambito", "fecha", "resumen", "contenido",
-                     "palabras_clave", "estado_vigencia", "imagen_titulo"],
-        "properties": {
-            "titulo": {
-                "type": "string",
-                "description": (
-                    "Nombre oficial de la norma, máximo 300 caracteres. Cadena vacía si el "
-                    "documento no permite identificarla."
-                ),
-            },
-            "numero": {
-                "type": "string",
-                "description": (
-                    'Identificador corto, p. ej. "DS 048-2011-PCM", "Ley 29664", '
-                    '"Ordenanza Regional 123-2020-CR/GRC.CUSCO". Vacío si no aparece.'
-                ),
-            },
-            "tipo": {"type": "string", "enum": ["Ley", "DS", "RM", "RJ", "Ordenanza"]},
-            "ambito": {
-                "type": "string",
-                "enum": ["nacional", "regional", "local"],
-                "description": (
-                    "Nivel de gobierno de la entidad que la emite: Congreso, PCM o un ministerio "
-                    "son 'nacional'; un gobierno regional, 'regional'; una municipalidad, 'local'."
-                ),
-            },
-            "fecha": {
-                "type": "string",
-                "description": "Fecha de publicación oficial en formato AAAA-MM-DD.",
-            },
-            "resumen": {
-                "type": "string",
-                "description": (
-                    "Sumilla en prosa de qué dispone la norma y a quién obliga, máximo 700 "
-                    "caracteres. Sin copiar el articulado."
-                ),
-            },
-            "contenido": {
-                "type": "string",
-                "description": (
-                    "Análisis desarrollado en HTML simple: solo <p>, <h2>, <h3>, <ul>, <ol>, "
-                    "<li>, <strong>, <em> y <blockquote>. Organiza el contenido de la norma por "
-                    "temas —objeto, alcance, obligaciones, plazos— en vez de transcribir "
-                    "artículos. Sin <html>, <head>, <script> ni atributos de estilo."
-                ),
-            },
-            "palabras_clave": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": (
-                    "Entre 3 y 6 términos del dominio de GRD/ACC (p. ej. SINAGERD, EVAR, "
-                    "competencias municipales), máximo 60 caracteres cada uno."
-                ),
-            },
-            "estado_vigencia": {
-                "type": "string",
-                "enum": ["vigente", "derogada", "modificada", ""],
-                "description": (
-                    "Solo si el propio documento lo dice. Cadena vacía si no consta: es preferible "
-                    "no declarar la vigencia a declararla mal."
-                ),
-            },
-            "imagen_titulo": {
-                "type": "string",
-                "description": "Pie para la imagen de portada, con su crédito si aparece. Puede ir vacío.",
+
+def _esquema() -> dict:
+    """El esquema se arma al vuelo, porque el `enum` de entidades sale del catálogo vivo.
+
+    Escribir la lista a mano aquí obligaría a tocar el prompt cada vez que PREDES da de alta una
+    institución desde el admin, y las dos copias se desincronizarían el primer día. Es el mismo
+    mecanismo que usa `apps/medidas/redaccion.py` con los nueve peligros.
+    """
+    from apps.normativa.models import EntidadEmisora
+
+    entidades = list(EntidadEmisora.objects.values_list("slug", flat=True))
+
+    return {
+        "name": "norma",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["titulo", "numero", "tipo", "ambito", "entidad_emisora", "fecha", "resumen",
+                         "contenido", "palabras_clave", "estado_vigencia", "imagen_titulo"],
+            "properties": {
+                "titulo": {
+                    "type": "string",
+                    "description": (
+                        "Nombre oficial de la norma, máximo 300 caracteres. Cadena vacía si el "
+                        "documento no permite identificarla."
+                    ),
+                },
+                "numero": {
+                    "type": "string",
+                    "description": (
+                        'Identificador corto, p. ej. "DS 048-2011-PCM", "Ley 29664", '
+                        '"Ordenanza Regional 123-2020-CR/GRC.CUSCO". Vacío si no aparece.'
+                    ),
+                },
+                "tipo": {"type": "string", "enum": ["Ley", "DS", "RM", "RJ", "Ordenanza"]},
+                "ambito": {
+                    "type": "string",
+                    "enum": ["nacional", "regional", "local"],
+                    "description": (
+                        "Nivel de gobierno de la entidad que la emite: Congreso, PCM o un ministerio "
+                        "son 'nacional'; un gobierno regional, 'regional'; una municipalidad, 'local'."
+                    ),
+                },
+                "entidad_emisora": {
+                    "type": "string",
+                    "enum": [*entidades, ""],
+                    "description": (
+                        "Institución que dicta la norma, elegida de la lista. Cadena vacía si la "
+                        "que la emite no está en ella: no elijas la más parecida ni la del mismo "
+                        "nivel de gobierno."
+                    ),
+                },
+                "fecha": {
+                    "type": "string",
+                    "description": "Fecha de publicación oficial en formato AAAA-MM-DD.",
+                },
+                "resumen": {
+                    "type": "string",
+                    "description": (
+                        "Sumilla en prosa de qué dispone la norma y a quién obliga, máximo 700 "
+                        "caracteres. Sin copiar el articulado."
+                    ),
+                },
+                "contenido": {
+                    "type": "string",
+                    "description": (
+                        "Análisis desarrollado en HTML simple: solo <p>, <h2>, <h3>, <ul>, <ol>, "
+                        "<li>, <strong>, <em> y <blockquote>. Organiza el contenido de la norma por "
+                        "temas —objeto, alcance, obligaciones, plazos— en vez de transcribir "
+                        "artículos. Sin <html>, <head>, <script> ni atributos de estilo."
+                    ),
+                },
+                "palabras_clave": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Entre 3 y 6 términos del dominio de GRD/ACC (p. ej. SINAGERD, EVAR, "
+                        "competencias municipales), máximo 60 caracteres cada uno."
+                    ),
+                },
+                "estado_vigencia": {
+                    "type": "string",
+                    "enum": ["vigente", "derogada", "modificada", ""],
+                    "description": (
+                        "Solo si el propio documento lo dice. Cadena vacía si no consta: es preferible "
+                        "no declarar la vigencia a declararla mal."
+                    ),
+                },
+                "imagen_titulo": {
+                    "type": "string",
+                    "description": "Pie para la imagen de portada, con su crédito si aparece. Puede ir vacío.",
+                },
             },
         },
-    },
-}
+    }
 
 INSTRUCCIONES = (
     "Eres editor del Observatorio Kallpachakuy de PREDES, sobre gestión del riesgo de desastres y "
@@ -145,6 +166,7 @@ class Redaccion:
     numero: str
     tipo: str
     ambito: str
+    entidad_emisora: object | None
     fecha: date
     resumen: str
     contenido: str
@@ -179,7 +201,7 @@ def redactar(url: str, *, con_imagen: bool = True) -> Redaccion:
         # Extraer campos de un documento no mejora razonando y sí se paga. `None` no valdría: el
         # modelo por defecto razona salvo que se le diga que no.
         razonamiento=False,
-        response_format={"type": "json_schema", "json_schema": ESQUEMA},
+        response_format={"type": "json_schema", "json_schema": _esquema()},
         # `require_parameters` cierra el fallo intermitente del encabezado; `plugins` solo aparece
         # en la rama PDF, y lo resuelve OpenRouter antes de elegir proveedor.
         extra_body={"provider": {"require_parameters": True}, **extra_plugins},
@@ -284,6 +306,7 @@ def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
         # vacíos, que es lo que el modelo permite y lo que hace que el editor lo vea y lo elija.
         tipo=tipo if tipo in tipos else "",
         ambito=ambito if ambito in ambitos else "",
+        entidad_emisora=_resolver_entidad(datos.get("entidad_emisora"), avisos),
         fecha=_a_fecha(datos.get("fecha")),
         resumen=str(datos.get("resumen") or "").strip()[:700],
         contenido=salida_ia.a_html(str(datos.get("contenido") or "").strip(), avisos),
@@ -294,6 +317,28 @@ def _normalizar(datos: dict, *, modelo: str, costo: float | None) -> Redaccion:
         costo=costo,
         avisos=avisos,
     )
+
+
+def _resolver_entidad(slug, avisos: list[str]):
+    """La entidad se elige del catálogo o se deja vacía; nunca se crea desde aquí.
+
+    El `enum` del esquema ya la restringe, pero la salida estructurada falla de vez en cuando y un
+    slug inventado reventaría al guardar **dentro del worker**, donde el editor no lo ve. Crear la
+    entidad que falta tampoco vale: acabaría con «MINAM» y «Ministerio del Ambiente» como dos filas
+    distintas, que es justo lo que un catálogo existe para evitar.
+    """
+    from apps.normativa.models import EntidadEmisora
+
+    slug = str(slug or "").strip()
+    if not slug:
+        return None
+    entidad = EntidadEmisora.objects.filter(slug=slug).first()
+    if entidad is None:
+        avisos.append(
+            f"«{slug}» no está en el catálogo de entidades emisoras: elígela a mano, o créala "
+            f"desde «Normativa - Entidades emisoras»."
+        )
+    return entidad
 
 
 def _a_fecha(valor) -> date:

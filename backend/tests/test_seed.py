@@ -82,6 +82,50 @@ def test_el_seed_no_pisa_los_textos_que_edito_predes(db):
     assert "no se toca" in bloque.cuerpo
 
 
+def test_el_catalogo_de_entidades_NO_pisa_lo_que_renombro_predes(db):
+    """Es dato editable, no código: `sembrar` sin `actualizar=True`.
+
+    PREDES renombra una entidad cuando el Estado la reorganiza —MINAGRI pasó a MIDAGRI—, y una
+    recarga de datos no puede devolverle el nombre viejo.
+    """
+    from apps.normativa.models import EntidadEmisora
+
+    _seed("--solo-catalogos")
+    EntidadEmisora.objects.filter(slug="midagri").update(nombre="Ministerio de Agricultura")
+
+    _seed("--solo-catalogos")
+
+    assert EntidadEmisora.objects.get(slug="midagri").nombre == "Ministerio de Agricultura"
+
+
+def test_borrar_una_entidad_en_uso_no_vacia_las_normas_en_silencio(db):
+    """La FK es PROTECT aunque el campo sea opcional.
+
+    Con `SET_NULL`, borrar una entidad desde su pantalla de mantenimiento vaciaría la atribución
+    de todas sus normas sin que nada lo dijera. Así el admin se planta.
+    """
+    import datetime
+
+    from django.db.models import ProtectedError
+
+    from apps.normativa.models import EntidadEmisora, Norma
+
+    _seed("--solo-catalogos")
+    entidad = EntidadEmisora.objects.get(slug="pcm")
+    Norma.objects.create(
+        slug="ds-de-prueba",
+        titulo="Norma que cita a la entidad",
+        tipo=Norma.Tipo.DS,
+        ambito=Norma.Ambito.NACIONAL,
+        entidad_emisora=entidad,
+        fecha=datetime.date(2024, 1, 1),
+        resumen="Existe solo para sujetar la FK.",
+    )
+
+    with pytest.raises(ProtectedError):
+        entidad.delete()
+
+
 def test_el_catalogo_de_peligros_si_se_actualiza(db):
     """Excepción deliberada: el catálogo es código, no contenido editable.
 

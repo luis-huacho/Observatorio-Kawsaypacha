@@ -247,10 +247,13 @@ class MedidaFilter(TemaFilterMixin):
 
 class NormaFilter(TemaFilterMixin):
     anio = django_filters.NumberFilter(field_name="fecha__year")
+    # Por slug y no por pk, como en `VideoFilter`: la URL de un filtro se comparte y se guarda,
+    # y un id autoincremental no sobrevive a una recarga de la base.
+    entidad = django_filters.CharFilter(field_name="entidad_emisora__slug")
 
     class Meta:
         model = Norma
-        fields = ["tipo", "ambito", "anio", "tema"]
+        fields = ["tipo", "ambito", "entidad", "anio", "tema"]
 
 
 class NoticiaFilter(TemaFilterMixin):
