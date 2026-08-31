@@ -347,6 +347,32 @@ def test_el_reporte_llama_en_curso_solo_a_lo_que_lo_esta(api, inversion_publicad
     assert "junio de 2025" in html
 
 
+def test_el_reporte_dice_una_sola_vez_donde_esta_el_dinero_que_no_pinta(api, inversion_publicada):
+    """«Sí cuenta en el total del ámbito y en la tabla» estaba escrito a mano en la plantilla.
+
+    Desde que entra en el `motivo` que redacta el backend —que es lo que pide ADR-D6 y lo que
+    hace que la pantalla lo diga también—, dejarlo además en el HTML lo imprimiría dos veces. Es
+    la misma corrección de las cuatro declaraciones: una frase, un sitio.
+    """
+    from django.template.loader import render_to_string
+
+    from apps.informes import reporte_inversion
+
+    contexto = reporte_inversion.reunir_datos(anio=2026, nivel="distrital")
+    html = render_to_string("informes/reporte_inversion.html", contexto)
+
+    assert html.count("en la tabla") == 1
+    assert "Sí están contados" not in html
+
+    # Y el pie de los polígonos en blanco tampoco está, por lo mismo que en la pantalla: la
+    # leyenda del reporte **sí** trae su cuadro «sin municipalidad (N)» —lo añade la plantilla
+    # después del bucle de tramos, no `_leyenda()`—, así que la frase solo lo repetía. El dato
+    # sigue en el payload por si un cliente dibuja este mapa sin nuestra leyenda.
+    assert contexto["mapa"]["poligonos"]["motivo"] not in html
+    # (Que la leyenda del PDF sí trae ese cuadro no se comprueba aquí: la leyenda vive dentro del
+    # `{% if mapa_png %}`, y este render va sin captura para no lanzar un Chromium por prueba.)
+
+
 def test_sin_ejercicio_publicado_el_reporte_explica_el_vacio_y_no_es_404(
     api, inversion_publicada, sin_throttling
 ):
