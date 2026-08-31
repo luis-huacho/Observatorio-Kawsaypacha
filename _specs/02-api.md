@@ -275,6 +275,11 @@ Con datos:
   "procesos": [ { "slug": "prevencion_reduccion", "nombre": "Prevención y reducción",
                   "color": "#009257", "pim": 28909461, "devengado": 0, "pct": 0.53 } ],
   "sin_clasificar": { "pim": 0, "devengado": 0, "pct": 0 },
+  "proyectos": { "pim": 22217511, "con_proyectos": 24, "de": 116,
+                 "entidades": [ { "codigo": "301027", "entidad": "MUNICIPALIDAD DISTRITAL DE PICHARI",
+                                  "ambito": "distrital", "provincia": "LA CONVENCION",
+                                  "pim": 9327510, "pim_proyectos": 6455719,
+                                  "pct_proyectos": 0.692 } ] },
   "tendencia": [ { "anio": 2022, "corte": "anual", "corte_legible": "", "es_parcial": false,
                    "en_curso": false, "fuente": "…",
                    "pia": 18060834, "pim": 48813109, "devengado": 37260987 } ],
@@ -316,6 +321,22 @@ Con datos:
                      "pia": 0, "pim": 6150969, "devengado": 6150968, "pct_ejecucion": 1.0 } ],
   "ejercicios": [ … ] }
 ```
+
+> **`proyectos` desglosa lo que `agregados.pim_proyectos` solo cuenta.** Un «40 % en proyectos
+> de inversión» se lee como si las municipalidades estuvieran haciendo obra por toda la región,
+> y no es eso: en 2026 **24 de las 116** tienen presupuesto en obra y cinco concentran el 81 %.
+> `de` es el total de entidades del ámbito —sin él, «24» no dice nada—, y solo entran las que
+> tienen PIM de proyectos **> 0**: una fila en cero las haría contar como si tuvieran obra. La
+> lista **va entera y no recortada a un top N**, porque son 24 en la región y 9 en la provincia
+> más cargada, y un «y otras N» no lo podría comprobar nadie. El orden es total (importe
+> descendente, código de desempate) para que no baile entre peticiones. Hay una prueba que fija
+> que la suma del desglose es exactamente `agregados.pim_proyectos`: un desglose al que le falta
+> dinero se ve idéntico a uno correcto.
+>
+> **No está en `ORDENES` de la tabla paginada, y es a propósito.** `pim_proyectos` se calcula en
+> Python después de paginar; ordenar por él exigiría anotarlo en SQL con una subconsulta sobre
+> `PresupuestoActividad`. Con 24 filas como mucho, el desglose viaja completo en el tablero.
+
 
 La `serie` **omite los ejercicios sin presupuesto** en vez de rellenarlos con ceros: no participar del programa un año no es participar con cero soles. Las `actividades` no se paginan —3 de media por entidad y ejercicio, 50 en el máximo real—, con el mismo criterio por el que no se paginan los 112 distritos.
 

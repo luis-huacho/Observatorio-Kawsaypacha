@@ -40,9 +40,9 @@ async function abrir(page: Page, ruta: string, api: RegExp = API_TABLERO) {
 /**
  * La tabla de municipalidades, acotada a su sección.
  *
- * Desde que el cuadro de evolución existe hay dos `<table>` en la página, y un `table tbody tr`
- * suelto empezaría a leer las cifras por año como si fueran filas del ranking — sin dar ningún
- * error, porque también son números.
+ * Ya son tres las `<table>` de la página —el ranking, el cuadro de evolución y el desglose de
+ * proyectos—, y un `table tbody tr` suelto empezaría a leer unas por otras sin dar ningún
+ * error, porque todas llevan números.
  */
 function tablaDeMunicipalidades(page: Page) {
   return page
@@ -151,7 +151,9 @@ test.describe("Inversión (PP 0068)", () => {
     const cuerpo = await abrir(page, "/inversion?anio=2026");
     test.skip(!cuerpo.disponible || cuerpo.anio !== 2026, "el entorno no publica 2026");
 
-    const primera = page.locator("table tbody tr td:first-child a").first();
+    // Acotado a su tabla: `table tbody tr` suelto ahora cae en el desglose de proyectos, que
+    // va antes en el DOM. Para eso existe el helper.
+    const primera = tablaDeMunicipalidades(page).locator("tbody tr td:first-child a").first();
     const nombre = (await primera.textContent())!.trim();
     await primera.click();
 
@@ -174,6 +176,48 @@ test.describe("Inversión (PP 0068)", () => {
     await expect(cuadro.getByText("PIA", { exact: true }).first()).toBeVisible();
     if (cuerpo.tendencia.some((t: { es_parcial: boolean }) => t.es_parcial)) {
       await expect(cuadro.getByText(/^\* Ejercicio en curso o con corte parcial/)).toBeVisible();
+    }
+  });
+
+  test("cada gráfico declara en palabras lo que enseña", async ({ page }) => {
+    const cuerpo = await abrir(page, "/inversion");
+    test.skip(!cuerpo.disponible, "sin ejercicio publicado");
+
+    // Un gráfico se deja leer pero no concluye. Estas frases son lo que un periodista copia, y
+    // sin una prueba se pierden en el siguiente retoque de maquetación sin que nada falle.
+    const declaraciones = page.locator("p.border-l-2");
+    expect(await declaraciones.count()).toBeGreaterThanOrEqual(4);
+
+    await expect(page.getByText(/entre lo aprobado al abrir el año y lo vigente hoy/i)).toBeVisible();
+    await expect(page.getByText(/concentra .* del presupuesto vigente/i).first()).toBeVisible();
+
+    if (cuerpo.tendencia.filter((t: { es_parcial: boolean }) => !t.es_parcial).length >= 2) {
+      // Compara los dos últimos COMPLETOS. Comparar contra el corte a mitad de año daría una
+      // caída del devengado que no mide una caída: mide medio año contra un año entero.
+      await expect(page.getByText(/los dos últimos ejercicios completos/i)).toBeVisible();
+    }
+  });
+
+  test("el desglose de proyectos dice de quién es el dinero", async ({ page }) => {
+    const cuerpo = await abrir(page, "/inversion");
+    test.skip(!cuerpo.disponible, "sin ejercicio publicado");
+
+    const seccion = page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: /Proyectos de inversión frente a/i }) });
+
+    const { con_proyectos: con, de, entidades } = cuerpo.proyectos;
+    await expect(page.getByText(new RegExp(`${con} de las ${de} municipalidades`, "i"))).toBeVisible();
+    // El ámbito es municipal y el porcentaje en obra se atribuye al Gobierno Regional si no se
+    // dice. Es la lectura equivocada que este bloque existe para corregir.
+    await expect(seccion.getByText(/El Gobierno Regional no entra en este ámbito/i)).toBeVisible();
+
+    if (con > 0) {
+      await expect(seccion.locator("tbody tr")).toHaveCount(con);
+      // Ordenado por importe: la primera fila es la que más obra tiene, que es la que se busca.
+      await expect(seccion.locator("tbody tr").first()).toContainText(entidades[0].entidad);
+    } else {
+      await expect(seccion.locator("table")).toHaveCount(0);
     }
   });
 

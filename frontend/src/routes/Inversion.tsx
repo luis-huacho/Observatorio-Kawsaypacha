@@ -10,6 +10,7 @@ import { registrar, registrarExport } from "@/lib/metricas";
 import { useBloque } from "@/lib/sitio";
 import type {
   CapaMapa,
+  Inversion,
   InversionEntidad,
   InversionMapaResponse,
   InversionResponse,
@@ -18,6 +19,10 @@ import type {
 import { formatNumber, formatPct, formatSoles } from "@/lib/semaforo";
 import {
   PIE_EJERCICIO_PARCIAL,
+  declaracionEjecucion,
+  declaracionProcesos,
+  declaracionProyectos,
+  declaracionTendencia,
   estadoEjercicio,
   etiquetaEjercicio,
   mesDelCorte,
@@ -357,8 +362,7 @@ export default function InversionView() {
                   ¿Se ejecuta lo proyectado? — {d.anio}
                 </h2>
                 <p className="text-xs text-ink-600 mb-4">
-                  De lo aprobado al abrir el año (PIA) a lo gastado. La variación PIA-PIM del
-                  ámbito es de {formatSoles(a.variacion_pia_pim)}.
+                  De lo aprobado al abrir el año (PIA) a lo gastado.
                 </p>
                 <div className="h-64">
                   <ResponsiveContainer>
@@ -374,6 +378,14 @@ export default function InversionView() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+                <Declaracion>
+                  {declaracionEjecucion(
+                    a,
+                    d.es_parcial ? mesDelCorte(d) : "",
+                    formatSoles,
+                    formatPct,
+                  )}
+                </Declaracion>
               </div>
 
               <div className="card p-5">
@@ -385,11 +397,6 @@ export default function InversionView() {
                   nivel de producto, «Acciones comunes» y los proyectos se llevan tres cuartas
                   partes y el gráfico no dice nada.
                 </p>
-                <ProyectosVsActividades
-                  proyectos={a.pim_proyectos}
-                  actividades={a.pim_actividades}
-                  pct={a.pct_proyectos}
-                />
                 <div className="h-64">
                   <ResponsiveContainer>
                     <BarChart data={procesos} layout="vertical" margin={{ left: 8 }}>
@@ -409,7 +416,32 @@ export default function InversionView() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+                <Declaracion>
+                  {declaracionProcesos(d.procesos, d.sin_clasificar, formatSoles, formatPct)}
+                </Declaracion>
               </div>
+            </section>
+
+            {/* Los proyectos tenían media tarjeta prestada de «¿En qué se invierte?», y su barra
+                sola decía «el 40 % va a obra» sin decir de quién. Ese porcentaje se lee como si
+                todas las municipalidades hicieran obra, y casi ninguna la hace: en la región son
+                24 de 116. El cuadro es la respuesta a «este monto parece alto». */}
+            <section className="card p-5 mt-6">
+              <h2 className="font-display font-semibold text-mountain-900 mb-2">
+                Proyectos de inversión frente a actividades — {d.anio}
+              </h2>
+              <p className="text-xs text-ink-600 mb-3">
+                Un proyecto es una obra —defensas ribereñas, muros de contención—; una actividad
+                es gasto recurrente. Los dos son gestión del riesgo, pero no se ejecutan igual ni
+                los tiene el mismo número de municipalidades.
+              </p>
+              <ProyectosVsActividades
+                proyectos={a.pim_proyectos}
+                actividades={a.pim_actividades}
+                pct={a.pct_proyectos}
+              />
+              <Declaracion>{declaracionProyectos(d.proyectos, formatSoles, formatPct)}</Declaracion>
+              <TablaProyectos proyectos={d.proyectos} params={params} />
             </section>
 
             <section className="card p-5 mt-6">
@@ -451,6 +483,7 @@ export default function InversionView() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+              <Declaracion>{declaracionTendencia(d.tendencia, formatSoles, formatPct)}</Declaracion>
 
               <div className="overflow-x-auto mt-5">
                 <table className="w-full text-sm min-w-[44rem]">
@@ -658,6 +691,72 @@ export default function InversionView() {
  * porcentaje sin forma no deja ver que en algunos ámbitos la obra pública se come casi todo el
  * programa mientras la gestión corriente se queda sin nada.
  */
+/**
+ * La frase que dice lo que el gráfico de encima enseña.
+ *
+ * Mismo registro que las `.declaracion` del PDF —filete a la izquierda, texto pequeño y gris—
+ * porque es el mismo tipo de afirmación. **Sin verde ni rojo a propósito**: `Delta` colorea
+ * porque compara dos ejercicios que alguien eligió; aquí más presupuesto no es de suyo una
+ * buena noticia, y pintarlo de verde sería opinar por el lector.
+ *
+ * Devuelve `null` con contenido vacío, para que un ámbito sin datos no deje un filete huérfano.
+ */
+function Declaracion({ children }: { children: string | null }) {
+  if (!children) return null;
+  return (
+    <p className="mt-4 border-l-2 border-earth-500 pl-3 text-xs leading-relaxed text-ink-600">
+      {children}
+    </p>
+  );
+}
+
+/**
+ * Quién tiene los proyectos de inversión.
+ *
+ * Van todas las que tienen, sin recortar a un top N: son 24 en la región entera y 9 en la
+ * provincia más cargada, y un «y otras N» no lo podría comprobar nadie. La columna «% de su
+ * PIM» es la que distingue a quien hace una obra y poco más de quien reparte en actividades.
+ */
+function TablaProyectos({
+  proyectos,
+  params,
+}: {
+  proyectos: Inversion["proyectos"];
+  params: URLSearchParams;
+}) {
+  if (!proyectos.entidades.length) return null;
+  return (
+    <div className="overflow-x-auto mt-4">
+      <table className="w-full text-sm min-w-[32rem]">
+        <thead className="text-xs uppercase text-ink-600">
+          <tr>
+            <th className="text-left py-2">Municipalidad</th>
+            <th className="text-left py-2 hidden sm:table-cell">Provincia</th>
+            <th className="text-right py-2">PIM en proyectos</th>
+            <th className="text-right py-2">% de su PIM</th>
+          </tr>
+        </thead>
+        <tbody>
+          {proyectos.entidades.map((e) => (
+            <tr key={e.codigo} className="border-t border-sand-200">
+              <td className="py-2">
+                <Link to={`/inversion/${e.codigo}?${params.toString()}`} className="hover:underline">
+                  {e.entidad}
+                </Link>
+              </td>
+              <td className="py-2 hidden sm:table-cell text-ink-600">{e.provincia || "—"}</td>
+              <td className="py-2 text-right tabular-nums">{formatSoles(e.pim_proyectos)}</td>
+              <td className="py-2 text-right tabular-nums">
+                {e.pct_proyectos === null ? "—" : formatPct(e.pct_proyectos)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ProyectosVsActividades({
   proyectos,
   actividades,

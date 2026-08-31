@@ -101,6 +101,9 @@ class InversionView(APIView):
             "unidad": "municipalidad (entidad ejecutora), no distrito",
             "agregados": consultas.agregados(ejercicio, ambito, provincia),
             **consultas.procesos(ejercicio, ambito, provincia),
+            # El desglose de quién tiene los proyectos viaja con el agregado que lo necesita:
+            # `agregados.pim_proyectos` solo se entiende sabiendo en cuántas manos está.
+            "proyectos": consultas.proyectos_por_entidad(ejercicio, ambito, provincia),
             "tendencia": consultas.tendencia(ambito, provincia),
             "ejercicios": [
                 consultas.datos_ejercicio(e)

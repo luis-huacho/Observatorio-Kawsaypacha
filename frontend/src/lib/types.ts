@@ -271,6 +271,18 @@ export type InversionPuntoTendencia = InversionEjercicio & {
   devengado: number;
 };
 
+/** Una municipalidad con presupuesto en obra, en el desglose de «Proyectos de inversión». */
+export type InversionEntidadProyectos = {
+  codigo: string;
+  entidad: string;
+  ambito: string;
+  provincia: string;
+  pim: number;
+  pim_proyectos: number;
+  /** Cuánto del PIM del 0068 de ESA municipalidad es obra. */
+  pct_proyectos: number | null;
+};
+
 export type Inversion = InversionEjercicio & {
   fuente: string;
   ambito: string;
@@ -298,6 +310,17 @@ export type Inversion = InversionEjercicio & {
   procesos: InversionProceso[];
   /** Lo que el catálogo aún no imputa a ningún proceso. No se reparte ni se esconde. */
   sin_clasificar: { pim: number; devengado: number; pct: number | null };
+  /**
+   * Quién tiene el PIM de proyectos. `agregados.pim_proyectos` solo dice cuánto; sin saber en
+   * cuántas manos está, un 40 % se lee como si todas hicieran obra, y casi ninguna la hace.
+   * `de` es el total de entidades del ámbito: es lo que da sentido a «24 de 116».
+   */
+  proyectos: {
+    pim: number;
+    con_proyectos: number;
+    de: number;
+    entidades: InversionEntidadProyectos[];
+  };
   tendencia: InversionPuntoTendencia[];
   ejercicios: InversionEjercicio[];
   /** Solo con `comparar_con`: los agregados del otro ejercicio y sus deltas. */
