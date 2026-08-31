@@ -289,34 +289,36 @@ export default function InversionView() {
             </select>
           </label>
 
-          {/* Qué se está viendo, no solo con qué unidad. Sin filtros la página servía el
-              ejercicio más reciente y toda la región sin decirlo en ninguna parte: el
-              encabezado ponía «ejercicio 2026» y nadie declaraba que era un valor por defecto
-              ni cuál era el ámbito territorial. La tabla de cabecera del PDF ya lo hacía. */}
+          {/* Qué se está viendo. Sin filtros la página servía el ejercicio más reciente y toda
+              la región sin decirlo en ninguna parte: el encabezado ponía «ejercicio 2026» y
+              nadie declaraba que era un valor por defecto ni cuál era el ámbito territorial.
+              La tabla de cabecera del PDF ya lo hacía.
+
+              Aquí estuvo también la unidad («la municipalidad, no el distrito») y el recuento
+              de cuántas tienen presupuesto del 0068. Se quitaron para que entre el filtro y la
+              primera cifra no haya un párrafo que leer: la unidad la siguen diciendo el
+              encabezado «Municipalidades», la columna de la tabla y la leyenda del mapa, y el
+              PDF la deja escrita entera. */}
           <p className="text-xs text-ink-600 max-w-md">
-            Viendo <strong>{ambitoTexto}</strong> ({a.entidades_con_presupuesto} de{" "}
-            {a.entidades_en_ambito} con presupuesto del 0068), ejercicio {d.anio}
-            {d.es_parcial ? ` al corte de ${mesDelCorte(d)}` : ""}. Unidad: la municipalidad
-            (entidad ejecutora), no el distrito. Fuente: {d.fuente}.
+            Viendo <strong>{ambitoTexto}</strong>, ejercicio {d.anio}
+            {d.es_parcial ? ` al corte de ${mesDelCorte(d)}` : ""}. Fuente: {d.fuente}.
           </p>
         </section>
 
-        {/* El corte parcial se avisa donde se leen las cifras, no en una nota al pie: el % de
-            ejecución de medio año se calcula contra un PIM anual.
+        {/* El corte parcial se avisa donde se leen las cifras, y NOMBRA el ejercicio: dice qué
+            es, no con qué no se compara. La versión anterior solo advertía, y obligaba a saber
+            qué es un «ejercicio cerrado» para deducir por descarte que 2026 es el año corriente.
 
-            Y abre diciendo QUÉ ES el ejercicio, no con qué no se compara. Antes solo estaba la
-            advertencia, que obliga a saber qué es un «ejercicio cerrado» para deducir por
-            descarte que 2026 es el año corriente. El PDF ya lo decía bien. */}
+            La banda solo identifica; la explicación de por qué un % de medio año no es media
+            ejecución perdida vive al pie del cuadro de tendencia (`PIE_EJERCICIO_PARCIAL`),
+            que es donde están los porcentajes que se comparan entre sí, y en el PDF. Estuvo
+            también aquí y eran cuatro líneas de aviso antes del primer número. */}
         {d.es_parcial && (
           <p className="mb-6 rounded-lg border border-level-2/40 bg-level-2/10 px-4 py-3 text-sm text-yellow-900">
             <strong>
               Ejercicio {d.anio}, {estadoEjercicio(d)}
             </strong>
-            {d.corte_legible ? ` — datos al corte de ${d.corte_legible}.` : "."} El devengado no
-            cubre el año completo, pero el porcentaje de ejecución se calcula contra el PIM de
-            todo el año: {a.pct_ejecucion === null ? "un 47 %" : `un ${formatPct(a.pct_ejecucion)}`}{" "}
-            a mitad de año no es media ejecución perdida, y no se puede comparar con el de un año
-            completo.
+            {d.corte_legible ? ` — corte a ${d.corte_legible}.` : "."}
           </p>
         )}
 
@@ -418,7 +420,7 @@ export default function InversionView() {
                 PIA, PIM y devengado en millones de soles. Las tres juntas cuentan el ciclo
                 completo: lo aprobado al abrir el año, lo que quedó tras las modificaciones y lo
                 que se llegó a gastar. La serie combina el comparativo del MEF con la base
-                entregada por PREDES, y los ejercicios con corte parcial van con asterisco.
+                desarrollada por PREDES, y los ejercicios con corte parcial van con asterisco.
               </p>
               <div className="h-64">
                 <ResponsiveContainer>

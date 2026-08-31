@@ -67,6 +67,60 @@ workers — se destraba solo a los 25 s con los PDF sin mapa, pero no está repr
 
 Sin ADR: no cambia ninguna decisión. Suite: **481 + 7** y **73 casos e2e** (146 corridas), en verde.
 
+### Actualización 31/08/2026 — el contexto de `/inversion` se identificaba dos veces y se explicaba tres
+
+La entrada de abajo, de ayer, arregló que el aviso del ejercicio parcial **nombrara** el
+ejercicio en vez de solo advertir de él. Al verlo en pantalla apareció el problema siguiente:
+entre el selector de filtros y la primera cifra había **sesenta palabras** de contexto, en dos
+párrafos, y ninguna era un número.
+
+Se recorta cada uno a lo que identifica lo que se está mirando:
+
+- «Viendo todas las municipalidades de la región Cusco **(115 de 116 con presupuesto del
+  0068)**, ejercicio 2026 al corte de junio. **Unidad: la municipalidad (entidad ejecutora), no
+  el distrito.** Fuente: …» → se van el recuento y la unidad.
+- «Ejercicio 2026, año fiscal en curso — **datos al corte de** junio de 2026. **El devengado no
+  cubre el año completo, pero el porcentaje de ejecución se calcula contra el PIM de todo el
+  año: un 47.7 % a mitad de año no es media ejecución perdida, y no se puede comparar con el de
+  un año completo.**» → queda «— corte a junio de 2026».
+
+**El argumento no es que sobrara, es que ya estaba dicho más abajo.** La explicación del corte
+parcial es literalmente `PIE_EJERCICIO_PARCIAL` («el devengado no cubre el año completo, así que
+su % de ejecución no se compara con el de un año ya terminado»), que se pinta al pie del cuadro
+de tendencia **de esta misma página** y de la ficha de municipalidad — y ahí está mejor puesta,
+porque es donde hay porcentajes de varios ejercicios uno debajo de otro, que es cuando la
+comparación se hace de verdad. La unidad la siguen diciendo el encabezado «Municipalidades», la
+columna de la tabla y la leyenda «sin municipalidad» del mapa.
+
+**Lo que esto invierte, y a sabiendas**: el spec 06 decía «el corte parcial se avisa **junto a
+las cifras**, no al pie». Ahora se identifica junto a las cifras y se explica al pie. Queda
+reescrito así, no borrado, porque la regla vieja seguía siendo buena para el sitio donde nació:
+**el PDF no cambia** y conserva la explicación entera y arriba, por la razón que ya llevaba
+escrita en su plantilla —«un documento en papel viaja sin su pantalla»—. Las tres mitigaciones
+de ADR-D5 son otros elementos (el asterisco del Δ, su leyenda pegada a la tabla y la columna
+«Comparabilidad» del Excel) y no se tocan.
+
+**Ninguna prueba cambió, y eso se comprobó antes de recortar, no después.** Las tres aserciones
+e2e que rozan la banda miran el `<strong>` («Ejercicio 2026, año fiscal en curso»), que
+`corte_legible` esté visible, y que la palabra «cerrado» siga sin aparecer: las tres se
+cumplen. Ojo con la segunda —`corte_legible` completo («junio de 2026») se pinta **en un solo
+punto del tablero**, esta banda—: acortarla a «corte a junio» rompería `e2e/inversion.spec.ts`
+sin tocar nada más.
+
+**De paso, la fuente pasa a llamarse «Base PP 0068 desarrollada por PREDES»** (era «entregada»):
+la base la construyó PREDES, no se la entregó un tercero. Vive en el label de
+`Ejercicio.Fuente.CLIENTE`, así que el cambio es de una línea y **emite migración**
+(`inversion.0002`, `AlterField` de metadatos: Django serializa los `choices` y hay dos pruebas
+que corren `makemigrations --check`). Con el label cambian solos la pantalla, la columna
+«Fuente» de la tendencia, la cabecera del PDF y el Excel de export; las **dos frases en prosa**
+que repetían el literal a mano —el pie de fuentes del PDF y el texto de la tendencia— hubo que
+igualarlas aparte, que es justo el precio de escribir a mano lo que ya sirve el modelo.
+
+**Deuda que queda declarada**: la banda gemela de la ficha de municipalidad
+(`InversionDetalle.tsx`) sigue diciendo «— datos al corte de … El devengado no cubre el año
+completo», así que las dos pantallas usan ahora fórmulas distintas para el mismo aviso.
+`lib/inversion.ts` existe precisamente para que no pase; alinearlas es un encargo aparte.
+
 ### Actualización 30/08/2026 — `/inversion` decía qué NO era el dato y nunca qué era
 
 La ventana del PP 0068 abría con una sola frase sobre el ejercicio que estaba mostrando: «**Corte a
