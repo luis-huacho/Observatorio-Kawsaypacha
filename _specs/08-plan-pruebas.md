@@ -383,7 +383,7 @@ Y dos cosas que las pruebas mismas enseñaron: que las dos muestras de Excel tie
 
 ## Criterio de "listo para entregar"
 
-- `pytest` completo (incluido `-m lento`) en verde: 569 + 7 pruebas.
+- `pytest` completo (incluido `-m lento`) en verde: 575 + 7 pruebas.
 - `npm run lint && npm run build` sin errores.
 - `npx playwright test` en verde **dos veces**: contra el dev server y contra el bundle servido por nginx (`E2E_URL=http://localhost`). La segunda es la que vale.
 - Las cinco comprobaciones manuales hechas y documentadas.

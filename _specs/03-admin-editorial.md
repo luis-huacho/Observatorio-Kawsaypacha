@@ -191,9 +191,12 @@ ficha es uno solo para los dos, y depende de que el estado y el candado se llame
   en un `clean()`: `estado` está excluido del formulario y publicar no pasa por ninguno. Su
   hermano `avisos_al_publicar()` es lo que no impide publicar pero hay que mirar una vez.
 - **Los `enum` del esquema se construyen desde los catálogos vivos**, no escritos a mano: los nueve
-  slugs salen de `peligros.catalogo`, las dos taxonomías de `Medida` y **las entidades emisoras de
-  `Norma`, que PREDES da de alta desde el admin**. Añadir un peligro —o una entidad— no puede dejar
-  el esquema atrás, y el síntoma sería una clasificación vacía sin explicación.
+  slugs salen de `peligros.catalogo`, las dos taxonomías de `Medida`, **las entidades emisoras de
+  `Norma`** —que PREDES da de alta desde el admin— y, desde el 31/08/2026, el `tipo` de `Noticia`,
+  que era el último que seguía escrito a mano. Añadir un peligro, una entidad o un tipo no puede
+  dejar el esquema atrás, y el síntoma sería una clasificación vacía sin explicación. En noticias
+  era peor y más callado: `_normalizar` ya validaba contra `Noticia.Tipo`, así que una opción nueva
+  quedaba disponible para el editor y **la IA no podía proponerla nunca**.
 - **La IA elige entidad emisora del catálogo, nunca la crea.** Una que no reconozca se deja vacía y
   se dice en el `log_ia`, igual que un `tipo` o un `ambito` fuera de catálogo. Crear la que falta
   llenaría la taxonomía de variantes del mismo nombre —«MINAM» y «Ministerio del Ambiente» como dos

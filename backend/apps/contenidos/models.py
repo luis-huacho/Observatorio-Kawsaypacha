@@ -20,6 +20,8 @@ class Noticia(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, ImagenOptimizadaMi
         NOTICIA = "noticia", "Noticia"
         ARTICULO = "articulo", "Artículo"
         OPINION = "opinion", "Opinión"
+        PUBLICACION = "publicacion", "Publicación"
+        BASE_DATOS = "base_datos", "Base de datos"
 
     slug = models.SlugField(max_length=120, unique=True)
     titulo = models.CharField(max_length=250)
@@ -27,7 +29,9 @@ class Noticia(TimeStampedMixin, WorkflowMixin, HtmlRicoMixin, ImagenOptimizadaMi
     cuerpo = models.TextField(
         blank=True, help_text="HTML de CKEditor 5. Se sanea al guardar (ADR-D2)."
     )
-    tipo = models.CharField(max_length=10, choices=Tipo.choices, default=Tipo.NOTICIA)
+    # El valor crudo **es el nombre de la ilustración por defecto** (`/img/default/<tipo>.svg`),
+    # así que añadir una opción es también añadir un archivo — lo vigila `imagenes.clave_noticia`.
+    tipo = models.CharField(max_length=20, choices=Tipo.choices, default=Tipo.NOTICIA)
     autor = models.CharField(max_length=150, blank=True)
     fecha = models.DateField(db_index=True)
     imagen_portada = models.ImageField(

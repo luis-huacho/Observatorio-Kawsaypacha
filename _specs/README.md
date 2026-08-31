@@ -13,6 +13,41 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 31/08/2026 — dos tipos más de noticia, y el valor crudo era el nombre de un archivo
+
+PREDES necesitaba **«Publicación»** y **«Base de datos»** en el desplegable «Tipo» del formulario de
+noticias: es lo que el observatorio publica además de piezas editoriales —un informe, un conjunto de
+datos liberado—. Son dos líneas en un `TextChoices`, y detrás había tres cosas que fallan sin dar
+ningún error.
+
+- **El valor crudo del tipo ES el nombre de la ilustración por defecto** (`/img/default/<tipo>.svg`,
+  vía `serializers._clave_portada` → `imagenes.portada`). Un tipo sin su SVG dejaba **toda noticia
+  sin portada propia con la imagen rota**. Se cierra con `imagenes.clave_noticia()`, que repliega a
+  `noticia.svg` —calcado de `clave_medida`, que ya resolvía lo mismo para los peligros— y con los dos
+  dibujos nuevos, en el lenguaje visual de la casa.
+- **La red de esa red tuvo que rehacerse a mitad de camino.** El caso e2e comprobaba que ninguna
+  petición a `/img/default/` respondiera 4xx, y **daba verde siempre**: el `try_files $uri
+  /index.html` de la SPA —y el dev server de Vite— responden **200 con `text/html`** a un archivo que
+  no existe (es el mismo mecanismo que fundó ADR-A26). Ahora se mide con `naturalWidth`: un HTML
+  servido donde iba una imagen no decodifica. Comprobado escondiendo `publicacion.svg` y viendo la
+  prueba caer, que es la única forma de saber que una prueba prueba algo.
+- **El `enum` de `tipo` que se le manda a la IA estaba escrito a mano**, aparte de los `choices`.
+  `_normalizar` sí validaba contra `Noticia.Tipo`, así que los dos tipos nuevos habrían quedado
+  disponibles para el editor y **la IA no habría podido proponerlos nunca**, sin que fallara nada.
+  `ESQUEMA` pasa a `_esquema()` y el `enum` sale de los choices, como en medidas y normativa; el
+  spec 03 afirmaba esto de todos los esquemas y para noticias era falso.
+- **`max_length=10` y `publicacion` son 11 caracteres.** La migración amplía la columna a 20 además
+  de registrar los choices. Sin eso, el error habría salido al guardar en el admin.
+- **Un detalle de dibujo que se vio solo en pantalla**: la cordillera de cierre partía el sello de
+  `publicacion.svg` exactamente por la mitad, y eso no se lee como «el motivo se tapa tras la
+  cresta» sino como un recorte fallido. El sello se movió al valle entre dos picos.
+- La descripción del fieldset «Portada» del admin enumeraba «(noticia, artículo u opinión)». Se
+  quitó la lista en vez de ampliarla: ya se había quedado corta una vez.
+
+Suite: **509 + 7 deselected** en pytest (6 pruebas nuevas) y **1 caso e2e nuevo** en
+`noticias.spec.ts`. Dos noticias demo nuevas, una de cada tipo y **sin portada propia a propósito**,
+que son las que ejercitan las ilustraciones.
+
 ### Actualización 31/08/2026 — normativa se puede importar desde Excel, y es el primer importador que deduce
 
 PREDES tiene las normas en una hoja con siete columnas —`N`, `Tipo de normativa`, `Nombre`,

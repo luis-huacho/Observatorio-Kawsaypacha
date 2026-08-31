@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Ilustración del Observatorio Kallpachakuy">
+  <!-- Imagen por defecto para publicaciones de tipo "base de datos".
+       La retícula de centros poblados de `noticia.svg`, pero puesta en columnas: aquí los datos
+       no ilustran el territorio, lo dibujan. El punto alto de cada columna, en azul, es el perfil
+       que sale de contarlos. -->
+  <rect width="600" height="400" fill="#E5F4EE"/>
+
+  <!-- El eje sobre el que se apoyan las columnas -->
+  <line x1="24" y1="326" x2="576" y2="326" stroke="#009257" stroke-width="2" opacity="0.35"/>
+
+  <!-- Las columnas de datos -->
+  <g>
+    <circle cx="60" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="60" cy="286" r="7" fill="#0095A4"/>
+    <circle cx="100" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="100" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="100" cy="262" r="7" fill="#0095A4"/>
+    <circle cx="140" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="140" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="140" cy="262" r="7" fill="#009257" opacity="0.45"/><circle cx="140" cy="238" r="7" fill="#009257" opacity="0.45"/><circle cx="140" cy="214" r="7" fill="#0095A4"/>
+    <circle cx="180" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="180" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="180" cy="262" r="7" fill="#009257" opacity="0.45"/><circle cx="180" cy="238" r="7" fill="#0095A4"/>
+    <circle cx="220" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="220" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="220" cy="262" r="7" fill="#009257" opacity="0.45"/><circle cx="220" cy="238" r="7" fill="#009257" opacity="0.45"/><circle cx="220" cy="214" r="7" fill="#009257" opacity="0.45"/><circle cx="220" cy="190" r="7" fill="#0095A4"/>
+    <circle cx="260" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="260" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="260" cy="262" r="7" fill="#009257" opacity="0.45"/><circle cx="260" cy="238" r="7" fill="#009257" opacity="0.45"/><circle cx="260" cy="214" r="7" fill="#009257" opacity="0.45"/><circle cx="260" cy="190" r="7" fill="#009257" opacity="0.45"/><circle cx="260" cy="166" r="7" fill="#009257" opacity="0.45"/><circle cx="260" cy="142" r="7" fill="#0095A4"/>
+    <circle cx="300" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="300" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="300" cy="262" r="7" fill="#009257" opacity="0.45"/><circle cx="300" cy="238" r="7" fill="#009257" opacity="0.45"/><circle cx="300" cy="214" r="7" fill="#009257" opacity="0.45"/><circle cx="300" cy="190" r="7" fill="#009257" opacity="0.45"/><circle cx="300" cy="166" r="7" fill="#0095A4"/>
+    <circle cx="340" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="340" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="340" cy="262" r="7" fill="#009257" opacity="0.45"/><circle cx="340" cy="238" r="7" fill="#009257" opacity="0.45"/><circle cx="340" cy="214" r="7" fill="#009257" opacity="0.45"/><circle cx="340" cy="190" r="7" fill="#009257" opacity="0.45"/><circle cx="340" cy="166" r="7" fill="#009257" opacity="0.45"/><circle cx="340" cy="142" r="7" fill="#009257" opacity="0.45"/><circle cx="340" cy="118" r="7" fill="#0095A4"/>
+    <circle cx="380" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="380" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="380" cy="262" r="7" fill="#009257" opacity="0.45"/><circle cx="380" cy="238" r="7" fill="#009257" opacity="0.45"/><circle cx="380" cy="214" r="7" fill="#009257" opacity="0.45"/><circle cx="380" cy="190" r="7" fill="#0095A4"/>
+    <circle cx="420" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="420" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="420" cy="262" r="7" fill="#009257" opacity="0.45"/><circle cx="420" cy="238" r="7" fill="#009257" opacity="0.45"/><circle cx="420" cy="214" r="7" fill="#009257" opacity="0.45"/><circle cx="420" cy="190" r="7" fill="#009257" opacity="0.45"/><circle cx="420" cy="166" r="7" fill="#0095A4"/>
+    <circle cx="460" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="460" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="460" cy="262" r="7" fill="#009257" opacity="0.45"/><circle cx="460" cy="238" r="7" fill="#009257" opacity="0.45"/><circle cx="460" cy="214" r="7" fill="#0095A4"/>
+    <circle cx="500" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="500" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="500" cy="262" r="7" fill="#009257" opacity="0.45"/><circle cx="500" cy="238" r="7" fill="#0095A4"/>
+    <circle cx="540" cy="310" r="7" fill="#009257" opacity="0.45"/><circle cx="540" cy="286" r="7" fill="#009257" opacity="0.45"/><circle cx="540" cy="262" r="7" fill="#0095A4"/>
+  </g>
+
+  <!-- Valle de cierre: la cordillera aquí la dibujan los propios datos -->
+  <path d="M0 400 L0 360 L160 342 L330 366 L480 340 L600 358 L600 400 Z" fill="#0B3B26"/>
+</svg>

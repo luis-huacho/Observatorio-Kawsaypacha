@@ -250,8 +250,9 @@ class NoticiaListaSerializer(PortadaMixin, serializers.ModelSerializer):
         ]
 
     def _clave_portada(self, obj) -> str:
-        # La ilustración va por tipo de contenido: noticia, artículo u opinión.
-        return obj.tipo or "noticia"
+        # La ilustración va por tipo de contenido, y `clave_noticia` repliega si ese tipo no tiene
+        # la suya: el valor crudo es el nombre del archivo y un tipo nuevo daría un 404 mudo.
+        return imagenes.clave_noticia(obj.tipo)
 
 
 class NoticiaDetalleSerializer(NoticiaListaSerializer):

@@ -45,6 +45,25 @@ def pie(propio: str | None, es_propia: bool) -> str:
     return "" if es_propia else PIE_POR_DEFECTO
 
 
+#: Los tipos de noticia que tienen ilustración propia en `frontend/public/img/default/`.
+#:
+#: Se declara aquí porque el backend **no puede comprobarlo**: los SVG viven en el bundle del
+#: frontend y el contenedor solo monta `./backend`. Una prueba fija que todo `Noticia.Tipo` esté en
+#: este conjunto, que es el olvido probable; el archivo ausente lo caza el e2e.
+CLAVES_NOTICIA = frozenset(
+    {"noticia", "articulo", "opinion", "publicacion", "base_datos"}
+)
+
+
+def clave_noticia(tipo: str | None) -> str:
+    """La noticia se ilustra por su tipo de contenido.
+
+    Si el tipo no tiene ilustración —dato viejo, o una opción nueva cuyo SVG no se dibujó— cae en
+    la reserva `noticia`, que es preferible a un 404 de imagen. Mismo criterio que `clave_medida`.
+    """
+    return tipo if tipo in CLAVES_NOTICIA else "noticia"
+
+
 def clave_medida(slug_peligro: str | None) -> str:
     """La medida se ilustra por su peligro, que es el eje con el que se explora la sección.
 

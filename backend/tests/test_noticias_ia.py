@@ -294,6 +294,37 @@ def test_un_tipo_inventado_cae_a_noticia(ia, crudo, esperado):
     assert redaccion.redactar("https://medio.pe/nota", con_imagen=False).tipo == esperado
 
 
+def test_el_enum_de_tipo_sale_de_los_CHOICES_del_modelo(ia):
+    """Estaba escrito a mano, y eso son dos fuentes de verdad para lo mismo.
+
+    `_normalizar` ya validaba contra `Noticia.Tipo`, así que añadir una opción al modelo y
+    olvidarse del esquema dejaba un tipo que la IA **no podía proponer nunca**, sin que nada
+    fallara. Es como se coló el hueco que abrió «publicación» y «base de datos».
+    """
+    llamadas = ia()
+
+    redaccion.redactar("https://medio.pe/nota", con_imagen=False)
+
+    esquema = llamadas[0]["response_format"]["json_schema"]
+    opciones = esquema["schema"]["properties"]["tipo"]["enum"]
+    assert opciones == [valor for valor, _ in Noticia.Tipo.choices]
+    assert {"publicacion", "base_datos"} <= set(opciones)
+
+
+@pytest.mark.parametrize("tipo", ["publicacion", "base_datos"])
+def test_la_ia_puede_clasificar_en_los_tipos_nuevos(ia, tipo):
+    """Y la tarea lo escribe encima del default, que es la rama de ADR-D7."""
+    ia(ficha={**FICHA, "tipo": tipo})
+    noticia = _noticia_en_proceso()  # nace con tipo="noticia", el default
+
+    from apps.contenidos.tasks import redactar_noticia_desde_url
+
+    redactar_noticia_desde_url.func(pk=noticia.pk)
+
+    noticia.refresh_from_db()
+    assert noticia.tipo == tipo
+
+
 def test_una_fecha_ilegible_cae_a_hoy(ia):
     ia(ficha={**FICHA, "fecha": "el martes pasado"})
 

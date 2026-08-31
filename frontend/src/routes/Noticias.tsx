@@ -15,6 +15,8 @@ export const TIPO_ESTILO: Record<Noticia["tipo"], string> = {
   noticia: "bg-mountain-100 text-mountain-900 border border-mountain-500/20",
   articulo: "bg-sky-200/40 text-sky-700 border border-sky-500/20",
   opinion: "bg-earth-200/50 text-earth-700 border border-earth-500/25",
+  publicacion: "bg-mountain-500/15 text-mountain-800 border border-mountain-700/25",
+  base_datos: "bg-ink-300/25 text-ink-900 border border-ink-600/25",
 };
 
 export default function Noticias() {
