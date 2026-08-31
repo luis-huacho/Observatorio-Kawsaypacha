@@ -57,9 +57,16 @@ export default function NormaDetalle() {
             <CalendarDays className="w-4 h-4" />
             {formatFecha(n.fecha)}
           </span>
+          {/* Si consta la entidad se nombra; si no, se repliega al nivel de gobierno que se
+              deduce del ámbito, que es lo que se decía antes de que existiera el catálogo. No
+              todas las fichas la tienen, y quedarse sin línea sería peor que una aproximación. */}
           <span className="inline-flex items-center gap-1">
             <Landmark className="w-4 h-4" />
-            Publicada por el {PUBLICA[n.ambito]}
+            {n.entidad_emisora
+              ? `Emitida por ${n.entidad_emisora.nombre}${
+                  n.entidad_emisora.sigla ? ` (${n.entidad_emisora.sigla})` : ""
+                }`
+              : `Publicada por el ${PUBLICA[n.ambito]}`}
           </span>
         </div>
 

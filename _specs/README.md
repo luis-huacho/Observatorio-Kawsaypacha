@@ -13,6 +13,61 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 31/08/2026 — la norma no decía quién la emite, y el ámbito no es una institución (ADR-D11)
+
+`Norma` no tenía forma de nombrar a la entidad que la dicta. La ficha lo aproximaba derivándolo del
+ámbito —«Publicada por el Gobierno Nacional»—, que es un **nivel de gobierno**, no una institución:
+sirve para tres valores y no distingue al MINAM del MEF. Quien arma un expediente busca «todo lo del
+MINAM» o «las ordenanzas del Gobierno Regional de Cusco», y eso no se podía pedir en ninguna parte
+del sitio. Entra `normativa.EntidadEmisora` con FK opcional desde `Norma`, filtro en `/normativa`,
+faceta en el buscador, columna en el Excel y **pantalla de mantenimiento propia** en el admin.
+
+- **Taxonomía y no un `CharField`, que es toda la decisión.** Escrito a mano, «PCM», «Presidencia del
+  Consejo de Ministros» y «P.C.M.» son tres valores distintos: el desplegable ofrecería tres opciones
+  para lo mismo y ninguna devolvería el conjunto completo. Un campo de texto eran dos líneas de
+  código y un filtro inservible el día que haya cien normas.
+- **La FK es `PROTECT` aunque el campo sea opcional**, apartándose del `SET_NULL` de `Video.tema`. El
+  motivo es dónde se edita este catálogo: tiene pantalla propia, y con `SET_NULL` borrar una entidad
+  desde ahí vaciaría la atribución de todas sus normas **sin que nada lo dijera**. Con `PROTECT` el
+  admin se planta, y el listado del catálogo lleva una columna con cuántas normas usan cada fila para
+  que el aviso llegue antes del intento. Hay una prueba que lo fija.
+- **La IA elige del catálogo y no crea nunca.** El `enum` del esquema se arma al vuelo desde las
+  entidades vivas —`ESQUEMA` pasó a ser `_esquema()`, como en `medidas`—, así que dar de alta una
+  institución en el admin la pone a disposición del modelo **sin tocar el prompt**. Lo que no
+  reconoce se deja vacío y se dice en el `log_ia`, igual que un `tipo` fuera de catálogo (ADR-D8).
+  Dejar que creara la que falta habría llenado la taxonomía de variantes del mismo nombre. La guarda
+  es doble: el `enum` restringe y `_resolver_entidad` vuelve a comprobarlo, porque la salida
+  estructurada falla de vez en cuando y un slug inventado reventaría **dentro del worker**.
+- **El catálogo se siembra dos veces, y las dos hacen falta.** `entidades.yaml` para el seed y la
+  migración de datos `normativa.0005` para las bases ya creadas, porque **`seed` no corre en el
+  despliegue**. Solo el YAML habría dejado el catálogo vacío en todos los servidores sin ningún
+  error: el desplegable no se pinta y nadie sabe por qué. Es la lección de `sitio.0007`, aplicada
+  antes de repetirla y no después.
+- **El desplegable solo ofrece entidades con normas publicadas.** Servir las doce del catálogo de
+  arranque daría filtros que devuelven cero resultados, que se lee como que el sitio no tiene
+  contenido. Va como acción del router (`/api/normativa/entidades/`) y no como ruta suelta: así se
+  registra **antes** que `/<slug>/` y no puede chocar con una norma llamada «entidades».
+- **Y esa misma cadena mordió a la prueba e2e.** `/api/normativa/entidades/` contiene
+  `/api/normativa/` como prefijo, así que `esperarApi` casaba con la respuesta que llegara primero:
+  cuando ganaba el catálogo, `datos.results` era `undefined` y la prueba fallaba de forma
+  **intermitente**. Se acota con una expresión regular que exige el final o la interrogación.
+- **La ficha repliega, no desaparece.** Sin entidad se sigue diciendo «Publicada por el Gobierno …» a
+  partir del ámbito. Es el estado de **todas** las normas ya cargadas —el campo es opcional y aún no
+  lo ha rellenado nadie—, así que quitar la línea les habría restado un dato en vez de sumarlo. Los
+  dos estados están comprobados en pantalla y en el e2e nuevo.
+- **Un detalle de paleta que no habría dado ningún error.** El chip de la sigla salió con
+  `bg-earth-100 text-earth-800`, y `earth` solo define 200/500/700 en `tailwind.config.ts`: las dos
+  clases existen como texto y **no hacen nada**. Es el mismo modo de fallo que el CSS precompilado de
+  Unfold, aquí en la paleta propia.
+- **Lo que se descartó**: M2M para normas cofirmadas —una norma la emite una entidad, y el caso de
+  dos se resuelve nombrando la principal—, y compartir catálogo con
+  `biblioteca.Documento.autor_institucion`, que es texto libre y de otra naturaleza.
+
+Suite: **514 + 7 deselected** en pytest (11 pruebas nuevas) y **2 casos e2e nuevos** en
+`e2e/normativa.spec.ts`, que hasta hoy no tenía spec propio. Los 13 fallos e2e de `home`, `buscar` y
+`peligros` son **anteriores a esta rama** y ajenos a ella: la portada busca «Centros poblados
+monitoreados», una cadena que no existe en `frontend/src`.
+
 ### Actualización 31/08/2026 — la caja necesitaba aire, y los dos pies del mapa sobraban casi enteros
 
 Continuación del anterior, con la caja ya en pantalla. Tres cosas, y una de ellas la había metido yo.

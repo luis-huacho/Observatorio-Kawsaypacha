@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, Download, FileText } from "lucide-react";
-import { urlApi, useApiPaginado } from "@/lib/api";
+import { urlApi, useApi, useApiPaginado } from "@/lib/api";
 import { registrarExport } from "@/lib/metricas";
-import type { Norma } from "@/lib/types";
+import type { EntidadEmisora, Norma } from "@/lib/types";
 import { formatFecha } from "@/lib/semaforo";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
@@ -13,10 +13,15 @@ import EnlaceNorma, { PUBLICA } from "@/components/EnlaceNorma";
 export default function NormativaView() {
   const [tipo, setTipo] = useState("");
   const [ambito, setAmbito] = useState("");
+  const [entidad, setEntidad] = useState("");
   const [params, setParams] = useSearchParams();
   const tema = params.get("tema") ?? "";
 
-  const filtros = { tipo, ambito, tema };
+  // El catálogo lo mantiene PREDES, así que las opciones no se pueden escribir aquí como las de
+  // tipo y ámbito. Solo llegan las entidades con alguna norma publicada.
+  const entidades = useApi<EntidadEmisora[]>("/normativa/entidades/");
+
+  const filtros = { tipo, ambito, entidad, tema };
   const normas = useApiPaginado<Norma>("/normativa/", filtros);
   const filtradas = normas.resultados;
   // El export respeta los filtros que el usuario tiene puestos: un Excel que no cuadra con lo
@@ -39,7 +44,7 @@ export default function NormativaView() {
         descripcion="Repositorio de normativa reciente de GRD y ACC, con análisis y recomendaciones de PREDES. Cada norma enlaza a su publicación oficial en el portal del organismo que la emite."
       />
       <div className="container-page py-8">
-      <div className="grid sm:grid-cols-2 gap-3 mb-6 max-w-xl">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6 max-w-3xl">
         <select
           value={tipo}
           onChange={(e) => setTipo(e.target.value)}
@@ -60,6 +65,21 @@ export default function NormativaView() {
           <option value="regional">Regional</option>
           <option value="local">Local</option>
         </select>
+        {/* Sin entidades no se pinta el desplegable: un select con una sola opción, «todas», no
+            filtra nada y solo ocupa sitio. */}
+        {!!entidades.data?.length && (
+          <select
+            value={entidad}
+            onChange={(e) => setEntidad(e.target.value)}
+            className="control"
+            aria-label="Entidad emisora"
+          >
+            <option value="">Todas las entidades</option>
+            {entidades.data.map((e) => (
+              <option key={e.slug} value={e.slug}>{e.sigla || e.nombre}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <FiltroTema tema={tema} onLimpiar={() => setParams({})} />
@@ -67,7 +87,7 @@ export default function NormativaView() {
       {filtradas.length === 0 ? (
         <EmptyState
           title="Sin normas con esos filtros"
-          message="Prueba con otro tipo, ámbito o palabra clave."
+          message="Prueba con otro tipo, ámbito, entidad o palabra clave."
         />
       ) : (
         <ul className="space-y-3">
@@ -89,6 +109,16 @@ export default function NormativaView() {
                     {n.numero && (
                       <span className="chip bg-mountain-100 text-mountain-900 border border-mountain-500/20">
                         {n.numero}
+                      </span>
+                    )}
+                    {/* La sigla y no el nombre: «Presidencia del Consejo de Ministros» ocupa la
+                        fila entera de chips. El nombre completo está en la ficha y en el `title`. */}
+                    {n.entidad_emisora && (
+                      <span
+                        className="chip bg-earth-200/40 text-earth-700 border border-earth-500/20"
+                        title={n.entidad_emisora.nombre}
+                      >
+                        {n.entidad_emisora.sigla || n.entidad_emisora.nombre}
                       </span>
                     )}
                     <span className="chip bg-sky-200/40 text-sky-700 border border-sky-500/20">

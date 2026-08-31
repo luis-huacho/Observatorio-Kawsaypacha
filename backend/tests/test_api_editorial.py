@@ -146,6 +146,61 @@ def test_normativa_expone_anio_y_acceso_al_documento(api, norma):
     assert "documento_url" in fila
 
 
+def test_la_entidad_emisora_viaja_como_objeto_y_es_null_cuando_no_consta(api, norma):
+    """`null` es un estado real: la ficha repliega entonces al nivel de gobierno del ámbito."""
+    from apps.normativa.models import EntidadEmisora
+
+    fila = api.get("/api/normativa/").json()["results"][0]
+    assert fila["entidad_emisora"] is None
+
+    norma.entidad_emisora = EntidadEmisora.objects.get(slug="gore-cusco")
+    norma.save()
+
+    fila = api.get("/api/normativa/").json()["results"][0]
+    assert fila["entidad_emisora"] == {
+        "slug": "gore-cusco",
+        "nombre": "Gobierno Regional de Cusco",
+        "sigla": "GORE Cusco",
+    }
+
+
+def test_normativa_se_filtra_por_entidad(api, norma):
+    from apps.normativa.models import EntidadEmisora
+
+    norma.entidad_emisora = EntidadEmisora.objects.get(slug="gore-cusco")
+    norma.save()
+
+    assert api.get("/api/normativa/?entidad=gore-cusco").json()["count"] == 1
+    assert api.get("/api/normativa/?entidad=pcm").json()["count"] == 0
+
+
+def test_el_catalogo_de_entidades_solo_lista_las_que_TIENEN_normas_publicadas(api, norma):
+    """Ofrecer el catálogo entero sería ofrecer filtros que devuelven cero resultados.
+
+    El catálogo de arranque trae doce entidades y aquí solo una está en uso.
+    """
+    from apps.normativa.models import EntidadEmisora
+
+    assert EntidadEmisora.objects.count() > 1
+    assert api.get("/api/normativa/entidades/").json() == []
+
+    norma.entidad_emisora = EntidadEmisora.objects.get(slug="gore-cusco")
+    norma.save()
+
+    assert [e["slug"] for e in api.get("/api/normativa/entidades/").json()] == ["gore-cusco"]
+
+
+def test_el_catalogo_de_entidades_no_cuenta_los_borradores(api, norma):
+    """Un borrador no puede delatar en el desplegable público a quién se está a punto de citar."""
+    from apps.normativa.models import EntidadEmisora, Norma
+
+    norma.estado = Norma.Estado.BORRADOR
+    norma.entidad_emisora = EntidadEmisora.objects.get(slug="pcm")
+    norma.save()
+
+    assert api.get("/api/normativa/entidades/").json() == []
+
+
 def test_normativa_se_filtra_por_anio(api, norma):
     assert api.get("/api/normativa/?anio=2024").json()["count"] == 1
     assert api.get("/api/normativa/?anio=2023").json()["count"] == 0
@@ -167,6 +222,8 @@ def test_el_export_de_normativa_solo_lleva_lo_publicado(api, norma, sin_throttli
 
     respuesta = api.get("/api/normativa/export.xlsx")
     libro = openpyxl.load_workbook(io.BytesIO(respuesta.content))
+    cabecera = [c.value for c in next(libro.active.iter_rows(max_row=1))]
+    assert "Entidad emisora" in cabecera
     titulos = [
         fila[0] for fila in libro.active.iter_rows(min_row=2, values_only=True) if fila[0]
     ]

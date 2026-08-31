@@ -527,11 +527,24 @@ export const TIPOS_NOTICIA: Record<Noticia["tipo"], string> = {
 };
 
 /** Espejo de `NormaSerializer`: `/api/normativa/`. */
+/** Espejo de `EntidadEmisoraSerializer`: la institución que dicta la norma. */
+export type EntidadEmisora = {
+  slug: string;
+  nombre: string;
+  /** Abreviatura ("PCM"). Puede ir vacía; es lo que se pinta donde no cabe el nombre. */
+  sigla: string;
+};
+
 export type Norma = {
   slug: string;
   titulo: string;
   tipo: "Ley" | "DS" | "RM" | "RJ" | "Ordenanza";
   ambito: "nacional" | "regional" | "local";
+  /**
+   * Institución que la dicta. `null` es un estado real y frecuente —no todas las fichas lo
+   * tienen—: la ficha repliega entonces al nivel de gobierno que se deduce del ámbito.
+   */
+  entidad_emisora: EntidadEmisora | null;
   fecha: string;
   anio: number;
   resumen: string;

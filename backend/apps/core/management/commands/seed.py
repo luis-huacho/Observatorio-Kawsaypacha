@@ -93,6 +93,7 @@ class Command(BaseCommand):
         self._sitio()
         self._capas()
         self._categorias_documento()
+        self._entidades_emisoras()
 
         self._titulo("Grupos y superusuario")
         self._grupos()
@@ -238,6 +239,13 @@ class Command(BaseCommand):
         creados, existentes = semilla.sembrar(CapaCartografica, datos["capas"], "slug")
         self._ok(f"capas: {creados} nuevas, {existentes} ya existían")
 
+    def _entidades_emisoras(self):
+        from apps.normativa.models import EntidadEmisora
+
+        datos = semilla.leer(APPS / "normativa/semillas/entidades.yaml")
+        creadas, existentes = semilla.sembrar(EntidadEmisora, datos["entidades"], "slug")
+        self._ok(f"entidades emisoras: {creadas} nuevas, {existentes} ya existían")
+
     def _categorias_documento(self):
         from apps.biblioteca.models import CategoriaDocumento
 
@@ -336,7 +344,7 @@ class Command(BaseCommand):
     def _demo(self):
         from apps.contenidos.models import Noticia
         from apps.medidas.models import Medida
-        from apps.normativa.models import Norma
+        from apps.normativa.models import EntidadEmisora, Norma
         from apps.peligros.models import TipoPeligro
         from apps.territorio.models import Distrito
 
@@ -358,10 +366,16 @@ class Command(BaseCommand):
         self._ok(f"medidas: {creados} nuevas, {existentes} ya existían")
 
         datos = semilla.leer(APPS / "normativa/semillas/demo.yaml")
-        registros = [
-            {**n, "estado": Norma.Estado.PUBLICADO, "publicado_en": ahora}
-            for n in datos["normas"]
-        ]
+        entidades = {e.slug: e for e in EntidadEmisora.objects.all()}
+        registros = []
+        for n in datos["normas"]:
+            fila = dict(n)
+            # Una de las cinco va sin entidad a propósito: su municipalidad distrital no está en
+            # el catálogo de arranque, y así en desarrollo se ve también la ficha sin ella.
+            fila["entidad_emisora"] = entidades.get(fila.pop("entidad", None))
+            fila["estado"] = Norma.Estado.PUBLICADO
+            fila["publicado_en"] = ahora
+            registros.append(fila)
         creados, existentes = semilla.sembrar(Norma, registros, "slug")
         self._ok(f"normas: {creados} nuevas, {existentes} ya existían")
 

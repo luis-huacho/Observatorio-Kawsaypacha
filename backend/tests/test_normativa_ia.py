@@ -22,7 +22,7 @@ import pytest
 
 from apps.core.models import EstadoIA
 from apps.normativa import redaccion
-from apps.normativa.models import Norma
+from apps.normativa.models import EntidadEmisora, Norma
 
 pytestmark = pytest.mark.django_db
 
@@ -104,6 +104,15 @@ def formulario(rf, admin_user):
         return Form(datos, instance=instance)
 
     return construir
+
+
+@pytest.fixture
+def entidades(db):
+    """Las entidades que ya sembró `seed --solo-catalogos` para toda la sesión (`conftest`).
+
+    No se crean aquí: son catálogo, y crearlas de nuevo chocaría con la unicidad del nombre.
+    """
+    return {e.slug: e for e in EntidadEmisora.objects.all()}
 
 
 def _norma_en_proceso(**extra):
@@ -222,6 +231,33 @@ def test_la_tarea_no_pisa_lo_que_escribio_una_persona(ia):
     assert "titulo" in norma.log_ia and "tipo" in norma.log_ia
 
 
+def test_la_tarea_no_pisa_la_entidad_que_ELIGIO_EL_EDITOR(ia, entidades):
+    """La FK entra en `CAMPOS_REDACTADOS`, así que le aplica la misma regla que al resto: si ya
+    hay algo puesto a mano, la IA no lo toca."""
+    ia({**FICHA, "entidad_emisora": "minam"})
+    norma = _norma_en_proceso(entidad_emisora=entidades["pcm"])
+
+    from apps.normativa.tasks import redactar_norma_desde_url
+
+    redactar_norma_desde_url.func(norma.pk)
+    norma.refresh_from_db()
+
+    assert norma.entidad_emisora == entidades["pcm"]
+    assert "entidad_emisora" in norma.log_ia
+
+
+def test_la_tarea_rellena_la_entidad_cuando_estaba_vacia(ia, entidades):
+    ia({**FICHA, "entidad_emisora": "minam"})
+    norma = _norma_en_proceso()
+
+    from apps.normativa.tasks import redactar_norma_desde_url
+
+    redactar_norma_desde_url.func(norma.pk)
+    norma.refresh_from_db()
+
+    assert norma.entidad_emisora == entidades["minam"]
+
+
 def test_la_tarea_NO_escribe_el_analisis_de_predes_ni_la_url_oficial(ia):
     """Los dos campos que la IA no toca, y no por olvido.
 
@@ -337,6 +373,43 @@ def test_un_tipo_o_un_ambito_inventado_se_deja_VACIO(ia, campo):
     propuesta = redaccion.redactar("https://busquedas.elperuano.pe/normas/x")
 
     assert getattr(propuesta, campo) == ""
+
+
+def test_la_entidad_del_catalogo_se_resuelve_a_su_fila(ia, entidades):
+    ia({**FICHA, "entidad_emisora": "pcm"})
+
+    propuesta = redaccion.redactar("https://busquedas.elperuano.pe/normas/x")
+
+    assert propuesta.entidad_emisora == entidades["pcm"]
+
+
+def test_una_entidad_fuera_del_catalogo_se_deja_VACIA_y_lo_avisa(ia, entidades):
+    """Misma doctrina que `tipo` y `ambito`, y un motivo más: crear la que falta llenaría el
+    catálogo de variantes del mismo nombre, que es justo lo que un catálogo existe para evitar."""
+    ia({**FICHA, "entidad_emisora": "municipalidad-de-echarati"})
+
+    propuesta = redaccion.redactar("https://busquedas.elperuano.pe/normas/x")
+
+    assert propuesta.entidad_emisora is None
+    assert any("municipalidad-de-echarati" in a for a in propuesta.avisos)
+    # Y no se ha creado por el camino.
+    assert not EntidadEmisora.objects.filter(slug="municipalidad-de-echarati").exists()
+
+
+def test_el_enum_de_entidades_sale_del_CATALOGO_VIVO(ia, entidades):
+    """Escrita a mano, la lista se desincronizaría en cuanto PREDES diera de alta una entidad
+    desde el admin, y la IA no podría elegirla nunca."""
+    llamadas = ia()
+    EntidadEmisora.objects.create(
+        slug="entidad-recien-creada", nombre="Entidad recién creada en el admin"
+    )
+
+    redaccion.redactar("https://busquedas.elperuano.pe/normas/x")
+
+    esquema = llamadas[0]["response_format"]["json_schema"]
+    opciones = esquema["schema"]["properties"]["entidad_emisora"]["enum"]
+    assert set(opciones) == set(EntidadEmisora.objects.values_list("slug", flat=True)) | {""}
+    assert "entidad-recien-creada" in opciones
 
 
 def test_un_estado_de_vigencia_inventado_se_deja_vacio(ia):

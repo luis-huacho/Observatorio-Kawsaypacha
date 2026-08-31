@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db.models import Count
 from django_ckeditor_5.widgets import CKEditor5Widget
 from unfold.admin import ModelAdmin
 
@@ -6,7 +7,7 @@ from apps.core.admin_ia import RedaccionIAAdminMixin
 from apps.core.admin_workflow import WorkflowAdmin
 
 from .forms import NormaForm
-from .models import Norma
+from .models import EntidadEmisora, Norma
 
 
 @admin.register(Norma)
@@ -21,11 +22,11 @@ class NormaAdmin(RedaccionIAAdminMixin, WorkflowAdmin, ModelAdmin):
     campos_rich = ["contenido"]
     form = NormaForm
 
-    list_display = ("titulo", "tipo", "ambito", "fecha", "acceso", "ia_badge")
-    list_filter = ("estado", "tipo", "ambito", "estado_vigencia", "ia_estado")
+    list_display = ("titulo", "tipo", "entidad_emisora", "ambito", "fecha", "acceso", "ia_badge")
+    list_filter = ("estado", "tipo", "ambito", "entidad_emisora", "estado_vigencia", "ia_estado")
     search_fields = ("titulo", "numero", "resumen", "slug")
     prepopulated_fields = {"slug": ("titulo",)}
-    autocomplete_fields = ("documento",)
+    autocomplete_fields = ("documento", "entidad_emisora")
     date_hierarchy = "fecha"
 
     fieldsets = (
@@ -38,7 +39,10 @@ class NormaAdmin(RedaccionIAAdminMixin, WorkflowAdmin, ModelAdmin):
                            "redactado hay que revisarlo antes de publicar.",
         }),
         (None, {"fields": ("titulo", "slug", "numero", "resumen")}),
-        ("Clasificación", {"fields": ("tipo", "ambito", "fecha", "estado_vigencia")}),
+        ("Clasificación", {
+            "fields": ("entidad_emisora", "tipo", "ambito", "fecha", "estado_vigencia"),
+            "description": "Si la entidad que la emite no está en la lista, créala con el «+» sin salir de aquí.",
+        }),
         ("Análisis", {"fields": ("analisis_predes", "contenido", "palabras_clave")}),
         ("Acceso a la publicación oficial", {
             "fields": ("documento", "url_oficial"),
@@ -74,3 +78,26 @@ class NormaAdmin(RedaccionIAAdminMixin, WorkflowAdmin, ModelAdmin):
         from apps.normativa.tasks import redactar_norma_desde_url
 
         redactar_norma_desde_url.enqueue(pk=obj.pk)
+
+
+@admin.register(EntidadEmisora)
+class EntidadEmisoraAdmin(ModelAdmin):
+    """Pantalla de mantenimiento del catálogo.
+
+    `search_fields` no es cosmético: sin él, el `autocomplete_fields` de `NormaAdmin` revienta.
+    """
+
+    list_display = ("nombre", "sigla", "slug", "orden", "total_normas")
+    list_editable = ("orden",)
+    search_fields = ("nombre", "sigla")
+    prepopulated_fields = {"slug": ("nombre",)}
+    ordering = ("orden", "nombre")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(_normas=Count("normas"))
+
+    @admin.display(description="normas", ordering="_normas")
+    def total_normas(self, obj) -> int:
+        """Cuántas la usan. Es lo que distingue una entidad viva de una que sobra —y la que
+        avisa, antes de intentarlo, de que borrarla va a dar error de protección."""
+        return obj._normas
