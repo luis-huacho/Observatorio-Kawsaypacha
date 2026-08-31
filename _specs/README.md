@@ -51,6 +51,13 @@ cliente que dibuje este mapa sin nuestra leyenda. De paso, el PDF dejó de escri
 contados en las cifras de cabecera y en la tabla» —ya entra en el `motivo`— y su párrafo de quintiles
 recibió el mismo recorte que el de la pantalla.
 
+**Y al final el pie se ocultó, que no es lo mismo que borrarlo.** Con la frase ya arreglada delante,
+el dueño del proyecto decidió que en pantalla no ayudaba: va con `hidden`. El contrato no se mueve
+—importe, porcentaje y motivo siguen en el payload y **el PDF lo sigue imprimiendo**, que es donde
+ADR-D6 más aprieta porque el documento viaja sin la página que lo explica— y hay una prueba e2e que
+exige que **siga en el DOM y oculto**. Borrarlo dejaría el mapa pintando el 81 % del presupuesto sin
+que nada lo dijera; oculto, vuelve quitando una clase.
+
 Suite: **520 + 7** y **81 casos e2e** (162 corridas), en verde.
 
 ### Actualización 31/08/2026 — el mapa de /inversion se explicaba cuatro veces y no decía qué enseña

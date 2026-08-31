@@ -241,10 +241,15 @@ test.describe("Inversión (PP 0068)", () => {
     // ADR-D6: a nivel distrital las municipalidades provinciales no se pintan, y su importe se
     // declara. Que el pie exista es lo que impide que el mapa se lea como el total del programa.
     expect(mapa.no_ubicado.entidades).toBeGreaterThan(0);
-    // Con su PORCENTAJE: un importe suelto obliga a ir a buscar el total para saber si es mucho.
-    await expect(visor.getByText(/no está en el mapa/i)).toBeVisible();
-    await expect(visor.getByText(/S\/[\s\d,.]+\(\d+(\.\d+)?%\)/)).toBeVisible();
-    // El dato de los polígonos en blanco vive en la LEYENDA, que es donde se mira el color.
+    // **El pie va oculto con CSS, no borrado.** Es una decisión editorial: en pantalla no estaba
+    // ayudando. Pero el aviso tiene que seguir EXISTIENDO —en el DOM, en el payload y en el
+    // PDF—, porque borrarlo dejaría el mapa pintando el 81 % del presupuesto sin que nada lo
+    // dijera, que es literalmente lo que fundó ADR-D6. Y así vuelve quitando una clase.
+    const pie = visor.getByText(/no está en el mapa/i);
+    await expect(pie).toHaveCount(1);
+    await expect(pie).toBeHidden();
+    await expect(pie).toContainText(/S\/[\s\d,.]+\(\d+(\.\d+)?%\)/);
+    // El dato de los polígonos en blanco sí se ve, y vive en la LEYENDA: es donde se mira el color.
     await expect(visor.getByText(/sin municipalidad \(\d+\)/)).toBeVisible();
   });
 
@@ -384,6 +389,8 @@ test.describe("Inversión (PP 0068)", () => {
     // cubre el ámbito entero y el pie de «no aparecen» desaparece.
     expect(mapa.no_ubicado.entidades).toBe(0);
     const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    // Aquí ni siquiera se renderiza —`entidades === 0`—, que es distinto de estar oculto: a este
+    // nivel no hay nada que declarar, y el mapa cubre el ámbito entero.
     await expect(visor.getByText(/no está en el mapa/i)).toHaveCount(0);
   });
 
