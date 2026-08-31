@@ -318,6 +318,35 @@ def test_el_reporte_avisa_del_corte_parcial(api, inversion_publicada):
     assert cerrado["es_parcial"] is False
 
 
+def test_el_reporte_llama_en_curso_solo_a_lo_que_lo_esta(api, inversion_publicada):
+    """El aviso del PDF decía «está en curso» sobre `es_parcial` a secas.
+
+    Es cierto hoy —el único parcial es el del año corriente— y falso el día que se cargue un
+    corte a junio de un año ya pasado: seguiría siendo parcial sin estar en curso, y el
+    documento afirmaría en negrita algo que no es. Se renderiza el HTML y no el PDF porque lo
+    que se comprueba es la frase, y WeasyPrint tarda segundos en cada corrida.
+    """
+    from django.template.loader import render_to_string
+
+    from apps.informes import reporte_inversion
+    from apps.inversion.models import Ejercicio
+
+    contexto = reporte_inversion.reunir_datos(anio=2026)
+    assert contexto["en_curso"] is True
+    assert contexto["corte_legible"] == "junio de 2026"
+    assert "está en curso" in render_to_string("informes/reporte_inversion.html", contexto)
+
+    Ejercicio.objects.filter(anio=2025).update(es_parcial=True, corte="2025-06")
+    pasado = reporte_inversion.reunir_datos(anio=2025)
+    assert pasado["es_parcial"] is True
+    assert pasado["en_curso"] is False
+
+    html = render_to_string("informes/reporte_inversion.html", pasado)
+    assert "está en curso" not in html
+    # Sigue advirtiendo de que el dato es parcial: lo que cambia es cómo se llama, no si se avisa.
+    assert "junio de 2025" in html
+
+
 def test_sin_ejercicio_publicado_el_reporte_explica_el_vacio_y_no_es_404(
     api, inversion_publicada, sin_throttling
 ):

@@ -6,6 +6,7 @@ import { MapPin } from "lucide-react";
 import { useApi } from "@/lib/api";
 import type { InversionDetalleResponse } from "@/lib/types";
 import { formatPct, formatSoles } from "@/lib/semaforo";
+import { PIE_EJERCICIO_PARCIAL, estadoEjercicio } from "@/lib/inversion";
 import EmptyState from "@/components/EmptyState";
 import KPI from "@/components/KPI";
 import PageHeader from "@/components/PageHeader";
@@ -112,8 +113,11 @@ export default function InversionDetalle() {
         )}
         {d.es_parcial && (
           <p className="mb-6 rounded-lg border border-level-2/40 bg-level-2/10 px-4 py-3 text-sm text-yellow-900">
-            <strong>Corte a {d.corte}.</strong> El devengado del ejercicio {d.anio} no cubre el
-            año completo.
+            <strong>
+              Ejercicio {d.anio}, {estadoEjercicio(d)}
+            </strong>
+            {d.corte_legible ? ` — datos al corte de ${d.corte_legible}.` : "."} El devengado no
+            cubre el año completo.
           </p>
         )}
 
@@ -175,7 +179,10 @@ export default function InversionDetalle() {
                   <td className="py-2">
                     {s.anio}
                     {s.es_parcial && (
-                      <span className="text-xs text-yellow-800" title={`Corte a ${s.corte}`}>
+                      <span
+                        className="text-xs text-yellow-800"
+                        title={s.corte_legible ? `Datos al corte de ${s.corte_legible}` : "Corte parcial"}
+                      >
                         {" "}*
                       </span>
                     )}
@@ -195,10 +202,7 @@ export default function InversionDetalle() {
             </tbody>
           </table>
           {d.serie.some((s) => s.es_parcial) && (
-            <p className="text-xs text-ink-600 mt-3">
-              * Ejercicio con corte parcial: su % de ejecución no se compara con el de un año
-              cerrado.
-            </p>
+            <p className="text-xs text-ink-600 mt-3">{PIE_EJERCICIO_PARCIAL}</p>
           )}
         </section>
 

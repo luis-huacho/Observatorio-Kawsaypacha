@@ -261,7 +261,8 @@ Un `anio` que no existe o que no está visible **no cae al último**: devuelve `
 Con datos:
 ```jsonc
 {
-  "disponible": true, "anio": 2026, "corte": "2026-06", "es_parcial": true,
+  "disponible": true, "anio": 2026, "corte": "2026-06", "corte_legible": "junio de 2026",
+  "es_parcial": true, "en_curso": true,
   "fuente": "Base PP 0068 entregada por PREDES",
   "ambito": "municipal", "unidad": "municipalidad (entidad ejecutora), no distrito",
   "agregados": { "pia": 16754644, "pim": 54591255, "devengado": 26064745,
@@ -274,9 +275,11 @@ Con datos:
   "procesos": [ { "slug": "prevencion_reduccion", "nombre": "Prevención y reducción",
                   "color": "#009257", "pim": 28909461, "devengado": 0, "pct": 0.53 } ],
   "sin_clasificar": { "pim": 0, "devengado": 0, "pct": 0 },
-  "tendencia": [ { "anio": 2022, "corte": "anual", "es_parcial": false, "fuente": "…",
+  "tendencia": [ { "anio": 2022, "corte": "anual", "corte_legible": "", "es_parcial": false,
+                   "en_curso": false, "fuente": "…",
                    "pia": 18060834, "pim": 48813109, "devengado": 37260987 } ],
-  "ejercicios": [ { "anio": 2026, "corte": "2026-06", "es_parcial": true } ]
+  "ejercicios": [ { "anio": 2026, "corte": "2026-06", "corte_legible": "junio de 2026",
+                    "es_parcial": true, "en_curso": true } ]
 }
 
 // GET /api/inversion/entidades/?anio=2026&ordenar=saldo  → sobre estándar de DRF
@@ -291,8 +294,8 @@ Con datos:
                  "pim_proyectos": 0, "pim_actividades": 1278015, "pct_proyectos": 0.0 } ] }
 
 // Con `comparar_con=2025`, cada fila añade:
-"comparacion": { "anio": 2025, "corte": "anual", "es_parcial": false,
-                 "comparable": false, "sin_presupuesto": false,
+"comparacion": { "anio": 2025, "corte": "anual", "corte_legible": "", "es_parcial": false,
+                 "en_curso": false, "comparable": false, "sin_presupuesto": false,
                  "pia": 40000, "pim": 585804, "devengado": 500000, "pct_ejecucion": 0.85,
                  "delta_pim": 692211, "pct_delta_pim": 1.18,
                  "delta_devengado": -128214, "delta_pct_ejecucion": -0.56 }
@@ -302,8 +305,10 @@ Con datos:
   "entidad": { "codigo": "300757", "nombre": "…", "ambito": "distrital",
                "ambito_nombre": "Municipalidad distrital", "ubigeo_distrito": "080910",
                "distrito": "PICHARI", "provincia": "LA CONVENCION", "sin_territorio": false },
-  "anio": 2026, "corte": "2026-06", "es_parcial": true, "fuente": "…",
-  "serie": [ { "anio": 2022, "corte": "anual", "es_parcial": false, "…": "los mismos derivados" } ],
+  "anio": 2026, "corte": "2026-06", "corte_legible": "junio de 2026",
+  "es_parcial": true, "en_curso": true, "fuente": "…",
+  "serie": [ { "anio": 2022, "corte": "anual", "corte_legible": "", "es_parcial": false,
+               "en_curso": false, "…": "los mismos derivados" } ],
   "procesos": [ … ], "sin_clasificar": { … },
   "actividades": [ { "codigo": "2534780", "nombre": "CREACION DEL SERVICIO…",
                      "origen": "proyecto", "proceso": "Prevención y reducción",
@@ -316,10 +321,10 @@ La `serie` **omite los ejercicios sin presupuesto** en vez de rellenarlos con ce
 
 Cinco reglas del payload que la interfaz no puede reinventar:
 
-- **`es_parcial` y `corte` viajan con el dato**, en la raíz y en cada punto de `tendencia`. Un % de ejecución de medio año se calcula contra un PIM anual: cualquier cliente que lo dibuje tiene que poder advertirlo.
+- **Los cinco campos que identifican el ejercicio viajan con el dato**, en la raíz y en cada punto de `tendencia`, `ejercicios`, `comparacion` y `serie`. Salen todos de `consultas.datos_ejercicio()`, que es lo que impide que un payload se quede sin uno. `es_parcial` y `corte` dicen qué **no** es el dato —un % de ejecución de medio año se calcula contra un PIM anual, y cualquier cliente que lo dibuje tiene que poder advertirlo—; **`en_curso` y `corte_legible` dicen qué es**, que es lo que la pantalla no podía decir sin deducirlo por descarte. **`en_curso` no es un alias de `es_parcial`**: un corte a junio de un año ya pasado es parcial sin estar en curso, y llamarlo «en curso» sería afirmar algo falso.
 - **Un porcentaje que no se puede calcular es `null`, no `0`.** Una municipalidad sin total institucional no tiene un 0 % de su presupuesto en el 0068.
 - **Los importes institucionales de `agregados` y su porcentaje salen del mismo universo**: solo las entidades que tienen ese dato. Con el numerador de las 116 y el denominador de las 114 que tienen total, el porcentaje saldría inflado sin que nada lo dijera, y publicar un total institucional que no cuadre con el porcentaje de al lado es el mismo problema por otra vía. Por eso `entidades_con_institucional` viaja junto a las tres cifras: es su rótulo. Sin ninguna entidad con dato, los tres son `null` y no cero.
-- **`comparacion.comparable`** es `false` cuando los dos ejercicios tienen cortes distintos. El Δ de % de ejecución se sirve igual —así se decidió (ADR-D5)— pero nadie debe pintarlo sin la marca: un 47.7 % de medio año contra un 86.4 % de año cerrado no es una caída. Las variaciones de PIA, PIM y devengado sí son comparables.
+- **`comparacion.comparable`** es `false` cuando los dos ejercicios tienen cortes distintos. El Δ de % de ejecución se sirve igual —así se decidió (ADR-D5)— pero nadie debe pintarlo sin la marca: un 47.7 % de medio año contra un 86.4 % de un año completo no es una caída. Las variaciones de PIA, PIM y devengado sí son comparables.
 - **`comparacion.sin_presupuesto`** distingue «no participó del programa ese año» de «participó con cero». En ese caso los deltas son `null`: aparecer de la nada no es no haber cambiado.
 
 ### El mapa — `GET /api/inversion/mapa/`
@@ -328,7 +333,8 @@ Alimenta el coroplético de `/inversion`, y su contrato **es ADR-D6**: se pinta 
 
 ```jsonc
 // GET /api/inversion/mapa/?anio=2026&nivel=distrital
-{ "disponible": true, "anio": 2026, "corte": "2026-06", "es_parcial": true,
+{ "disponible": true, "anio": 2026, "corte": "2026-06", "corte_legible": "junio de 2026",
+  "es_parcial": true, "en_curso": true,
   "nivel": "distrital", "ambito": "municipal",
   "filas": [ { "ubigeo": "080910", "nombre": "PICHARI", "provincia": "LA CONVENCION",
                "codigo_entidad": "300757", "entidad": "MUNICIPALIDAD DISTRITAL DE PICHARI",

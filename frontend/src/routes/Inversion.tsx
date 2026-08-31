@@ -16,6 +16,12 @@ import type {
   MetricaMapa,
 } from "@/lib/types";
 import { formatNumber, formatPct, formatSoles } from "@/lib/semaforo";
+import {
+  PIE_EJERCICIO_PARCIAL,
+  estadoEjercicio,
+  etiquetaEjercicio,
+  mesDelCorte,
+} from "@/lib/inversion";
 import EmptyState from "@/components/EmptyState";
 import KPI from "@/components/KPI";
 import MapaInversion from "@/components/MapaInversion";
@@ -137,6 +143,14 @@ export default function InversionView() {
   const d = datos;
   const a = d.agregados;
   const comparacion = d.comparacion;
+  // Nunca dice «toda la región» mientras hay una provincia filtrada: el catálogo puede no haber
+  // llegado todavía, y equivocar el ámbito es peor que nombrarlo de forma genérica.
+  const nombreProvincia = provincias.find((p) => p.ubigeo === provincia)?.nombre;
+  const ambitoTexto = !provincia
+    ? "todas las municipalidades de la región Cusco"
+    : nombreProvincia
+      ? `las municipalidades de la provincia de ${nombreProvincia}`
+      : "las municipalidades de la provincia elegida";
   const urlExport = urlApi("/inversion/export.xlsx", {
     anio: d.anio,
     provincia: provincia || undefined,
@@ -207,19 +221,28 @@ export default function InversionView() {
           </BotonVista>
         </div>
 
+        {/* Para qué sirve la pestaña, antes de pedir el segundo año. Hasta aquí no lo decía
+            nada: al entrar solo aparecía «Elige un ejercicio para comparar», que dice cómo
+            usarla pero no qué se gana usándola. */}
+        {comparando && (
+          <p className="text-sm text-ink-600 max-w-2xl mb-6">
+            Enfrenta dos ejercicios <strong>municipalidad por municipalidad</strong>: cuánto subió
+            o bajó su PIM, cuánto más o menos devengó, y quién entró o salió del programa. La
+            tendencia del tablero ya da el total de la región; esto es lo que en ella no se ve.
+          </p>
+        )}
+
         <section className="flex flex-wrap items-end gap-4 mb-6">
           <label className="text-sm">
             <span className="block text-ink-600 mb-1">Ejercicio</span>
             <select
               value={d.anio}
               onChange={(e) => ponerParam("anio", e.target.value)}
+              title="Sin elegir nada se muestra el ejercicio publicado más reciente."
               className="control py-1.5"
             >
               {d.ejercicios.map((e) => (
-                <option key={e.anio} value={e.anio}>
-                  {e.anio}
-                  {e.es_parcial ? ` (corte ${e.corte})` : ""}
-                </option>
+                <option key={e.anio} value={e.anio}>{etiquetaEjercicio(e)}</option>
               ))}
             </select>
           </label>
@@ -236,10 +259,7 @@ export default function InversionView() {
                 {d.ejercicios
                   .filter((e) => e.anio !== d.anio)
                   .map((e) => (
-                    <option key={e.anio} value={e.anio}>
-                      {e.anio}
-                      {e.es_parcial ? ` (corte ${e.corte})` : ""}
-                    </option>
+                    <option key={e.anio} value={e.anio}>{etiquetaEjercicio(e)}</option>
                   ))}
               </select>
             </label>
@@ -259,18 +279,34 @@ export default function InversionView() {
             </select>
           </label>
 
+          {/* Qué se está viendo, no solo con qué unidad. Sin filtros la página servía el
+              ejercicio más reciente y toda la región sin decirlo en ninguna parte: el
+              encabezado ponía «ejercicio 2026» y nadie declaraba que era un valor por defecto
+              ni cuál era el ámbito territorial. La tabla de cabecera del PDF ya lo hacía. */}
           <p className="text-xs text-ink-600 max-w-md">
-            Unidad: <strong>municipalidad</strong> ({a.entidades_con_presupuesto} de{" "}
-            {a.entidades_en_ambito} con presupuesto del 0068). Fuente: {d.fuente}.
+            Viendo <strong>{ambitoTexto}</strong> ({a.entidades_con_presupuesto} de{" "}
+            {a.entidades_en_ambito} con presupuesto del 0068), ejercicio {d.anio}
+            {d.es_parcial ? ` al corte de ${mesDelCorte(d)}` : ""}. Unidad: la municipalidad
+            (entidad ejecutora), no el distrito. Fuente: {d.fuente}.
           </p>
         </section>
 
         {/* El corte parcial se avisa donde se leen las cifras, no en una nota al pie: el % de
-            ejecución de medio año se calcula contra un PIM anual. */}
+            ejecución de medio año se calcula contra un PIM anual.
+
+            Y abre diciendo QUÉ ES el ejercicio, no con qué no se compara. Antes solo estaba la
+            advertencia, que obliga a saber qué es un «ejercicio cerrado» para deducir por
+            descarte que 2026 es el año corriente. El PDF ya lo decía bien. */}
         {d.es_parcial && (
           <p className="mb-6 rounded-lg border border-level-2/40 bg-level-2/10 px-4 py-3 text-sm text-yellow-900">
-            <strong>Corte a {d.corte}.</strong> El devengado no cubre el año completo, así que su
-            porcentaje de ejecución no es comparable con el de un ejercicio cerrado.
+            <strong>
+              Ejercicio {d.anio}, {estadoEjercicio(d)}
+            </strong>
+            {d.corte_legible ? ` — datos al corte de ${d.corte_legible}.` : "."} El devengado no
+            cubre el año completo, pero el porcentaje de ejecución se calcula contra el PIM de
+            todo el año: {a.pct_ejecucion === null ? "un 47 %" : `un ${formatPct(a.pct_ejecucion)}`}{" "}
+            a mitad de año no es media ejecución perdida, y no se puede comparar con el de un año
+            completo.
           </p>
         )}
 
@@ -454,10 +490,7 @@ export default function InversionView() {
                 </table>
               </div>
               {d.tendencia.some((t) => t.es_parcial) && (
-                <p className="text-xs text-ink-600 mt-3">
-                  * Ejercicio con corte parcial: el devengado no cubre el año completo, así que su
-                  % de ejecución no se compara con el de un año cerrado.
-                </p>
+                <p className="text-xs text-ink-600 mt-3">{PIE_EJERCICIO_PARCIAL}</p>
               )}
             </section>
 

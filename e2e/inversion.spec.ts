@@ -78,10 +78,16 @@ test.describe("Inversión (PP 0068)", () => {
     expect(await filas.count()).toBeGreaterThan(1);
 
     // Un corte a mitad de año tiene que avisarlo en pantalla: su % de ejecución se calcula
-    // contra un PIM anual y sin el aviso se lee como una caída de la ejecución.
+    // contra un PIM anual y sin el aviso se lee como una caída de la ejecución. Y el aviso
+    // tiene que NOMBRAR el ejercicio, no solo decir con qué no se compara: la versión anterior
+    // obligaba a saber qué es un «ejercicio cerrado» para deducir por descarte cuál se mira.
     if (cuerpo.es_parcial) {
-      await expect(page.getByText(new RegExp(`Corte a ${cuerpo.corte}`, "i"))).toBeVisible();
+      const estado = cuerpo.en_curso ? "año fiscal en curso" : "datos parciales";
+      await expect(page.getByText(new RegExp(`Ejercicio ${cuerpo.anio}, ${estado}`, "i"))).toBeVisible();
+      await expect(page.getByText(new RegExp(cuerpo.corte_legible, "i")).first()).toBeVisible();
     }
+    // La jerga contable no vuelve por la puerta de atrás en el siguiente retoque de copy.
+    await expect(page.getByText(/\bcerrado\b/i)).toHaveCount(0);
 
     expect(errores, `errores en consola:\n${errores.join("\n")}`).toEqual([]);
   });
@@ -167,7 +173,7 @@ test.describe("Inversión (PP 0068)", () => {
     // El PIA es la tercera serie: sin él, la distancia hasta el PIM —la variación— no se ve.
     await expect(cuadro.getByText("PIA", { exact: true }).first()).toBeVisible();
     if (cuerpo.tendencia.some((t: { es_parcial: boolean }) => t.es_parcial)) {
-      await expect(cuadro.getByText(/^\* Ejercicio con corte parcial/)).toBeVisible();
+      await expect(cuadro.getByText(/^\* Ejercicio en curso o con corte parcial/)).toBeVisible();
     }
   });
 
@@ -209,6 +215,38 @@ test.describe("Inversión (PP 0068)", () => {
     await expect(
       page.getByText(/no (se )?(encontr|existe)|no disponible|404/i).first(),
     ).toBeVisible();
+  });
+
+  test("declara qué está viendo cuando no se ha filtrado nada", async ({ page }) => {
+    // Sin filtros la página sirve el ejercicio publicado más reciente y TODA la región, y no lo
+    // decía en ninguna parte: el encabezado ponía «ejercicio 2026» sin declarar que era un valor
+    // por defecto ni cuál era el ámbito territorial. Un total de región leído como el de una
+    // provincia no falla, solo es falso.
+    const cuerpo = await abrir(page, "/inversion");
+    test.skip(!cuerpo.disponible, "sin ejercicio publicado");
+
+    await expect(page.getByText(/todas las municipalidades de la región Cusco/i)).toBeVisible();
+    await expect(page.getByText(new RegExp(`ejercicio ${cuerpo.anio}`, "i")).first()).toBeVisible();
+
+    // Con una provincia puesta, el ámbito cambia de nombre. Lo que nunca puede pasar es que
+    // siga diciendo «toda la región» mientras la tabla enseña una sola provincia.
+    const provincia = await page.locator("select").nth(1).locator("option").nth(1).getAttribute("value");
+    test.skip(!provincia, "el catálogo de provincias no llegó");
+    await irEsperando(page, `/inversion?provincia=${provincia}`, API_TABLERO);
+
+    await expect(page.getByText(/las municipalidades de la provincia de/i)).toBeVisible();
+    await expect(page.getByText(/todas las municipalidades de la región Cusco/i)).toHaveCount(0);
+  });
+
+  test("comparar ejercicios dice para qué sirve antes de pedir el segundo año", async ({ page }) => {
+    // Al entrar solo estaba «Elige un ejercicio para comparar», que explica cómo usar la pestaña
+    // pero no qué se gana usándola: la tendencia del tablero ya da el total de la región, y lo
+    // que esta vista añade es el detalle por municipalidad.
+    const cuerpo = await abrir(page, "/inversion?vista=comparar");
+    test.skip(!cuerpo.disponible, "sin ejercicio publicado");
+
+    await expect(page.getByText(/municipalidad por municipalidad/i)).toBeVisible();
+    await expect(page.getByText(/qui.n entr. o sali. del programa/i)).toBeVisible();
   });
 
   test("comparar ejercicios advierte cuando los cortes no son comparables", async ({ page }) => {

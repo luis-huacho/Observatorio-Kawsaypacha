@@ -67,6 +67,27 @@ def ejercicio_para(anio=None) -> Ejercicio | None:
     return visibles.order_by("-anio").first()
 
 
+def datos_ejercicio(ejercicio: Ejercicio) -> dict:
+    """Cómo se identifica un ejercicio en cualquier payload: año, corte y **cómo se llama**.
+
+    Iba copiado a mano en siete sitios —la raíz del tablero, el selector, la tendencia, las dos
+    caras de la comparación, la ficha de la municipalidad y el contexto del PDF— y añadir una
+    clave a seis de las siete es la forma segura de que un cliente se quede sin poder nombrar el
+    ejercicio que está pintando.
+
+    `es_parcial` dice qué **no** es el dato (su % de ejecución no se compara con el de un año
+    completo); `en_curso` y `corte_legible` dicen qué **es**. La pantalla tenía solo lo primero y
+    obligaba a deducir por descarte que 2026 es el año corriente.
+    """
+    return {
+        "anio": ejercicio.anio,
+        "corte": ejercicio.corte,
+        "corte_legible": ejercicio.corte_legible,
+        "es_parcial": ejercicio.es_parcial,
+        "en_curso": ejercicio.en_curso,
+    }
+
+
 def entidades(ambito: str = AMBITO_POR_DEFECTO, provincia: str = ""):
     """Queryset de entidades del ámbito pedido, opcionalmente acotado a una provincia."""
     queryset = EntidadEjecutora.objects.filter(
@@ -231,9 +252,7 @@ def comparacion_fila(presupuesto: PresupuestoEntidad, otro: PresupuestoEntidad |
     comparable = son_comparables(presupuesto.ejercicio, ejercicio_comparado)
     if otro is None:
         return {
-            "anio": ejercicio_comparado.anio,
-            "corte": ejercicio_comparado.corte,
-            "es_parcial": ejercicio_comparado.es_parcial,
+            **datos_ejercicio(ejercicio_comparado),
             "comparable": comparable,
             "sin_presupuesto": True,
             "pia": None, "pim": None, "devengado": None, "pct_ejecucion": None,
@@ -244,9 +263,7 @@ def comparacion_fila(presupuesto: PresupuestoEntidad, otro: PresupuestoEntidad |
     pct_actual = _porcentaje(presupuesto.devengado, presupuesto.pim)
     pct_otro = _porcentaje(otro.devengado, otro.pim)
     return {
-        "anio": ejercicio_comparado.anio,
-        "corte": ejercicio_comparado.corte,
-        "es_parcial": ejercicio_comparado.es_parcial,
+        **datos_ejercicio(ejercicio_comparado),
         "comparable": comparable,
         "sin_presupuesto": False,
         "pia": float(otro.pia),
@@ -270,9 +287,7 @@ def comparacion_agregada(ejercicio, ejercicio_comparado, ambito=AMBITO_POR_DEFEC
     otros = agregados(ejercicio_comparado, ambito, provincia)
     actuales = agregados(ejercicio, ambito, provincia)
     return {
-        "anio": ejercicio_comparado.anio,
-        "corte": ejercicio_comparado.corte,
-        "es_parcial": ejercicio_comparado.es_parcial,
+        **datos_ejercicio(ejercicio_comparado),
         "comparable": son_comparables(ejercicio, ejercicio_comparado),
         "agregados": otros,
         "deltas": {
@@ -457,9 +472,7 @@ def tendencia(ambito=AMBITO_POR_DEFECTO, provincia="") -> list[dict]:
     for ejercicio in Ejercicio.objects.filter(visible=True).order_by("anio"):
         fila = por_anio.get(ejercicio.anio, {})
         serie.append({
-            "anio": ejercicio.anio,
-            "corte": ejercicio.corte,
-            "es_parcial": ejercicio.es_parcial,
+            **datos_ejercicio(ejercicio),
             "fuente": ejercicio.get_fuente_display(),
             "pia": float(fila.get("pia", CERO)),
             "pim": float(fila.get("pim", CERO)),
@@ -488,9 +501,7 @@ def serie_entidad(entidad: EntidadEjecutora) -> list[dict]:
         if presupuesto is None:
             continue
         serie.append({
-            "anio": ejercicio.anio,
-            "corte": ejercicio.corte,
-            "es_parcial": ejercicio.es_parcial,
+            **datos_ejercicio(ejercicio),
             "fuente": ejercicio.get_fuente_display(),
             **{
                 clave: fila_entidad(presupuesto)[clave]

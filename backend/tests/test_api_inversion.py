@@ -88,6 +88,77 @@ def test_declara_el_corte_parcial_y_la_fuente(api, inversion_cargada):
     ]
 
 
+def test_el_payload_nombra_el_ejercicio_en_curso_y_su_corte_en_palabras(api, inversion_cargada):
+    """`es_parcial` dice qué NO es el dato; `en_curso` y `corte_legible` dicen qué ES.
+
+    La pantalla solo tenía la advertencia («no comparable con un ejercicio cerrado») y de ahí
+    había que deducir por descarte que 2026 es el año en curso. La etiqueta la calcula el
+    servidor para que pantalla, PDF y cualquier otro cliente digan lo mismo.
+    """
+    cuerpo = api.get("/api/inversion/?anio=2026").json()
+
+    assert cuerpo["en_curso"] is True
+    assert cuerpo["corte_legible"] == "junio de 2026"
+
+    cerrado = api.get("/api/inversion/?anio=2025").json()
+    assert cerrado["en_curso"] is False
+    # Un año completo no tiene corte que nombrar: cadena vacía, no "anual" ni None.
+    assert cerrado["corte_legible"] == ""
+
+
+def test_un_corte_parcial_de_un_anio_pasado_no_esta_en_curso(api, inversion_cargada):
+    """La trampa que obliga a que `en_curso` sea propia y no un alias de `es_parcial`.
+
+    «Parcial» es *el devengado no cubre el año*; «en curso» es *el año no ha terminado*. Hoy
+    coinciden porque el único parcial es el del año corriente, pero el día que PREDES cargue un
+    corte a junio de un año ya pasado, llamarlo «en curso» sería mentir en pantalla y en el PDF.
+    """
+    from apps.inversion.models import Ejercicio
+
+    Ejercicio.objects.filter(anio=2025).update(es_parcial=True, corte="2025-06")
+
+    cuerpo = api.get("/api/inversion/?anio=2025").json()
+
+    assert cuerpo["es_parcial"] is True
+    assert cuerpo["en_curso"] is False
+    assert cuerpo["corte_legible"] == "junio de 2025"
+
+
+def test_un_corte_con_formato_inesperado_no_revienta(api, inversion_cargada):
+    """`corte` es un CharField libre que llena una persona en el admin.
+
+    Se prefiere devolver el valor crudo antes que una excepción: el peor caso de una etiqueta
+    mal formateada es que se lea raro, y el de un 500 es que la ventana entera desaparezca.
+    Los 10 caracteres de `max_length` acotan el destrozo, pero no obligan al formato.
+    """
+    from apps.inversion.models import Ejercicio
+
+    Ejercicio.objects.filter(anio=2026).update(corte="jun 2026")
+
+    cuerpo = api.get("/api/inversion/?anio=2026").json()
+
+    assert cuerpo["corte_legible"] == "jun 2026"
+
+
+def test_la_etiqueta_del_corte_viaja_en_los_cinco_sitios(api, inversion_cargada):
+    """Las claves iban copiadas a mano en cinco payloads; ahora salen de un solo helper.
+
+    Si un día falta en uno, el cliente de ese punto se queda sin poder nombrar el ejercicio y
+    vuelve a la advertencia por descarte, que es justo lo que se está corrigiendo.
+    """
+    claves = {"anio", "corte", "corte_legible", "es_parcial", "en_curso"}
+
+    cuerpo = api.get("/api/inversion/?anio=2026&comparar_con=2025").json()
+    assert claves <= set(cuerpo)
+    assert all(claves <= set(e) for e in cuerpo["ejercicios"])
+    assert all(claves <= set(p) for p in cuerpo["tendencia"])
+    assert claves <= set(cuerpo["comparacion"])
+
+    ficha = api.get("/api/inversion/entidades/300684/?anio=2026").json()
+    assert claves <= set(ficha)
+    assert all(claves <= set(p) for p in ficha["serie"])
+
+
 def test_los_derivados_de_una_entidad_cuadran_a_mano(api, inversion_cargada):
     """Cusco 2026: PIA 100 000, PIM 220 000, devengado 65 000, institucional 2 200 000."""
     filas = api.get("/api/inversion/entidades/?anio=2026").json()["results"]

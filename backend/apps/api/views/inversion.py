@@ -92,11 +92,10 @@ class InversionView(APIView):
         comparado = _ejercicio_comparado(request, ejercicio)
         cuerpo = {
             "disponible": True,
-            "anio": ejercicio.anio,
-            "corte": ejercicio.corte,
             # Lo declara el payload y no una nota de la interfaz: cualquier cliente que dibuje
-            # un % de ejecución de un corte a mitad de año tiene que poder advertirlo.
-            "es_parcial": ejercicio.es_parcial,
+            # un % de ejecución de un corte a mitad de año tiene que poder advertirlo, y poder
+            # decir de qué ejercicio es sin deducirlo por descarte (`en_curso`, `corte_legible`).
+            **consultas.datos_ejercicio(ejercicio),
             "fuente": ejercicio.get_fuente_display(),
             "ambito": ambito,
             "unidad": "municipalidad (entidad ejecutora), no distrito",
@@ -104,7 +103,7 @@ class InversionView(APIView):
             **consultas.procesos(ejercicio, ambito, provincia),
             "tendencia": consultas.tendencia(ambito, provincia),
             "ejercicios": [
-                {"anio": e.anio, "corte": e.corte, "es_parcial": e.es_parcial}
+                consultas.datos_ejercicio(e)
                 for e in consultas.Ejercicio.objects.filter(visible=True).order_by("-anio")
             ],
         }
@@ -186,15 +185,13 @@ class InversionEntidadDetalleView(APIView):
                 # con datos territoriales, y la ficha lo dice en vez de callarlo.
                 "sin_territorio": entidad.sin_territorio,
             },
-            "anio": ejercicio.anio,
-            "corte": ejercicio.corte,
-            "es_parcial": ejercicio.es_parcial,
+            **consultas.datos_ejercicio(ejercicio),
             "fuente": ejercicio.get_fuente_display(),
             "serie": consultas.serie_entidad(entidad),
             **consultas.procesos(ejercicio, entidad=entidad),
             "actividades": consultas.actividades_entidad(entidad, ejercicio),
             "ejercicios": [
-                {"anio": e.anio, "corte": e.corte, "es_parcial": e.es_parcial}
+                consultas.datos_ejercicio(e)
                 for e in consultas.Ejercicio.objects.filter(visible=True).order_by("-anio")
             ],
         })
@@ -217,9 +214,7 @@ class InversionMapaView(APIView):
         ambito, provincia = _parametros(request)
         return Response({
             "disponible": True,
-            "anio": ejercicio.anio,
-            "corte": ejercicio.corte,
-            "es_parcial": ejercicio.es_parcial,
+            **consultas.datos_ejercicio(ejercicio),
             **consultas.mapa(
                 ejercicio,
                 ambito=ambito,

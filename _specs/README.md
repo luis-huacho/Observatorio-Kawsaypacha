@@ -13,6 +13,54 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 30/08/2026 — `/inversion` decía qué NO era el dato y nunca qué era
+
+La ventana del PP 0068 abría con una sola frase sobre el ejercicio que estaba mostrando: «**Corte a
+2026-06.** El devengado no cubre el año completo, así que su porcentaje de ejecución no es
+comparable con el de un **ejercicio cerrado**». Es correcta y era lo único que había. El problema es
+que **define el dato por su contrario**: obliga a saber que un «ejercicio cerrado» es un año fiscal
+terminado y liquidado para deducir, por descarte, que 2026 es el año en curso. Nunca lo decía.
+
+**El PDF ya lo decía bien, y ese es el argumento.** `reporte_inversion.html` abría con «El ejercicio
+2026 **está en curso** (corte a 2026-06)» y remataba con «un 50 % a mitad de año no es media
+ejecución perdida»; su tabla de cabecera declaraba además el ámbito («Municipal **de la región
+Cusco**»). El documento en papel estaba mejor redactado que la pantalla de la que sale. Este cambio
+sube a la pantalla lo que el reporte ya había resuelto.
+
+**«Parcial» y «en curso» no son lo mismo, y el PDF tenía ahí un fallo latente.** `es_parcial` dice
+*el devengado no cubre el año entero*; «en curso» dice *el año no ha terminado*. Hoy coinciden
+porque el único parcial es el del año corriente, y el PDF afirmaba «está en curso» sobre
+`es_parcial` a secas: el día que PREDES cargue un corte a junio de un año ya pasado, el documento
+diría en negrita algo falso. Ahora son dos propiedades de `Ejercicio` —`en_curso`
+(`es_parcial and anio >= hoy.year`) y `corte_legible` («junio de 2026»)—, **no columnas: no emiten
+migración**, y las dos viajan en el payload junto a `corte` y `es_parcial`.
+
+**El bloque que identifica un ejercicio estaba copiado a mano en siete payloads** —la raíz del
+tablero, el selector, la tendencia, las dos caras de la comparación, la ficha de la municipalidad y
+el contexto del PDF—. Añadir dos claves a seis de los siete es la forma segura de que un cliente se
+quede sin poder nombrar lo que pinta, así que salen de un solo `consultas.datos_ejercicio()`, y hay
+una prueba que recorre los cinco sitios del API. En el frontend el espejo es
+`InversionEjercicio`, del que ahora derivan los siete tipos por intersección.
+
+**Y de paso, dos preguntas que la página tampoco contestaba.** Sin filtrar nada servía el ejercicio
+publicado más reciente y **toda la región Cusco** sin declararlo en ninguna parte —el encabezado
+ponía «ejercicio 2026» y nadie decía que era un valor por defecto ni cuál era el ámbito
+territorial—; ahora hay una línea de alcance con la tabla de cabecera del PDF como modelo, que
+nunca dice «toda la región» mientras hay una provincia filtrada, ni siquiera si el catálogo de
+provincias aún no ha llegado. Y la pestaña «Comparar ejercicios» solo mostraba «Elige un ejercicio
+para comparar», que explica cómo usarla pero no qué se gana: ahora dice que enfrenta los ejercicios
+**municipalidad por municipalidad**, que es justo lo que el total de la tendencia no deja ver.
+
+La palabra «cerrado» **desaparece de la interfaz** —donde hace falta el término de comparación se
+dice «un año completo» o «un año ya terminado»— y hay una aserción e2e que lo fija, porque el copy
+es lo más fácil de revertir sin querer en el siguiente retoque. Se queda en los `help_text` del
+admin, que es su público: ahí «ejercicio cerrado» es el término contable correcto, y cambiarlo
+emitiría una migración por texto.
+
+Sin ADR: no cambia ninguna decisión, corrige la redacción de una que ya estaba tomada (ADR-D5). No
+se toca ninguna cifra ni el Excel, donde `corte` es una columna de dato y `AAAA-MM` es lo que se
+quiere en una celda. Suite: **480 + 7** y **69 casos e2e** (138 corridas), en verde.
+
 ### Actualización 29/08/2026 — el sitio decía «200, aquí está» a documentos que no existen (ADR-A26)
 
 Un test externo de *agent-readiness* señaló doce carencias. Se comprobaron **las doce contra el
