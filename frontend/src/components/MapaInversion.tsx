@@ -292,7 +292,7 @@ export default function MapaInversion({
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-ink-600">
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-ink-600">
         <span className="font-semibold text-ink-900">{nombreMetrica}</span>
         {rampa.map((color, i) => (
           <span key={color} className="flex items-center gap-1.5">
@@ -314,42 +314,52 @@ export default function MapaInversion({
 
       {/* El reparto, que es lo que el color no puede enseñar: los quintiles son la escala
           correcta para un mapa, pero su último tramo se traga la cola. Va aquí y no en
-          `Inversion.tsx` para quedar pegada a la leyenda que explica, y antes de los pies, que
-          hablan de lo que NO se pinta. */}
-      <CajaDistribucion
-        caja={datos.distribucion[metrica]}
-        metrica={metrica}
-        unidad={CAPAS[datos.nivel].etiqueta.toLowerCase()}
-        etiquetaMetrica={nombreMetrica}
-      />
-      <Declaracion>{datos.distribucion[metrica].frase}</Declaracion>
+          `Inversion.tsx` para quedar pegada a la leyenda que explica, y antes del pie, que habla
+          de lo que NO se pinta.
+
+          En recuadro y con su frase DENTRO: apilado al mismo nivel que los demás párrafos, el
+          gráfico se leía como dos apartados sueltos más de una lista de ocho. El encuadre es el
+          que ya usa `FiltroTema` para un panel embebido. */}
+      <div className="mt-5 rounded-xl border border-mountain-500/25 bg-mountain-100/40 px-4 py-3.5">
+        <CajaDistribucion
+          caja={datos.distribucion[metrica]}
+          metrica={metrica}
+          unidad={CAPAS[datos.nivel].etiqueta.toLowerCase()}
+          etiquetaMetrica={nombreMetrica}
+        />
+        <Declaracion>{datos.distribucion[metrica].frase}</Declaracion>
+      </div>
 
       {metrica === "pct_ejecucion" && datos.es_parcial && (
         // Se repite aquí y no solo arriba porque este mapa se cita suelto, fuera de la página.
-        <p className="text-xs text-ink-600 mt-2 border-l-2 border-level-2 pl-3">
+        <p className="text-xs text-ink-600 mt-4 border-l-2 border-level-2 pl-3">
           El ejercicio {datos.anio} va al corte {datos.corte_legible || datos.corte}, pero el % se
           calcula contra un PIM anual: un 50 % a mitad de año no es media ejecución perdida.
         </p>
       )}
 
       {metrica !== "pct_ejecucion" && (
-        <p className="text-[11px] text-ink-600 mt-2">
+        <p className="text-[11px] text-ink-600 mt-4">
           Los cinco tramos son quintiles de esta vista: al acotar por provincia, un mismo distrito
           puede cambiar de tono.
         </p>
       )}
 
+      {/* ADR-D6: lo que el nivel no puede pintar se declara, o faltaría el 19 % del presupuesto
+          sin que nada se viera raro. Va **con su porcentaje**: un importe suelto obliga a ir a
+          buscar el total para saber si es mucho o poco.
+
+          El pie de `poligonos.motivo` que había debajo **se retiró**: la leyenda de aquí arriba
+          ya trae su cuadro blanco con «sin municipalidad (N)», y la frase solo repetía el porqué.
+          En el PDF sigue, y no es una incoherencia: la leyenda del reporte solo pinta los cinco
+          tramos de la rampa, así que allí ese párrafo es lo único que los explica. */}
       {datos.no_ubicado.entidades > 0 && (
-        <p className="text-xs text-ink-600 mt-2 border-l-2 border-earth-500 pl-3">
+        <p className="text-xs text-ink-600 mt-4 border-l-2 border-earth-500 pl-3">
           <strong className="text-ink-900">
-            {formatSoles(datos.no_ubicado[metrica === "pct_ejecucion" ? "pim" : metrica])}
+            {formatSoles(datos.no_ubicado[metrica === "pct_ejecucion" ? "pim" : metrica])} (
+            {formatPct(datos.no_ubicado.pct[metrica === "pct_ejecucion" ? "pim" : metrica])})
           </strong>{" "}
-          no aparecen en el mapa. {datos.no_ubicado.motivo}
-        </p>
-      )}
-      {datos.poligonos.sin_dato > 0 && (
-        <p className="text-xs text-ink-600 mt-1.5 border-l-2 border-ink-300 pl-3">
-          {datos.poligonos.motivo}
+          no está en el mapa. {datos.no_ubicado.motivo}
         </p>
       )}
     </div>

@@ -783,6 +783,15 @@ def mapa(ejercicio, ambito=AMBITO_POR_DEFECTO, provincia="", nivel=NIVEL_POR_DEF
             "pim": float(resto["pim"]),
             "devengado": float(resto["devengado"]),
             "entidades": provinciales + sin_geografia,
+            # Qué PARTE del ámbito se queda fuera del mapa. Un importe suelto obliga a ir a
+            # buscar el total para saber si es mucho o poco; «el 19 % del PIM» se entiende solo.
+            # Es la contabilidad de ADR-D6 —pintado + declarado == total— en la unidad en la que
+            # se lee, y con el denominador protegido: un ámbito vacío da 0, no un 500.
+            "pct": {
+                m: (float(resto[m]) / total if (total := sum(f[m] for f in filas) + float(resto[m]))
+                    else 0.0)
+                for m in ("pia", "pim", "devengado")
+            },
             "motivo": _motivo_no_ubicado(nivel, provinciales, sin_geografia),
         },
         "poligonos": {
@@ -801,21 +810,23 @@ def _motivo_no_ubicado(nivel: str, provinciales: int, sin_geografia: int) -> str
     """
     if not (provinciales or sin_geografia):
         return ""
-    # Empieza por «Son de» y no por «De» porque la interfaz lo encadena tras «S/ X no aparecen
+    # Empieza por «Es de» y no por «De» porque la interfaz lo encadena tras «S/ X (19 %) no está
     # en el mapa.», y un complemento suelto tras un punto se lee como una frase partida.
+    #
+    # **Y termina diciendo dónde SÍ está ese dinero**, que es lo que el lector se pregunta y lo
+    # que hacía inútil el pie: antes cerraba justificando una decisión metodológica —«se declara
+    # aparte en vez de repartirse»—, que es información para quien programa esto, no para quien
+    # lo lee. La frase la tenía el PDF a mano en su plantilla y la pantalla no; ahora sale de
+    # aquí y la dicen los dos.
     partes = []
     if provinciales:
         cuales = "municipalidad provincial" if provinciales == 1 else "municipalidades provinciales"
-        partes.append(
-            f"{provinciales} {cuales} —su presupuesto es de toda la provincia—"
-        )
+        partes.append(f"{provinciales} {cuales}")
     if sin_geografia:
         donde = "distrito" if nivel == "distrital" else "provincia"
         cuales = "entidad" if sin_geografia == 1 else "entidades"
-        partes.append(f"{sin_geografia} {cuales} sin {donde} en el padrón")
-    return (
-        "Son de " + " y de ".join(partes) + ". Su importe se declara aparte en vez de repartirse."
-    )
+        partes.append(f"{sin_geografia} {cuales} sin {donde}")
+    return "Es de " + " y ".join(partes) + ". Sí cuenta en el total del ámbito y en la tabla."
 
 
 def sin_clasificar_pendiente() -> dict:

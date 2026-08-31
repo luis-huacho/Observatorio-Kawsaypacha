@@ -13,6 +13,46 @@ Especificaciones técnicas de la plataforma real, sucesora del prototipo aprobad
 > error, se cierra allí y entra aquí como una entrada nueva. El ciclo —severidades, la regla de
 > cierre, qué se hace al cerrar— está en **[09-errores.md](09-errores.md)**.
 
+### Actualización 31/08/2026 — la caja necesitaba aire, y los dos pies del mapa sobraban casi enteros
+
+Continuación del anterior, con la caja ya en pantalla. Tres cosas, y una de ellas la había metido yo.
+
+**El recorte.** El `viewBox` de `CajaDistribucion` medía **78 px de alto** y las etiquetas de Q1 y Q3
+tenían su línea base en **`y = 78`**, justo el borde: se veían cortadas por abajo. Un texto que se
+sale del `viewBox` **no da ningún error**, así que ahora hay una prueba e2e que comprueba que cada
+`<text>` cabe. Alto a 96.
+
+**El apiñamiento, medido.** Bajo el mapa se apilaban **ocho bloques** con huecos de 6 a 16 px, y los
+tres últimos a 8, 8 y 6. La caja no estaba enmarcada, así que se leía como dos párrafos más de la
+lista en vez de como un gráfico. Ahora va en un recuadro —el encuadre que ya usa `FiltroTema` para un
+panel embebido— **con su declaración dentro**, y quedan seis bloques con 12-20 px.
+
+**Los dos pies, y por qué la decisión no fue simétrica.** El de `poligonos.motivo` se retira: dos
+líneas más arriba la leyenda ya trae un cuadro blanco rotulado «sin municipalidad (13)», y la frase
+solo añadía el porqué. El de `no_ubicado` **se queda**, porque es la consecuencia nº 1 de ADR-D6,
+escrita como «no opcional», y sin él faltaría el **19 % del presupuesto sin que nada se viera raro**
+— que es literalmente lo que fundó ese ADR.
+
+Pero se queda **arreglado**, porque no ayudaba por una razón concreta: **no contestaba lo que
+planteaba**. Decía qué falta y de quién es, y cerraba justificando una decisión metodológica —«se
+declara aparte en vez de repartirse»—, que es información para quien programa esto, no para quien lo
+lee. Lo que uno se pregunta es *dónde está entonces ese dinero*, y **el PDF lo decía y la pantalla
+no**. Ahora sale del `motivo` que redacta el backend y lo dicen los dos, y además llega **con su
+porcentaje**: «S/ 10.350.637 **(19 %)** no está en el mapa», porque un importe suelto obliga a ir a
+buscar el total para saber si es mucho o poco. `no_ubicado.pct` viaja por métrica —19 % del PIM,
+10,7 % del PIA, 17,2 % del devengado— con el denominador protegido: un ámbito sin nada que declarar
+da 0, no un 500.
+
+**Y una corrección a mitad de camino.** El plan decía que el pie de los polígonos se quedaba en el
+PDF porque «la leyenda del reporte no tiene el cuadro de sin municipalidad». **Era falso**: lo añade
+la plantilla justo después del bucle de tramos, no `_leyenda()`, y se vio al abrir el PDF generado en
+vez de leer solo el Python. Así que sale de los dos medios. El dato sigue en el payload para un
+cliente que dibuje este mapa sin nuestra leyenda. De paso, el PDF dejó de escribir a mano «Sí están
+contados en las cifras de cabecera y en la tabla» —ya entra en el `motivo`— y su párrafo de quintiles
+recibió el mismo recorte que el de la pantalla.
+
+Suite: **520 + 7** y **81 casos e2e** (162 corridas), en verde.
+
 ### Actualización 31/08/2026 — el mapa de /inversion se explicaba cuatro veces y no decía qué enseña
 
 La sección «¿Dónde está el presupuesto?» rodeaba el coroplético de **~150 palabras**: una entradilla

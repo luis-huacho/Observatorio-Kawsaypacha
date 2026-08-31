@@ -282,7 +282,7 @@ Estos cuatro archivos existían sin figurar aquí, y son justo los que encajan c
 
 ## Casos obligatorios — E2E (Playwright)
 
-Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. **79 casos, que Playwright ejecuta 158 veces** —uno por proyecto—, ~1.4 min. `npx playwright test --list` cuenta lo segundo: al escribir una cifra aquí hay que decir cuál de las dos es, o la siguiente persona la «corrige» a la otra.
+Corren contra el stack de compose ya sembrado, en dos proyectos: **escritorio** y **móvil** (Pixel 5), porque el TDR pide que el sitio sirva en campo y en campo se entra desde el teléfono. **81 casos, que Playwright ejecuta 162 veces** —uno por proyecto—, ~1.4 min. `npx playwright test --list` cuenta lo segundo: al escribir una cifra aquí hay que decir cuál de las dos es, o la siguiente persona la «corrige» a la otra.
 
 | Spec | Comprueba |
 |---|---|
@@ -351,7 +351,7 @@ Y dos cosas que las pruebas mismas enseñaron: que las dos muestras de Excel tie
 
 ## Criterio de "listo para entregar"
 
-- `pytest` completo (incluido `-m lento`) en verde: 517 + 7 pruebas.
+- `pytest` completo (incluido `-m lento`) en verde: 520 + 7 pruebas.
 - `npm run lint && npm run build` sin errores.
 - `npx playwright test` en verde **dos veces**: contra el dev server y contra el bundle servido por nginx (`E2E_URL=http://localhost`). La segunda es la que vale.
 - Las cinco comprobaciones manuales hechas y documentadas.

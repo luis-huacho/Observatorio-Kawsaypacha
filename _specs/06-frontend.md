@@ -165,6 +165,19 @@ se pinta y ninguno sobre lo que sí. Ahora lleva la suya, y debajo un **diagrama
 Los cinco números **no se calculan aquí**: vienen del payload junto a `cortes` (ver 02). `Declaracion`
 salió de `Inversion.tsx` a `components/` al ganar un quinto usuario.
 
+**La caja va enmarcada y con su frase dentro**, con el encuadre que ya usa `FiltroTema` para un panel
+embebido. Apilada al mismo nivel que los demás párrafos se leía como dos apartados sueltos más de una
+lista de ocho bloques separados por 6-16 px; ahora son seis, con 12-20. Y el `viewBox` mide 96 y no
+78: **las etiquetas de los cuartiles tenían su línea base justo en el borde y se veían cortadas**, que
+es un fallo que no da ningún error — lo vigila una prueba e2e que comprueba que cada `<text>` cabe.
+
+Bajo el mapa queda **un solo pie**, el de ADR-D6, y **con su porcentaje**: «S/ 10.350.637 (19 %) no
+está en el mapa. Es de 13 municipalidades provinciales y 4 entidades sin distrito. Sí cuenta en el
+total del ámbito y en la tabla.» Cerraba justificando una decisión metodológica —«se declara aparte en
+vez de repartirse»— en vez de contestar lo que el lector se pregunta, que es dónde está entonces ese
+dinero. El pie de `poligonos.motivo` **se retiró de los dos medios**: pantalla y PDF traen en su
+leyenda el cuadro blanco «sin municipalidad (N)», así que la frase solo repetía el porqué.
+
 ## Descargas (`BotonDescarga`)
 
 Las cuatro descargas del sitio —ayuda memoria y Excel de `/peligros`, reporte y Excel de

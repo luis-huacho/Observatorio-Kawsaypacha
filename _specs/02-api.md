@@ -390,7 +390,9 @@ Alimenta el coroplético de `/inversion`, y su contrato **es ADR-D6**: se pinta 
                              "frase": "La mitad de los 99 distritos está entre…" },
                     "pia": {…}, "devengado": {…}, "pct_ejecucion": {…} },
   "no_ubicado": { "pia": …, "pim": 10350637, "devengado": …, "entidades": 17,
-                  "motivo": "Son de 13 municipalidades provinciales —su presupuesto es de…" },
+                  "pct": { "pia": 0.107, "pim": 0.190, "devengado": 0.172 },
+                  "motivo": "Es de 13 municipalidades provinciales y 4 entidades sin distrito.
+                             Sí cuenta en el total del ámbito y en la tabla." },
   "poligonos": { "pintados": 99, "sin_dato": 13,
                  "motivo": "Sin municipalidad distrital con presupuesto este año…" } }
 ```
@@ -400,7 +402,8 @@ Cinco cosas que no son detalles de implementación:
 - **`ubigeo` casa directamente con el tile**: seis dígitos = `UBIGEO` de `limites-distritales`, cuatro = `IDPROV` de `limites-provinciales`. No hay traducción intermedia.
 - **Las cuatro métricas viajan en cada fila.** Conmutar entre PIA, PIM, devengado y % de ejecución no dispara otra petición, así que dos métricas del mismo mapa no pueden acabar viniendo de ejercicios distintos si alguien cambia la visibilidad entre medias.
 - **`suma(filas) + no_ubicado == el total del ámbito`, siempre.** Es la contabilidad completa del mapa, y hay dos pruebas que la fijan: un mapa al que le falta dinero se ve exactamente igual que uno correcto.
-- **`poligonos.sin_dato`** cuenta los polígonos sin municipalidad —a nivel distrital son las 13 capitales de provincia— y es distinto de una municipalidad con PIM cero, que **sí** aparece en `filas` con sus ceros y su `pct_ejecucion: null`.
+- **`poligonos.sin_dato`** cuenta los polígonos sin municipalidad —a nivel distrital son las 13 capitales de provincia— y es distinto de una municipalidad con PIM cero, que **sí** aparece en `filas` con sus ceros y su `pct_ejecucion: null`. Su `motivo` **ya no lo pinta nadie**: tanto la pantalla como el PDF traen en la leyenda un cuadro blanco rotulado «sin municipalidad (N)», y la frase solo repetía el porqué. Sigue en el payload para un cliente que dibuje este mapa sin esa leyenda.
+- **`no_ubicado.pct` dice qué PARTE del ámbito se queda fuera**, una por métrica de dinero (19 % del PIM en 2026, 10,7 % del PIA, 17,2 % del devengado). Un importe suelto obliga a ir a buscar el total para saber si es mucho o poco; es la contabilidad de ADR-D6 —pintado + declarado == total— dicha en la unidad en la que se lee. Con un ámbito sin nada que declarar vale **0, no una división por cero**. Y el `motivo` termina diciendo **dónde sí está contado** ese dinero, en vez de justificar la decisión de no repartirlo: era lo que el lector se preguntaba y lo que hacía inútil el pie.
 - **`distribucion` es lo que el coroplético no puede enseñar.** Los quintiles son la escala correcta para un mapa, pero su último tramo se traga toda la cola: con el PIM distrital de 2026 arranca en S/ 216.445, así que un distrito de 220 mil y otro de 9,3 millones **se pintan del mismo color**. La mediana es S/ 73.510 y el máximo, 127 veces más. Los cinco números salen del servidor por lo mismo que `cortes` y los dos `motivo` (ADR-D6): dos cálculos de la misma mediana acaban discrepando. Tres reglas: los **cuartiles van por índice, sin interpolar**, igual que `cortes` —son estadísticos distintos y no pueden coincidir, pero con métodos distintos nadie sabría si la diferencia es del dato o del método—; los **ceros cuentan para el cuartil y se cuentan aparte**, porque no caben en el eje logarítmico que el cliente dibuja y hay que poder declararlos; y **`pct_ejecucion` descarta los nulos**, que no son un 0 %. Las cuatro métricas viajan juntas por el mismo motivo que las de `filas`.
 
 ### El reporte — `GET /api/inversion/reporte.pdf`

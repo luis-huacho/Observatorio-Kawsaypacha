@@ -241,7 +241,10 @@ test.describe("Inversión (PP 0068)", () => {
     // ADR-D6: a nivel distrital las municipalidades provinciales no se pintan, y su importe se
     // declara. Que el pie exista es lo que impide que el mapa se lea como el total del programa.
     expect(mapa.no_ubicado.entidades).toBeGreaterThan(0);
-    await expect(visor.getByText(/no aparecen en el mapa/i)).toBeVisible();
+    // Con su PORCENTAJE: un importe suelto obliga a ir a buscar el total para saber si es mucho.
+    await expect(visor.getByText(/no está en el mapa/i)).toBeVisible();
+    await expect(visor.getByText(/S\/[\s\d,.]+\(\d+(\.\d+)?%\)/)).toBeVisible();
+    // El dato de los polígonos en blanco vive en la LEYENDA, que es donde se mira el color.
     await expect(visor.getByText(/sin municipalidad \(\d+\)/)).toBeVisible();
   });
 
@@ -269,6 +272,51 @@ test.describe("Inversión (PP 0068)", () => {
     }
     // Y la frase, que es lo que se copia a un informe.
     await expect(visor.getByText(/La mitad de los \d+ distritos está entre/)).toBeVisible();
+  });
+
+  test("la caja va enmarcada, con su frase dentro y sin cifras cortadas", async ({ page }) => {
+    // Apilada al mismo nivel que los demás párrafos, la caja se leía como dos apartados sueltos
+    // más de una lista de ocho bloques con 6-16 px entre ellos.
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    const recuadro = visor.locator("div.rounded-xl:has(figure svg)");
+    await expect(recuadro).toBeVisible();
+    // La frase que describe la caja va CON la caja, no suelta entre los pies del mapa.
+    await expect(recuadro.getByText(/La mitad de los \d+ distritos está entre/)).toBeVisible();
+
+    // Las etiquetas de los cuartiles se dibujan por debajo de la caja, y su línea base caía
+    // justo en el borde del `viewBox`: se veían cortadas. Un texto que se sale **no da ningún
+    // error**, así que esto es lo único que lo vigila.
+    const dentro = await recuadro.locator("svg").evaluate((svg) => {
+      const alto = Number(svg.getAttribute("viewBox").split(" ")[3]);
+      return [...svg.querySelectorAll("text")].every(
+        (t) => Number(t.getAttribute("y")) + 4 <= alto
+      );
+    });
+    expect(dentro, "una etiqueta del diagrama se sale del viewBox").toBe(true);
+  });
+
+  test("el pie que repetía la leyenda ya no está en pantalla", async ({ page }) => {
+    // «Sin municipalidad distrital con presupuesto este año…» iba dos líneas debajo de un cuadro
+    // blanco rotulado «sin municipalidad (13)». Se retiró la frase, **no el dato**.
+    //
+    // Sale también del PDF, por lo mismo: su leyenda **sí** trae el cuadro «sin municipalidad»
+    // —lo añade la plantilla, no `_leyenda()`—, así que allí la frase también repetía. Lo fija
+    // `test_el_reporte_dice_una_sola_vez_donde_esta_el_dinero_que_no_pinta`.
+    const respuesta = esperarApi(page, API_MAPA);
+    await page.goto("/inversion");
+    const mapa = await (await respuesta).json();
+    test.skip(!mapa.disponible, "sin ejercicio publicado");
+
+    const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
+    await expect(visor.getByText(/Sin municipalidad distrital/i)).toHaveCount(0);
+    await expect(visor.getByText(/sin municipalidad \(\d+\)/)).toBeVisible();
+    // Y el payload lo sigue trayendo, que es de donde lo toma el papel.
+    expect(mapa.poligonos.motivo).toBeTruthy();
   });
 
   test("el porcentaje de ejecución cambia la caja de escala y de unidades", async ({ page }) => {
@@ -336,7 +384,7 @@ test.describe("Inversión (PP 0068)", () => {
     // cubre el ámbito entero y el pie de «no aparecen» desaparece.
     expect(mapa.no_ubicado.entidades).toBe(0);
     const visor = page.locator("section", { hasText: /Dónde está el presupuesto/ }).first();
-    await expect(visor.getByText(/no aparecen en el mapa/i)).toHaveCount(0);
+    await expect(visor.getByText(/no está en el mapa/i)).toHaveCount(0);
   });
 
   test("una municipalidad que no existe no deja la página en blanco", async ({ page }) => {

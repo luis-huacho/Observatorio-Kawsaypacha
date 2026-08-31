@@ -720,6 +720,36 @@ def test_el_mapa_publica_la_distribucion_de_las_cuatro_metricas(api, inversion_c
     assert pim["frase"]
 
 
+def test_el_mapa_dice_que_PORCENTAJE_del_ambito_no_esta_pintado(api, inversion_cargada):
+    """Un importe suelto es abstracto; el porcentaje es lo que se puede usar.
+
+    «S/ 10.350.637 no aparecen» obliga a ir a buscar el total para saber si eso es mucho o poco.
+    «El 19 % del PIM» se entiende solo, y es la misma contabilidad de ADR-D6 —lo pintado más lo
+    declarado es el total— dicha en la unidad en la que se lee.
+    """
+    cuerpo = api.get("/api/inversion/mapa/?anio=2026&nivel=distrital").json()
+    no_ubicado = cuerpo["no_ubicado"]
+
+    assert set(no_ubicado["pct"]) == {"pia", "pim", "devengado"}
+    for metrica, pct in no_ubicado["pct"].items():
+        total = sum(f[metrica] for f in cuerpo["filas"]) + no_ubicado[metrica]
+        assert pct == pytest.approx(no_ubicado[metrica] / total)
+
+
+def test_sin_nada_que_declarar_el_porcentaje_es_cero_y_no_una_division_por_cero(
+    api, inversion_cargada
+):
+    """A nivel provincial todas las municipalidades caen dentro de alguna provincia.
+
+    No hay resto que declarar, y el denominador podría ser cero en un ámbito vacío: el fallo
+    tiene que ser un 0, no un 500.
+    """
+    cuerpo = api.get("/api/inversion/mapa/?anio=2026&nivel=provincial").json()
+
+    assert cuerpo["no_ubicado"]["entidades"] == 0
+    assert set(cuerpo["no_ubicado"]["pct"].values()) == {0.0}
+
+
 def test_los_pies_del_mapa_no_dicen_dos_veces_lo_mismo(api, inversion_cargada):
     """Los 13 distritos capital salían explicados en los dos pies, con palabras distintas.
 
@@ -734,10 +764,15 @@ def test_los_pies_del_mapa_no_dicen_dos_veces_lo_mismo(api, inversion_cargada):
     # El plural entre paréntesis leía como una circular administrativa.
     assert "(es)" not in no_ubicado and "(es)" not in poligonos
     # Qué gestiona una municipalidad provincial se explica UNA vez, en el pie del dinero.
-    assert "provincia" in no_ubicado
     assert "gestiona" not in poligonos
-    assert len(no_ubicado.split()) <= 32
+    assert len(no_ubicado.split()) <= 22
     assert len(poligonos.split()) <= 20
+
+    # Terminaba justificando una decisión metodológica —«se declara aparte en vez de
+    # repartirse»— en vez de contestar lo que el lector se pregunta: si ese dinero no está en el
+    # mapa, ¿dónde está? Ahora lo dice, y es lo que hace que el pie sirva para algo.
+    assert "se declara aparte" not in no_ubicado
+    assert "en la tabla" in no_ubicado
 
 
 def test_el_mapa_se_acota_por_provincia(api, inversion_cargada):

@@ -447,6 +447,8 @@ export type InversionMapa = InversionEjercicio & {
     pim: number;
     devengado: number;
     entidades: number;
+    /** Qué PARTE del ámbito se queda fuera del mapa (0-1). Un importe suelto no dice si es mucho. */
+    pct: Record<"pia" | "pim" | "devengado", number>;
     motivo: string;
   };
   poligonos: { pintados: number; sin_dato: number; motivo: string };

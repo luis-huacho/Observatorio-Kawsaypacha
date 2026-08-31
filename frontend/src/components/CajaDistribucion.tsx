@@ -20,8 +20,14 @@ import { formatPct, formatSoles } from "@/lib/semaforo";
  * `motivo`, por lo mismo (ADR-D6): dos cálculos de la misma mediana acaban discrepando.
  */
 
-const ALTO = 78;
-const MARGEN = { izq: 8, der: 8, arriba: 26, abajo: 30 };
+/**
+ * El alto tiene que dejar sitio a las etiquetas de los cuartiles, que se dibujan POR DEBAJO de
+ * la caja: con 78 su línea base caía en `y = 78` —justo el borde del `viewBox`— y se veían
+ * cortadas. Un texto que se sale del `viewBox` **no da ningún error**, solo se ve mal, así que
+ * hay una prueba e2e que comprueba que cabe.
+ */
+const ALTO = 96;
+const MARGEN = { izq: 8, der: 8, arriba: 26, abajo: 34 };
 const ANCHO = 640;
 const EJE_Y = MARGEN.arriba + 16;
 const ALTO_CAJA = 22;
@@ -87,7 +93,7 @@ export default function CajaDistribucion({
   const medio = EJE_Y + ALTO_CAJA / 2;
 
   return (
-    <figure className="mt-4 mb-0">
+    <figure className="m-0">
       <figcaption className="text-xs text-ink-600 mb-1">
         Cómo se reparte: <strong className="text-mountain-900">{etiquetaMetrica}</strong> por{" "}
         {unidad}, {caja.n} valores
@@ -141,17 +147,17 @@ export default function CajaDistribucion({
                 fontSize="11" fill="#0F172A" fontWeight="600">
             {f(caja.mediana)}
           </text>
-          <text x={x(caja.q1)} y={EJE_Y + ALTO_CAJA + 14} textAnchor="middle"
+          <text x={x(caja.q1)} y={EJE_Y + ALTO_CAJA + 18} textAnchor="middle"
                 fontSize="10" fill="#6B7280">
             {f(caja.q1)}
           </text>
-          <text x={x(caja.q3)} y={EJE_Y + ALTO_CAJA + 14} textAnchor="middle"
+          <text x={x(caja.q3)} y={EJE_Y + ALTO_CAJA + 18} textAnchor="middle"
                 fontSize="10" fill="#6B7280">
             {f(caja.q3)}
           </text>
         </svg>
       </div>
-      <p className="text-[11px] text-ink-600 -mt-1">
+      <p className="text-[11px] text-ink-600 mt-1">
         La caja va del primer al tercer cuartil y la línea gruesa es la mediana; los círculos son
         los {unidad}s que se salen del rango (pasa el cursor para ver cuáles).
       </p>
